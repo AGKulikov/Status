@@ -32,6 +32,9 @@ final class JournalWriteQueue {
     @NonNull private final Sink sink;
     @NonNull private final ArrayDeque<Operation> pending = new ArrayDeque<>();
     private boolean drainScheduled;
+    private long droppedCount, clearedCount, scheduleErrors, sinkErrors;
+    synchronized String state() { return "pending=" + pending.size() + ", dropped=" + droppedCount
+            + ", cleared=" + clearedCount + ", schedule_errors=" + scheduleErrors + ", sink_errors=" + sinkErrors; }
 
     JournalWriteQueue(int maximumPending, @NonNull Scheduler scheduler,
                       @NonNull Sink sink) {
@@ -45,7 +48,7 @@ final class JournalWriteQueue {
         synchronized (this) {
             boolean dropped = false;
             while (pending.size() >= maximumPending) {
-                pending.removeFirst();
+                pending.removeFirst(); droppedCount++;
                 dropped = true;
             }
             // If file writes fall behind, the retained batch must replace the on-disk prefix;
@@ -64,7 +67,7 @@ final class JournalWriteQueue {
     void resetAndAppend(@NonNull String line) {
         boolean schedule;
         synchronized (this) {
-            pending.clear();
+            clearedCount += pending.size(); pending.clear();
             pending.addLast(new Operation(true, line));
             schedule = markDrainScheduledLocked();
         }
@@ -82,7 +85,7 @@ final class JournalWriteQueue {
             scheduler.execute(this::drain);
         } catch (RuntimeException ignored) {
             synchronized (this) {
-                drainScheduled = false;
+                drainScheduled = false; scheduleErrors++;
             }
         }
     }
@@ -101,6 +104,7 @@ final class JournalWriteQueue {
             try {
                 sink.write(batch);
             } catch (RuntimeException ignored) {
+                synchronized (this) { sinkErrors++; }
                 // The in-memory journal remains authoritative for the running process.
             }
         }

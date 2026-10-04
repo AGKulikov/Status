@@ -17,7 +17,7 @@ public File getCacheDir(){return new File(root,"cache");}}""",
 "android/os/SystemClock.java": """package android.os;public class SystemClock {
 static long time;public static synchronized long elapsedRealtime(){return ++time;}}""",
 "dezz/status/widget/diagnostics/DiagnosticJournal.java": """package dezz.status.widget.diagnostics;
-public class DiagnosticJournal {public static String redact(String s){return s;}
+public class DiagnosticJournal {public enum Level {INFO};public static void recordEarly(Level l,String c,String m){} public static String redact(String s){return s;}
 public static void info(String a,String b){}public static void warn(String a,String b){}
 public static void error(String a,String b,Throwable t){throw new AssertionError(t);}}""",
 "dezz/status/widget/diagnostics/PrivilegedActionCollector.java": """package dezz.status.widget.diagnostics;
@@ -49,8 +49,8 @@ public class RecorderReplay {
  static Object field(String name)throws Exception{Field f=ActionRecorder.class.getDeclaredField(name);f.setAccessible(true);return f.get(null);}
  static void exportCompleteEnvelopeWithoutChangingSource()throws Exception{
   ActionRecorder.Session s=ActionRecorder.start("test");
-  for(int i=0;i<1200;i++)ActionRecorder.record("test","EVENT",ActionRecorder.object("number",i,"text","Поездка \"2\"\nследующая строка"));
-  ActionRecorder.stop("finished");
+  for(int i=0;i<1200;i++){ActionRecorder.record("test","EVENT",ActionRecorder.object("number",i,"text","Поездка \"2\"\nследующая строка"));if(i%100==99)check(ActionRecorder.awaitPendingWrites());}
+  ActionRecorder.stop("finished");check(ActionRecorder.awaitPendingWrites());
   Path source=folder.resolve("diagnostics/actions-"+s.id+".jsonl");byte[] original=Files.readAllBytes(source);
   File exported=ActionRecorder.copyLatestForExport(context,true);check(exported!=null);
   check(Arrays.equals(original,Files.readAllBytes(source)));
@@ -60,25 +60,19 @@ public class RecorderReplay {
   try(java.util.stream.Stream<Path> files=Files.list(exported.getParentFile().toPath())){check(files.noneMatch(p->p.toString().endsWith(".snapshot")));}
   System.out.println(Base64.getEncoder().encodeToString(Files.readAllBytes(exported.toPath())));
  }
- static void observerNeverWaitsOnFileLockAndOldSessionQueueIsDiscarded()throws Exception{
+ static void observerNeverWaitsOnFileLockAndAcceptedSessionTailIsRetained()throws Exception{
   ActionRecorder.Session first=ActionRecorder.start("first");
-  ThreadPoolExecutor queue=(ThreadPoolExecutor)field("ASYNC");
-  CountDownLatch entered=new CountDownLatch(1),release=new CountDownLatch(1);
-  queue.execute(()->{entered.countDown();try{release.await();}catch(InterruptedException e){throw new AssertionError(e);}});
-  check(entered.await(2,TimeUnit.SECONDS));
-  synchronized(field("LOCK")){
-   CountDownLatch returned=new CountDownLatch(1);
-   new Thread(()->{ActionRecorder.recordAsync("test","OLD_KEY",null);returned.countDown();}).start();
-   check(returned.await(2,TimeUnit.SECONDS));
+  check(ActionRecorder.awaitPendingWrites());
+  synchronized(field("DISK_LOCK")){
+   FutureTask<Void> admission=new FutureTask<>(()->{ActionRecorder.recordAsync("test","OLD_KEY",null);return null;});
+   new Thread(admission).start();admission.get(2,TimeUnit.SECONDS);
+   ActionRecorder.stop("stop first");
   }
-  ActionRecorder.stop("stop first");ActionRecorder.Session second=ActionRecorder.start("second");
-  release.countDown();CountDownLatch drained=new CountDownLatch(1);queue.execute(drained::countDown);
-  check(drained.await(2,TimeUnit.SECONDS));
-  ActionRecorder.recordAsync("test","NEW_KEY",null);CountDownLatch done=new CountDownLatch(1);queue.execute(done::countDown);
-  check(done.await(2,TimeUnit.SECONDS));ActionRecorder.stop("stop second");
+  ActionRecorder.Session second=ActionRecorder.start("second");
+  ActionRecorder.recordAsync("test","NEW_KEY",null);ActionRecorder.stop("stop second");check(ActionRecorder.awaitPendingWrites());
   String current=Files.readString(folder.resolve("diagnostics/actions-"+second.id+".txt"));
   check(!current.contains("OLD_KEY")&&current.contains("NEW_KEY"));
-  check(!Files.readString(folder.resolve("diagnostics/actions-"+first.id+".txt")).contains("OLD_KEY"));
+  check(Files.readString(folder.resolve("diagnostics/actions-"+first.id+".txt")).contains("OLD_KEY"));
  }
  public static void main(String[] args)throws Exception{
   folder=Paths.get(args[1]);context=new android.content.Context(folder.toFile());ActionRecorder.initialize(context);
@@ -86,6 +80,11 @@ public class RecorderReplay {
  }
 }'''
 }
+
+SOURCES.update({
+"android/os/Process.java":"package android.os;public class Process {public static int myPid(){return 123;}}",
+"dezz/status/widget/diagnostics/CausalDiagnostics.java":"package dezz.status.widget.diagnostics;public class CausalDiagnostics {public static String session(){return \"test-session\";} public static String capture(String s,boolean manual){return s;}}"
+})
 
 
 class ActionRecorderAsyncTest(unittest.TestCase):
@@ -100,7 +99,7 @@ class ActionRecorderAsyncTest(unittest.TestCase):
             file.write_text(source)
             files.append(str(file))
         src = ROOT / "app/src/main/java/dezz/status/widget/diagnostics"
-        files += [str(src / name) for name in ("ActionRecorder.java", "BoundedUtf8Tail.java")]
+        files += [str(src / name) for name in ("ActionRecorder.java", "BoundedUtf8Tail.java", "DiagnosticWriteQueue.java", "DiagnosticFileSnapshot.java")]
         result = subprocess.run(["java", "com.sun.tools.javac.Main", "-d", str(cls.path), *files], capture_output=True, text=True)
         if result.returncode: raise AssertionError(result.stderr)
 
@@ -120,4 +119,4 @@ class ActionRecorderAsyncTest(unittest.TestCase):
         self.assertEqual(result["events"][-1]["event"], "SESSION_STOP")
 
     def test_nonblocking_input_and_session_fence(self):
-        self.replay("observerNeverWaitsOnFileLockAndOldSessionQueueIsDiscarded")
+        self.replay("observerNeverWaitsOnFileLockAndAcceptedSessionTailIsRetained")

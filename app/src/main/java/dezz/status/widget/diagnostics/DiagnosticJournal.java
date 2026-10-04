@@ -72,7 +72,7 @@ public final class DiagnosticJournal {
         public String readable() {
             String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
                     .format(new Date(timestamp));
-            return time + "  " + level + "  [" + component + "]  "
+            return time + "  " + level + "  [" + component + "]  [elapsed_ms=" + uptimeMs + "]  "
                     + message.replace("\\n", "\n");
         }
     }
@@ -83,10 +83,13 @@ public final class DiagnosticJournal {
     private static final Object DISK_LOCK = new Object();
     private static final long ROTATE_AT_BYTES = 1_500_000L;
     private static final int KEEP_TAIL_BYTES = 900_000;
+    private static final long INCIDENT_ROTATE_BYTES = 256_000L;
+    private static final int INCIDENT_KEEP_BYTES = 180_000;
     private static final int MAX_MESSAGE_CHARS = 16_000;
     private static final Pattern SECRET_ASSIGNMENT = Pattern.compile(
             "(?i)(token|password|passwd|secret|authorization|bearer|key)"
                     + "\\s*[:=]\\s*[^\\s,;]+");
+    private static final Pattern INTENT_BEARER = Pattern.compile("(?i)\\.x[0-9a-f]{32}\\b");
     private static final Pattern MAC_ADDRESS = Pattern.compile(
             "(?i)\\b(?:[0-9a-f]{2}:){5}[0-9a-f]{2}\\b");
     private static final Pattern LONG_CREDENTIAL = Pattern.compile(
@@ -94,17 +97,25 @@ public final class DiagnosticJournal {
 
     @Nullable private static volatile Context appContext;
     private static volatile boolean enabled;
-    private static final int MAX_EARLY_ENTRIES = 64;
+    private static final int MAX_EARLY_ENTRIES = 256;
+    private static int earlyDropped;
+    private static volatile boolean hudControlRegistered;
+    private static final java.util.concurrent.atomic.AtomicBoolean crashWriting = new java.util.concurrent.atomic.AtomicBoolean();
     private static final ArrayDeque<Entry> earlyEntries = new ArrayDeque<>();
     private static boolean initialPreferencesRead;
     private static volatile long asyncGeneration;
-    private static final AtomicInteger droppedAsyncEntries = new AtomicInteger();
+    private static final java.util.concurrent.atomic.AtomicLong diskFailures = new java.util.concurrent.atomic.AtomicLong();
+    private static volatile String lastDiskFailure = "none";
+    private static volatile long lastPersistedElapsed;
+    private static long reportedDrops;
+    private static final java.util.concurrent.atomic.AtomicLong invalidatedWrites = new java.util.concurrent.atomic.AtomicLong();
     private static final ThreadPoolExecutor ASYNC = new ThreadPoolExecutor(0, 1,
-            30L, TimeUnit.SECONDS, new ArrayBlockingQueue<>(128), task -> {
+            30L, TimeUnit.SECONDS, new ArrayBlockingQueue<>(1), task -> {
                 Thread thread = new Thread(task, "status-journal-writer");
                 thread.setDaemon(true);
                 return thread;
-            }, (task, executor) -> droppedAsyncEntries.incrementAndGet());
+            });
+    private static final DiagnosticWriteQueue WRITES = new DiagnosticWriteQueue(256, 64, ASYNC::execute);
 
     private DiagnosticJournal() {
     }
@@ -113,6 +124,19 @@ public final class DiagnosticJournal {
     public static void initializeEarly(@NonNull Context context) {
         synchronized (LOCK) {
             appContext = context.getApplicationContext();
+        }
+        if (dezz.status.widget.AppProcessPolicy.isHudProcess() && !hudControlRegistered) {
+            hudControlRegistered = true;
+            androidx.core.content.ContextCompat.registerReceiver(context, new android.content.BroadcastReceiver() {
+                @Override public void onReceive(Context owner, android.content.Intent intent) {
+                    if (intent != null && intent.getBooleanExtra("clear", false)) {
+                        try { ASYNC.execute(DiagnosticJournal::clear); }
+                        catch (java.util.concurrent.RejectedExecutionException busy) { warn("journal-control", "clear_queue_busy; retry_required"); }
+                    }
+                    else if (intent != null) setEnabled(owner, intent.getBooleanExtra("enabled", false));
+                }
+            }, new android.content.IntentFilter(context.getPackageName() + ".DIAGNOSTIC_STATE"),
+                    androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED);
         }
     }
 
@@ -123,8 +147,8 @@ public final class DiagnosticJournal {
             if (enabled) {
                 enqueueLocked(level, component, message,
                         System.currentTimeMillis(), SystemClock.elapsedRealtime());
-            } else if (!initialPreferencesRead) {
-                if (earlyEntries.size() == MAX_EARLY_ENTRIES) earlyEntries.removeFirst();
+            } else if (!initialPreferencesRead && appContext != null) {
+                if (earlyEntries.size() == MAX_EARLY_ENTRIES) { earlyEntries.removeFirst(); earlyDropped++; }
                 String safe = sanitize(message);
                 if (safe.length() > 1_000) safe = safe.substring(0, 1_000);
                 earlyEntries.addLast(new Entry(System.currentTimeMillis(),
@@ -136,6 +160,8 @@ public final class DiagnosticJournal {
     private static void finishEarlyEntriesLocked() {
         initialPreferencesRead = true;
         if (enabled) {
+            if (earlyDropped > 0) enqueueLocked(Level.WARN, "runtime", "early_events_dropped=" + earlyDropped,
+                    System.currentTimeMillis(), SystemClock.elapsedRealtime());
             for (Entry entry : earlyEntries) {
                 enqueueLocked(entry.level, entry.component, entry.message,
                         entry.timestamp, entry.uptimeMs);
@@ -146,6 +172,7 @@ public final class DiagnosticJournal {
 
     public static void initialize(@NonNull Context context, boolean initiallyEnabled) {
         synchronized (LOCK) {
+            if (initialPreferencesRead && enabled == initiallyEnabled) return;
             asyncGeneration++;
             appContext = context.getApplicationContext();
             enabled = initiallyEnabled;
@@ -157,6 +184,8 @@ public final class DiagnosticJournal {
         }
         SteeringKeyDiagnostics.debugChanged(initiallyEnabled);
         dezz.status.widget.navigation.MapStartupDiagnostics.journalChanged(initiallyEnabled);
+        CausalDiagnostics.debugChanged(initiallyEnabled);
+        MainThreadWatchdog.setEnabled(initiallyEnabled);
     }
 
     public static void setEnabled(@NonNull Context context, boolean value) {
@@ -173,6 +202,12 @@ public final class DiagnosticJournal {
         }
         SteeringKeyDiagnostics.debugChanged(value);
         dezz.status.widget.navigation.MapStartupDiagnostics.journalChanged(value);
+        CausalDiagnostics.debugChanged(value);
+        MainThreadWatchdog.setEnabled(value);
+        if (!dezz.status.widget.AppProcessPolicy.isHudProcess()) context.sendBroadcast(
+                new android.content.Intent(context.getPackageName() + ".DIAGNOSTIC_STATE")
+                        .setPackage(context.getPackageName()).addFlags(android.content.Intent.FLAG_RECEIVER_REGISTERED_ONLY)
+                        .putExtra("enabled", value));
     }
 
     public static boolean isEnabled() {
@@ -208,7 +243,8 @@ public final class DiagnosticJournal {
 
     public static void record(@NonNull Level level, @NonNull String component,
                               @NonNull String message) {
-        if (!enabled) return;
+        if (!enabled) { recordEarly(level, component, message); return; }
+        CausalDiagnostics.journalEvent(component, message);
         synchronized (LOCK) {
             if (!enabled) return;
             enqueueLocked(level, component, message,
@@ -221,18 +257,46 @@ public final class DiagnosticJournal {
         record(Level.INFO, component, message);
     }
 
+    /** Small separate tail keeps failure evidence when routine progress rotates the main log. */
+    static void recordIncident(String component, String message) {
+        if (!enabled) return;
+        final long timestamp = System.currentTimeMillis(), uptime = SystemClock.elapsedRealtime();
+        final String bounded = message.length() > MAX_MESSAGE_CHARS ? message.substring(0, MAX_MESSAGE_CHARS) : message;
+        synchronized (LOCK) {
+            final long generation = asyncGeneration;
+            WRITES.submit(true, () -> {
+                synchronized (DISK_LOCK) {
+                    if (!enabled || generation != asyncGeneration) { invalidatedWrites.incrementAndGet(); return; }
+                    appendLocked(Level.WARN, component, bounded, timestamp, uptime);
+                    File journal = journalFileLocked();
+                    if (journal == null) return;
+                    File pinned = new File(journal.getParentFile(), processFile("incidents"));
+                    rotateLocked(pinned, INCIDENT_ROTATE_BYTES, INCIDENT_KEEP_BYTES);
+                    writeLine(pinned, Level.WARN, component, bounded, timestamp, uptime);
+                }
+            });
+        }
+    }
+
+    public static String queueState() {
+        return WRITES.state() + ", invalidated_writes=" + invalidatedWrites.get() + ", disk_failures=" + diskFailures.get()
+                + ", last_disk_failure=" + lastDiskFailure + ", last_persisted_elapsed_ms=" + lastPersistedElapsed;
+    }
+
     /** LOCK protects only admission/epochs; the disk worker never takes it. */
     private static void enqueueLocked(Level level, String component, String message,
                                       long timestamp, long uptime) {
         long generation = asyncGeneration;
         String bounded = message.length() > MAX_MESSAGE_CHARS
                 ? message.substring(0, MAX_MESSAGE_CHARS) : message;
-        ASYNC.execute(() -> {
+        WRITES.submit(level == Level.WARN || level == Level.ERROR, () -> {
             synchronized (DISK_LOCK) {
-                if (!enabled || generation != asyncGeneration) return;
-                int dropped = droppedAsyncEntries.getAndSet(0);
-                if (dropped > 0) appendLocked(Level.WARN, "journal-writer",
-                        "diagnostic_queue_dropped=" + dropped);
+                if (!enabled || generation != asyncGeneration) { invalidatedWrites.incrementAndGet(); return; }
+                long dropped = WRITES.dropped();
+                if (dropped != reportedDrops) {
+                    appendLocked(Level.WARN, "journal-writer", "diagnostic_queue_dropped_total=" + dropped + "; " + queueState());
+                    reportedDrops = dropped;
+                }
                 appendLocked(level, component, bounded, timestamp, uptime);
             }
         });
@@ -240,31 +304,30 @@ public final class DiagnosticJournal {
 
     /** Crash handlers call this even if normal debug mode was disabled. */
     public static void recordCrash(@NonNull Thread thread, @NonNull Throwable error) {
-        synchronized (DISK_LOCK) {
+        // Never wait behind a stuck journal/export lock while the default crash handler waits.
+        if (!crashWriting.compareAndSet(false, true)) return;
+        try {
             StringWriter stack = new StringWriter();
             error.printStackTrace(new PrintWriter(stack));
-            appendLocked(Level.ERROR, "crash",
+            File journal = journalFileLocked();
+            if (journal == null) return;
+            File crash = new File(journal.getParentFile(), processFile("crash"));
+            writeLine(crash, Level.ERROR, "crash",
                     "uncaught exception on " + thread.getName() + "\n"
-                            + environmentLocked() + "\n" + stack);
-        }
+                            + environmentLocked() + "\n" + stack, System.currentTimeMillis(), SystemClock.elapsedRealtime(), false);
+        } finally { crashWriting.set(false); }
     }
 
     @NonNull
     public static List<Entry> read() {
-        synchronized (DISK_LOCK) {
+        {
             File file = journalFileLocked();
-            if (file == null || !file.isFile()) return Collections.emptyList();
+            if (file == null) return Collections.emptyList();
             ArrayList<Entry> result = new ArrayList<>();
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-                    new FileInputStream(file), StandardCharsets.UTF_8))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    Entry entry = parse(line);
-                    if (entry != null) result.add(entry);
-                }
-            } catch (IOException ignored) {
-                return Collections.emptyList();
+            for (String name : new String[]{"journal.log", "journal-hud.log", "crash.log", "crash-hud.log"}) {
+                result.addAll(readEntries(new File(file.getParentFile(), name)));
             }
+            result.sort(java.util.Comparator.comparingLong(entry -> entry.timestamp));
             return Collections.unmodifiableList(result);
         }
     }
@@ -285,8 +348,7 @@ public final class DiagnosticJournal {
         synchronized (DISK_LOCK) {
             synchronized (LOCK) {
                 asyncGeneration++;
-                ASYNC.getQueue().clear();
-                droppedAsyncEntries.set(0);
+                WRITES.clear();
                 // Queue the boundary before admitting new producers; the worker waits only on
                 // DISK_LOCK until deletion finishes, never the other way around.
                 if (enabled) enqueueLocked(Level.INFO, "runtime", "journal cleared",
@@ -297,21 +359,49 @@ public final class DiagnosticJournal {
                 //noinspection ResultOfMethodCallIgnored
                 file.delete();
             }
+            if (file != null) {
+                String[] names = dezz.status.widget.AppProcessPolicy.isHudProcess()
+                        ? new String[]{"incidents-hud.log", "crash-hud.log"}
+                        : new String[]{"incidents.log", "crash.log", "journal-hud.log", "incidents-hud.log", "crash-hud.log"};
+                for (String name : names) { File old = new File(file.getParentFile(), name);
+                    if (old.exists() && !old.delete()) { diskFailures.incrementAndGet(); lastDiskFailure="clear_failed"; }
+                }
+            }
         }
+        Context owner = appContext;
+        if (owner != null && !dezz.status.widget.AppProcessPolicy.isHudProcess()) owner.sendBroadcast(
+                new android.content.Intent(owner.getPackageName() + ".DIAGNOSTIC_STATE")
+                        .setPackage(owner.getPackageName()).addFlags(android.content.Intent.FLAG_RECEIVER_REGISTERED_ONLY)
+                        .putExtra("clear", true));
     }
 
     @Nullable
     public static File copyForExport(@NonNull Context context) {
-        awaitPendingWrites(); // Called by the export worker, never inside DISK_LOCK.
-        synchronized (DISK_LOCK) {
+        String snapshot = enabled ? CausalDiagnostics.snapshot() : "debug_disabled; no live state collected";
+        boolean flushed = awaitPendingWrites(); // Called by the export worker, never inside DISK_LOCK.
+        {
             File source = journalFileLocked();
-            if (source == null || !source.isFile()) return null;
+            if (source == null) return null;
             File directory = new File(context.getCacheDir(), "exports");
             if (!directory.isDirectory() && !directory.mkdirs()) return null;
             File target = new File(directory, "status-widget-debug.txt");
             try (FileOutputStream output = new FileOutputStream(target, false)) {
+                output.write(("Natro diagnostic export; session=" + CausalDiagnostics.session()
+                        + "; pid=" + android.os.Process.myPid() + "; wall_ms=" + System.currentTimeMillis()
+                        + "; elapsed_ms=" + SystemClock.elapsedRealtime() + "; uptime_ms=" + SystemClock.uptimeMillis()
+                        + "; timezone=" + java.util.TimeZone.getDefault().getID()
+                        + "; pending_writes_flushed=" + flushed + "; " + queueState()
+                        + "\n=== CURRENT OBSERVATIONS (sample ages are explicit) ===\n" + snapshot
+                        + "\n=== JOURNAL ===\n").getBytes(StandardCharsets.UTF_8));
                 for (Entry entry : read()) {
                     output.write((entry.readable() + "\n").getBytes(StandardCharsets.UTF_8));
+                }
+                for (String name : new String[]{"incidents.log", "incidents-hud.log"}) {
+                    File pinned = new File(source.getParentFile(), name);
+                    if (pinned.isFile()) {
+                        output.write(("\n=== RETAINED INCIDENTS " + name + " (may also appear above) ===\n").getBytes(StandardCharsets.UTF_8));
+                        for (Entry entry : readEntries(pinned)) output.write((entry.readable() + "\n").getBytes(StandardCharsets.UTF_8));
+                    }
                 }
                 return target;
             } catch (IOException ignored) {
@@ -321,11 +411,11 @@ public final class DiagnosticJournal {
     }
 
     /** Best-effort bounded export barrier. Queue saturation cannot turn into CallerRuns disk IO. */
-    private static void awaitPendingWrites() {
+    public static boolean awaitPendingWrites() {
         CountDownLatch barrier = new CountDownLatch(1);
-        synchronized (LOCK) { ASYNC.execute(barrier::countDown); }
-        try { barrier.await(1500L, TimeUnit.MILLISECONDS); }
-        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); }
+        synchronized (LOCK) { WRITES.submit(true, barrier::countDown); }
+        try { return barrier.await(1500L, TimeUnit.MILLISECONDS); }
+        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); return false; }
     }
 
     private static void appendLocked(@NonNull Level level, @NonNull String component,
@@ -337,17 +427,27 @@ public final class DiagnosticJournal {
     private static void appendLocked(@NonNull Level level, @NonNull String component,
                                      @NonNull String rawMessage, long timestamp, long uptimeMs) {
         File file = journalFileLocked();
-        if (file == null) return;
+        if (file == null) { diskFailures.incrementAndGet(); lastDiskFailure="destination_unavailable"; return; }
         rotateLocked(file);
-        String message = sanitize(rawMessage);
+        writeLine(file, level, component, rawMessage, timestamp, uptimeMs);
+    }
+
+    private static void writeLine(File file, Level level, String component, String rawMessage, long timestamp, long uptimeMs) {
+        writeLine(file, level, component, rawMessage, timestamp, uptimeMs, true);
+    }
+    private static void writeLine(File file, Level level, String component, String rawMessage, long timestamp, long uptimeMs, boolean append) {
+        String message = "session=" + CausalDiagnostics.session() + ", " + sanitize(rawMessage);
         String line = timestamp + "\t" + uptimeMs
                 + "\t" + level.name() + "\t" + sanitize(component)
                 + "\t" + message.replace("\r", "")
                 .replace("\n", "\\n").replace("\t", " ") + "\n";
-        try (FileOutputStream output = new FileOutputStream(file, true)) {
+        try (FileOutputStream output = new FileOutputStream(file, append)) {
             output.write(line.getBytes(StandardCharsets.UTF_8));
             output.flush();
-        } catch (IOException ignored) {
+            if (level == Level.ERROR || component.startsWith("incident")) output.getFD().sync();
+            lastPersistedElapsed = SystemClock.elapsedRealtime();
+        } catch (IOException failure) {
+            diskFailures.incrementAndGet(); lastDiskFailure = failure.getClass().getSimpleName();
         }
     }
 
@@ -357,27 +457,50 @@ public final class DiagnosticJournal {
         if (context == null) return null;
         File directory = new File(context.getFilesDir(), "diagnostics");
         if (!directory.isDirectory() && !directory.mkdirs()) return null;
-        return new File(directory, "journal.log");
+        return new File(directory, processFile("journal"));
+    }
+
+    static String processFile(String kind) {
+        return kind + (dezz.status.widget.AppProcessPolicy.isHudProcess() ? "-hud" : "") + ".log";
+    }
+
+    private static List<Entry> readEntries(File file) {
+        ArrayList<Entry> result = new ArrayList<>();
+        if (!file.isFile()) return result;
+        try {
+            DiagnosticFileSnapshot snapshot = DiagnosticFileSnapshot.read(file, 1_600_000);
+            for (String line : snapshot.text.split("\n")) {
+                Entry entry = parse(line);
+                if (entry != null) result.add(entry);
+            }
+        } catch (IOException unavailable) { diskFailures.incrementAndGet(); lastDiskFailure = unavailable.getClass().getSimpleName(); }
+        return result;
     }
 
     private static void rotateLocked(@NonNull File file) {
-        if (!file.isFile() || file.length() < ROTATE_AT_BYTES) return;
-        File replacement = new File(file.getParentFile(), "journal.next");
+        rotateLocked(file, ROTATE_AT_BYTES, KEEP_TAIL_BYTES);
+    }
+
+    private static void rotateLocked(@NonNull File file, long maximumBytes, int keepBytes) {
+        if (!file.isFile() || file.length() < maximumBytes) return;
+        File replacement = new File(file.getParentFile(), file.getName() + ".next");
         try (RandomAccessFile input = new RandomAccessFile(file, "r");
              FileOutputStream output = new FileOutputStream(replacement, false)) {
-            long start = Math.max(0L, input.length() - KEEP_TAIL_BYTES);
+            long start = Math.max(0L, input.length() - keepBytes);
             input.seek(start);
             if (start > 0L) input.readLine();
             byte[] buffer = new byte[16_384];
             int read;
             while ((read = input.read(buffer)) > 0) output.write(buffer, 0, read);
             output.flush();
-        } catch (IOException ignored) {
+        } catch (IOException failure) {
+            diskFailures.incrementAndGet(); lastDiskFailure = failure.getClass().getSimpleName();
             //noinspection ResultOfMethodCallIgnored
             replacement.delete();
             return;
         }
-        if (!file.delete() || !replacement.renameTo(file)) {
+        if (!replacement.renameTo(file)) {
+            diskFailures.incrementAndGet(); lastDiskFailure = "rotation_rename_failed";
             //noinspection ResultOfMethodCallIgnored
             replacement.delete();
         }
@@ -398,6 +521,7 @@ public final class DiagnosticJournal {
     @NonNull
     private static String sanitize(@Nullable String raw) {
         String value = raw == null ? "" : raw;
+        value = INTENT_BEARER.matcher(value).replaceAll(".x<hidden>");
         value = SECRET_ASSIGNMENT.matcher(value).replaceAll("$1=<hidden>");
         value = MAC_ADDRESS.matcher(value).replaceAll("**:**:**:**:**:**");
         value = LONG_CREDENTIAL.matcher(value).replaceAll("<hidden>");

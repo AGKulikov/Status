@@ -2,7 +2,7 @@
   "schema_version": 1,
   "status": "SOURCE_IMPLEMENTED_LOCAL_RUNTIME_TESTED_KX11_GATES_PENDING",
   "baseline_commit": "c4d3ffc121a0a69ba21094abe2987f889926505c",
-  "scope": "Production storage owners reviewed for 3.0.4 in FULL_BACKUP_CONTRACT_RU.md: write barrier, APNs transaction, defaults migration, external originals and explicit system-operation review. Static fingerprints do not certify runtime/device completeness.",
+  "scope": "Production storage owners reviewed for 3.0.5 logging in FULL_BACKUP_CONTRACT_RU.md. Diagnostic process/incident archives retain existing archive policy; temporary export is not a backup; defaults 335/336/337 to 338 reviewed. Static fingerprints do not certify runtime/device completeness.",
   "shared_preferences": [
     {
       "name": "{package}_preferences",
@@ -222,7 +222,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/FullBackupActivity.java": {
-      "sha256": "6faff12dd51f73b6ad2d108aa8c41f2cb2e8b654422b4cc293451d3ecf81de31",
+      "sha256": "e98093d0c016826eaef84304700242c6f04c3ea30be59b9bdd33e6a7f15592e4",
       "access_kinds": [
         "external_resource",
         "files"
@@ -304,7 +304,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/StatusWidgetApplication.java": {
-      "sha256": "f323a2e4b2296b10e05e5ba672d73893c92f759785b640569ee2f0d9d337290c",
+      "sha256": "e97bf07166e280170840599f777c2e64991165bd62f482f80e9bb14b9c2059b7",
       "access_kinds": [
         "files"
       ]
@@ -334,7 +334,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "3b76b1bba37aa38293948270937f9b9fbb5c40832b84d9573d69654701438ca5",
+      "sha256": "f9f1908eabb666626ea4992ec2c1c79f62ae876b56c5d3e6d26b6c246eb73aad",
       "access_kinds": [
         "files"
       ]
@@ -408,7 +408,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/ActionRecorder.java": {
-      "sha256": "d882e878f8bd41a612440bc5f36a9b4bb2f3eb068e21d959f8c8373e031c863d",
+      "sha256": "10466fc1172869d595204dc65dbbd308732972bb9cb6dee0f414138131b55aad",
       "access_kinds": [
         "files"
       ]
@@ -419,8 +419,20 @@
         "files"
       ]
     },
+    "app/src/main/java/dezz/status/widget/diagnostics/DiagnosticBundle.java": {
+      "sha256": "190d9842ed71119c347ca677a800d2470f9e10c4a2faa069665be9dae2933e01",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/diagnostics/DiagnosticFileSnapshot.java": {
+      "sha256": "b7fc77a10dbf604b6e942d34c79703e7f35737a0b957304e5c823b3a78c5d59f",
+      "access_kinds": [
+        "files"
+      ]
+    },
     "app/src/main/java/dezz/status/widget/diagnostics/DiagnosticJournal.java": {
-      "sha256": "3719f34325d0eee50d0c50a57d4417e89e9846f27876536ea6eb3fcf4c5f3512",
+      "sha256": "6fda54db954b5d533be2ed25e60ce929f0775441061be9034443b0de4110f1e6",
       "access_kinds": [
         "files"
       ]
@@ -444,7 +456,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/instrument/InstrumentOemController.java": {
-      "sha256": "73bfba0e8ebf8c167c32db3c27059ecd93ca4f941756aa504464362ca0ca808a",
+      "sha256": "b111689051b63a69b128ee5de857a449fcde2011f2d0d2c443073078db6f1816",
       "access_kinds": [
         "preferences"
       ]
@@ -518,7 +530,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/media/VehicleButtonController.java": {
-      "sha256": "6936c55e7f1ca2de15ae87a0de3a7ff3505b2952ceddd0908e93ef7482b923e2",
+      "sha256": "9a5a618c6f220132239e0ccb2d0227c0589f39ff2d8efb26dff239bb53ab251f",
       "access_kinds": [
         "preferences"
       ]
@@ -548,7 +560,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/phone/PhoneConnectionJournal.java": {
-      "sha256": "d31c8b4c7e6f02bec06fbd38065eac8160d7e436429c4b0865734386f9e1e43a",
+      "sha256": "65f8d8f589c12732d36fd41ea8b436613749c66c5abe5d49b732a2b78ec591b9",
       "access_kinds": [
         "files"
       ]
@@ -633,7 +645,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/settings/SettingsApplyJournal.java": {
-      "sha256": "07ee6f2313460fff2acb80475ad13c8bdd489020aef2b47aabe8f6f58c52d234",
+      "sha256": "b25cc88573568fb8dd4ed19ba75ba943439ce7a77196ce452d333573b6132dc8",
       "access_kinds": [
         "files",
         "preferences"

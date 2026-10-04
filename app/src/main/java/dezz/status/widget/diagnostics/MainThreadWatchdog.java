@@ -60,6 +60,7 @@ public final class MainThreadWatchdog {
                 return;
             }
             if (!RUNNING.get() || GENERATION.get() != generation) return;
+            CausalDiagnostics.poll();
             long now = SystemClock.uptimeMillis();
             long heartbeat = HEARTBEAT.get();
             if (reportedHeartbeat >= 0L && heartbeat > reportedHeartbeat) {
@@ -71,6 +72,7 @@ public final class MainThreadWatchdog {
             if (blocked < HANG_THRESHOLD_MS || now - lastReport < REPORT_COOLDOWN_MS) continue;
             lastReport = now;
             reportedHeartbeat = heartbeat;
+            CausalDiagnostics.capture("main_unresponsive", false);
             DiagnosticJournal.warn("watchdog",
                     "main thread unresponsive for " + blocked + " ms\n" + threadDump());
         }

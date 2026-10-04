@@ -29,6 +29,9 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
 import dezz.status.widget.Preferences;
+import dezz.status.widget.diagnostics.CausalDiagnostics;
+import dezz.status.widget.diagnostics.DiagnosticJournal;
+import dezz.status.widget.diagnostics.DiagnosticIntentTrace;
 import dezz.status.widget.scenario.IntentActionRule;
 import dezz.status.widget.scenario.IntentActionRuleStore;
 
@@ -64,9 +67,10 @@ public final class IntentScenarioController {
         @Override public void onReceive(Context ignored, Intent intent) {
             if (intent == null || !isExplicitlyTargetedAt(intent, context.getPackageName())) {
                 Log.w(TAG, "Ignored Intent that was not targeted at this package");
+            DiagnosticJournal.warn("scenario", "Ignored Intent that was not targeted at this package");
                 return;
             }
-            triggerAction(intent.getAction());
+            DiagnosticIntentTrace.receive(intent, () -> triggerAction(intent.getAction()));
         }
     };
 
@@ -85,6 +89,7 @@ public final class IntentScenarioController {
             rules = store.loadStrict();
         } catch (IllegalArgumentException invalid) {
             Log.w(TAG, "Intent action configuration is invalid; all actions disabled", invalid);
+            DiagnosticJournal.warn("scenario", "configuration_invalid error=" + CausalDiagnostics.failure(invalid));
             applyRules(Collections.emptyList());
             return;
         }
@@ -99,6 +104,7 @@ public final class IntentScenarioController {
         if (rule == null || !rule.matchesTriggerToken(triggerToken)
                 || !rule.matchesExecutionFingerprint(ruleFingerprint)) {
             Log.w(TAG, "Ignored unknown, changed, or disabled Intent rule id");
+            DiagnosticJournal.warn("scenario", "Ignored unknown, changed, or disabled Intent rule id");
             return false;
         }
         return submit(rule, deadlineElapsed);
@@ -109,6 +115,7 @@ public final class IntentScenarioController {
         IntentActionRule rule = intentAction == null ? null : enabledByAction.get(intentAction);
         if (rule == null) {
             Log.w(TAG, "Ignored unknown or disabled Intent action");
+            DiagnosticJournal.warn("scenario", "Ignored unknown or disabled Intent action");
             return false;
         }
         long now = SystemClock.elapsedRealtime();
@@ -121,6 +128,7 @@ public final class IntentScenarioController {
         unregisterDynamicReceiver();
         for (Execution execution : new ArrayList<>(executions.values())) {
             if (execution.retry != null) main.removeCallbacks(execution.retry);
+            execution.trace.finish("runtime_destroyed", "dispatched=" + execution.dispatched + ", effect=unknown");
             claims.release(execution.rule.id);
         }
         executions.clear();
@@ -157,7 +165,7 @@ public final class IntentScenarioController {
         // A not-yet-dispatched command must never survive an edit which changes its target/value.
         for (Execution execution : new ArrayList<>(executions.values())) {
             IntentActionRule current = enabledById.get(execution.rule.id);
-            if (!execution.dispatched && !execution.rule.equals(current)) finish(execution);
+            if (!execution.dispatched && !execution.rule.equals(current)) { execution.trace.finish("rule_changed", "dispatched=false"); finish(execution); }
         }
 
         LinkedHashSet<String> nextActions = new LinkedHashSet<>(byAction.keySet());
@@ -178,18 +186,21 @@ public final class IntentScenarioController {
         } catch (RuntimeException failure) {
             registeredActions = Collections.emptySet();
             Log.e(TAG, "Could not register Intent action receiver", failure);
+            DiagnosticJournal.warn("scenario", "receiver_registration_failed error=" + CausalDiagnostics.failure(failure));
         }
     }
 
     private boolean submit(IntentActionRule rule, long deadlineElapsed) {
-        if (destroyed || enabledById.get(rule.id) != rule) return false;
+        if (destroyed || enabledById.get(rule.id) != rule) { DiagnosticJournal.warn("scenario", "rejected=runtime_destroyed_or_rule_changed"); return false; }
         long now = SystemClock.elapsedRealtime();
         if (!isAcceptableDeadline(now, deadlineElapsed)) {
             Log.w(TAG, "Ignored expired or invalid Intent rule deadline");
+            DiagnosticJournal.warn("scenario", "Ignored expired or invalid Intent rule deadline");
             return false;
         }
         if (!claims.tryClaim(rule.id, now)) {
             Log.i(TAG, "Ignored debounced or in-flight Intent rule " + rule.id);
+            DiagnosticJournal.infoAsync("scenario", "rejected=debounced_or_inflight");
             return false;
         }
         Execution execution = new Execution(rule, deadlineElapsed);
@@ -202,6 +213,7 @@ public final class IntentScenarioController {
         if (destroyed || executions.get(execution.rule.id) != execution) return;
         IntentActionRule configured = enabledById.get(execution.rule.id);
         if (!execution.rule.equals(configured)) {
+            execution.trace.finish("rule_changed", "dispatched=false");
             finish(execution);
             return;
         }
@@ -211,6 +223,8 @@ public final class IntentScenarioController {
         // the time this callback finally runs.
         if (isExpired(now, execution.deadlineElapsed)) {
             Log.w(TAG, "Intent rule expired before dispatch " + execution.rule.id);
+            execution.trace.finish("expired_before_dispatch", "ready_retries=" + execution.retryIndex);
+            CausalDiagnostics.capture("scenario_readiness_expired", false);
             finish(execution);
             return;
         }
@@ -218,6 +232,8 @@ public final class IntentScenarioController {
             long delay = READY_RETRY_MS[Math.min(execution.retryIndex,
                     READY_RETRY_MS.length - 1)];
             execution.retryIndex++;
+            execution.trace.stage("waiting_ready", "connector=" + execution.rule.command.connectorType
+                    + ", retry=" + execution.retryIndex + ", remaining_ms=" + (execution.deadlineElapsed - now));
             execution.retry = () -> attempt(execution);
             main.postDelayed(execution.retry, Math.min(delay,
                     execution.deadlineElapsed - now));
@@ -227,23 +243,30 @@ public final class IntentScenarioController {
         // From this point retries are forbidden. An I/O failure after dispatch may be an
         // acknowledgement loss, and repeating SET/TOGGLE could be unsafe or reverse the result.
         execution.dispatched = true;
+        execution.trace.stage("dispatch", "connector=" + execution.rule.command.connectorType + ", retry_after_dispatch=false");
         final CompletableFuture<Void> future;
         try {
-            future = dispatcher.dispatch(execution.rule.command, contextPayload(execution.rule));
+            future = execution.trace.call(() -> dispatcher.dispatch(execution.rule.command, contextPayload(execution.rule)));
         } catch (RuntimeException failure) {
+            execution.trace.fail("dispatch_exception", failure);
             Log.w(TAG, "Intent rule dispatch failed before submission: "
                     + execution.rule.id, failure);
             finish(execution);
             return;
         }
-        future.whenComplete((ignored, failure) -> main.post(() -> {
+        future.whenComplete((ignored, failure) -> {
+            execution.trace.stage("completion_main_queued", "error=" + CausalDiagnostics.failure(failure));
+            if (!main.post(execution.trace.wrap(() -> {
             if (failure == null) {
+                execution.trace.finish("connector_completed", "effect=unobserved");
                 Log.i(TAG, "Intent rule completed: " + execution.rule.id);
             } else {
+                execution.trace.fail("connector_failed_no_retry", failure);
                 Log.w(TAG, "Intent rule failed without retry: " + execution.rule.id, failure);
             }
             finish(execution);
-        }));
+        }))) execution.trace.finish("completion_main_rejected", "effect=unknown");
+        });
     }
 
     static boolean isExpired(long nowElapsed, long deadlineElapsed) {
@@ -297,6 +320,7 @@ public final class IntentScenarioController {
     private static final class Execution {
         final IntentActionRule rule;
         final long deadlineElapsed;
+        final CausalDiagnostics.Span trace;
         int retryIndex;
         boolean dispatched;
         @Nullable Runnable retry;
@@ -304,6 +328,7 @@ public final class IntentScenarioController {
         Execution(IntentActionRule rule, long deadlineElapsed) {
             this.rule = rule;
             this.deadlineElapsed = deadlineElapsed;
+            trace = CausalDiagnostics.begin("scenario", "connector=" + rule.command.connectorType, 16000);
         }
     }
 

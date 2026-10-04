@@ -18,10 +18,13 @@ public final class ButtonActionDeadline {
     }
     public boolean valid() { return SystemClock.uptimeMillis() <= expiresAt && owner.getAsBoolean(); }
     public static void run(long expiresAt, BooleanSupplier owner, Runnable action) {
+        runIfValid(expiresAt, owner, action);
+    }
+    public static boolean runIfValid(long expiresAt, BooleanSupplier owner, Runnable action) {
         ButtonActionDeadline previous = active.get();
         ButtonActionDeadline value = new ButtonActionDeadline(expiresAt, owner);
         active.set(value);
-        try { if (value.valid()) action.run(); }
+        try { if (!value.valid()) return false; action.run(); return true; }
         finally { if (previous == null) active.remove(); else active.set(previous); }
     }
 }

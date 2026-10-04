@@ -71,6 +71,9 @@ public final class PhoneConnectionJournal {
     private static boolean loaded;
     private static boolean historyClearedInProcess;
     private static long revision;
+    private static final AtomicLong diskFailures = new AtomicLong();
+    public static String writerState() { return WRITE_QUEUE.state() + ", disk_failures=" + diskFailures.get()
+            + ", export_source=merged_memory_and_disk, limit_lines=" + MAX_LINES; }
 
     private PhoneConnectionJournal() {}
 
@@ -94,12 +97,14 @@ public final class PhoneConnectionJournal {
         String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
                 .format(new Date());
         String line = time + "  [s=" + SESSION + " #" + SEQUENCE.incrementAndGet()
-                + "]  [" + sanitize(component) + "]  " + sanitize(message);
+                + " elapsed_ms=" + SystemClock.elapsedRealtime() + "]  [" + sanitize(component) + "]  " + sanitize(message);
         synchronized (LOCK) {
             addLocked(line);
             revision++;
         }
         WRITE_QUEUE.append(line);
+        // Share only already-filtered connection states, never raw notification/protocol content.
+        dezz.status.widget.diagnostics.CausalDiagnostics.observe("phone-state", "component=" + sanitize(component) + ", " + sanitize(message));
     }
 
     @NonNull
@@ -156,6 +161,7 @@ public final class PhoneConnectionJournal {
             String line;
             while ((line = input.readLine()) != null) read.add(sanitize(line));
         } catch (IOException ignored) {
+            diskFailures.incrementAndGet();
             return read;
         }
         int start = Math.max(0, read.size() - MAX_LINES);
@@ -177,6 +183,7 @@ public final class PhoneConnectionJournal {
                 retained.addLast(line);
             }
         } catch (IOException ignored) {
+            diskFailures.incrementAndGet();
             return;
         }
         File temporary = new File(file.getParentFile(), "phone-connection.next");
@@ -195,6 +202,7 @@ public final class PhoneConnectionJournal {
                 temporary.delete();
             }
         } catch (IOException ignored) {
+            diskFailures.incrementAndGet();
             //noinspection ResultOfMethodCallIgnored
             temporary.delete();
         }
@@ -227,11 +235,13 @@ public final class PhoneConnectionJournal {
             }
             if (output != null) output.flush();
         } catch (IOException ignored) {
+            diskFailures.incrementAndGet();
         } finally {
             if (output != null) {
                 try {
                     output.close();
                 } catch (IOException ignored) {
+            diskFailures.incrementAndGet();
                 }
             }
         }

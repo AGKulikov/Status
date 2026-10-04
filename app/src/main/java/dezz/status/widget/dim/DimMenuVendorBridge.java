@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import dezz.status.widget.diagnostics.DiagnosticJournal;
+import dezz.status.widget.diagnostics.CausalDiagnostics;
 
 /** Optional DIM subscription. Vendor Binder calls never occupy the button/UI Looper. */
 final class DimMenuVendorBridge {
@@ -100,28 +101,33 @@ final class DimMenuVendorBridge {
                 else initialStates.put(method,snapshot);
             },0);
         };
-        worker.execute(()->{
+        CausalDiagnostics.Span trace=CausalDiagnostics.begin("dim-connect","generation="+epoch,10000);
+        worker.execute(trace.wrap(()->{
             try {
+                trace.stage("vendor_connect","generation="+epoch);
                 Connection candidate=connector.connect(events);
+                trace.stage("main_completion_queued","generation="+epoch);
                 // Always deliver completion, including after stop: a late registration must be removed.
                 main.post(()->{
-                    if(!started||epoch!=generation){worker.execute(candidate::close);return;}
+                    if(!started||epoch!=generation){trace.finish("stale_connection","generation="+epoch);worker.execute(candidate::close);return;}
                     connecting=false;connection=candidate;connected=true;retryIndex=0;
                     for(Map.Entry<String,Object[]> state:initialStates.entrySet())handleCallback(state.getKey(),state.getValue());
                     initialStates.clear();listener.onVendorStateChanged();
+                    trace.finish("connected","generation="+epoch);
                     DiagnosticJournal.infoAsync("dim-subscription","connected generation="+epoch);
                     scheduleHealth(epoch,candidate);
                 });
-            }catch(Exception|LinkageError failure){main.post(()->lost(epoch,"connect_"+failure.getClass().getSimpleName()));}
-        });
+            }catch(Exception|LinkageError failure){trace.fail("connect",failure);main.post(()->lost(epoch,"connect_"+failure.getClass().getSimpleName()));}
+        }));
     }
     private void scheduleHealth(long epoch,Connection current){
         post(()->{
             if(!started||generation!=epoch||current!=connection)return;
-            worker.execute(()->{
-                try {current.check();main.post(()->{if(started&&generation==epoch&&current==connection)scheduleHealth(epoch,current);});}
-                catch(Exception|LinkageError failure){main.post(()->lost(epoch,"read_"+failure.getClass().getSimpleName()));}
-            });
+            CausalDiagnostics.Span trace=CausalDiagnostics.begin("dim-health","generation="+epoch,5000);
+            worker.execute(trace.wrap(()->{
+                try {trace.stage("sdk_read","generation="+epoch);current.check();trace.finish("sdk_returned","physical_effect=unobserved");main.post(()->{if(started&&generation==epoch&&current==connection)scheduleHealth(epoch,current);});}
+                catch(Exception|LinkageError failure){trace.fail("sdk_read",failure);main.post(()->lost(epoch,"read_"+failure.getClass().getSimpleName()));}
+            }));
         },HEALTH_MS);
     }
     private void lost(long epoch,String reason){
@@ -136,13 +142,17 @@ final class DimMenuVendorBridge {
     private void release(){
         Connection previous=connection;connection=null;connected=false;initialStates.clear();
         engineOn=true;currentTab=-1;controlCenterState=0;
-        if(previous!=null)worker.execute(previous::close);
+        if(previous!=null){
+            CausalDiagnostics.Span trace=CausalDiagnostics.begin("dim-release","generation="+generation,5000);
+            worker.execute(trace.wrap(()->{trace.stage("unregister","shared_owner_disconnect=false");previous.close();trace.finish("released","");}));
+        }
     }
     private void post(Runnable task,long delay){main.postAtTime(task,this,SystemClock.uptimeMillis()+delay);}
     private void handleCallback(String method,Object[] args){
         if("onEngineStatusChanged".equals(method))engineOn=booleanArg(args,true);
         else if("onTabChanged".equals(method))currentTab=intArg(args,-1);
         else if("onControlCenterStateChanged".equals(method))controlCenterState=intArg(args,0);
+        DiagnosticJournal.infoAsync("dim-subscription", "callback="+method+", engine_on="+engineOn+", tab="+currentTab+", center="+controlCenterState);
         listener.onVendorStateChanged();
     }
     private static int intArg(Object[] args,int fallback){return args!=null&&args.length>0&&args[0] instanceof Number?((Number)args[0]).intValue():fallback;}
@@ -181,7 +191,9 @@ final class DimMenuVendorBridge {
             }catch(Exception|LinkageError failure){result.close();throw failure;}
         }
         @Override public void check()throws Exception{
-            if(!(read.invoke(menu) instanceof Number))throw new IllegalStateException("DIM mode read unavailable");
+            Object observed=read.invoke(menu);
+            if(!(observed instanceof Number))throw new IllegalStateException("DIM mode read unavailable");
+            CausalDiagnostics.current().stage("sdk_value","mode="+((Number)observed).intValue());
         }
         @Override public void close(){
             if(unregister!=null&&callback!=null)try{unregister.invoke(menu,callback);}catch(Exception ignored){}

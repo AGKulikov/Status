@@ -45,6 +45,7 @@ public final class PassengerHomeService extends Service implements DisplayManage
         if(displays!=null)displays.registerDisplayListener(this,main);
     }
     @Override public int onStartCommand(Intent intent,int flags,int startId){
+        DiagnosticJournal.infoAsync("passenger-home", "request start_id="+startId+", present="+(intent!=null)+", attached="+(window!=null));
         if(intent==null){stopSelf();return START_NOT_STICKY;}
         Intent next=intent.getParcelableExtra(EXTRA_REQUEST);
         if(!(retained instanceof dezz.status.widget.settings.SettingsEditSession)
@@ -57,6 +58,7 @@ public final class PassengerHomeService extends Service implements DisplayManage
     }
     private void reconcile(){
         main.removeCallbacks(retry);
+        DiagnosticJournal.infoAsync("passenger-home", "reconcile generation="+generation+", wanted="+wanted+", destroyed="+destroyed+", retries="+retries+", attached="+(window!=null));
         if(destroyed||!wanted)return;
         if(!Settings.canDrawOverlays(this)){
             DiagnosticJournal.warn("passenger-home","overlay_permission_missing");
@@ -65,6 +67,7 @@ public final class PassengerHomeService extends Service implements DisplayManage
         }
         Display display=displays==null?null:displays.getDisplay(PassengerHomeLauncher.DISPLAY_ID);
         if(display==null||!display.isValid()||display.getState()==Display.STATE_OFF){
+            DiagnosticJournal.infoAsync("passenger-home", "display_unavailable present="+(display!=null)+", state="+(display==null?-1:display.getState()));
             release(true);scheduleRetry();return;
         }
         if(window!=null)return;
@@ -79,8 +82,12 @@ public final class PassengerHomeService extends Service implements DisplayManage
             scheduleRetry();
         }
     }
-    private void scheduleRetry(){if(!destroyed&&wanted&&retries++<12)main.postDelayed(retry,5000L);}
+    private void scheduleRetry(){
+        if(!destroyed&&wanted&&retries++<12){DiagnosticJournal.infoAsync("passenger-home","retry_scheduled attempt="+retries);main.postDelayed(retry,5000L);}
+        else if(!destroyed&&wanted){DiagnosticJournal.warn("passenger-home","retries_exhausted; waiting_for_display_event_or_request");dezz.status.widget.diagnostics.CausalDiagnostics.capture("passenger_home_unavailable",false);}
+    }
     private void release(boolean keepDraft){
+        DiagnosticJournal.infoAsync("passenger-home", "release generation="+generation+", keep_draft="+keepDraft+", attached="+(window!=null));
         generation++;
         PassengerHomeWindow previous=window;window=null;
         if(previous!=null){if(keepDraft)retained=previous.retainAndRelease();else previous.dismiss();request=new Intent(previous.intent());}
@@ -94,10 +101,12 @@ public final class PassengerHomeService extends Service implements DisplayManage
     }
     @Override public void closed(PassengerHomeWindow source){
         if(source!=window)return;
+        DiagnosticJournal.infoAsync("passenger-home", "closed_by_user");
         wanted=false;window=null;generation++;stopSelf();
     }
     @Override public void launchedExternal(PassengerHomeWindow source){
         if(source!=window)return;
+        DiagnosticJournal.infoAsync("passenger-home", "launched_external");
         wanted=false;release(true);if(retained==null)stopSelf();
     }
     @Override public void displayInvalidated(PassengerHomeWindow source){

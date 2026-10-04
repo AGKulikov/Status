@@ -27,6 +27,11 @@ public class InputDiagnosticsTest {
         assertTrue(ThreadDumpFormatter.format(main,stacks).contains("Main.block"));
         assertEquals(48,ThreadDumpFormatter.format(main,stacks).split("  at ").length-1);
     }
+    @Test public void secretIntentSuffixIsHiddenInLifecycleAndExport() {
+        String token="abcdef0123456789abcdef0123456789";
+        String safe=DiagnosticJournal.redact("action=example.saved.x"+token+", key_code=200231");
+        assertFalse(safe.contains(token));assertTrue(safe.contains("example.saved.x<hidden>"));assertTrue(safe.contains("key_code=200231"));
+    }
     @Test public void mediaCodesSurviveWithoutExposingCredentials() {
         String value=DiagnosticJournal.redact("key_code=87, after_key_code=88, session_id=ab12, "
                 + "token=secret123, key=secret456, password=secret789");

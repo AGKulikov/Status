@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.util.concurrent.CompletableFuture;
 
 import dezz.status.widget.mqtt.MqttController;
+import dezz.status.widget.diagnostics.CausalDiagnostics;
 import dezz.status.widget.sprut.SprutHubController;
 import dezz.status.widget.ha.api.HaApiController;
 
@@ -50,6 +51,20 @@ public final class ConnectorActionDispatcher implements ActionDispatcher {
     @Override
     public CompletableFuture<Void> dispatch(@NonNull ActionBinding binding,
                                             @NonNull JSONObject contextPayload) {
+        CausalDiagnostics.Span trace = CausalDiagnostics.begin("connector", "type=" + binding.connectorType
+                + ", ready=" + isReady(binding), 15000);
+        trace.stage("submit", "payload=not_logged");
+        try {
+            CompletableFuture<Void> future = trace.call(() -> dispatchInternal(binding));
+            future.whenComplete((ignored, failure) -> {
+                if (failure != null) trace.fail("completion", failure);
+                else trace.finish(binding.connectorType == ConnectorType.MQTT ? "publish_returned" : "api_completed",
+                        "effect=unobserved; mqtt_puback=not_exposed_here");
+            });
+            return future;
+        } catch (RuntimeException failure) { trace.fail("submit", failure); throw failure; }
+    }
+    private CompletableFuture<Void> dispatchInternal(ActionBinding binding) {
         switch (binding.connectorType) {
             case MQTT:
                 try {

@@ -104,20 +104,26 @@ public final class FullBackupActivity extends dezz.status.widget.settings.Settin
         File file=new File(BackupMaintenance.control(this),prefix+"-"+UUID.randomUUID());BackupFiles.directory(file);return file;
     }
     private String create(Uri uri,char[] key)throws Exception {
+        dezz.status.widget.diagnostics.CausalDiagnostics.current().stage("snapshot_prepare","");
         File snapshot=stage("snapshot");NavigatorBackup bridge=new NavigatorBackup(this);JSONObject navigator=null;
         try(BackupMaintenance session=BackupMaintenance.begin(this)) {
             BackupStorage storage=new BackupStorage(this);storage.transaction().recover();
+        dezz.status.widget.diagnostics.CausalDiagnostics.current().stage("navigator_freeze","");
             navigator=bridge.freeze();JSONObject metadata=storage.capture(snapshot);
             JSONObject portableNavigator=new JSONObject(navigator.toString());portableNavigator.remove("token");metadata.put("navigator",portableNavigator);
+        dezz.status.widget.diagnostics.CausalDiagnostics.current().stage("snapshot_validate","");
             storage.validate(snapshot,metadata);
             // Finish the archive privately first. A failed SAF copy is never reported as a complete backup.
             File archive=new File(snapshot.getParentFile(),snapshot.getName()+".encrypted");
             try {
+        dezz.status.widget.diagnostics.CausalDiagnostics.current().stage("encrypt_archive","");
                 try(FileOutputStream output=new FileOutputStream(archive)){BackupArchive.write(snapshot,metadata,key,output);}
+        dezz.status.widget.diagnostics.CausalDiagnostics.current().stage("archive_readback","");
                 File verification=stage("readback");
                 try(FileInputStream input=new FileInputStream(archive)) {
                     JSONObject checked=BackupArchive.read(input,key,verification);storage.validate(new File(verification,"data"),checked);
                 }finally{BackupFiles.removeTree(verification);}
+        dezz.status.widget.diagnostics.CausalDiagnostics.current().stage("destination_copy_and_readback","");
                 if("file".equals(uri.getScheme()))BackupLocalFiles.copyVerified(archive,new File(uri.getPath()));
                 else {
                     try(InputStream input=new FileInputStream(archive);OutputStream output=getContentResolver().openOutputStream(uri,"wt")) {
@@ -140,6 +146,7 @@ public final class FullBackupActivity extends dezz.status.widget.settings.Settin
         }
     }
     private String check(Uri uri,char[] key)throws Exception {
+        dezz.status.widget.diagnostics.CausalDiagnostics.current().stage("check_archive","");
         clearChecked();File stage=stage("checked");
         try(InputStream input=getContentResolver().openInputStream(uri)) {
             if(input==null)throw new IOException("Не удалось прочитать копию");
@@ -157,6 +164,7 @@ public final class FullBackupActivity extends dezz.status.widget.settings.Settin
                 .setNegativeButton("Отмена",null).setPositiveButton("Восстановить",(d,w)->runOperation(this::restore)).show();
     }
     private String restore()throws Exception {
+        dezz.status.widget.diagnostics.CausalDiagnostics.current().stage("restore_prepare","");
         BackupStorage storage=new BackupStorage(this);NavigatorBackup bridge=new NavigatorBackup(this);JSONObject frozen=null;boolean journalOwns=false;
         try(BackupMaintenance session=BackupMaintenance.begin(this)) {
             storage.transaction().recover();File data=new File(checkedStage,"data");storage.prepareRestore(data,checkedMetadata);
@@ -196,11 +204,13 @@ public final class FullBackupActivity extends dezz.status.widget.settings.Settin
     private interface Operation {String run()throws Exception;}
     private void runOperation(Operation operation) {
         if(busy)return;busy=true;status.setText("Выполняется операция… Не закрывайте приложение.");apply.setEnabled(false);
-        worker.execute(()->{
-            String message;
-            try{message=operation.run();}catch(Exception failure){message="Операция не завершена: "+failure.getMessage();}
+        dezz.status.widget.diagnostics.CausalDiagnostics.Span trace=dezz.status.widget.diagnostics.CausalDiagnostics.begin("backup-operation","checked_snapshot="+(checkedStage!=null),60000);
+        worker.execute(trace.wrap(()->{
+            String message;trace.stage("worker_started","password_and_paths=not_logged");
+            try{message=operation.run();trace.finish("operation_returned","archive_status=see_backup_report");}
+            catch(Exception failure){trace.fail("operation",failure);message="Операция не завершена: "+failure.getMessage();}
             String result=message;runOnUiThread(()->{busy=false;status.setText(result);apply.setEnabled(checkedStage!=null);});
-        });
+        }));
     }
     private void clearPassword(){if(password!=null){Arrays.fill(password,'\0');password=null;}}
     private void clearChecked()throws IOException{if(checkedStage!=null)BackupFiles.removeTree(checkedStage);checkedStage=null;checkedMetadata=null;}

@@ -45,8 +45,8 @@ public final class DiagnosticsContractTest {
         String recorder = source("diagnostics/ActionRecorder.java");
         String overlay = source("diagnostics/ActionRecorderOverlayService.java");
 
-        assertTrue(recorder.contains("actions-\" + session.id + \".jsonl\""));
-        assertTrue(recorder.contains("actions-\" + session.id + \".txt\""));
+        assertTrue(recorder.contains("actions-\" + captured.session.id + \".jsonl\""));
+        assertTrue(recorder.contains("actions-\" + captured.session.id + \".txt\""));
         assertTrue(recorder.contains("output.flush()"));
         assertTrue(recorder.contains("SESSION_INTERRUPTED"));
         assertTrue(recorder.contains("status-widget-action-session-v1"));

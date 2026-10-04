@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import dezz.status.widget.diagnostics.DiagnosticJournal;
+import dezz.status.widget.diagnostics.CausalDiagnostics;
 import dezz.status.widget.shell.PrivilegedShell;
 
 /** One owner for live InputImpl events. Independent of the optional diagnostic recorder. */
@@ -47,7 +48,12 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
     private volatile String status = "Загрузка настроек…";
     private volatile long generation, logGeneration;
     private volatile Process logProcess;
-    private boolean listening, permissionPending;
+    private volatile boolean listening, permissionPending;
+    private final java.util.concurrent.atomic.AtomicLong inputSequence = new java.util.concurrent.atomic.AtomicLong();
+    private final java.util.concurrent.atomic.AtomicLong discardedInputs = new java.util.concurrent.atomic.AtomicLong();
+    private volatile long lastInputAt;
+    private String currentInput = "none";
+    private final Map<String, String> gestureInputs = new HashMap<>();
     private int permissionAttempts;
     private final java.util.Set<VehicleButton> patching = java.util.EnumSet.noneOf(VehicleButton.class);
     private final java.util.Map<VehicleButton, Boolean> verifiedDefault = new java.util.concurrent.ConcurrentHashMap<>();
@@ -66,11 +72,20 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
         engine = new ButtonGestureEngine(new ButtonGestureEngine.Scheduler() {
             @Override public Object after(long ms, Runnable r) {
                 long epoch = inputEpoch.get();
-                Runnable guarded = () -> { if (epoch == inputEpoch.get()) r.run(); else engine.reset(); };
+                String inputId = currentInput;
+                Runnable guarded = () -> {
+                    String previous = currentInput; currentInput = inputId;
+                    try { if (epoch == inputEpoch.get()) r.run(); else { inputDrop("timer_epoch_changed", -1, inputId); engine.reset(); } }
+                    finally { currentInput = previous; }
+                };
                 input.postDelayed(guarded, ms); return guarded;
             }
             @Override public void cancel(Object token) { input.removeCallbacks((Runnable) token); }
         }, this, new ButtonGestureEngine.Output() {
+            @Override public void diagnostic(int code, String gesture, String outcome) {
+                DiagnosticJournal.infoAsync("vehicle-buttons", "input=" + currentInput + ", code=" + code
+                        + ", gesture=" + gesture + ", outcome=" + outcome + ", epoch=" + inputEpoch.get());
+            }
             @Override public void action(String group, String gesture) {
                 ButtonBinding binding = binding(group, gesture);
                 submit(() -> actionExecutor().execute(binding), group + ":" + gesture + ":" + binding.action.id);
@@ -96,6 +111,24 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
                         + (direction < 0 ? "PREV_1" : "NEXT_1")).addFlags(0x01000020)), "dm:menu");
             }
             @Override public void starHeld() { submit(() -> actionExecutor().starHeld(), "star:10s"); }
+        });
+        input.post(new Runnable() {
+            @Override public void run() {
+                if (DiagnosticJournal.isEnabled()) {
+                    Process process = logProcess;
+                    DiagnosticJournal.infoAsync("vehicle-buttons-health", "ready=" + ready + ", needed=" + needed()
+                            + ", va_enabled=" + enabled(VehicleButton.VA) + ", listening=" + listening
+                            + ", process_alive=" + (process != null && process.isAlive())
+                            + ", read_logs=" + (context.checkSelfPermission("android.permission.READ_LOGS") == PackageManager.PERMISSION_GRANTED)
+                            + ", permission_pending=" + permissionPending + ", generation=" + generation
+                            + ", log_owner=" + logGeneration + ", epoch=" + inputEpoch.get()
+                            + ", input_pending=" + pendingInputs.get() + ", actions_pending=" + actions.getQueue().size()
+                            + ", actions_active=" + actions.getActiveCount() + ", discarded=" + discardedInputs.get()
+                            + ", last_input_age_ms=" + (lastInputAt == 0 ? -1 : SystemClock.uptimeMillis() - lastInputAt)
+                            + ", native_va_route_verified=" + verifiedDefault.containsKey(VehicleButton.VA));
+                }
+                input.postDelayed(this, 15000);
+            }
         });
         input.post(() -> {
             storage = dezz.status.widget.backup.BackupPreferences.open(context.createDeviceProtectedStorageContext(),"vehicle_buttons", Context.MODE_PRIVATE);
@@ -275,7 +308,7 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
                     Matcher log = LOG.matcher(line);
                     if (!log.matches()) continue;
                     double eventSeconds = Double.parseDouble(log.group(1));
-                    if (eventSeconds < started) continue;
+                    if (eventSeconds < started) continue; // Historical logcat tail is deliberately not a live input.
                     String body = log.group(2);
                     boolean down = body.contains("onKeyPressed"), up = body.contains("onKeyReleased");
                     if (down == up) continue;
@@ -283,31 +316,46 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
                     if (!key.find()) continue;
                     int code = Integer.parseInt(key.group(1));
                     if (VehicleButton.fromCode(code) == null) continue;
-                    if (System.currentTimeMillis() - eventSeconds * 1000 > 750) { invalidateInput(); continue; }
+                    String eventId = CausalDiagnostics.session() + "/input-" + inputSequence.incrementAndGet();
+                    long eventAge = (long) (System.currentTimeMillis() - eventSeconds * 1000);
+                    DiagnosticJournal.infoAsync("vehicle-buttons", "input=" + eventId + ", phase=received, code=" + code
+                            + ", down=" + down + ", source_age_ms=" + eventAge + ", log_owner=" + owner);
+                    if (eventAge > 750) { inputDrop("source_stale", code, eventId); invalidateInput(); continue; }
                     long received = SystemClock.uptimeMillis();
                     long epoch = inputEpoch.get();
                     if (pendingInputs.incrementAndGet() > 64) {
                         pendingInputs.decrementAndGet();
                         invalidateInput();
+                        inputDrop("input_queue_full", code, eventId);
                         status = "Слишком много событий кнопок";
                         continue;
                     }
-                    input.post(() -> {
+                    boolean accepted = input.post(() -> {
                         pendingInputs.decrementAndGet();
-                        if (owner != logGeneration) return;
-                        if (epoch != inputEpoch.get()) return;
-                        if (SystemClock.uptimeMillis() - received > 750) { invalidateInput(); return; }
-                        engine.input(code, down);
-                        DiagnosticJournal.infoAsync("vehicle-buttons", "code=" + code + ", down=" + down);
+                        if (owner != logGeneration) { inputDrop("log_owner_changed", code, eventId); return; }
+                        if (epoch != inputEpoch.get()) { inputDrop("epoch_changed", code, eventId); return; }
+                        if (SystemClock.uptimeMillis() - received > 750) { inputDrop("input_queue_stale", code, eventId); invalidateInput(); return; }
+                        lastInputAt = SystemClock.uptimeMillis();
+                        String group = VehicleButton.bindingGroup(code);
+                        if (down) gestureInputs.put(group, eventId);
+                        currentInput = gestureInputs.getOrDefault(group, eventId);
+                        try { engine.input(code, down); }
+                        finally { currentInput = "none"; }
+                        DiagnosticJournal.infoAsync("vehicle-buttons", "input=" + eventId + ", phase=processed, code=" + code
+                                + ", down=" + down + ", queue_ms=" + (SystemClock.uptimeMillis() - received));
                     });
+                    if (!accepted) { pendingInputs.decrementAndGet(); inputDrop("input_handler_rejected", code, eventId); }
                 }
             }
         } catch (Exception failed) {
+            DiagnosticJournal.warn("vehicle-buttons", "input_reader_failed owner=" + owner + ", error=" + CausalDiagnostics.failure(failed));
+            CausalDiagnostics.capture("input_reader_failed", false);
             if (owner == logGeneration) status = "События кнопок недоступны: " + failed.getClass().getSimpleName();
         } finally {
             if (process != null) process.destroy();
             input.post(() -> {
                 if (owner != logGeneration) return;
+                DiagnosticJournal.warn("vehicle-buttons", "input_reader_closed owner=" + owner + ", reconnect_ms=5000");
                 logProcess = null; listening = false; engine.reset();
                 status = "Ожидание подключения кнопок";
                 input.postDelayed(() -> { if (owner == logGeneration) reconcile(); }, 5000);
@@ -320,23 +368,35 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
             engine.reset(); inputResetPending.set(false);
         });
     }
+    private void inputDrop(String reason, int code, String eventId) {
+        discardedInputs.incrementAndGet();
+        DiagnosticJournal.warn("vehicle-buttons", "input=" + eventId + ", dropped=" + reason + ", code=" + code
+                + ", epoch=" + inputEpoch.get() + ", total=" + discardedInputs.get());
+    }
     private void submit(Runnable action, String detail) {
         long owner = generation, received = SystemClock.uptimeMillis();
         long epoch = inputEpoch.get();
-        try { actions.execute(() -> {
-            if (owner != generation || (detail != null && SystemClock.uptimeMillis() - received > 750)) return;
-            if (detail != null && epoch != inputEpoch.get()) return;
+        CausalDiagnostics.Span trace = CausalDiagnostics.begin("button-action", "assignment=" + detail
+                + ", input=" + (android.os.Looper.myLooper()==input.getLooper()?currentInput:"independent") + ", generation=" + owner + ", epoch=" + epoch, 1500);
+        try { actions.execute(trace.wrap(() -> {
+            long wait = SystemClock.uptimeMillis() - received;
+            if (owner != generation) { trace.finish("dropped_owner_changed", "queue_ms=" + wait); return; }
+            if (detail != null && wait > 750) { trace.finish("dropped_expired", "queue_ms=" + wait); return; }
+            if (detail != null && epoch != inputEpoch.get()) { trace.finish("dropped_epoch_changed", "queue_ms=" + wait); return; }
+            trace.stage("worker_started", "queue_ms=" + wait);
             try {
                 if (detail == null) action.run();
-                else ButtonActionDeadline.run(received + 750L,
-                        () -> owner == generation && epoch == inputEpoch.get(), action);
-                if (detail != null) DiagnosticJournal.infoAsync("vehicle-buttons", "dispatch=" + detail + ", effect=unobserved");
+                else if (!ButtonActionDeadline.runIfValid(received + 750L,
+                        () -> owner == generation && epoch == inputEpoch.get(), () -> { trace.stage("dispatch", "effect=unobserved"); action.run(); })) {
+                    trace.finish("dropped_at_dispatch_boundary", "expired_or_owner_changed=true"); return;
+                }
+                trace.finish("handler_returned", "effect=unobserved; downstream_result_separate=true");
             } catch (Exception failed) {
                 status = "Действие недоступно: " + failed.getClass().getSimpleName();
-                DiagnosticJournal.warn("vehicle-buttons", "dispatch_failed=" + detail + ", reason=" + failed.getClass().getSimpleName());
+                trace.fail("dispatch_exception", failed);
             }
-        }); } catch (java.util.concurrent.RejectedExecutionException full) {
-            status = "Очередь действий занята";
+        })); } catch (java.util.concurrent.RejectedExecutionException full) {
+            status = "Очередь действий занята"; trace.fail("action_queue_full", full);
         }
     }
     void beginStoredRestore(java.util.List<VehicleButton> buttons, Runnable ready) {

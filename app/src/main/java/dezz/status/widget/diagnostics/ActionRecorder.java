@@ -57,20 +57,23 @@ public final class ActionRecorder {
     public static final String SOURCE_USER = "user";
 
     private static final Object LOCK = new Object();
+    private static final Object DISK_LOCK = new Object();
+    private static final java.util.concurrent.atomic.AtomicLong SESSION_IDS = new java.util.concurrent.atomic.AtomicLong();
     private static final String ACTIVE_MARKER = "recorder-active.json";
-    private static final AtomicLong SEQUENCE = new AtomicLong();
+    private static final AtomicLong diskFailures = new AtomicLong();
     private static final Set<RecordingListener> RECORDING_LISTENERS =
             new CopyOnWriteArraySet<>();
 
     @Nullable private static Context appContext;
     @Nullable private static volatile Session activeSession;
-    private static final AtomicInteger droppedAsync = new AtomicInteger();
+
     private static final ThreadPoolExecutor ASYNC = new ThreadPoolExecutor(0, 1,
-            30L, TimeUnit.SECONDS, new ArrayBlockingQueue<>(128), task -> {
+            30L, TimeUnit.SECONDS, new ArrayBlockingQueue<>(1), task -> {
                 Thread thread = new Thread(task, "status-action-journal");
                 thread.setDaemon(true);
                 return thread;
-            }, (task, executor) -> droppedAsync.incrementAndGet());
+            });
+    private static final DiagnosticWriteQueue WRITES = new DiagnosticWriteQueue(256, 32, ASYNC::execute);
 
     private ActionRecorder() {
     }
@@ -82,6 +85,7 @@ public final class ActionRecorder {
     public static final class Session {
         @NonNull public final String id;
         public final long startedAt;
+        final AtomicLong sequence = new AtomicLong();
 
         Session(@NonNull String id, long startedAt) {
             this.id = id;
@@ -93,58 +97,48 @@ public final class ActionRecorder {
         synchronized (LOCK) {
             if (appContext != null) return;
             appContext = context.getApplicationContext();
-            recoverInterruptedSessionLocked();
+            WRITES.submit(true, () -> { synchronized (DISK_LOCK) { recoverInterruptedSessionLocked(); } });
         }
     }
 
-    public static boolean isRecording() {
-        synchronized (LOCK) {
-            return activeSession != null;
-        }
-    }
+    public static boolean isRecording() { return activeSession != null; }
+    public static long startedAt() { Session session=activeSession; return session==null?0:session.startedAt; }
 
-    public static long startedAt() {
-        synchronized (LOCK) {
-            return activeSession == null ? 0L : activeSession.startedAt;
-        }
-    }
-
-    @Nullable
-    public static Session start(@NonNull String reason) {
+    @Nullable public static Session start(@NonNull String reason) {
+        final Session session;
         synchronized (LOCK) {
             if (activeSession != null) return activeSession;
             if (appContext == null) return null;
             long now = System.currentTimeMillis();
-            String id = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US)
-                    .format(new Date(now)) + "-" + Long.toHexString(SystemClock.elapsedRealtime());
-            activeSession = new Session(id, now);
-            SEQUENCE.set(0L);
-            writeMarkerLocked(activeSession);
-            appendLocked(SOURCE_USER, "SESSION_START", object(
-                    "reason", DiagnosticJournal.redact(reason),
-                    "session", id));
-            DiagnosticJournal.info("recorder", "action session started: " + id);
-            Session session = activeSession;
-            notifyRecordingChanged(true);
-            return session;
+            String id = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date(now))
+                    + "-" + Long.toHexString(SystemClock.elapsedRealtime()) + "-" + android.os.Process.myPid() + "-" + SESSION_IDS.incrementAndGet();
+            session = new Session(id, now); activeSession = session;
+            CapturedEvent event = new CapturedEvent(session, SOURCE_USER, "SESSION_START",
+                    object("reason", DiagnosticJournal.redact(reason), "session", id));
+            WRITES.submit(true, () -> { synchronized (DISK_LOCK) {
+                writeMarkerLocked(session); persistLocked(event);
+            } });
         }
+        DiagnosticJournal.info("recorder", "action session started: " + session.id);
+        notifyRecordingChanged(true);
+        return session;
     }
 
-    @Nullable
-    public static Session stop(@NonNull String reason) {
+    @Nullable public static Session stop(@NonNull String reason) {
+        final Session session;
         synchronized (LOCK) {
-            Session session = activeSession;
-            if (session == null) return null;
-            appendLocked(SOURCE_USER, "SESSION_STOP", object(
-                    "reason", DiagnosticJournal.redact(reason),
-                    "duration_ms", Math.max(0L,
-                            System.currentTimeMillis() - session.startedAt)));
+            session = activeSession; if (session == null) return null;
+            CapturedEvent event = new CapturedEvent(session, SOURCE_USER, "SESSION_STOP",
+                    object("reason", DiagnosticJournal.redact(reason), "duration_ms",
+                            Math.max(0L, System.currentTimeMillis() - session.startedAt)));
             activeSession = null;
-            deleteMarkerLocked();
-            DiagnosticJournal.info("recorder", "action session stopped: " + session.id);
-            notifyRecordingChanged(false);
-            return session;
+            WRITES.submit(true, () -> { synchronized (DISK_LOCK) {
+                persistLocked(event); deleteMarkerLocked();
+            } });
         }
+        DiagnosticJournal.info("recorder", "action session stopped: " + session.id);
+        notifyRecordingChanged(false);
+        return session;
     }
 
     public static void addRecordingListener(@NonNull RecordingListener listener) {
@@ -158,31 +152,37 @@ public final class ActionRecorder {
 
     public static void record(@NonNull String source, @NonNull String event,
                               @Nullable JSONObject safeDetails) {
+        // Lifecycle evidence must not require starting a separate action-recorder session.
+        if (SOURCE_ACTIVITY.equals(source) || SOURCE_SERVICE.equals(source) || SOURCE_OVERLAY.equals(source))
+            DiagnosticJournal.recordEarly(DiagnosticJournal.Level.INFO, "lifecycle", source + ":" + event
+                    + " " + redactedObject(safeDetails == null ? new JSONObject() : safeDetails));
         synchronized (LOCK) {
-            if (activeSession == null) return;
-            appendLocked(source, event, safeDetails == null ? new JSONObject() : safeDetails);
+            Session session = activeSession;
+            if (session == null) return;
+            CapturedEvent captured = new CapturedEvent(session, source, event,
+                    safeDetails == null ? new JSONObject() : safeDetails);
+            boolean critical = SOURCE_USER.equals(source) || event.contains("FAILED") || event.contains("CRASH");
+            WRITES.submit(critical, () -> { synchronized (DISK_LOCK) { persistLocked(captured); } });
         }
     }
 
-    /** Observer callbacks never wait for a recorder file, export or session transition. */
+    /** Every ordinary producer now uses the same non-blocking admission path. */
     public static void recordAsync(@NonNull String source, @NonNull String event,
-                                   @Nullable JSONObject safeDetails) {
-        Session expected = activeSession;
-        if (expected == null) return;
-        ASYNC.execute(() -> {
-            synchronized (LOCK) {
-                if (activeSession != expected) return;
-                int dropped = droppedAsync.getAndSet(0);
-                if (dropped > 0) appendLocked(SOURCE_SYSTEM_TRACE,
-                        "RECORDER_QUEUE_DROPPED", object("count", dropped));
-                appendLocked(source, event, safeDetails == null ? new JSONObject() : safeDetails);
-            }
-        });
+                                  @Nullable JSONObject safeDetails) { record(source, event, safeDetails); }
+
+    public static String writerState() { return WRITES.state() + ", disk_failures=" + diskFailures.get(); }
+
+    public static boolean awaitPendingWrites() {
+        java.util.concurrent.CountDownLatch barrier = new java.util.concurrent.CountDownLatch(1);
+        WRITES.submit(true, barrier::countDown);
+        try { return barrier.await(1500, TimeUnit.MILLISECONDS); }
+        catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); return false; }
     }
 
     public static void mark(@Nullable String comment) {
         record(SOURCE_USER, "MARK", object(
                 "comment", DiagnosticJournal.redact(comment)));
+        CausalDiagnostics.capture("action_recorder_marker", true);
         PrivilegedActionCollector.captureMarkerSnapshot();
     }
 
@@ -207,18 +207,17 @@ public final class ActionRecorder {
     @NonNull
     public static String latestTimeline(int maxChars) {
         final File latest;
-        synchronized (LOCK) {
-            latest = latestLocked(".txt");
-        }
+        latest = latestLocked(".txt");
         if (latest == null) return "Сессий пока нет";
         return readTail(latest, Math.max(1_000, maxChars));
     }
 
     @Nullable
     public static File copyLatestForExport(@NonNull Context context, boolean json) {
+        awaitPendingWrites();
         final File source;
         final long snapshotBytes;
-        synchronized (LOCK) {
+        synchronized (DISK_LOCK) {
             source = latestLocked(json ? ".jsonl" : ".txt");
             if (source == null) return null;
             // Appends finish under the same lock, so this boundary ends at a complete event.
@@ -297,35 +296,40 @@ public final class ActionRecorder {
         }
     }
 
-    private static void appendToSessionLocked(@NonNull Session session,
-                                              @NonNull String source,
-                                              @NonNull String event,
-                                              @NonNull JSONObject rawDetails) {
+    private static final class CapturedEvent {
+        final Session session;
+        final long sequence, timestamp, elapsed;
+        final String source, event;
+        final JSONObject details;
+        CapturedEvent(Session session, String source, String event, JSONObject details) {
+            this.session=session; this.sequence=session.sequence.incrementAndGet();
+            timestamp=System.currentTimeMillis(); elapsed=SystemClock.elapsedRealtime();
+            this.source=DiagnosticJournal.redact(source); this.event=DiagnosticJournal.redact(event);
+            JSONObject copy=redactedObject(details);
+            this.details=copy.toString().length()>16_000 ? object("details_truncated",true) : copy;
+        }
+    }
+    private static void appendToSessionLocked(@NonNull Session session, @NonNull String source,
+            @NonNull String event, @NonNull JSONObject details) {
+        persistLocked(new CapturedEvent(session,source,event,details));
+    }
+    private static void persistLocked(CapturedEvent captured) {
         File directory = directoryLocked();
-        if (directory == null) return;
-        long now = System.currentTimeMillis();
-        long uptime = SystemClock.elapsedRealtime();
-        JSONObject details = redactedObject(rawDetails);
-        JSONObject line = object(
-                "sequence", SEQUENCE.incrementAndGet(),
-                "timestamp", now,
-                "uptime_ms", uptime,
-                "source", DiagnosticJournal.redact(source),
-                "event", DiagnosticJournal.redact(event),
-                "details", details);
-        File json = new File(directory, "actions-" + session.id + ".jsonl");
-        File text = new File(directory, "actions-" + session.id + ".txt");
+        if (directory == null) { diskFailures.incrementAndGet(); return; }
+        JSONObject line = object("sequence", captured.sequence, "timestamp", captured.timestamp,
+                "uptime_ms", captured.elapsed, "process_session", CausalDiagnostics.session(),
+                "source", captured.source, "event", captured.event, "details", captured.details);
+        File json = new File(directory, "actions-" + captured.session.id + ".jsonl");
+        File text = new File(directory, "actions-" + captured.session.id + ".txt");
         String readable = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.US)
-                .format(new Date(now))
-                + "  #" + line.optLong("sequence")
-                + "  [" + DiagnosticJournal.redact(source) + "]  "
-                + DiagnosticJournal.redact(event)
-                + (details.length() == 0 ? "" : "  " + details) + "\n";
+                .format(new Date(captured.timestamp)) + "  #" + captured.sequence
+                + "  [session=" + CausalDiagnostics.session() + "] [elapsed_ms=" + captured.elapsed + "] [" + captured.source + "]  "
+                + captured.event + "  " + captured.details + "\n";
         try {
-            write(json, line.toString() + "\n", true);
-            write(text, readable, true);
+            write(json, line.toString() + "\n", true); write(text, readable, true);
         } catch (IOException failure) {
-            DiagnosticJournal.error("recorder", "could not persist action event", failure);
+            diskFailures.incrementAndGet();
+            DiagnosticJournal.error("recorder", "could not persist action event; " + writerState(), failure);
         }
     }
 
@@ -336,7 +340,8 @@ public final class ActionRecorder {
         while (keys.hasNext()) {
             String key = keys.next();
             try {
-                result.put(DiagnosticJournal.redact(key), redactValue(source.opt(key)));
+                boolean secret = key.toLowerCase(Locale.ROOT).matches(".*(?:password|passwd|secret|authorization|credential|token|private_key|notification_text|body)$");
+                result.put(DiagnosticJournal.redact(key), secret ? "<hidden>" : redactValue(source.opt(key)));
             } catch (JSONException ignored) {
             }
         }
@@ -368,10 +373,14 @@ public final class ActionRecorder {
             JSONObject value = new JSONObject(read(marker));
             String id = value.optString("id", "");
             long startedAt = value.optLong("started_at", 0L);
-            if (!id.isEmpty()) {
+            if (id.matches("[A-Za-z0-9_-]{1,120}")) {
                 Session interrupted = new Session(id, startedAt);
-                SEQUENCE.set(Math.max(0L, countLines(
-                        new File(directory, "actions-" + id + ".jsonl"))));
+                long last = 0;
+                File events = new File(directory, "actions-" + id + ".jsonl");
+                if (events.isFile()) for (String row : DiagnosticFileSnapshot.read(events, 64000).text.split("\n")) {
+                    try { last = Math.max(last, new JSONObject(row).optLong("sequence", 0)); } catch (JSONException ignored) { }
+                }
+                interrupted.sequence.set(last);
                 appendToSessionLocked(interrupted, SOURCE_SERVICE, "SESSION_INTERRUPTED",
                         object("reason", "process restarted before explicit stop"));
                 DiagnosticJournal.warn("recorder",
@@ -390,7 +399,7 @@ public final class ActionRecorder {
             write(new File(directory, ACTIVE_MARKER), object(
                     "id", session.id,
                     "started_at", session.startedAt).toString(), false);
-        } catch (IOException ignored) {
+        } catch (IOException ignored) { diskFailures.incrementAndGet();
         }
     }
 
@@ -471,7 +480,7 @@ public final class ActionRecorder {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(
                 new FileInputStream(file), StandardCharsets.UTF_8))) {
             while (reader.readLine() != null) count++;
-        } catch (IOException ignored) {
+        } catch (IOException ignored) { diskFailures.incrementAndGet();
         }
         return count;
     }

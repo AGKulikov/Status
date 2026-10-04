@@ -66,6 +66,7 @@ public class StatusWidgetApplication extends Application {
         // Keep Application.onCreate minimal. Preferences, recorder recovery and vendor status-bar
         // calls begin from the first-surface event instead of delaying startup with a timer.
         DiagnosticJournal.initializeEarly(this);
+        if (!AppProcessPolicy.isHudProcess()) dezz.status.widget.diagnostics.SystemProcessDiagnostics.initialize(this);
         installCrashHandler(hudProcess);
         // The main process is the sole coordinator writer. MODE_MULTI_PROCESS is read-through
         // compatibility for :hud, not a transactional cross-process state machine.
@@ -87,7 +88,7 @@ public class StatusWidgetApplication extends Application {
         Preferences preferences = new Preferences(this, false);
         completePreferenceMigrationsInBackground(preferences);
         DiagnosticJournal.initialize(this,
-                !hudProcess && preferences.debugModeEnabled.get());
+                preferences.debugModeEnabled.get());
         if (hudProcess) {
             // HUD owns SurfaceFlinger and external-display callbacks in a dedicated process. Do
             // not duplicate the status-row bootstrap, recorder overlay or lifecycle observers
@@ -232,7 +233,7 @@ public class StatusWidgetApplication extends Application {
             throwable.printStackTrace(out);
             out.println();
             out.println("Last diagnostic events:");
-            out.println(DiagnosticJournal.tailText(160));
+            out.println(dezz.status.widget.diagnostics.CausalDiagnostics.snapshot());
         }
     }
 

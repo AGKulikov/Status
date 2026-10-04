@@ -18,6 +18,16 @@ public class BackupDefaultsMigrationTest {
         assertTrue(values.size()>100);assertTrue(values.containsKey("launcherLayoutJson"));
         assertFalse(new File(RuntimeEnvironment.getApplication().createDeviceProtectedStorageContext().getDataDir(),"shared_prefs").exists());
     }
+    @Test public void loggingReleaseAcceptsAllReviewedPredecessorsAndRejectsFutureSchema()throws Exception{
+        for(int source:new int[]{208021335,208021336,208021337,208021338}){
+            JSONObject metadata=new JSONObject().put("sourceVersionCode",source).put("defaultsSchema",source)
+                    .put("declaredMainDefaults",BackupPreferencesXml.encode(Collections.singletonMap("debugModeEnabled",false)));
+            BackupDefaultsMigration.validate(metadata,208021338);
+        }
+        JSONObject future=new JSONObject().put("sourceVersionCode",208021339).put("defaultsSchema",208021339)
+                .put("declaredMainDefaults",BackupPreferencesXml.encode(Collections.emptyMap()));
+        try{BackupDefaultsMigration.validate(future,208021338);fail();}catch(IOException expected){}
+    }
     @Test public void oldEffectiveDefaultsAndUnknownValuesSurviveOnTheNewVersion()throws Exception{
         File snapshot=new File(RuntimeEnvironment.getApplication().getCacheDir(),"migration");
         File main=BackupFiles.child(snapshot,"de_prefs/example_preferences.xml");

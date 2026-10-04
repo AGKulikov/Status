@@ -20,6 +20,7 @@ import dezz.status.widget.driver.DriverPanelActionExecutor;
 import dezz.status.widget.driver.DriverPanelService;
 import dezz.status.widget.launcher.LauncherShortcutStore;
 import dezz.status.widget.shell.PrivilegedShell;
+import dezz.status.widget.diagnostics.CausalDiagnostics;
 
 /** Dispatches button assignments; shares Natro actions with the DIM and driver menus. */
 final class ButtonActionExecutor {
@@ -70,7 +71,7 @@ final class ButtonActionExecutor {
                     else if (value instanceof Boolean) intent.putExtra(extra.getKey(), (Boolean) value);
                     else intent.putExtra(extra.getKey(), (String) value);
                 }
-                if (binding.action == ButtonAction.BROADCAST) context.sendBroadcast(intent);
+                if (binding.action == ButtonAction.BROADCAST) context.sendBroadcast(dezz.status.widget.diagnostics.DiagnosticIntentTrace.attach(context, intent));
                 else context.startActivity(intent);
                 return;
             case ADB:
@@ -129,27 +130,35 @@ final class ButtonActionExecutor {
                 LauncherShortcutStore.Shortcut shortcut = LauncherShortcutStore.decodeAction(binding.shortcutJson);
                 ButtonActionDeadline deadline = ButtonActionDeadline.current();
                 long trace=traceSequence.incrementAndGet(),queued=android.os.SystemClock.uptimeMillis();
+                CausalDiagnostics.Span operation = CausalDiagnostics.begin("button-main", "kind=" + shortcut.kind.name(), 1500);
                 String action=shortcut.kind.name()+(shortcut.kind==LauncherShortcutStore.Kind.BUILTIN
                         ?":"+LauncherShortcutStore.Builtin.fromKey(shortcut.target).name():"");
                 if (shortcut.enabled && LauncherShortcutStore.isInteractive(shortcut)) {
                     dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("button-action",
                             "trace="+trace+", stage=main_queued, action="+action);
-                    boolean posted=main.post(() -> {
+                    boolean posted=main.post(operation.wrap(() -> {
                         long delay=android.os.SystemClock.uptimeMillis()-queued;
                         if(!deadline.valid()){
+                            operation.finish("dropped_expired_or_stale", "main_wait_ms=" + delay);
                             dezz.status.widget.diagnostics.DiagnosticJournal.warn("button-action",
                                     "trace="+trace+", stage=dropped_expired_or_stale, main_wait_ms="+delay+", action="+action);
                             return;
                         }
                         dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("button-action",
                                 "trace="+trace+", stage=handler_started, main_wait_ms="+delay+", action="+action);
-                        driver.execute(shortcut);
+                        operation.stage("handler_started", "main_wait_ms=" + delay);
+                        try { driver.execute(shortcut); operation.finish("handler_returned", "effect=unobserved"); }
+                        catch (RuntimeException failure) { operation.fail("handler_exception", failure); throw failure; }
                         dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("button-action",
                                 "trace="+trace+", stage=handler_returned, action="+action+", effect=unobserved");
-                    });
+                    }));
+                    if (!posted) operation.finish("main_rejected", "");
                     if(!posted)dezz.status.widget.diagnostics.DiagnosticJournal.warn("button-action","trace="+trace+", stage=main_rejected");
-                }else dezz.status.widget.diagnostics.DiagnosticJournal.warn("button-action",
+                }else {
+                    operation.finish("disabled_or_noninteractive", "");
+                    dezz.status.widget.diagnostics.DiagnosticJournal.warn("button-action",
                         "trace="+trace+", stage=disabled_or_noninteractive, action="+action);
+                }
                 } catch (org.json.JSONException invalid) { throw new IllegalArgumentException("Некорректное действие меню", invalid); }
                 return;
         }
@@ -190,8 +199,12 @@ final class ButtonActionExecutor {
         Settings.Global.putString(context.getContentResolver(), "policy_control", next);
     }
     private void car(String id, CarControlCommand.Operation operation, double value) {
-        CarIntegrations.get(context).executeControl(new CarControlCommand(id, operation, value),
-                (success, message) -> { if (!success) toast(message == null ? "Команда недоступна" : message); });
+        CausalDiagnostics.Span trace = CausalDiagnostics.begin("button-car", "control=" + id + ", operation=" + operation, 10000);
+        trace.run(() -> CarIntegrations.get(context).executeControl(new CarControlCommand(id, operation, value),
+                (success, message) -> trace.run(() -> {
+                    trace.finish(success ? "callback_success" : "callback_failed", "effect=unobserved");
+                    if (!success) { CausalDiagnostics.capture("car_callback_failed", false); toast(message == null ? "Команда недоступна" : message); }
+                })));
     }
     void setStarDefaultDisabled(boolean disabled, VehicleButtonController.Result callback) {
         CarIntegrations.get(context).executeControl(new CarControlCommand("vehicle.star_default",

@@ -80,6 +80,13 @@ public final class PrivilegedActionCollector {
     @Nullable private Process rootInputProcess;
     private int logEventCount;
     private int rootEventCount;
+    private long logLimitDropped,rootLimitDropped,rateDropped,duplicates;
+    public static String state(){
+        PrivilegedActionCollector value=instance;if(value==null)return "not_initialized; requires_action_recording";
+        synchronized(value.rateLock){return "recording="+ActionRecorder.isRecording()+", log_events="+value.logEventCount
+            +", root_events="+value.rootEventCount+", log_limit_dropped="+value.logLimitDropped+", root_limit_dropped="+value.rootLimitDropped
+            +", rate_dropped="+value.rateDropped+", duplicate_filtered="+value.duplicates+", event_limit=2500; snapshots_require_DUMP";}
+    }
     private long rateWindowStarted;
     private int rateWindowEvents;
     @NonNull private String lastLogLine = "";
@@ -115,6 +122,7 @@ public final class PrivilegedActionCollector {
         long currentGeneration = generation.incrementAndGet();
         stopProcesses();
         synchronized (rateLock) {
+            logLimitDropped=rootLimitDropped=rateDropped=duplicates=0;
             logEventCount = 0;
             rootEventCount = 0;
             rateWindowStarted = 0L;
@@ -216,9 +224,10 @@ public final class PrivilegedActionCollector {
 
     private boolean acceptSystemLine(@NonNull String line) {
         synchronized (rateLock) {
-            if (logEventCount >= MAX_LOG_EVENTS || !acceptRateLocked()) return false;
+            if (logEventCount >= MAX_LOG_EVENTS) {logLimitDropped++;return false;}
+            if (!acceptRateLocked()) return false;
             long now = SystemClock.elapsedRealtime();
-            if (line.equals(lastLogLine) && now - lastLogLineAt < 750L) return false;
+            if (line.equals(lastLogLine) && now - lastLogLineAt < 750L) {duplicates++;return false;}
             lastLogLine = line;
             lastLogLineAt = now;
             logEventCount++;
@@ -232,7 +241,7 @@ public final class PrivilegedActionCollector {
             rateWindowStarted = now;
             rateWindowEvents = 0;
         }
-        if (rateWindowEvents >= MAX_EVENTS_PER_SECOND) return false;
+        if (rateWindowEvents >= MAX_EVENTS_PER_SECOND) {rateDropped++;return false;}
         rateWindowEvents++;
         return true;
     }
@@ -270,7 +279,8 @@ public final class PrivilegedActionCollector {
             while (isCurrent(expectedGeneration) && (line = reader.readLine()) != null) {
                 if (!line.toUpperCase(Locale.US).contains("EV_KEY")) continue;
                 synchronized (rateLock) {
-                    if (rootEventCount >= MAX_ROOT_KEY_EVENTS || !acceptRateLocked()) continue;
+                    if (rootEventCount >= MAX_ROOT_KEY_EVENTS) {rootLimitDropped++;continue;}
+                    if (!acceptRateLocked()) continue;
                     rootEventCount++;
                 }
                 ActionRecorder.record(ActionRecorder.SOURCE_ROOT_INPUT,

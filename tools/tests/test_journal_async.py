@@ -14,9 +14,9 @@ STUBS = {
       private final java.io.File root; public Context(java.io.File r){root=r;}
       public Context getApplicationContext(){return this;}
       public java.io.File getFilesDir(){return root;}
-      public java.io.File getCacheDir(){return root;} }""",
+      public java.io.File getCacheDir(){return root;} public String getPackageName(){return "fixture";}public void sendBroadcast(Intent i){} }""",
     "android/os/SystemClock.java": """package android.os; public class SystemClock {
-      public static long elapsedRealtime(){return System.nanoTime()/1000000;} }""",
+      public static long elapsedRealtime(){return System.nanoTime()/1000000;} public static long uptimeMillis(){return elapsedRealtime();} }""",
     "android/os/Build.java": """package android.os; public class Build {
       public static String MANUFACTURER="test",MODEL="test";
       public static class VERSION { public static String RELEASE="test"; public static int SDK_INT=28;} }""",
@@ -63,9 +63,9 @@ STUBS = {
             for(int i=0;i<2000;i++)DiagnosticJournal.info("bounded","record-"+i);
             ThreadPoolExecutor writer=(ThreadPoolExecutor)field("ASYNC");
             check(writer.getQueue().size()<=128);
-            check(((AtomicInteger)field("droppedAsyncEntries")).get()>0);
+            check(((DiagnosticWriteQueue)field("WRITES")).dropped()>0);
           }
-          check(exported().contains("diagnostic_queue_dropped="));
+          check(exported().contains("diagnostic_queue_dropped_total="));
         }
         static void clearAndDisableFenceQueuedWrites()throws Exception{
           DiagnosticJournal.initialize(context,true);
@@ -102,6 +102,17 @@ STUBS = {
       }""",
 }
 
+STUBS.update({
+    "android/os/Process.java":"package android.os;public class Process {public static int myPid(){return 123;}}",
+    "android/content/Intent.java": "package android.content;public class Intent{public static int FLAG_RECEIVER_REGISTERED_ONLY=1;public Intent(String s){} public Intent setPackage(String s){return this;} public Intent addFlags(int i){return this;}public Intent putExtra(String s,boolean b){return this;}public boolean getBooleanExtra(String s,boolean b){return b;}}",
+    "android/content/IntentFilter.java":"package android.content;public class IntentFilter{public IntentFilter(String s){}}",
+    "android/content/BroadcastReceiver.java":"package android.content;public abstract class BroadcastReceiver{public abstract void onReceive(Context c,Intent i);}",
+    "androidx/core/content/ContextCompat.java":"package androidx.core.content;import android.content.*;public class ContextCompat{public static int RECEIVER_NOT_EXPORTED=1;public static void registerReceiver(Context c,BroadcastReceiver b,IntentFilter f,int flag){}}",
+    "dezz/status/widget/AppProcessPolicy.java":"package dezz.status.widget;public class AppProcessPolicy{public static boolean isHudProcess(){return false;}}",
+    "dezz/status/widget/diagnostics/MainThreadWatchdog.java":"package dezz.status.widget.diagnostics;public class MainThreadWatchdog{public static void setEnabled(boolean b){}}",
+    "dezz/status/widget/diagnostics/CausalDiagnostics.java":'package dezz.status.widget.diagnostics;public class CausalDiagnostics{public static void debugChanged(boolean b){}public static void journalEvent(String a,String b){}public static String session(){return "fixture";}public static String snapshot(){return "sample";}}',
+})
+
 
 class JournalAsyncTest(unittest.TestCase):
     @classmethod
@@ -114,7 +125,7 @@ class JournalAsyncTest(unittest.TestCase):
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(text)
             sources.append(str(target))
-        sources.append(str(ROOT / "app/src/main/java/dezz/status/widget/diagnostics/DiagnosticJournal.java"))
+        sources.extend(str(ROOT / "app/src/main/java/dezz/status/widget/diagnostics" / name) for name in ("DiagnosticJournal.java","DiagnosticWriteQueue.java","DiagnosticFileSnapshot.java"))
         compiler = [shutil.which("javac")] if shutil.which("javac") else ["java", "com.sun.tools.javac.Main"]
         subprocess.run([*compiler, "-d", str(cls.root), *sources], check=True, capture_output=True)
 

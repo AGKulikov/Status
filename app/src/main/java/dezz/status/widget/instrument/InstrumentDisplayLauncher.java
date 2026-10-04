@@ -341,11 +341,14 @@ public final class InstrumentDisplayLauncher {
 
     static Integer readDimMode(Context app) {
         try {
+            dezz.status.widget.diagnostics.CausalDiagnostics.current().stage("dim_getter_started", "");
             Object menu = dimMenu(app);
             Object result = menu == null ? null : menu.getClass().getMethod("getNaviMode").invoke(menu);
+            dezz.status.widget.diagnostics.CausalDiagnostics.current().stage("dim_getter_returned", "menu_present=" + (menu!=null) + ", number=" + (result instanceof Number));
             return result instanceof Number ? ((Number) result).intValue() : null;
         } catch (Throwable unavailable) {
-            trace("DIM readback unavailable=" + unavailable.getClass().getSimpleName());
+            trace("DIM readback unavailable=" + dezz.status.widget.diagnostics.CausalDiagnostics.failure(unavailable));
+            dezz.status.widget.diagnostics.CausalDiagnostics.current().stage("dim_getter_failed", "error=" + dezz.status.widget.diagnostics.CausalDiagnostics.failure(unavailable));
             return null;
         }
     }

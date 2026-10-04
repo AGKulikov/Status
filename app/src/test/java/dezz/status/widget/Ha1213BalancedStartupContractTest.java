@@ -93,7 +93,7 @@ public final class Ha1213BalancedStartupContractTest {
         assertTrue(start.contains("new Intent(command)"));
         assertTrue(start.contains("drainPendingIntentScenarioCommands()"));
         assertTrue(start.contains("ScenarioTriggerReceiver.EXTRA_DEADLINE_ELAPSED"));
-        assertTrue(start.contains("command.getLongExtra"));
+        assertTrue(start.contains("acceptedCommand.getLongExtra"));
         assertFalse(start.contains("IntentScenarioController.deadlineAfter"));
     }
 

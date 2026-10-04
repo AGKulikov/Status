@@ -171,13 +171,21 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
         Button copy = button("Копировать");
         copy.setOnClickListener(view -> copyJournal());
         journalActions.addView(copy, weighted());
-        Button export = button("Экспорт TXT");
-        export.setOnClickListener(view -> exportAsync(0));
+        Button export = button("Отчёт ZIP");
+        export.setOnClickListener(view -> exportAsync(3));
         journalActions.addView(export, weightedWithMargin(8));
         Button clear = button("Очистить");
         clear.setOnClickListener(view -> confirmClearJournal());
         journalActions.addView(clear, weightedWithMargin(8));
         page.addView(journalActions, topMargin(8));
+        LinearLayout incidentActions = row();
+        Button incident = button("Проблема сейчас");
+        incident.setOnClickListener(view -> markProblem());
+        incidentActions.addView(incident, weighted());
+        Button legacyText = button("Экспорт TXT");
+        legacyText.setOnClickListener(view -> exportAsync(0));
+        incidentActions.addView(legacyText, weightedWithMargin(8));
+        page.addView(incidentActions, topMargin(8));
 
         page.addView(heading("Регистратор воспроизводимых действий", 21), topMargin(28));
         page.addView(label("Сессия фиксирует порядок: обычные кнопки руля "
@@ -186,7 +194,7 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
                 + "штатное появление окна ecarx.hvac.app и прямой openHvacMain; экраны и "
                 + "нажатия из спецвозможностей, запуск наших сервисов, Intent action без "
                 + "персональных extras и открытие/закрытие оверлеев. Файлы записываются "
-                + "немедленно, поэтому незавершённая при падении сессия не теряется."),
+                + "в фоне; при аварийном завершении последние записи могут не сохраниться."),
                 topMargin(6));
 
         recorderState = label("");
@@ -478,18 +486,34 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
         final long expected = lifecycleGeneration;
         try {
             exportWorker.execute(() -> {
-                File file = type == 0 ? DiagnosticJournal.copyForExport(this)
+                File file = type == 3 ? dezz.status.widget.diagnostics.DiagnosticBundle.create(this)
+                        : type == 0 ? DiagnosticJournal.copyForExport(this)
                         : ActionRecorder.copyLatestForExport(this, type == 2);
                 runOnUiThread(() -> {
                     if (!screenResumed || isFinishing() || isDestroyed()
                             || lifecycleGeneration != expected) return;
-                    share(file, type == 2 ? "application/json" : "text/plain");
+                    share(file, type == 3 ? "application/zip" : type == 2 ? "application/json" : "text/plain");
                 });
             });
         } catch (java.util.concurrent.RejectedExecutionException busy) {
             Toast.makeText(this, "Экспорт уже выполняется; дождитесь завершения",
                     Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void markProblem() {
+        if (!DiagnosticJournal.isEnabled()) {
+            Toast.makeText(this, "Сначала включите подробную запись. Прошлые события восстановить нельзя.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        String[] labels = {"VA / кнопки", "Белая полоса / приборка", "Телефон", "Медиа", "Карта / HUD", "HOME пассажира", "Другая проблема"};
+        String[] reasons = {"user_va", "user_white_bar", "user_phone", "user_media", "user_map", "user_passenger_home", "user_other"};
+        new AlertDialog.Builder(this).setTitle("Какая проблема сейчас?").setItems(labels, (dialog, which) -> {
+            String result = dezz.status.widget.diagnostics.CausalDiagnostics.capture(reasons[which], true);
+            boolean accepted = result.contains("/incident-");
+            Toast.makeText(this, accepted ? "Метка принята. Через несколько секунд сохраните отчёт ZIP."
+                    : "Снимок уже запрошен; подождите несколько секунд", Toast.LENGTH_LONG).show();
+        }).show();
     }
 
     private void copyJournal() {
@@ -507,8 +531,10 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
                 .setMessage("Файлы отдельных сессий регистратора останутся.")
                 .setNegativeButton("Отмена", null)
                 .setPositiveButton("Очистить", (dialog, which) -> {
-                    DiagnosticJournal.clear();
-                    refreshJournal();
+                    try { exportWorker.execute(() -> { DiagnosticJournal.clear(); runOnUiThread(this::refreshJournal); }); }
+                    catch (java.util.concurrent.RejectedExecutionException busy) {
+                        Toast.makeText(this, "Дождитесь завершения экспорта", Toast.LENGTH_SHORT).show();
+                    }
                 })
                 .show();
     }

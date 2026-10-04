@@ -83,7 +83,7 @@ public final class DriverPanelActionExecutor {
                 case INTENT:
                     Intent command = new Intent(shortcut.target);
                     if (!shortcut.packageName.isEmpty()) command.setPackage(shortcut.packageName);
-                    context.sendBroadcast(command);
+                    context.sendBroadcast(dezz.status.widget.diagnostics.DiagnosticIntentTrace.attach(context, command));
                     return;
                 case RULE:
                     executeRule(shortcut.target);
@@ -97,12 +97,16 @@ public final class DriverPanelActionExecutor {
                             shortcut.commandCycleValues);
                     CarControlCommand resolved = TrunkControlSafety.resolve(requested,
                             host.carControlState(shortcut.target));
-                    Runnable executeCar = () -> CarIntegrations.get(context).executeControl(
-                            resolved,
-                            (success, message) -> {
-                                if (!success) toast(message == null
-                                        ? "Команда автомобиля не выполнена" : message);
-                            });
+                    dezz.status.widget.diagnostics.CausalDiagnostics.Span origin=dezz.status.widget.diagnostics.CausalDiagnostics.current();
+                    Runnable executeCar = origin.wrap(() -> {
+                        dezz.status.widget.diagnostics.CausalDiagnostics.Span trace=dezz.status.widget.diagnostics.CausalDiagnostics.begin(
+                                "driver-car", "operation="+shortcut.command+", control="+shortcut.target,10000);
+                        trace.run(() -> CarIntegrations.get(context).executeControl(resolved,(success,message)->{
+                            trace.finish(success?"callback_success":"callback_failed","effect=unobserved");
+                            if(!success){dezz.status.widget.diagnostics.CausalDiagnostics.capture("driver_car_failed",false);
+                                toast(message==null?"Команда автомобиля не выполнена":message);}
+                        }));
+                    });
                     if (TrunkControlSafety.confirmOpeningIfNeeded(
                             anchor != null ? anchor.getContext() : context, resolved, executeCar)) return;
                     executeCar.run();
@@ -116,6 +120,7 @@ public final class DriverPanelActionExecutor {
                             shortcut.target, anchor);
             }
         } catch (RuntimeException error) {
+            dezz.status.widget.diagnostics.CausalDiagnostics.current().fail("driver_handler", error);
             dezz.status.widget.diagnostics.DiagnosticJournal.warn("button-action",
                     "stage=driver_handler_failed, kind="+shortcut.kind.name()+", reason="+error.getClass().getSimpleName());
             toast("Действие не выполнено: " + shortcut.title);
@@ -299,10 +304,10 @@ public final class DriverPanelActionExecutor {
         List<IntentActionRule> rules = new IntentActionRuleStore(preferences).loadStrict();
         for (IntentActionRule rule : rules) {
             if (!rule.enabled || !rule.id.equals(ruleId)) continue;
-            context.sendBroadcast(new Intent(context, ScenarioTriggerReceiver.class)
+            context.sendBroadcast(dezz.status.widget.diagnostics.DiagnosticIntentTrace.attach(context, new Intent(context, ScenarioTriggerReceiver.class)
                     .setAction(ScenarioTriggerReceiver.ACTION_TRIGGER)
                     .putExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_ID, rule.id)
-                    .putExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_TOKEN, rule.triggerToken));
+                    .putExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_TOKEN, rule.triggerToken)));
             return;
         }
         throw new IllegalArgumentException("Missing rule");

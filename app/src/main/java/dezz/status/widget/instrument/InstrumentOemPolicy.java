@@ -7,6 +7,13 @@ public final class InstrumentOemPolicy {
     public static boolean suppressWhiteBar(boolean enabled, int naviMode) {
         return enabled && naviMode == 3;
     }
+    public static String appOpState(String output) {
+        if (output == null) return "no_output";
+        java.util.regex.Matcher match = java.util.regex.Pattern.compile("(?m)^\\s*SYSTEM_ALERT_WINDOW:\\s*(allow|deny|ignore|default|foreground|errored)(?:;|\\s|$)").matcher(output);
+        if (match.find()) return match.group(1);
+        if (output.toLowerCase(java.util.Locale.ROOT).contains("permission")) return "permission_error";
+        return "not_reported";
+    }
     public static boolean appOpMatches(String output, boolean denied) {
         if (output == null) return false;
         return java.util.regex.Pattern.compile("(?m)^\\s*SYSTEM_ALERT_WINDOW:\\s*"

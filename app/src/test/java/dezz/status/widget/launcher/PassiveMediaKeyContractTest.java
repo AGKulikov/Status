@@ -73,7 +73,7 @@ public final class PassiveMediaKeyContractTest {
         assertFalse(early.contains("appendLocked("));
         assertFalse(record.contains("DISK_LOCK"));
         assertFalse(journal.contains("CallerRunsPolicy"));
-        assertTrue(journal.contains("new ArrayBlockingQueue<>(128)"));
+        assertTrue(journal.contains("new DiagnosticWriteQueue(256, 64, ASYNC::execute)"));
         assertTrue(journal.contains("status-journal-writer"));
     }
 

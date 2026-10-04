@@ -2475,11 +2475,12 @@ public class WidgetService extends Service {
             // Reload before lookup so a broadcast accepted from the latest device-protected
             // preferences cannot execute an older in-memory target after a settings edit.
             if (reloadRules) intentScenarioController.reconfigure();
-            intentScenarioController.triggerRuleId(
-                    command.getStringExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_ID),
-                    command.getStringExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_TOKEN),
-                    command.getStringExtra(ScenarioTriggerReceiver.EXTRA_RULE_FINGERPRINT),
-                    command.getLongExtra(ScenarioTriggerReceiver.EXTRA_DEADLINE_ELAPSED, 0L));
+            final Intent acceptedCommand = command;
+            dezz.status.widget.diagnostics.DiagnosticIntentTrace.receive(acceptedCommand, () -> intentScenarioController.triggerRuleId(
+                    acceptedCommand.getStringExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_ID),
+                    acceptedCommand.getStringExtra(ScenarioTriggerReceiver.EXTRA_TRIGGER_TOKEN),
+                    acceptedCommand.getStringExtra(ScenarioTriggerReceiver.EXTRA_RULE_FINGERPRINT),
+                    acceptedCommand.getLongExtra(ScenarioTriggerReceiver.EXTRA_DEADLINE_ELAPSED, 0L)));
         }
         reconcileExplicitScenarioRuntimeOverride(false);
         reconcileTemporaryScenarioHeadlessHost(false);

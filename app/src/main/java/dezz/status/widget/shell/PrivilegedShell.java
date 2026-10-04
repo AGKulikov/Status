@@ -17,6 +17,8 @@
 
 package dezz.status.widget.shell;
 
+import dezz.status.widget.diagnostics.CausalDiagnostics;
+
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.pm.PackageManager;
@@ -289,33 +291,52 @@ public class PrivilegedShell {
 
     /** Resolve mutable state after waiting for the transport queue, not when enqueuing. */
     public void runCommand(java.util.function.Supplier<String> command, CommandCallback callback) {
-        executor.execute(() -> {
-            ConnectionStorage.Endpoint endpoint = ensureEndpoint();
-            if (endpoint == null) {
-                mainHandler.post(() -> callback.onResult(null, "No privileged transport available"));
-                return;
-            }
+        CausalDiagnostics.Span trace = CausalDiagnostics.begin("priv-shell", "cached_endpoint=" + (activeEndpoint.get()!=null), 10_000);
+        try { executor.execute(trace.wrap(() -> {
+            trace.stage("worker_started", "");
             ShellTransport transport = null;
             try {
+                trace.stage("discovery_started", "");
+                ConnectionStorage.Endpoint endpoint = ensureEndpoint();
+                if (endpoint == null) {
+                    deliverCommand(trace, callback, null, "No privileged transport available", "no_transport"); return;
+                }
+                trace.stage("connect_started", "transport=" + endpoint.transport);
                 transport = open(endpoint);
+                trace.stage("command_supplier_started", "");
                 String resolved = command.get();
                 if (resolved == null) {
-                    mainHandler.post(() -> callback.onResult(null, "Command superseded"));
-                    return;
+                    deliverCommand(trace, callback, null, "Command superseded", "superseded"); return;
                 }
+                trace.stage("exec_started", "command_and_output_not_logged=true");
                 String output = transport.exec(resolved);
-                mainHandler.post(() -> callback.onResult(output, null));
+                trace.stage("transport_returned", "output_chars=" + (output==null?0:output.length()) + ", exit_code=unavailable");
+                deliverCommand(trace, callback, output, null, "none");
             } catch (Exception e) {
                 Log.w(TAG, "runCommand failed", e);
-                // Endpoint may have died (head unit reboot, port reshuffle). Invalidate so
-                // the next call re-discovers.
-                activeEndpoint.set(null);
-                storage.clear();
-                mainHandler.post(() -> callback.onResult(null, e.getMessage()));
+                activeEndpoint.set(null); storage.clear();
+                trace.stage("transport_failed", "error=" + CausalDiagnostics.failure(e));
+                deliverCommand(trace, callback, null, e.getMessage(), CausalDiagnostics.failure(e));
             } finally {
                 if (transport != null) transport.close();
             }
-        });
+        })); } catch (java.util.concurrent.RejectedExecutionException rejected) {
+            trace.fail("executor_rejected", rejected); throw rejected;
+        }
+    }
+
+    private void deliverCommand(CausalDiagnostics.Span trace, CommandCallback callback,
+            String output, String error, String reason) {
+        final long queued = android.os.SystemClock.uptimeMillis();
+        trace.stage("callback_main_queued", "reason=" + reason);
+        if (!mainHandler.post(trace.wrap(() -> {
+            trace.stage("callback_started", "main_wait_ms=" + (android.os.SystemClock.uptimeMillis()-queued));
+            try {
+                callback.onResult(output,error);
+                trace.finish("none".equals(reason) ? "callback_returned" : "failed", "reason=" + reason + ", effect=unobserved");
+                if (!"none".equals(reason) && !"superseded".equals(reason)) CausalDiagnostics.capture("shell_failure", false);
+            } catch (RuntimeException failure) { trace.fail("callback_failed",failure); throw failure; }
+        }))) trace.finish("callback_rejected", "main_looper_unavailable=true");
     }
 
     /**

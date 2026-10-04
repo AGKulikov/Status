@@ -15,6 +15,7 @@ import dezz.status.widget.car.CarIntegrationFactory;
 import dezz.status.widget.car.CarIntegrations;
 import dezz.status.widget.car.InstrumentTsrAccess;
 import dezz.status.widget.diagnostics.DiagnosticJournal;
+import dezz.status.widget.diagnostics.CausalDiagnostics;
 import dezz.status.widget.shell.PrivilegedShell;
 
 /** These settings affect the stock driver display, independently of any Natro panel preset. */
@@ -123,6 +124,8 @@ public final class InstrumentOemController {
     }
     private void scheduleWhiteBar() {
         whiteGeneration++;
+        DiagnosticJournal.infoAsync("instrument-oem", "white_bar_scheduled generation=" + whiteGeneration
+                + ", enabled=" + whiteBarEnabled + ", observing=" + observing + ", shell_busy=" + shellBusy);
         whiteAttempt = 0;
         main.removeCallbacks(verifyWhiteBar);
         // A stream of mode notifications cannot keep moving the existing deadline.
@@ -134,20 +137,30 @@ public final class InstrumentOemController {
     }
     private void applyWhiteBarNow() {
         whiteScheduled = false;
-        if (shellBusy) return; // completion will reconcile the newest generation.
+        if (shellBusy) { DiagnosticJournal.infoAsync("instrument-oem", "white_bar_waiting_for_prior_command=true"); return; }
         final long owner = whiteGeneration;
         shellBusy = true;
         whiteAttempt++;
         final int[] modes = {-1, -1};
         final boolean[] requested = {false};
         final boolean[] wrote = {false};
-        PrivilegedShell.get(context).runCommand(() -> {
+        final boolean[] sdkAvailable = {false};
+        CausalDiagnostics.Span trace = CausalDiagnostics.begin("white-bar", "generation=" + owner
+                + ", attempt=" + whiteAttempt + ", enabled=" + whiteBarEnabled, 7_000);
+        trace.run(() -> PrivilegedShell.get(context).runCommand(() -> {
+            trace.stage("global_mode_read_started", "");
             modes[0] = Settings.Global.getInt(context.getContentResolver(), "NaviMode", -1);
+            trace.stage("sdk_mode_read_started", "global_mode=" + modes[0]);
             Integer actual = whiteBarEnabled ? InstrumentDisplayLauncher.readDimMode(context) : null;
+            sdkAvailable[0] = actual != null && actual >= 1 && actual <= 3;
             modes[1] = actual == null || actual < 1 || actual > 3 ? modes[0] : actual;
             boolean deny = InstrumentOemPolicy.suppressWhiteBar(whiteBarEnabled, modes[1]);
+            trace.stage("mode_resolved", "global_mode=" + modes[0] + ", sdk_mode=" + actual
+                    + ", selected_mode=" + modes[1] + ", source=" + (sdkAvailable[0]?"SDK":"Global_fallback")
+                    + ", expected_appop=" + (deny?"deny":"allow"));
             requested[0] = deny;
             wrote[0] = forceWhiteApply || lastWhiteDeny == null || lastWhiteDeny != deny;
+            trace.stage("appop_submitted", "write=" + wrote[0]);
             String read = "appops get com.ecarx.dimmenu SYSTEM_ALERT_WINDOW";
             return wrote[0] ? "appops set com.ecarx.dimmenu SYSTEM_ALERT_WINDOW "
                     + (deny ? "deny" : "allow") + " && " + read : read;
@@ -155,6 +168,15 @@ public final class InstrumentOemController {
             shellBusy = false;
             boolean deny = requested[0];
             boolean success = error == null && InstrumentOemPolicy.appOpMatches(output, deny);
+            trace.finish(success ? "readback_matched" : "readback_failed", "generation=" + owner
+                    + ", current_generation=" + whiteGeneration + ", global_mode=" + modes[0]
+                    + ", selected_mode=" + modes[1] + ", sdk_available=" + sdkAvailable[0]
+                    + ", expected=" + (deny?"deny":"allow") + ", readback=" + InstrumentOemPolicy.appOpState(output)
+                    + ", transport_error=" + (error!=null) + ", wrote=" + wrote[0]
+                    + ", window=" + InstrumentPanelActivity.windowState() + ", physical_pixels=unobserved");
+            if (!success) CausalDiagnostics.capture("white_bar_readback_failed",false);
+            else if (whiteBarEnabled && Boolean.TRUE.equals(lastWhiteDeny) && !deny)
+                CausalDiagnostics.capture("white_bar_mode_left_navigation",false);
             forceWhiteApply = !success;
             if (success) {
                 lastWhiteDeny = deny;
@@ -179,6 +201,6 @@ public final class InstrumentOemController {
             whitePending = null;
             if (callback != null) callback.complete(success, whiteStatus);
             if (whiteBarEnabled) main.postDelayed(verifyWhiteBar, 5000);
-        });
+        }));
     }
 }

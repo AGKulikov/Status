@@ -29,6 +29,7 @@ public class ColdStartReplay {
  static class Settings {static boolean canDrawOverlays(Context c){return true;}static class Global {static int mode=3;static int getInt(Object c,String key,int fallback){return mode;}}}
  static class InstrumentDisplayLauncher {static Integer actual=3;static Integer readDimMode(Context c){return actual;}}
  static class InstrumentPanelActivity {static Object windowState(){return "visible";}}
+ static class CausalDiagnostics {static Span begin(String c,String d,long t){return new Span();}static void capture(String r,boolean manual){}static class Span{void stage(String p,String d){}void finish(String p,String d){}void run(Runnable r){r.run();}}}
  static class DiagnosticJournal {static void infoAsync(String t,String s){}}
  interface Result {void complete(boolean ok,String s);}
  interface Callback {void accept(String result,String error);}
@@ -41,7 +42,7 @@ public class ColdStartReplay {
   static void complete(){Command q=pending.remove();String c=q.command.get();executed.add(c);if(c.startsWith("appops set"))op=c.contains("WINDOW deny")?"deny":"allow";String result="SYSTEM_ALERT_WINDOW: "+op;new Handler().post(()->q.callback.accept(result,null));}
  }
  static class White {
-  Context context=new Context();Object preferences=new Object();Handler main=new Handler();boolean whiteBarEnabled=true,whiteOwned,whiteScheduled,shellBusy,forceWhiteApply=true;
+  Context context=new Context();Object preferences=new Object();Handler main=new Handler();boolean whiteBarEnabled=true,whiteOwned,whiteScheduled,shellBusy,forceWhiteApply=true,observing;
   Boolean lastWhiteDeny;long whiteGeneration;int whiteAttempt;String whiteStatus;Result whitePending;
   final Runnable applyWhiteBar=this::applyWhiteBarNow;
   final Runnable verifyWhiteBar=()->{if(whiteBarEnabled&&!shellBusy&&!whiteScheduled){whiteAttempt=0;applyWhiteBarNow();}};

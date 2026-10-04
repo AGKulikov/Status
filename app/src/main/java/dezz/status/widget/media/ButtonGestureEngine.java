@@ -16,6 +16,7 @@ public final class ButtonGestureEngine {
     }
     public interface Output {
         void action(String group, String gesture);
+        default void diagnostic(int code, String gesture, String outcome) {}
         void stockSrc(); void volume(int direction); void driveMenu(int direction); void starHeld();
     }
     private static final class State {
@@ -36,7 +37,7 @@ public final class ButtonGestureEngine {
         State state = states.get(code);
         if (pressed) {
             if (state == null) { state = new State(); states.put(code, state); }
-            if (state.down) return; // Repeated DOWN must not restart long/10-second timers.
+            if (state.down) { output.diagnostic(code, "down", "duplicate_down"); return; } // Repeated DOWN must not restart long/10-second timers.
             final State held = state;
             held.down = true; held.longFired = false;
             cancel(held.longTimer); cancel(held.starTimer);
@@ -50,11 +51,11 @@ public final class ButtonGestureEngine {
                     () -> { if (held.down) output.starHeld(); });
             return;
         }
-        if (state == null || !state.down) return;
+        if (state == null || !state.down) { output.diagnostic(code, "up", "unpaired_up"); return; }
         state.down = false;
         cancel(state.longTimer); cancel(state.starTimer);
         state.longTimer = state.starTimer = null;
-        if (state.longFired) return;
+        if (state.longFired) { output.diagnostic(code, "up", "long_already_dispatched"); return; }
         if (button == VehicleButton.DM) {
             int direction = code == 300001 ? -1 : 1;
             if (bindings.driveMenuShowing()) { output.driveMenu(direction); return; }
@@ -71,6 +72,7 @@ public final class ButtonGestureEngine {
             state.clicks = 0;
             dispatch(code, String.valueOf(count));
         } else {
+            output.diagnostic(code, String.valueOf(count), "awaiting_multiclick");
             final State pending = state;
             state.clickTimer = scheduler.after(MULTI_CLICK_MS, () -> {
                 int clicks = pending.clicks;
@@ -81,10 +83,11 @@ public final class ButtonGestureEngine {
     }
     private void dispatch(int code, String gesture) {
         VehicleButton button = VehicleButton.fromCode(code);
-        if (!bindings.enabled(button)) return;
+        if (!bindings.enabled(button)) { output.diagnostic(code, gesture, "disabled"); return; }
         String group = VehicleButton.bindingGroup(code);
         int id = bindings.actionId(group, gesture);
-        if (id == 0) return;
+        if (id == 0) { output.diagnostic(code, gesture, "no_assignment"); return; }
+        output.diagnostic(code, gesture, "dispatch");
         // DEX slh.y 0x019a..0x01e8: only SINGLE SRC redirects in stock multimedia mode.
         if (button == VehicleButton.SRC && "1".equals(gesture)
                 && bindings.stockMediaSource() && id != ButtonAction.SOURCE.id) output.stockSrc();

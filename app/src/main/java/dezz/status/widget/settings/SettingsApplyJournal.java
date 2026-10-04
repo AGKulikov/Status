@@ -37,8 +37,10 @@ public final class SettingsApplyJournal {
         return commit(context,changes,Collections.emptyMap());
     }
     public static boolean commit(Context context,Map<SharedPreferences,Map<String,Object>> changes,Map<String,SettingsFileChange> files) {
-        try { commit(context,changes,files,stage->{});return true; }
-        catch(Exception failure){android.util.Log.e("SettingsApply","Apply failed; working keys recovered or journal retained",failure);return false;}
+        dezz.status.widget.diagnostics.CausalDiagnostics.Span trace = dezz.status.widget.diagnostics.CausalDiagnostics.begin(
+                "settings-apply", "stores="+changes.size()+", files="+files.size(), 5000);
+        try { commit(context,changes,files,stage->trace.stage(stage,"values=not_logged"));trace.finish("applied","readback=true");return true; }
+        catch(Exception failure){trace.fail("apply_or_recovery",failure);android.util.Log.e("SettingsApply","Apply failed; working keys recovered or journal retained",failure);return false;}
     }
     static void commit(Context context,Map<SharedPreferences,Map<String,Object>> changes,Fault fault)throws Exception {
         commit(context,changes,Collections.emptyMap(),fault);
@@ -112,6 +114,7 @@ public final class SettingsApplyJournal {
         int schema=journal.getInt("schema");
         if(schema!=1&&schema!=SCHEMA)throw new IOException("Unknown settings journal schema");
         String state=journal.getString("state");
+        dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("settings-recovery", "wal_found schema="+schema+", state="+state);
         if(!state.equals("PREPARED")&&!state.equals("APPLIED"))throw new IOException("Unknown settings journal state");
         JSONArray stores=journal.getJSONArray("stores");if(stores.length()>128)throw new IOException("Too many settings stores");
         Set<String> seen=new HashSet<>();List<SharedPreferences> targets=new ArrayList<>();List<Map<String,Object>> original=new ArrayList<>();

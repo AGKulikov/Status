@@ -37,6 +37,9 @@ public final class ScenarioTriggerReceiver extends BroadcastReceiver {
             "ru.natro.statuswidget.internal.EXECUTE_INTENT_RULE";
 
     @Override public void onReceive(Context context, Intent intent) {
+        dezz.status.widget.diagnostics.DiagnosticIntentTrace.receive(intent, () -> receiveTraced(context, intent));
+    }
+    private void receiveTraced(Context context, Intent intent) {
         dezz.status.widget.diagnostics.ActionRecorder.record(
                 dezz.status.widget.diagnostics.ActionRecorder.SOURCE_SERVICE,
                 "BROADCAST_RECEIVED",
@@ -51,6 +54,7 @@ public final class ScenarioTriggerReceiver extends BroadcastReceiver {
         if (intent == null || !IntentScenarioController.isExplicitlyTargetedAt(
                 intent, context.getPackageName())) {
             Log.w(TAG, "Ignored trigger that was not targeted at this package");
+            dezz.status.widget.diagnostics.DiagnosticJournal.warn("scenario", "Ignored trigger that was not targeted at this package");
             return;
         }
 
@@ -60,6 +64,7 @@ public final class ScenarioTriggerReceiver extends BroadcastReceiver {
                 && !preferences.hudPanelEnabled.get()
                 && !preferences.dimMenuPanelEnabled.get()) {
             Log.i(TAG, "Ignored trigger while every integration surface is disabled");
+            dezz.status.widget.diagnostics.DiagnosticJournal.warn("scenario", "Ignored trigger while every integration surface is disabled");
             return;
         }
 
@@ -85,6 +90,7 @@ public final class ScenarioTriggerReceiver extends BroadcastReceiver {
         }
         if (rule == null) {
             Log.w(TAG, "Ignored unknown or disabled Intent trigger");
+            dezz.status.widget.diagnostics.DiagnosticJournal.warn("scenario", "Ignored unknown or disabled Intent trigger");
             return;
         }
 
@@ -97,10 +103,11 @@ public final class ScenarioTriggerReceiver extends BroadcastReceiver {
                 .putExtra(EXTRA_RULE_FINGERPRINT, rule.executionFingerprint())
                 .putExtra(EXTRA_DEADLINE_ELAPSED, deadlineElapsed);
         try {
-            context.startForegroundService(service);
+            context.startForegroundService(dezz.status.widget.diagnostics.DiagnosticIntentTrace.attach(context, service));
         } catch (RuntimeException failure) {
             // No durable command is intentionally retained: retrying a TOGGLE after an ambiguous
             // process/system failure could reverse an already-applied physical action.
+            dezz.status.widget.diagnostics.DiagnosticJournal.warn("scenario", "foreground_service_start_failed error=" + dezz.status.widget.diagnostics.CausalDiagnostics.failure(failure));
             Log.e(TAG, "Could not start foreground service for Intent rule " + rule.id, failure);
         }
     }
