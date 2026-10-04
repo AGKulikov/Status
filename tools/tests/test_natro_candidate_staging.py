@@ -25,7 +25,8 @@ class CandidateStagingTest(unittest.TestCase):
             "VERSION_NAME": "3.0.0", "VERSION_CODE": "208021333",
             "RUNNER_TEMP": str(self.root), "ANDROID_HOME": str(self.root / "sdk"),
             "GITHUB_SHA": "a" * 40, "GITHUB_RUN_ID": "123",
-            "REUSE_NAVIGATOR_300": "false",
+            "REUSE_NAVIGATOR_300": "false", "REUSE_NAVIGATOR_302": "false",
+            "HELPER_CHANGED": "false",
         })
         self.environment.start()
         self.addCleanup(self.environment.stop)
@@ -64,6 +65,7 @@ class CandidateStagingTest(unittest.TestCase):
         self.assertEqual(0, manifest["unitTests"]["failures"])
         self.assertEqual("pending", manifest["physicalKx11Verification"])
         self.assertTrue(manifest["navigator"]["pairRequired"])
+        self.assertFalse(manifest["helperChanged"])
         self.assertEqual(["classes19.dex"], manifest["navigator"]["allowedPayloadChanges"])
         self.assertEqual(self.dex.read_bytes(), (self.out / "classes19.dex").read_bytes())
         self.assertEqual(hashlib.sha256(self.dex.read_bytes()).hexdigest(), manifest["navigator"]["patchSha256"])
@@ -95,6 +97,24 @@ class CandidateStagingTest(unittest.TestCase):
         with self.assertRaises(KeyError):
             self.stage()
         self.assertFalse((self.out / "candidate.json").exists())
+
+    def test_302_reuse_refuses_a_different_navigator_patch(self):
+        with patch.dict(os.environ, {"REUSE_NAVIGATOR_302": "true"}):
+            with self.assertRaisesRegex(ValueError, "exact verified 3.0.2 patch"):
+                self.stage()
+        self.assertFalse((self.out / "candidate.json").exists())
+
+    def test_conflicting_reuse_baselines_stop_publication(self):
+        with patch.dict(os.environ, {"REUSE_NAVIGATOR_300": "true", "REUSE_NAVIGATOR_302": "true"}):
+            with self.assertRaisesRegex(ValueError, "exactly one verified Navigator"):
+                self.stage()
+        self.assertFalse((self.out / "candidate.json").exists())
+
+    def test_helper_update_is_explicit_in_candidate(self):
+        with patch.dict(os.environ, {"HELPER_CHANGED": "true"}):
+            self.stage()
+        manifest = json.loads((self.out / "candidate.json").read_text())
+        self.assertTrue(manifest["helperChanged"])
 
     def test_streaming_hashes_support_python_310(self):
         payload = self.root / "hash-fixture"

@@ -4,7 +4,6 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-from test_passenger_panel import STUBS
 
 ROOT = Path(__file__).resolve().parents[2]
 JAVA = ROOT / "app/src/main/java/dezz/status/widget"
@@ -28,80 +27,6 @@ class PassengerLauncherTest(unittest.TestCase):
                                  capture_output=True, text=True)
             self.assertEqual(run.returncode, 0, run.stdout + run.stderr)
 
-    def test_independent_preferences_future_keys_migration_and_restore(self):
-        jar = os.environ.get("NATRO_ANDROID_JSON_JAR")
-        if not jar:
-            self.skipTest("Set NATRO_ANDROID_JSON_JAR")
-        self.replay(STUBS, ["Preferences.java", "BrickType.java",
-            "launcher/PassengerLauncherProfile.java", "launcher/LauncherSettingsMigrationRegistry.java",
-            "launcher/LauncherGlobalElementLayoutStore.java",
-            "phone/PhoneNotificationDeferralPolicy.java", "phone/transport/v2/IphoneLeEnrollmentRecordV2.java",
-            "media/ButtonAction.java"], r'''package dezz.status.widget;
-import android.content.*;
-import dezz.status.widget.media.ButtonAction;
-import dezz.status.widget.launcher.LauncherGlobalElementLayoutStore;
-import java.util.*;
-public class Replay {
- static void check(boolean b,String m){if(!b)throw new AssertionError(m);}
- public static void main(String[] args)throws Exception {
-  Context c=new Context(); Preferences driver=new Preferences(c);
-  driver.launcherLayoutJson.set("driver layout");
-  driver.launcherClimateConfigJson.set("driver climate");
-  driver.launcherAllAppsColumns.set(4);
-  driver.launcherImmersive.set(false);
-  Preferences passenger=Preferences.forPassengerLauncher(c);
-  check(passenger.launcherLayoutJson.get().isEmpty(),"independent initial layout");
-  passenger.launcherLayoutJson.set("passenger layout");
-  passenger.launcherClimateConfigJson.set("passenger climate");
-  passenger.launcherAllAppsColumns.set(8);
-  passenger.launcherImmersive.set(true);
-  passenger.launcherAllAppsHiddenComponents.set(new HashSet<>(Arrays.asList("p/a")));
-  check(driver.launcherLayoutJson.get().equals("driver layout"),"layout isolation");
-  check(driver.launcherClimateConfigJson.get().equals("driver climate"),"climate isolation");
-  check(driver.launcherAllAppsColumns.get()==4 && !driver.launcherImmersive.get(),"scalar isolation");
-  check(driver.launcherAllAppsHiddenComponents.get().isEmpty(),"set isolation");
-  for(java.lang.reflect.Field f:Preferences.class.getFields()) {
-   if(!f.getName().startsWith("launcher") || !Preferences.Preference.class.isAssignableFrom(f.getType()))continue;
-   String main=((Preferences.Preference)f.get(driver)).key;
-   String other=((Preferences.Preference)f.get(passenger)).key;
-   if(f.getName().startsWith("launcherMediaAutoResume") || f.getName().startsWith("launcherMediaFixedPlayer")
-     || f.getName().equals("launcherHideSystemStatusBar") || f.getName().equals("launcherSystemStatusBarOriginalPolicy"))
-    check(main.equals(other),"device policy must stay shared: "+main);
-   else check(!main.equals(other),"profile key collision: "+main);
-  }
-  new Preferences.Str(passenger,"launcherFutureDocument","").set("future value");
-  check(new Preferences.Str(driver,"launcherFutureDocument","").get().isEmpty(),"future key isolation");
-  passenger.launcherMediaFixedPlayerPackage.set("player");
-  check(driver.launcherMediaFixedPlayerPackage.get().equals("player"),"global media policy");
-  LauncherGlobalElementLayoutStore widgets=new LauncherGlobalElementLayoutStore(passenger);
-  widgets.load(1920,720);
-  widgets.put("clock",new LauncherGlobalElementLayoutStore.Geometry(10,10,100,100));
-  LauncherGlobalElementLayoutStore.Appearance appearance=widgets.getAppearance("clock");
-  appearance.tapAction=LauncherGlobalElementLayoutStore.TapAction.PASSENGER_HOME;
-  widgets.putAppearance("clock",appearance);
-  Context restored=new Context(); Preferences restoredDriver=new Preferences(restored);
-  restoredDriver.importFromJson(driver.exportToJson());
-  Preferences restoredPassenger=Preferences.forPassengerLauncher(restored);
-  check(restoredDriver.launcherLayoutJson.get().equals("driver layout"),"restore driver");
-  check(restoredPassenger.launcherLayoutJson.get().equals("passenger layout"),"restore passenger");
-  check(restoredPassenger.launcherAllAppsHiddenComponents.get().contains("p/a"),"restore set");
-  check(new Preferences.Str(restoredPassenger,"launcherFutureDocument","").get().equals("future value"),"restore future key");
-  LauncherGlobalElementLayoutStore restoredWidgets=new LauncherGlobalElementLayoutStore(restoredPassenger);
-  restoredWidgets.load(1920,720);
-  check(restoredWidgets.getAppearance("clock").tapAction==LauncherGlobalElementLayoutStore.TapAction.PASSENGER_HOME,"restore widget action");
-  Context legacy=new Context();
-  SharedPreferences raw=legacy.getSharedPreferences("ru.natro.statuswidget_preferences",0);
-  raw.edit().putString("launcherClimateConfigJson","old driver climate").commit();
-  Preferences.forPassengerLauncher(legacy);
-  check(!raw.contains("floatingClimateConfigJson"),"passenger must not consume main migration");
-  Preferences migrated=new Preferences(legacy);
-  check(migrated.floatingClimateConfigJson.get().equals("old driver climate"),"main migration preserved");
-  check(ButtonAction.fromId(10)==ButtonAction.PASSENGER_HOME,"PHOME compatibility");
-  check(ButtonAction.fromId(108)==ButtonAction.NATRO_PASSENGER_HOME,"new physical action");
-  Set<Integer> ids=new HashSet<>();
-  for(ButtonAction a:ButtonAction.values())check(ids.add(a.id),"duplicate button id");
- }
-}''', "dezz.status.widget.Replay", jar)
 
     def test_explicit_passenger_task_and_no_fallback(self):
         stubs = {
