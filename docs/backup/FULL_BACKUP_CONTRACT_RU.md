@@ -253,3 +253,9 @@ DE/no_backup/natro-backup/settings-apply-v1.json и тот же maintenance.lock
 Постоянные темы, размер текста, выбранные разделы и прокрутка остаются в прежнем
 natro_settings_ui_v1 и включаются целиком. Шрифты пользовательских панелей не меняются.
 Это ревизия политики новых владельцев, не заявление о пройденном crash/KX11 gate.
+
+Recovery журнала Apply выбирает CE через application context и DE через
+createDeviceProtectedStorageContext, без скрытого Android API. Приложение с DE
+в качестве default context отвергается явно, как в BackupStorage. Имена, типы,
+defaults и формат журнала не изменены. HUD/LCA сохраняет тот же last-report.txt;
+новые сообщения ошибок не означают наличие резервного оригинала на устройстве.

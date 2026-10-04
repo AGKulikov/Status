@@ -93,7 +93,10 @@ public final class SettingsApplyJournal {
             if(!seen.add(namespace.device+":"+namespace.name))throw new IOException("Duplicate settings participant");
             Map<String,Object> before=decode(item.getJSONObject("before")),after=decode(item.getJSONObject("after"));
             if(!before.keySet().equals(after.keySet()))throw new IOException("Settings journal key mismatch");
-            Context storage=namespace.device?context.createDeviceProtectedStorageContext():context.createCredentialProtectedStorageContext();
+            Context application=context.getApplicationContext();
+            if(application.isDeviceProtectedStorage())
+                throw new IOException("Settings recovery requires a credential-protected application context");
+            Context storage=namespace.device?application.createDeviceProtectedStorageContext():application;
             SharedPreferences target=storage.getSharedPreferences(namespace.name,Context.MODE_PRIVATE);
             if(state.equals("PREPARED")){
                 Map<String,?> actual=target.getAll();

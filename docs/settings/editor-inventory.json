@@ -2901,25 +2901,25 @@
       "forms": [
         {
           "dialogs": 0,
-          "line": 96,
+          "line": 97,
           "method": "installContent",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 102,
+          "line": 103,
           "method": "buildContent",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 595,
+          "line": 596,
           "method": "showMediaPlayerPicker",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 642,
+          "line": 643,
           "method": "showMediaPlayerChoices",
           "numeric_controls": 0
         }
@@ -3002,7 +3002,7 @@
       ],
       "numeric_controls": 3,
       "path": "app/src/main/java/dezz/status/widget/MediaPanelSettingsActivity.java",
-      "sha256": "8f7d1efad494d14fef048e89b749dd7b42fec514090ad08ae633874cfc0b36de"
+      "sha256": "133810db75c121a0affded65a664b8d4b17211d2ea8fe0d97692d76b1a2633cf"
     },
     {
       "class": "dezz.status.widget.MqttSettingsActivity",

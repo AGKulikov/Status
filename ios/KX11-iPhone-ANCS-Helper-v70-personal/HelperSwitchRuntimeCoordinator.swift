@@ -1586,9 +1586,10 @@ public final class HelperSwitchRuntimeCoordinator {
                 }
             }
         }
-        let identifier = Thread.isMainThread
-            ? begin()
-            : DispatchQueue.main.sync(execute: begin)
+        // UIKit explicitly permits beginBackgroundTask on a non-main thread.
+        // Never synchronously wait for the UI queue here: the stop deadline is
+        // already armed and owner shutdown must keep progressing while UI stalls.
+        let identifier = begin()
         recoveryBackgroundTask = identifier
         recoveryBackgroundTaskStartedAtMs = identifier == .invalid ? nil : now
         onDiagnosticEvent?(

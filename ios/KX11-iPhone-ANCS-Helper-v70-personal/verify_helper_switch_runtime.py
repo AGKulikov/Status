@@ -261,6 +261,13 @@ def verify_app_and_single_owner() -> None:
     assert "UIApplication.shared.endBackgroundTask" in runtime
     assert "same_role_drain fired plannedMs=" in runtime
     assert "ble_recovery_background begin" in runtime
+    # FIELD-001: a suspended/busy main queue must not hold the BLE owner queue
+    # after its stop deadline has already been armed. This is a source gate,
+    # not a replacement for an iPhone suspension/reconnect acceptance test.
+    background_begin = runtime.split("    private func beginRecoveryBackgroundTask(", 1)[1].split(
+        "    private func expireRecoveryBackgroundTask", 1)[0]
+    assert "DispatchQueue.main.sync" not in background_begin
+    assert "let identifier = begin()" in background_begin
     assert "ble_recovery target_start totalMs=" in runtime
 
     with (ROOT / "KX11ANCSHelper/Info.plist").open("rb") as handle:

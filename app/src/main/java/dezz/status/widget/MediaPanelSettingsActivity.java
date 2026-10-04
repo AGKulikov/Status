@@ -59,6 +59,7 @@ public final class MediaPanelSettingsActivity extends SettingsLauncherProfileAct
     private MediaPanelConfigStore store;
     private MediaPanelConfig config;
     private MediaPanelView preview;
+    private FrameLayout previewHost;
     @Override public View settingsPreview(){return previewHost;}
     private LinearLayout elementList;
     private PanelEditScheduler editScheduler;
@@ -257,7 +258,7 @@ public final class MediaPanelSettingsActivity extends SettingsLauncherProfileAct
         previewTitle.setTypeface(Typeface.DEFAULT, Typeface.BOLD);
         previewColumn.addView(previewTitle, new LinearLayout.LayoutParams(match(), dp(38)));
 
-        FrameLayout previewHost = new FrameLayout(this);
+        previewHost = new FrameLayout(this);
         GradientDrawable hostBackground = new GradientDrawable();
         hostBackground.setColor(Color.rgb(8, 12, 18));
         hostBackground.setCornerRadius(dp(22));

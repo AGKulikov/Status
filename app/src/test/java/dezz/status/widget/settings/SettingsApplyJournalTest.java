@@ -48,4 +48,22 @@ public class SettingsApplyJournalTest {
         catch(IllegalStateException expected){}
         assertEquals(10,store.getInt("width",0));SettingsApplyJournal.recover(context);assertEquals(10,store.getInt("width",0));
     }
+    @Test public void credentialAndDeviceStoresWithSameNameRecoverIndependently()throws Exception {
+        Context context=RuntimeEnvironment.getApplication();
+        SharedPreferences credential=context.getSharedPreferences("journal-domains",0);
+        SharedPreferences device=context.createDeviceProtectedStorageContext().getSharedPreferences("journal-domains",0);
+        credential.edit().clear().putInt("width",10).commit();
+        device.edit().clear().putInt("width",30).commit();
+        SettingsApplyJournal.register(credential,"journal-domains",false);
+        SettingsApplyJournal.register(device,"journal-domains",true);
+        Map<SharedPreferences,Map<String,Object>> changes=new LinkedHashMap<>();
+        changes.put(credential,Collections.singletonMap("width",20));
+        changes.put(device,Collections.singletonMap("width",40));
+        try{SettingsApplyJournal.commit(context,changes,stage->{if(stage.equals("store:1"))throw new ProcessStopped();});fail();}
+        catch(ProcessStopped expected){}
+        // Even when the caller holds a DE context, a CE participant stays CE.
+        SettingsApplyJournal.recover(context.createDeviceProtectedStorageContext());
+        assertEquals(10,credential.getInt("width",0));
+        assertEquals(30,device.getInt("width",0));
+    }
 }
