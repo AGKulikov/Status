@@ -100,6 +100,7 @@ public final class BackupMaintenance implements AutoCloseable {
             if(running==null)throw new IOException("Cannot inspect application processes");
             for(ActivityManager.RunningAppProcessInfo process:running) {
                 if(process.uid!=android.os.Process.myUid()||process.pid==android.os.Process.myPid())continue;
+                if(process.processName==null)throw new IOException("Unknown application process");
                 if(!process.processName.equals(context.getPackageName())
                         &&!process.processName.startsWith(context.getPackageName()+":"))continue;
                 CountDownLatch acknowledged=new CountDownLatch(1);int[] result={android.app.Activity.RESULT_CANCELED};

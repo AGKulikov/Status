@@ -55,7 +55,7 @@ public final class Ha1136RegressionContractTest {
         assertTrue(enqueue > save);
         assertTrue(source.contains("StatusWidget/ANCS-icons"));
         assertTrue(source.contains("simple-icons@16/icons/"));
-        assertTrue(source.contains("new Download(bytes, \"svg\")"));
+        assertTrue(source.contains("new Download(bytes, \"svg\", url)"));
         assertTrue(source.contains("itunes.apple.com/lookup?bundleId="));
     }
 

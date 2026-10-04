@@ -30,6 +30,9 @@ import java.util.regex.Pattern;
  */
 public final class SettingsBackNavigationContractTest {
     private static final String[] SHARED_CHROME_DETAILS = {
+            "FullBackupActivity.java",
+            "HudLcaPatchActivity.java",
+            "SettingsAppearanceActivity.java",
             "AllAppsSettingsActivity.java",
             "ClimatePanelSettingsActivity.java",
             "DimMenuPanelSettingsActivity.java",
@@ -49,6 +52,7 @@ public final class SettingsBackNavigationContractTest {
     };
 
     private static final String[][] EXPLICIT_JAVA_DETAILS = {
+            {"PhoneAppIconsActivity.java", "Button back = button(\"‹ Назад\")", "back.setOnClickListener(v -> finish())"},
             {"AdbSettingsActivity.java", "button(\"← Назад\", this::finish)", "header.addView(back)"},
             {"LanTransferActivity.java", "button(\"← Назад\", this::finish)", "root.addView(button(\"← Назад\", this::finish))"},
             {"AboutActivity.java", "binding.backButton",
@@ -158,6 +162,16 @@ public final class SettingsBackNavigationContractTest {
         Set<String> expected = new LinkedHashSet<>();
         expected.add("SettingsHubActivity");
         expected.add("LauncherActivity");
+        expected.add("PassengerLauncherActivity");
+        String[][] inherited = {{"PassengerAllAppsSettingsActivity", "AllAppsSettingsActivity"},
+            {"PassengerFavoritesSettingsActivity", "DriverFavoritesSettingsActivity"},
+            {"PassengerPanelSettingsActivity", "DriverPanelSettingsActivity"},
+            {"PassengerLauncherSettingsActivity", "LauncherSettingsActivity"}};
+        for (String[] screen : inherited) {
+            assertTrue(javaSource(screen[0]+".java").contains("extends "+screen[1]));
+            assertTrue(javaSource(screen[1]+".java").contains("SettingsBackNavigation.install(this,"));
+            expected.add(screen[0]);
+        }
         for (String screen : SHARED_CHROME_DETAILS) expected.add(activityName(screen));
         for (String[] contract : EXPLICIT_JAVA_DETAILS) {
             expected.add(activityName(contract[0]));

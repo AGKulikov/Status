@@ -18,7 +18,7 @@ public final class Ha1216LauncherFirstFrameContractTest {
         String launcher = source("LauncherActivity.java");
         String create = between(launcher, "protected void onCreate(",
                 "protected void onNewIntent(");
-        int deferredPreferences = create.indexOf("new Preferences(this, false)");
+        int deferredPreferences = create.indexOf("createLauncherPreferences(false)");
         int setContent = create.indexOf("setContentView(root);");
         int bootstrap = create.indexOf("startLauncherBootstrapNow();");
         int service = create.indexOf("navigationUiHandler.post(this::startImmediateHomeRuntime);");

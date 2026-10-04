@@ -40,7 +40,7 @@ public final class Ha1220IconOutlineScenarioContractTest {
         assertTrue(editor.contains("field != LocalField.ICON_OUTLINE_WIDTH"));
         assertTrue(editor.contains("Изменить цвет контура значка (старый сценарий)"));
         assertTrue(editor.contains("Изменить толщину контура значка (старый сценарий)"));
-        assertTrue(editor.contains("!isDriverGlyphTarget(targetId)"));
+        assertTrue(editor.contains("!isDriverGlyphTarget(targetId, passenger)"));
     }
 
     @Test public void driverAndHomeRenderTheOutlineOnTheGlyphMask() throws IOException {

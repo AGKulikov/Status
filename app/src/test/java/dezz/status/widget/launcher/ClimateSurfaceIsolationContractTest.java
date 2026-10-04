@@ -24,7 +24,7 @@ public final class ClimateSurfaceIsolationContractTest {
         String store = source("launcher/climate/ClimatePanelConfigStore.java");
 
         assertTrue(preferences.contains("floatingClimateConfigJson"));
-        assertTrue(preferences.contains("if (!prefs.contains(floatingClimateConfigJson.key))"));
+        assertTrue(preferences.contains("&& !prefs.contains(floatingClimateConfigJson.key))"));
         assertTrue(overlay.contains("preferences.floatingClimateConfigJson"));
         assertTrue(store.contains("Preferences.Str storage"));
         assertTrue(settings.contains("EXTRA_LAUNCHER_ONLY"));

@@ -312,7 +312,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupMaintenance.java": {
-      "sha256": "180f6672571656ea9c6243498c447e8768c03c0917502abd33ebea47615b0760",
+      "sha256": "ed303d3e832e7c24269111ef81b14000076b387fc6773c69f6df1df690f36953",
       "access_kinds": [
         "files",
         "preferences"
@@ -600,7 +600,7 @@
       ]
     },
     "navigator-mod/src/main/java/ru/natro/navigation/NavigatorBackupBridge.java": {
-      "sha256": "80c77719edc3fc417722cd1ce58bfb663996bfe6234299614ee8ffd4022216b4",
+      "sha256": "324cbce5a2e2ad85933e494138b2fad329c795fb1c7afe00b13ba82e6eebe50c",
       "access_kinds": [
         "files",
         "preferences"

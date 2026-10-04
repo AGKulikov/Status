@@ -201,12 +201,12 @@ public class DriverPanelOverlayContractTest {
         String settings = read(widget.resolve(
                 "DriverPanelSettingsActivity.java"));
 
-        assertTrue(controller.contains("LauncherAppCatalog.loadVisible(appContext, preferences)"));
+        assertTrue(controller.contains("LauncherAppCatalog.loadVisible(appContext, preferences, passenger)"));
         assertTrue(controller.contains("LauncherAppTileRenderer.render("));
         assertFalse(controller.contains("InstalledAppCatalog"));
-        assertTrue(controller.contains("preferences.launcherAllAppsColumns.get()"));
-        assertTrue(controller.contains("preferences.launcherAllAppsGapPx.get()"));
-        assertTrue(controller.contains("preferences.launcherAllAppsIconScalePercent.get()"));
+        assertTrue(controller.contains("preferences.passengerAllAppsColumns : preferences.launcherAllAppsColumns).get()"));
+        assertTrue(controller.contains("preferences.passengerAllAppsGapPx : preferences.launcherAllAppsGapPx).get()"));
+        assertTrue(controller.contains("preferences.passengerAllAppsIconScalePercent : preferences.launcherAllAppsIconScalePercent).get()"));
         assertTrue(controller.contains("grid.setPadding(dp(context, 16), dp(context, 16),"));
         assertTrue(controller.contains("title.setText(\"Все приложения\")"));
         assertTrue(controller.contains("FavoriteAppsConfigStore"));
@@ -214,12 +214,12 @@ public class DriverPanelOverlayContractTest {
         assertTrue(controller.contains("setDrawerEditMode(true)"));
         assertTrue(controller.contains("AppDrawerUninstallPolicy.canUninstall("));
         assertTrue(controller.contains(
-                "AppUninstallLauncher.request(context, app, attachedType)"));
+                "AppUninstallLauncher.request(PanelDisplayLauncher.scoped(context, displayId), app, attachedType)"));
         int uninstall = controller.indexOf(
                 "@Override public void uninstall(@NonNull Context context,");
         int dismiss = controller.indexOf("dismissAllApps();", uninstall);
         int request = controller.indexOf(
-                "AppUninstallLauncher.request(context, app, attachedType)", uninstall);
+                "AppUninstallLauncher.request(PanelDisplayLauncher.scoped(context, displayId), app, attachedType)", uninstall);
         assertTrue(uninstall >= 0);
         assertTrue(request >= 0);
         assertTrue(dismiss < 0 || dismiss > request);

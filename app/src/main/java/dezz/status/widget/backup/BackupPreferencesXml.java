@@ -108,16 +108,18 @@ public final class BackupPreferencesXml {
         Map<String,Object> values=new LinkedHashMap<>();
         if(entries.length()>100000)throw new IOException("Too many preference values");
         for(int i=0;i<entries.length();i++) {
-            JSONObject item=entries.getJSONObject(i);String key=item.getString("key");Object value;
+            JSONObject item=entries.getJSONObject(i);
+            if(!(item.get("key") instanceof String)||!(item.get("type") instanceof String))throw new IOException("Invalid preference record");
+            String key=item.getString("key");Object value,raw=item.get("value");
             switch(item.getString("type")) {
-                case "boolean": value=item.getBoolean("value");break;
-                case "int32": value=item.getInt("value");break;
-                case "int64": value=Long.parseLong(item.getString("value"));break;
-                case "float32": value=Float.intBitsToFloat((int)Long.parseLong(item.getString("value"),16));break;
-                case "string": value=item.getString("value");break;
+                case "boolean": if(!(raw instanceof Boolean))throw new IOException("Invalid boolean type");value=raw;break;
+                case "int32": if(!(raw instanceof Integer))throw new IOException("Invalid int32 type");value=raw;break;
+                case "int64": if(!(raw instanceof String)||!((String)raw).matches("-?(0|[1-9][0-9]*)"))throw new IOException("Invalid int64 type");value=Long.parseLong((String)raw);break;
+                case "float32": if(!(raw instanceof String)||!((String)raw).matches("[a-f0-9]{1,8}"))throw new IOException("Invalid float32 bits");value=Float.intBitsToFloat((int)Long.parseLong((String)raw,16));break;
+                case "string": if(!(raw instanceof String))throw new IOException("Invalid string type");value=raw;break;
                 case "stringSet":
                     Set<String> set=new LinkedHashSet<>();JSONArray members=item.getJSONArray("value");
-                    for(int n=0;n<members.length();n++)if(!set.add(members.getString(n)))throw new IOException("Duplicate set item");
+                    for(int n=0;n<members.length();n++)if(!(members.get(n) instanceof String)||!set.add(members.getString(n)))throw new IOException("Invalid/duplicate set item");
                     value=set;break;
                 default: throw new IOException("Unknown preference type");
             }

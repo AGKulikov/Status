@@ -167,7 +167,7 @@ public final class DriverPanelHa1085ContractTest {
         assertTrue(launcher.contains("LauncherAppCatalog.loadIncludingSystem(context)"));
         assertFalse(launcher.contains("if (!app.systemApp"));
         assertTrue(overlay.contains("LauncherAppCatalog.loadVisible("));
-        assertTrue(catalog.contains("ensureDefaultSystemVisibility(context, preferences, catalog)"));
+        assertTrue(catalog.contains("ensureDefaultSystemVisibility(context, preferences, catalog, passenger)"));
         assertTrue(catalog.contains("launcherSystemAppsDefaultApplied"));
         assertTrue(catalog.contains("isUserFacingPhone(app, defaultDialer)"));
         assertTrue(preferences.contains("launcherAllAppsHiddenComponents"));
@@ -223,7 +223,7 @@ public final class DriverPanelHa1085ContractTest {
         assertTrue(receiver.contains("!preferences.driverPanelEnabled.get()"));
         assertTrue(editor.contains("keepDriverActionSupported()"));
         assertTrue(editor.contains("targetScope == TargetScope.DRIVER"));
-        assertTrue(editor.contains("!isDriverFieldSupported(selectedTargetId, field)"));
+        assertTrue(editor.contains("!isDriverFieldSupported(selectedTargetId, field, TargetScope.PASSENGER"));
         assertTrue(editor.contains("WidgetServiceStarter.startIfNeeded(this)"));
         assertTrue(intentRules.contains("DriverPanelService.apply(this)"));
     }

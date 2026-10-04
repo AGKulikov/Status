@@ -22,7 +22,7 @@ final class NavigatorBackupBridge {
     static void start(Context source) {
         synchronized(LOCK) {
             if(context!=null)return;context=source.getApplicationContext();
-            frozen=journal().getBaseFile().exists();
+            frozen=hasJournal();
             HandlerThread thread=new HandlerThread("natro-window-backup");thread.start();worker=new Handler(thread.getLooper());
             context.registerReceiver(new BroadcastReceiver(){
                 @Override public void onReceive(Context c,Intent i){worker.post(NavigatorBackupBridge::process);}
@@ -36,6 +36,7 @@ final class NavigatorBackupBridge {
         catch(RuntimeException failure){return false;}
     }
     private static AtomicFile journal(){return new AtomicFile(new File(context.getNoBackupFilesDir(),"natro-window-backup-v1.json"));}
+    private static boolean hasJournal(){File base=journal().getBaseFile();return base.exists()||new File(base.getPath()+".bak").exists();}
     private static JSONObject read()throws Exception {
         byte[] bytes=journal().readFully();if(bytes.length>512*1024)throw new IOException("Oversized window journal");
         return new JSONObject(new String(bytes,StandardCharsets.UTF_8));
@@ -102,10 +103,10 @@ final class NavigatorBackupBridge {
                 String token=request.getString("token"),operation=request.getString("operation");
                 if(token==null||!token.matches("[a-f0-9-]{36}"))throw new IOException("Invalid token");
                 if("freeze".equals(operation)) {
-                    if(journal().getBaseFile().exists())throw new IOException("Previous window transaction needs recovery");
+                    if(hasJournal())throw new IOException("Previous window transaction needs recovery");
                     JSONArray values=snapshot();write(new JSONObject().put("token",token).put("before",values));frozen=true;
                     reply.putString("values",values.toString());
-                } else if(journal().getBaseFile().exists()) {
+                } else if(hasJournal()) {
                     JSONObject state=read();if(!token.equals(state.getString("token")))throw new IOException("Token mismatch");
                     if("apply".equals(operation)) {
                         String raw=request.getString("values");if(raw==null||raw.length()>384*1024)throw new IOException("Invalid window snapshot");

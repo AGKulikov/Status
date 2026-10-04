@@ -64,7 +64,7 @@ public final class DriverPanelPost1117ContractTest {
                 "attachedType, drawerWidth, metrics.heightPixels, drawerWindowX"));
         assertTrue(overlay.contains("FLAG_NOT_TOUCH_MODAL"));
         assertFalse(overlay.contains("drawerParams.leftMargin = drawerLeft"));
-        assertTrue(catalog.contains("ensureDefaultSystemVisibility(context, preferences, catalog)"));
+        assertTrue(catalog.contains("ensureDefaultSystemVisibility(context, preferences, catalog, passenger)"));
         assertTrue(catalog.contains("if (app.systemApp && !isUserFacingPhone"));
         assertTrue(catalog.contains(
                 "for (InstalledAppCatalog.App installed : InstalledAppCatalog.load(context))"));

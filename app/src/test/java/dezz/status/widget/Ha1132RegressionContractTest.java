@@ -83,7 +83,7 @@ public final class Ha1132RegressionContractTest {
         String catalog = source("settings/SettingsDestinationCatalog.java");
         String settings = source("LauncherSettingsActivity.java");
         String migration = source("launcher/LauncherSettingsMigrationRegistry.java");
-        assertTrue(catalog.contains("HOME(\"home\", \"Лаунчер\""));
+        assertTrue(catalog.contains("HOME(\"home\", \"Главный экран\""));
         assertTrue(catalog.contains("activity(\"home_behavior\", Group.HOME"));
         assertFalse(catalog.contains("activity(\"panel_media\", Group.HOME"));
         assertFalse(catalog.contains("activity(\"panel_information\", Group.HOME"));
@@ -131,14 +131,14 @@ public final class Ha1132RegressionContractTest {
         assertTrue(driver.contains(
                 "DriverInformationTileLayoutPolicy.naturalHeight(context, shortcut, 1f)"));
         assertTrue(driver.contains(
-                "AppUninstallLauncher.request(context, app, attachedType)"));
+                "AppUninstallLauncher.request(PanelDisplayLauncher.scoped(context, displayId), app, attachedType)"));
         assertTrue(uninstall.contains("window.setType(windowType)"));
         assertTrue(catalog.contains("ensureDefaultSystemVisibility("));
         assertTrue(catalog.contains("app.systemApp && !isUserFacingPhone"));
         assertTrue(catalog.contains("defaultDialer = fallbackPhonePackage(catalog)"));
         assertTrue(catalog.contains(
                 "return !defaultDialer.isEmpty() && defaultDialer.equals(app.packageName)"));
-        assertTrue(catalog.contains("preferences.launcherSystemAppsDefaultApplied.set(true)"));
+        assertTrue(catalog.contains("preferences.passengerSystemAppsDefaultApplied : preferences.launcherSystemAppsDefaultApplied).set(true)"));
     }
 
     private static String source(String relative) throws Exception {

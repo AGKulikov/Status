@@ -65,6 +65,33 @@ public class BackupReplay {
    if(value.equals("new-value")){recovered.rollback();check(read(live,"same.txt").equals("old-value"),"explicit rollback");}
    check(!recovered.hasUnfinishedRestore(),"journal completed");
   }
+
+  Map<String,Object> typed=new LinkedHashMap<>();
+  typed.put("bool",true);typed.put("int",Integer.MIN_VALUE);typed.put("long",Long.MAX_VALUE);
+  typed.put("float",-0.0f);typed.put("unicode","Ночь <&> 😀");typed.put("set",new LinkedHashSet<>(Arrays.asList("a","Ночь")));
+  File xml=new File(root,"typed.xml");BackupPreferencesXml.write(xml,typed);
+  check(BackupPreferencesXml.encode(typed).toString().equals(BackupPreferencesXml.encode(BackupPreferencesXml.read(xml)).toString()),"typed XML round trip");
+  check(BackupPreferencesXml.encode(typed).toString().equals(BackupPreferencesXml.encode(BackupPreferencesXml.decode(BackupPreferencesXml.encode(typed))).toString()),"typed manifest round trip");
+  for(String bad:new String[]{"[{\"key\":\"a\",\"type\":\"boolean\",\"value\":\"true\"}]","[{\"key\":\"a\",\"type\":\"int32\",\"value\":1.5}]","[{\"key\":\"a\",\"type\":\"float32\",\"value\":\"100000000\"}]"}) {
+   try{BackupPreferencesXml.decode(new JSONArray(bad));throw new AssertionError("preference coercion accepted");}catch(IOException expected){}
+  }
+  for(boolean failCommit:new boolean[]{false,true}) {
+   File scope=new File(root,"participant-"+failCommit),live=new File(scope,"live"),replacement=new File(scope,"new");
+   put(live,"value","old");put(replacement,"prefs/value","new");
+   Map<String,File> owners=new LinkedHashMap<>();owners.put("prefs",live);
+   BackupTransaction txp=new BackupTransaction(new File(scope,"control"),owners,Collections.emptyMap(),null)
+     .withParticipant(new BackupTransaction.Participant(){
+       public void apply(JSONObject m)throws Exception{if(!failCommit)throw new IOException("participant interrupted before commit");}
+       public void finish(JSONObject m,boolean committed)throws Exception{throw new IOException("participant unavailable");}
+     });
+   try{txp.apply(replacement,new JSONObject());throw new AssertionError("participant interruption lost");}catch(IOException expected){}
+   check(txp.hasUnfinishedRestore(),"participant keeps recovery journal");
+   final boolean[] decision={false};
+   BackupTransaction recovery=new BackupTransaction(new File(scope,"control"),owners,Collections.emptyMap(),null)
+     .withParticipant(new BackupTransaction.Participant(){public void apply(JSONObject m){}public void finish(JSONObject m,boolean committed){check(committed==failCommit,"durable participant decision");decision[0]=true;}});
+   recovery.recover();check(decision[0]&&!recovery.hasUnfinishedRestore(),"participant recovery completed");
+   check(read(live,"value").equals(failCommit?"new":"old"),"participant whole generation");
+  }
   File attack=new File(root,"target-attack");put(attack,"unknown/file","x");
   Map<String,File> roots=new LinkedHashMap<>();roots.put("prefs",new File(root,"attack-live"));
   put(roots.get("prefs"),"keep","unchanged");
@@ -76,7 +103,7 @@ public class BackupReplay {
 }'''
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);(root/'BackupReplay.java').write_text(harness)
-            classes=['BackupFiles','BackupJson','BackupCipher','BackupArchive','BackupTransaction']
+            classes=['BackupFiles','BackupJson','BackupCipher','BackupArchive','BackupTransaction','BackupPreferencesXml']
             sources=[str(ROOT/'app/src/main/java/dezz/status/widget/backup'/f'{name}.java') for name in classes]
             build=subprocess.run(['java','com.sun.tools.javac.Main','-cp',jar,'-d',tmp,str(root/'BackupReplay.java'),*sources],capture_output=True,text=True)
             self.assertEqual(build.returncode,0,build.stderr)
