@@ -51,9 +51,19 @@ def main():
     if not patch.is_file() or patch.stat().st_size < 10000:
         raise ValueError("Compiled Navigator patch is required for this pair")
     shutil.copy2(patch, out / "classes19.dex")
-    reuse_navigator = os.environ.get("REUSE_NAVIGATOR_300") == "true"
-    if reuse_navigator and sha256(patch) != "b73c91580683a0b8ccd85c746f5ee290bd70cc9ea9e54e397839a028be7cf142":
-        raise ValueError("Navigator reuse requires the exact verified 3.0.0 patch bytes")
+    reuse_300 = os.environ.get("REUSE_NAVIGATOR_300") == "true"
+    reuse_302 = os.environ.get("REUSE_NAVIGATOR_302") == "true"
+    if reuse_300 and reuse_302:
+        raise ValueError("Select exactly one verified Navigator for reuse")
+    compatible_pair = None
+    if reuse_300:
+        if sha256(patch) != "b73c91580683a0b8ccd85c746f5ee290bd70cc9ea9e54e397839a028be7cf142":
+            raise ValueError("Navigator reuse requires the exact verified 3.0.0 patch bytes")
+        compatible_pair = "Natro 3.0.0 / Navigator 30.3.0"
+    if reuse_302:
+        if sha256(patch) != "342a80e3e03351828395e3a5603658e07a68fe5ae602e2159d13ea622b31079a":
+            raise ValueError("Navigator reuse requires the exact verified 3.0.2 patch bytes")
+        compatible_pair = "Natro 3.0.2 / Navigator 30.3.0"
     manifest = {
         "versionName": version, "versionCode": code, "package": "ru.natro.statuswidget",
         "sourceCommit": os.environ["GITHUB_SHA"],
@@ -61,13 +71,14 @@ def main():
         "ciRunId": os.environ["GITHUB_RUN_ID"], "unitTests": counts,
         "unsignedSha256": sha256(unsigned),
         "navigator": {
-            "pairRequired": not reuse_navigator,
-            "compatiblePair": "Natro 3.0.0 / Navigator 30.3.0" if reuse_navigator else None,
+            "pairRequired": compatible_pair is None,
+            "compatiblePair": compatible_pair,
             "patch": "classes19.dex", "patchSha256": sha256(patch),
             "baselineVersion": "30.3.0-Natro-2.9.8",
             "baselineSha256": "b224bed5268469f620ab4bff3fec382aece868b9372450ff05f1f9176631280a",
             "allowedPayloadChanges": ["classes19.dex"],
         },
+        "helperChanged": os.environ.get("HELPER_CHANGED") == "true",
         "physicalKx11Verification": "pending", "browserVisualVerification": "pending",
     }
     (out / "candidate.json").write_text(json.dumps(manifest, indent=2) + "\n")
