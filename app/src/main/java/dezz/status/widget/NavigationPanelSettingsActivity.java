@@ -83,6 +83,8 @@ public final class NavigationPanelSettingsActivity extends SettingsLauncherProfi
         super.onStop();
     }
 
+    @Override protected void flushSettingsDraft() { if (config != null) store.save(config); }
+
     @NonNull
     private View buildContent() {
         LinearLayout screen = new LinearLayout(this);
@@ -145,7 +147,7 @@ public final class NavigationPanelSettingsActivity extends SettingsLauncherProfi
 
         addButton(root, "Настроить кнопки избранных маршрутов…", v ->
                 startActivity(new Intent(this, FavoriteRoutesSettingsActivity.class)));
-        addButton(root, "Вернуть сетку по умолчанию", v -> new AlertDialog.Builder(this)
+        addButton(root, "Вернуть сетку по умолчанию", v -> new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Сбросить сетку навигации?")
                 .setMessage("Видимость, положение, размеры и масштаб элементов вернутся "
                         + "к исходным значениям. Размер всего блока HOME не изменится.")
@@ -193,7 +195,7 @@ public final class NavigationPanelSettingsActivity extends SettingsLauncherProfi
         previewColumn.addView(previewHost, new LinearLayout.LayoutParams(match(), 0, 1f));
 
         TextView saved = new TextView(this);
-        saved.setText("✓ Изменения сохраняются автоматически");
+        saved.setText("Предпросмотр · сохранение по «Применить»");
         saved.setTextSize(13);
         saved.setGravity(Gravity.CENTER);
         saved.setAlpha(.72f);
@@ -390,7 +392,7 @@ public final class NavigationPanelSettingsActivity extends SettingsLauncherProfi
         value.setGravity(Gravity.END);
         value.setMinWidth(dp(84));
         value.setText(formatter.format(current));
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, "");
         seek.setMax(safeMaximum - minimum);
         seek.setProgress(current - minimum);
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {

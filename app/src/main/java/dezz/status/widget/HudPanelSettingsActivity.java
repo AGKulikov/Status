@@ -242,7 +242,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
             }
         }
         if (external.isEmpty()) {
-            new AlertDialog.Builder(this)
+            new dezz.status.widget.settings.SettingsDialogBuilder(this)
                     .setTitle("HUD · Display ID 2")
                     .setMessage("В дампе магнитолы HUD подтверждён как постоянный Display ID 2 "
                             + "с поверхностью 1920×1080. Сейчас Android его не сообщает; "
@@ -259,11 +259,11 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                 selected = index;
             }
         }
-        new AlertDialog.Builder(this).setTitle("Подтверждённый HUD · ID 2")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Подтверждённый HUD · ID 2")
                 .setSingleChoiceItems(labels, selected, (dialog, which) -> {
                     HudDisplaySelector.remember(config, external.get(which));
                     persist(false);
-                    dialog.dismiss();
+                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     updateStatus();
                 })
                 .setNegativeButton("Отмена", null).show();
@@ -280,7 +280,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         for (int index = 0; index < types.size(); index++) {
             labels[index] = types.get(index).category + " · " + types.get(index).label;
         }
-        new AlertDialog.Builder(this).setTitle("Добавить на HUD")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Добавить на HUD")
                 .setItems(labels, (dialog, which) -> {
                     HudElementType type = types.get(which);
                     if (type == HudElementType.NAV_MAP && findMapElement() != null) {
@@ -401,7 +401,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         options.setMinLines(5);
         options.setSingleLine(false);
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(item.type.label)
                 .setView(scroll)
                 .setPositiveButton("Применить", null)
@@ -454,7 +454,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                         canvas.updateConfig(config);
                         updateSelection(item);
                         persist(false);
-                        dialog.dismiss();
+                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     } catch (Exception error) {
                         Toast.makeText(this, "Проверьте параметры: " + error.getMessage(),
                                 Toast.LENGTH_LONG).show();
@@ -822,7 +822,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         form.addView(text("Технические JSON-стили скрыты из обычных настроек. Цвета и состав "
                 + "карты меняются элементами выше.", 12, 0xFF95A0AF), marginTop(12));
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Независимая карта HUD")
                 .setView(scroll)
                 .setPositiveButton("Применить", null)
@@ -979,7 +979,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                         canvas.updateConfig(config);
                         updateSelection(item);
                         persist(false);
-                        dialog.dismiss();
+                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     } catch (Exception error) {
                         Toast.makeText(this, "Проверьте параметры: " + error.getMessage(),
                                 Toast.LENGTH_LONG).show();
@@ -1016,7 +1016,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
             controls.add(new RoadEventModeControl(spec.tag, mode));
         }
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Дорожные события HUD")
                 .setView(scroll)
                 .setPositiveButton("Применить", null)
@@ -1028,7 +1028,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                         profile.setRoadEventMode(control.tag,
                                 roadEventModeValue(control.spinner.getSelectedItemPosition()));
                     }
-                    if (persistNavigationConfiguration(navigation)) dialog.dismiss();
+                    if (persistNavigationConfiguration(navigation)) dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                 }));
         showSafeDialog(dialog);
     }
@@ -1156,7 +1156,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                 + "и прозрачность наследуются от штатного блока Навигатора.",
                 12, 0xFFB8C0CC), marginTop(8));
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Основная карта и окно Навигатора")
                 .setView(scroll)
                 .setPositiveButton("Применить", null)
@@ -1207,7 +1207,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                                     "не удалось проверить сохранённые настройки Навигатора");
                         }
                         NavigationHudEndpointService.requestConfigurationRefresh(this);
-                        dialog.dismiss();
+                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                         Toast.makeText(this, "Настройки Навигатора сохранены",
                                 Toast.LENGTH_SHORT).show();
                     } catch (Exception error) {
@@ -1713,7 +1713,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                 + "подложку HUD. Тень на HUD не используется.",
                 12, 0xFF95A0AF), marginTop(10));
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Горизонтальный ряд HUD")
                 .setView(scroll)
                 .setPositiveButton("Применить", null)
@@ -1760,7 +1760,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                         canvas.updateConfig(config);
                         updateSelection(group);
                         persist(false);
-                        dialog.dismiss();
+                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     } catch (RuntimeException error) {
                         Toast.makeText(this, "Проверьте параметры: " + error.getMessage(),
                                 Toast.LENGTH_LONG).show();
@@ -1904,7 +1904,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                 + "Тень на HUD отключена и в настройках отсутствует.",
                 12, 0xFF95A0AF), marginTop(6));
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Подложка HUD")
                 .setView(scroll)
                 .setPositiveButton("Применить", null)
@@ -1928,7 +1928,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                     canvas.updateConfig(config);
                     updateSelection(item);
                     persist(false);
-                    dialog.dismiss();
+                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                 }));
         showSafeDialog(dialog);
     }
@@ -2109,7 +2109,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         reset.setOnClickListener(view -> confirmReset());
         form.addView(reset, marginTop(12));
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Параметры HUD")
                 .setView(scroll)
                 .setPositiveButton("Применить", null)
@@ -2145,7 +2145,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                     config.normalize();
                     canvas.updateConfig(config);
                     persist(false);
-                    dialog.dismiss();
+                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                 }));
         showSafeDialog(dialog);
     }
@@ -2215,7 +2215,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         });
         form.addView(restore, marginTop(8));
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Штатный HUD ECARX")
                 .setView(scroll)
                 .setPositiveButton("Применить", null)
@@ -2260,7 +2260,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                             CarIntegration.StockHudDisplayCategory.PHONE,
                             originalPhone, phone.isChecked(), forceAllCategories[0],
                             preferences.hudStockPhone);
-                    dialog.dismiss();
+                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                 }));
         showSafeDialog(dialog);
     }
@@ -2288,7 +2288,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
     }
 
     private void confirmReset() {
-        new AlertDialog.Builder(this).setTitle("Сбросить HUD?")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Сбросить HUD?")
                 .setMessage("Будут заменены сетка и все элементы HUD. Остальные панели "
                         + "приложения не изменятся.")
                 .setPositiveButton("Сбросить", (dialog, which) -> {
@@ -2341,7 +2341,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
     private void deleteSelected() {
         HudElementConfig item = canvas.selected();
         if (item == null) return;
-        new AlertDialog.Builder(this).setTitle("Удалить «" + item.title + "»?")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Удалить «" + item.title + "»?")
                 .setMessage("Цель сценариев " + item.automationId
                         + " останется в сохранённых сценариях, но перестанет отображаться.")
                 .setPositiveButton("Удалить", (dialog, which) -> {
@@ -2370,6 +2370,8 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         HudPresentationService.notifyConfigChanged(this);
         if (toast) Toast.makeText(this, "HUD сохранён", Toast.LENGTH_SHORT).show();
     }
+
+    @Override protected void flushSettingsDraft() { persist(false); }
 
     private void updateStatus() {
         if (status == null) return;
@@ -2490,7 +2492,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                                double step, @NonNull String suffix) {
         TextView valueLabel = label("");
         parent.addView(valueLabel, marginTop(8));
-        SeekBar control = new SeekBar(this);
+        SeekBar control = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, step, suffix);
         int steps = Math.max(1, (int) Math.round((maximum - minimum) / step));
         control.setMax(steps);
         int initialProgress = (int) Math.round((initial - minimum) / step);

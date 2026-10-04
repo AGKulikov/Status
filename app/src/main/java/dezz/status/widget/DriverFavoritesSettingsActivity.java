@@ -228,7 +228,7 @@ public class DriverFavoritesSettingsActivity extends dezz.status.widget.settings
         TextView sizeLabel = text("Размер иконки: " + shortcut.iconSizePx + " px",
                 13, 0xFFC7C7CC);
         body.addView(sizeLabel, rowParams());
-        SeekBar size = new SeekBar(this);
+        SeekBar size = new dezz.status.widget.settings.SettingsSeekBar(this, LauncherShortcutStore.MIN_ICON_SIZE_PX, 1, " px");
         size.setMax(LauncherShortcutStore.MAX_ICON_SIZE_PX
                 - LauncherShortcutStore.MIN_ICON_SIZE_PX);
         size.setProgress(shortcut.iconSizePx - LauncherShortcutStore.MIN_ICON_SIZE_PX);
@@ -322,7 +322,7 @@ public class DriverFavoritesSettingsActivity extends dezz.status.widget.settings
 
     private void editAppearance(@NonNull LauncherShortcutStore.Shortcut shortcut) {
         String[] choices = {"Иконка", "Фон", "Цвет иконки", "Цвет подписи"};
-        new AlertDialog.Builder(this).setTitle("Оформление · " + shortcut.title)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Оформление · " + shortcut.title)
                 .setItems(choices, (dialog, which) -> {
                     if (which == 0) {
                         VectorIconPickerDialog.Option none = VectorIconPickerDialog.option(
@@ -375,7 +375,7 @@ public class DriverFavoritesSettingsActivity extends dezz.status.widget.settings
             labels[index] = value.title + " · " + value.columns + " × "
                     + value.visibleRows + " [" + value.id + "]";
         }
-        new AlertDialog.Builder(this).setTitle("Избранное водителя")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Избранное водителя")
                 .setItems(labels, (dialog, which) -> openPanel(panels.get(which).id))
                 .setNegativeButton("Отмена", null).show();
     }
@@ -384,7 +384,7 @@ public class DriverFavoritesSettingsActivity extends dezz.status.widget.settings
         EditText name = new EditText(this);
         name.setSingleLine(true);
         name.setHint("Например: Климат и поездка");
-        new AlertDialog.Builder(this).setTitle("Новая панель избранного")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Новая панель избранного")
                 .setView(name)
                 .setPositiveButton("Создать", (dialog, which) -> {
                     DriverFavoritesPanelConfig created =
@@ -399,7 +399,7 @@ public class DriverFavoritesSettingsActivity extends dezz.status.widget.settings
         name.setSingleLine(true);
         name.setText(panel.title);
         name.setSelection(name.length());
-        new AlertDialog.Builder(this).setTitle("Название панели")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Название панели")
                 .setView(name)
                 .setPositiveButton("Сохранить", (dialog, which) -> {
                     panel.title = name.getText().toString();
@@ -410,7 +410,7 @@ public class DriverFavoritesSettingsActivity extends dezz.status.widget.settings
     }
 
     private void removePanel() {
-        new AlertDialog.Builder(this).setTitle("Удалить панель?")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Удалить панель?")
                 .setMessage(panel.title + "\nЯчейки сохранятся в резервном документе.")
                 .setPositiveButton("Удалить", (dialog, which) -> {
                     panelStore.remove(panel.id);
@@ -438,7 +438,7 @@ public class DriverFavoritesSettingsActivity extends dezz.status.widget.settings
                                @NonNull String suffix, @NonNull IntSetter setter) {
         TextView label = text(title + ": " + current + suffix, 14, 0xFFC7C7CC);
         host.addView(label, rowParams());
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, suffix);
         seek.setMax(Math.max(0, maximum - minimum));
         seek.setProgress(Math.max(0, Math.min(maximum - minimum, current - minimum)));
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -468,7 +468,7 @@ public class DriverFavoritesSettingsActivity extends dezz.status.widget.settings
                                 @NonNull IntSetter setter) {
         TextView label = text(title + ": " + current + suffix, 14, 0xFFC7C7CC);
         host.addView(label, rowParams());
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, suffix);
         seek.setMax(Math.max(0, maximum - minimum));
         seek.setProgress(Math.max(0, Math.min(maximum - minimum, current - minimum)));
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -496,7 +496,7 @@ public class DriverFavoritesSettingsActivity extends dezz.status.widget.settings
         int current = panel.autoCloseSeconds;
         TextView label = text(autoCloseLabel(current), 14, 0xFFC7C7CC);
         host.addView(label, rowParams());
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, DriverFavoritesPanelConfig.MIN_AUTO_CLOSE_SECONDS - 1, 1, " с").firstValue("Выкл.");
         int maximumProgress = DriverFavoritesPanelConfig.MAX_AUTO_CLOSE_SECONDS
                 - DriverFavoritesPanelConfig.MIN_AUTO_CLOSE_SECONDS + 1;
         seek.setMax(maximumProgress);

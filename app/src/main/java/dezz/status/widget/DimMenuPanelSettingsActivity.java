@@ -218,7 +218,7 @@ public final class DimMenuPanelSettingsActivity extends dezz.status.widget.setti
                 value -> config.borderColor = value);
 
         MaterialButton reset = button("Вернуть расположение и оформление по умолчанию");
-        reset.setOnClickListener(v -> new AlertDialog.Builder(this)
+        reset.setOnClickListener(v -> new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Сбросить оформление панели?")
                 .setMessage("Действия и главный переключатель сохранятся.")
                 .setNegativeButton("Отмена", null)
@@ -357,7 +357,7 @@ public final class DimMenuPanelSettingsActivity extends dezz.status.widget.setti
         field.setText(config.title);
         field.setSelectAllOnFocus(true);
         field.setInputType(InputType.TYPE_CLASS_TEXT);
-        new AlertDialog.Builder(this).setTitle("Заголовок панели").setView(field)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Заголовок панели").setView(field)
                 .setNegativeButton("Отмена", null)
                 .setPositiveButton("Сохранить", (dialog, which) -> {
                     config.title = field.getText().toString();
@@ -417,7 +417,7 @@ public final class DimMenuPanelSettingsActivity extends dezz.status.widget.setti
         int safe = Math.max(minimum, Math.min(maximum, current));
         title.setText(label + ": " + safe + suffix);
         block.addView(title);
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, suffix);
         seek.setMax(maximum - minimum);
         seek.setProgress(safe - minimum);
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {

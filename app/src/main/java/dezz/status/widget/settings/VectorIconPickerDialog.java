@@ -195,7 +195,7 @@ public final class VectorIconPickerDialog {
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
         root.setLayoutParams(new ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, Math.max(dp(context, 360), height)));
-        AlertDialog dialog = new AlertDialog.Builder(context)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(context)
                 .setTitle(title)
                 .setView(root)
                 .setNegativeButton(android.R.string.cancel, null)

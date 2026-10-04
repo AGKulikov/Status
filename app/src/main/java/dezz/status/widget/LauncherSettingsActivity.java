@@ -296,7 +296,7 @@ public class LauncherSettingsActivity extends SettingsLauncherProfileActivity {
             rows.addView(card, rowParams());
         }
         updateApplicationCount(count);
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Приложения в общем меню")
                 .setMessage("Системные приложения изначально скрыты, кроме «Телефона». "
                         + "Изменения сразу действуют и на HOME, и на панели водителя.")
@@ -334,7 +334,7 @@ public class LauncherSettingsActivity extends SettingsLauncherProfileActivity {
             labels[index] = app.label + "\n" + app.packageName;
             if (current.equals(app.packageName)) checked = index;
         }
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Музыкальный плеер")
                 .setSingleChoiceItems(labels, checked, null)
                 .setNeutralButton("Последний плеер", (value, which) -> {
@@ -351,7 +351,7 @@ public class LauncherSettingsActivity extends SettingsLauncherProfileActivity {
                     preferences.launcherMediaFixedPlayerPackage.set(app.packageName);
                     preferences.launcherMediaFixedPlayerEnabled.set(true);
                     if (fixedPlayerSwitch != null) fixedPlayerSwitch.setChecked(true);
-                    dialog.dismiss();
+                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     refreshMediaTarget();
                 }));
         dialog.show();
@@ -418,7 +418,7 @@ public class LauncherSettingsActivity extends SettingsLauncherProfileActivity {
     }
 
     private void confirmLayoutReset() {
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Сбросить компоновку?")
                 .setMessage("Координаты, размеры, группы и подложки вернутся к исходным. "
                         + "Состав, действия, шрифты, цвета и параметры медиаплеера сохранятся.")
@@ -459,7 +459,7 @@ public class LauncherSettingsActivity extends SettingsLauncherProfileActivity {
         block.setOrientation(LinearLayout.VERTICAL);
         TextView value = text(label + ": " + current + suffix, 15, 0xFFC7C7CC);
         block.addView(value);
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, suffix);
         seek.setMax(maximum - minimum);
         seek.setProgress(current - minimum);
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {

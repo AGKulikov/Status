@@ -405,7 +405,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
         TextView sizeValue = text("Размер иконки: " + shortcut.iconSizePx + " px",
                 13, 0xFFC7C7CC);
         body.addView(sizeValue, topMargin(dp(8)));
-        SeekBar size = new SeekBar(this);
+        SeekBar size = new dezz.status.widget.settings.SettingsSeekBar(this, LauncherShortcutStore.MIN_ICON_SIZE_PX, 1, " px");
         size.setMax(LauncherShortcutStore.MAX_ICON_SIZE_PX
                 - LauncherShortcutStore.MIN_ICON_SIZE_PX);
         size.setProgress(shortcut.iconSizePx - LauncherShortcutStore.MIN_ICON_SIZE_PX);
@@ -591,7 +591,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
         LauncherShortcutStore.Builtin[] values = LauncherShortcutStore.Builtin.values();
         String[] labels = new String[values.length];
         for (int i = 0; i < values.length; i++) labels[i] = values[i].label;
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Функция")
                 .setItems(labels, (dialog, which) -> {
                     LauncherShortcutStore.Builtin action = values[which];
@@ -630,7 +630,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
         }
         ArrayAdapter<String> adapter = new ArrayAdapter<>(this,
                 android.R.layout.simple_list_item_1, labels);
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Все приложения · включая системные")
                 .setAdapter(adapter, (dialog, which) -> {
                     InstalledAppCatalog.App app = apps.get(which);
@@ -659,7 +659,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
 
     private void editColors(@NonNull LauncherShortcutStore.Shortcut shortcut) {
         String[] choices = {"Фон кнопки", "Цвет векторной иконки", "Цвет подписи"};
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Оформление · " + shortcut.title)
                 .setItems(choices, (dialog, which) -> {
                     String current = which == 0 ? shortcut.backgroundColor
@@ -724,7 +724,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
         hint.setTextSize(14);
         explanation.addView(hint, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Горизонтальный ряд")
                 // AlertDialog cannot render message + list together reliably on the Geely
                 // Android 9 theme: setMessage replaces the list entirely. A custom header keeps
@@ -753,7 +753,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
         EditText input = new EditText(this);
         input.setSingleLine(true);
         input.setHint("Например: Связь или Статусы");
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Название горизонтального ряда")
                 .setView(input)
                 .setPositiveButton("Создать", (dialog, which) -> {
@@ -834,7 +834,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
         MaterialButton placement = compactButton("Положение ряда: "
                 + (shortcut.informationPlacement == 1
                 ? "снизу панели" : "сверху панели"));
-        placement.setOnClickListener(view -> new AlertDialog.Builder(this)
+        placement.setOnClickListener(view -> new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Положение горизонтального ряда")
                 .setItems(new String[]{"Сверху панели", "Снизу панели"},
                         (dialog, which) -> {
@@ -849,7 +849,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
         MaterialButton distribution = compactButton("Ширина элементов: "
                 + (shortcut.informationGroupDistribution == 1
                 ? "по содержимому" : "одинаковая"));
-        distribution.setOnClickListener(view -> new AlertDialog.Builder(this)
+        distribution.setOnClickListener(view -> new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Распределение в ряду")
                 .setItems(new String[]{"Одинаковая ширина", "По содержимому"},
                         (dialog, which) -> {
@@ -864,7 +864,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
         MaterialButton horizontal = compactButton("Положение содержимого: "
                 + horizontalAlignmentLabel(
                 shortcut.informationGroupHorizontalAlignment));
-        horizontal.setOnClickListener(view -> new AlertDialog.Builder(this)
+        horizontal.setOnClickListener(view -> new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Положение ряда по горизонтали")
                 .setItems(new String[]{"Слева", "По центру", "Справа"},
                         (dialog, which) -> {
@@ -878,7 +878,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
 
         MaterialButton vertical = compactButton("Выравнивание элементов: "
                 + verticalAlignmentLabel(shortcut.informationGroupVerticalAlignment));
-        vertical.setOnClickListener(view -> new AlertDialog.Builder(this)
+        vertical.setOnClickListener(view -> new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Выравнивание элементов ряда")
                 .setItems(new String[]{"Сверху", "По центру", "Снизу"},
                         (dialog, which) -> {
@@ -956,7 +956,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
                         applyInformationGroupSetting(shortcut, value ->
                                 value.informationGroupCornerRadiusPx = selected));
 
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Горизонтальный ряд · " + groupName)
                 .setView(scroll)
                 .setPositiveButton("Готово", null)
@@ -1043,7 +1043,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
             input.setSingleLine(true);
             input.setText(shortcut.title);
             input.setSelection(input.length());
-            new AlertDialog.Builder(this)
+            new dezz.status.widget.settings.SettingsDialogBuilder(this)
                     .setTitle("Текст информационной кнопки")
                     .setView(input)
                     .setPositiveButton("Применить", (dialog, which) -> {
@@ -1059,7 +1059,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
         MaterialButton placement = compactButton("Расположение: "
                 + (shortcut.informationPlacement == 1
                 ? "снизу панели" : "сверху панели"));
-        placement.setOnClickListener(view -> new AlertDialog.Builder(this)
+        placement.setOnClickListener(view -> new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Расположение информационного элемента")
                 .setItems(new String[]{"Сверху панели водителя",
                                 "Снизу панели водителя"},
@@ -1151,7 +1151,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
             for (int index = 0; index < Fonts.ALL.size(); index++) {
                 labels[index] = getString(Fonts.ALL.get(index).labelRes);
             }
-            new AlertDialog.Builder(this)
+            new dezz.status.widget.settings.SettingsDialogBuilder(this)
                     .setTitle("Шрифт информационной кнопки")
                     .setItems(labels, (dialog, which) -> {
                         shortcut.informationFontFamily = Fonts.ALL.get(which).key;
@@ -1173,7 +1173,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
 
         MaterialButton horizontal = compactButton("По горизонтали: "
                 + horizontalAlignmentLabel(shortcut.informationHorizontalAlignment));
-        horizontal.setOnClickListener(view -> new AlertDialog.Builder(this)
+        horizontal.setOnClickListener(view -> new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Выравнивание по горизонтали")
                 .setItems(new String[]{"Слева", "По центру", "Справа"},
                         (dialog, which) -> {
@@ -1187,7 +1187,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
 
         MaterialButton vertical = compactButton("По вертикали: "
                 + verticalAlignmentLabel(shortcut.informationVerticalAlignment));
-        vertical.setOnClickListener(view -> new AlertDialog.Builder(this)
+        vertical.setOnClickListener(view -> new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Выравнивание по вертикали")
                 .setItems(new String[]{"Сверху", "По центру", "Снизу"},
                         (dialog, which) -> {
@@ -1221,7 +1221,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
                     persistInformationAppearance(shortcut);
                 });
 
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Информационная кнопка")
                 .setView(scroll)
                 .setPositiveButton("Готово", null)
@@ -1693,7 +1693,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
         block.setOrientation(LinearLayout.VERTICAL);
         TextView title = text(label + ": " + current + suffix, 15, 0xFFC7C7CC);
         block.addView(title);
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, min, 1, suffix);
         seek.setMax(max - min);
         seek.setProgress(Math.max(0, Math.min(max - min, current - min)));
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -1719,7 +1719,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
                         : "Высота кнопки: " + shortcut.buttonHeightPx + " px",
                 13, 0xFFC7C7CC);
         host.addView(value, topMargin(dp(6)));
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, LauncherShortcutStore.MIN_DRIVER_BUTTON_HEIGHT_PX - 1, 1, " px").firstValue("Авто");
         int selectable = LauncherShortcutStore.MAX_DRIVER_BUTTON_HEIGHT_PX
                 - LauncherShortcutStore.MIN_DRIVER_BUTTON_HEIGHT_PX + 1;
         seek.setMax(selectable);
@@ -1762,7 +1762,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
                         : label + ": " + current + " px",
                 13, 0xFFC7C7CC);
         host.addView(value, topMargin(dp(6)));
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, -1, 1, " px").firstValue("Авто");
         seek.setMax(81);
         seek.setProgress(current + 1);
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -1808,7 +1808,7 @@ public class DriverPanelSettingsActivity extends dezz.status.widget.settings.Set
         header.addView(zero, new LinearLayout.LayoutParams(dp(56), dp(40)));
         block.addView(header);
 
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, 0, 1, " px");
         seek.setMax(max);
         seek.setProgress(Math.max(0, Math.min(max, current)));
         zero.setEnabled(seek.getProgress() != 0);

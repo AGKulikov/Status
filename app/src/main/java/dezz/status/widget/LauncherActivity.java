@@ -2001,7 +2001,7 @@ public class LauncherActivity extends LauncherProfileActivity {
 
         MaterialButton scaleMode = widgetEditorButton("Масштабирование: "
                 + widgetScaleModeLabel(appearance.scaleMode));
-        scaleMode.setOnClickListener(view -> new androidx.appcompat.app.AlertDialog.Builder(this)
+        scaleMode.setOnClickListener(view -> new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Масштабирование содержимого")
                 .setItems(new String[]{"Вписать целиком", "Заполнить с обрезкой",
                         "Растянуть (может исказить)"}, (dialog, which) -> {
@@ -2034,7 +2034,7 @@ public class LauncherActivity extends LauncherProfileActivity {
             for (int index = 0; index < Fonts.ALL.size(); index++) {
                 labels[index + 1] = getString(Fonts.ALL.get(index).labelRes);
             }
-            new androidx.appcompat.app.AlertDialog.Builder(this)
+            new dezz.status.widget.settings.SettingsDialogBuilder(this)
                     .setTitle("Шрифт виджета")
                     .setItems(labels, (dialog, which) -> {
                         appearance.fontFamily = which == 0
@@ -2077,7 +2077,7 @@ public class LauncherActivity extends LauncherProfileActivity {
 
         MaterialButton horizontal = widgetEditorButton("По горизонтали: "
                 + widgetHorizontalLabel(appearance.horizontalAlignment));
-        horizontal.setOnClickListener(view -> new androidx.appcompat.app.AlertDialog.Builder(this)
+        horizontal.setOnClickListener(view -> new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Выравнивание по горизонтали")
                 .setItems(new String[]{"Как в элементе", "Слева", "По центру", "Справа"},
                         (dialog, which) -> {
@@ -2092,7 +2092,7 @@ public class LauncherActivity extends LauncherProfileActivity {
 
         MaterialButton vertical = widgetEditorButton("По вертикали: "
                 + widgetVerticalLabel(appearance.verticalAlignment));
-        vertical.setOnClickListener(view -> new androidx.appcompat.app.AlertDialog.Builder(this)
+        vertical.setOnClickListener(view -> new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Выравнивание по вертикали")
                 .setItems(new String[]{"Как в элементе", "Сверху", "По центру", "Снизу"},
                         (dialog, which) -> {
@@ -2133,7 +2133,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         form.addView(behavior, widgetEditorSection());
         MaterialButton tap = widgetEditorButton("Нажатие: "
                 + widgetTapActionLabel(appearance));
-        tap.setOnClickListener(view -> new androidx.appcompat.app.AlertDialog.Builder(this)
+        tap.setOnClickListener(view -> new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Действие виджета")
                 .setItems(new String[]{"Исходное действие", "Без действия",
                         "Открыть приложение…", "Домой пассажир"}, (dialog, which) -> {
@@ -2163,7 +2163,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         form.addView(tap, widgetEditorRow());
 
         androidx.appcompat.app.AlertDialog editor =
-                new androidx.appcompat.app.AlertDialog.Builder(this)
+                new dezz.status.widget.settings.SettingsDialogBuilder(this)
                         .setTitle("Виджет · " + label)
                         .setView(scroll)
                         .setPositiveButton("Готово", null)
@@ -2172,7 +2172,7 @@ public class LauncherActivity extends LauncherProfileActivity {
                         .create();
         editor.setOnShowListener(ignored -> {
             editor.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEUTRAL)
-                    .setOnClickListener(view -> new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setOnClickListener(view -> new dezz.status.widget.settings.SettingsDialogBuilder(this)
                             .setTitle("Сбросить настройки виджета?")
                             .setMessage("Положение и размер сохранятся; оформление и действие "
                                     + "вернутся к исходным.")
@@ -2184,7 +2184,7 @@ public class LauncherActivity extends LauncherProfileActivity {
                             .setNegativeButton("Отмена", null)
                             .show());
             editor.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE)
-                    .setOnClickListener(view -> new androidx.appcompat.app.AlertDialog.Builder(this)
+                    .setOnClickListener(view -> new dezz.status.widget.settings.SettingsDialogBuilder(this)
                             .setTitle("Удалить виджет с HOME?")
                             .setMessage("Его настройки и положение сохранятся. Вернуть виджет "
                                     + "можно кнопкой «＋ Виджет».")
@@ -2352,7 +2352,7 @@ public class LauncherActivity extends LauncherProfileActivity {
                 });
 
         androidx.appcompat.app.AlertDialog editor =
-                new androidx.appcompat.app.AlertDialog.Builder(this)
+                new dezz.status.widget.settings.SettingsDialogBuilder(this)
                         .setTitle(value.name)
                         .setView(scroll)
                         .setPositiveButton("Готово", null)
@@ -2361,7 +2361,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         editor.setOnShowListener(ignored ->
                 editor.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE)
                         .setOnClickListener(view ->
-                                new androidx.appcompat.app.AlertDialog.Builder(this)
+                                new dezz.status.widget.settings.SettingsDialogBuilder(this)
                                         .setTitle("Удалить подложку?")
                                         .setMessage("Подложка будет удалена, виджеты не изменятся.")
                                         .setPositiveButton("Удалить", (dialog, which) -> {
@@ -2394,7 +2394,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         }
         boolean[] selected = new boolean[ids.size()];
         androidx.appcompat.app.AlertDialog dialog =
-                new androidx.appcompat.app.AlertDialog.Builder(this)
+                new dezz.status.widget.settings.SettingsDialogBuilder(this)
                         .setTitle("Горизонтальный ряд")
                         .setMultiChoiceItems(labels.toArray(new String[0]), selected,
                                 (value, which, checked) -> selected[which] = checked)
@@ -2444,7 +2444,7 @@ public class LauncherActivity extends LauncherProfileActivity {
                                     preferences.launcherHorizontalGroupsJson.get();
                             syncLauncherHorizontalGroups();
                             refreshGlobalElementVisibility();
-                            dialog.dismiss();
+                            dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                             showLauncherHorizontalGroupEditor(created.id);
                         }));
         dialog.show();
@@ -2492,7 +2492,7 @@ public class LauncherActivity extends LauncherProfileActivity {
                 + (group.distribution == HorizontalGroupLayout.DISTRIBUTION_EQUAL
                 ? "равные ячейки" : "компактно"));
         distribution.setOnClickListener(view ->
-                new androidx.appcompat.app.AlertDialog.Builder(this)
+                new dezz.status.widget.settings.SettingsDialogBuilder(this)
                         .setTitle("Распределение в ряду")
                         .setItems(new String[]{"Компактно", "Равные ячейки"},
                                 (choice, which) -> {
@@ -2508,7 +2508,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         MaterialButton horizontal = widgetEditorButton("По горизонтали: "
                 + groupAlignmentLabel(group.horizontalAlignment));
         horizontal.setOnClickListener(view ->
-                new androidx.appcompat.app.AlertDialog.Builder(this)
+                new dezz.status.widget.settings.SettingsDialogBuilder(this)
                         .setTitle("Положение содержимого")
                         .setItems(new String[]{"Слева", "По центру", "Справа"},
                                 (choice, which) -> {
@@ -2523,7 +2523,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         MaterialButton vertical = widgetEditorButton("По вертикали: "
                 + groupVerticalAlignmentLabel(group.verticalAlignment));
         vertical.setOnClickListener(view ->
-                new androidx.appcompat.app.AlertDialog.Builder(this)
+                new dezz.status.widget.settings.SettingsDialogBuilder(this)
                         .setTitle("Выравнивание элементов")
                         .setItems(new String[]{"Сверху", "По центру", "Снизу"},
                                 (choice, which) -> {
@@ -2549,7 +2549,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         }
 
         androidx.appcompat.app.AlertDialog editor =
-                new androidx.appcompat.app.AlertDialog.Builder(this)
+                new dezz.status.widget.settings.SettingsDialogBuilder(this)
                         .setTitle(group.name)
                         .setView(scroll)
                         .setPositiveButton("Готово", null)
@@ -2558,7 +2558,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         editor.setOnShowListener(ignored ->
                 editor.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE)
                         .setOnClickListener(view ->
-                                new androidx.appcompat.app.AlertDialog.Builder(this)
+                                new dezz.status.widget.settings.SettingsDialogBuilder(this)
                                         .setTitle("Разгруппировать ряд?")
                                         .setMessage("Виджеты останутся на лаунчере и снова "
                                                 + "будут редактироваться отдельно.")
@@ -2592,7 +2592,7 @@ public class LauncherActivity extends LauncherProfileActivity {
             selected[index] = group.memberIds.contains(ids.get(index));
         }
         androidx.appcompat.app.AlertDialog dialog =
-                new androidx.appcompat.app.AlertDialog.Builder(this)
+                new dezz.status.widget.settings.SettingsDialogBuilder(this)
                         .setTitle("Состав горизонтального ряда")
                         .setMultiChoiceItems(labels.toArray(new String[0]), selected,
                                 (value, which, checked) -> selected[which] = checked)
@@ -2616,7 +2616,7 @@ public class LauncherActivity extends LauncherProfileActivity {
                             group.memberIds.addAll(members);
                             saveLauncherHorizontalGroup(group);
                             refreshGlobalElementVisibility();
-                            dialog.dismiss();
+                            dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                         }));
         dialog.show();
     }
@@ -2650,7 +2650,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         for (int index = 0; index < entries.size(); index++) {
             labels[index] = entries.get(index).label;
         }
-        new androidx.appcompat.app.AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Добавить виджет")
                 .setItems(labels, (dialog, which) ->
                         addLauncherCatalogEntry(entries.get(which)))
@@ -2776,7 +2776,7 @@ public class LauncherActivity extends LauncherProfileActivity {
             Toast.makeText(this, "Удалённых виджетов нет", Toast.LENGTH_SHORT).show();
             return;
         }
-        new androidx.appcompat.app.AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Вернуть виджет")
                 .setItems(labels.toArray(new String[0]), (dialog, which) -> {
                     String id = ids.get(which);
@@ -2807,7 +2807,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         }
         List<String> labels = new ArrayList<>();
         for (AppEntry app : available) labels.add(app.label + "\n" + app.packageName);
-        new androidx.appcompat.app.AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Добавить приложение")
                 .setItems(labels.toArray(new String[0]), (dialog, which) -> {
                     favoriteAppsConfigStore.add(available.get(which).packageName);
@@ -2841,7 +2841,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         for (int index = 0; index < available.size(); index++) {
             labels[index] = available.get(index).label;
         }
-        new androidx.appcompat.app.AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(title)
                 .setItems(labels, (dialog, which) -> {
                     PanelElementConfigStore.Panel updated = panelElementStore.load(panelId);
@@ -2876,7 +2876,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         for (int index = 0; index < available.size(); index++) {
             labels[index] = available.get(index).label;
         }
-        new androidx.appcompat.app.AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Добавить элемент медиаплеера")
                 .setItems(labels, (dialog, which) -> {
                     MediaPanelConfig updated =
@@ -2907,7 +2907,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         for (int index = 0; index < available.size(); index++) {
             labels[index] = available.get(index).label;
         }
-        new androidx.appcompat.app.AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Добавить элемент навигации")
                 .setItems(labels, (dialog, which) -> {
                     NavigationPanelConfig updated = navigationPanelConfigStore.load();
@@ -2939,7 +2939,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         for (int index = 0; index < available.size(); index++) {
             labels[index] = available.get(index).label;
         }
-        new androidx.appcompat.app.AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Добавить элемент климата")
                 .setItems(labels, (dialog, which) -> {
                     ClimatePanelConfig updated =
@@ -2972,7 +2972,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         TextView value = text(14, Color.LTGRAY, false);
         value.setText(label + ": " + current + suffix);
         block.addView(value);
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, suffix);
         seek.setMax(Math.max(0, maximum - minimum));
         seek.setProgress(Math.max(0, Math.min(maximum - minimum, current - minimum)));
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -3032,7 +3032,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         for (AppEntry app : apps) labels.add(app.label + "\n" + app.packageName);
         ArrayAdapter<String> adapter = new ArrayAdapter<>(
                 this, android.R.layout.simple_list_item_1, labels);
-        new androidx.appcompat.app.AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Приложение при нажатии")
                 .setAdapter(adapter, (dialog, which) -> {
                     AppEntry app = apps.get(which);
@@ -3944,7 +3944,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         previewParams.gravity = Gravity.CENTER_HORIZONTAL;
         previewParams.topMargin = dp(8);
         form.addView(preview, previewParams);
-        SeekBar size = new SeekBar(this);
+        SeekBar size = new dezz.status.widget.settings.SettingsSeekBar(this, LauncherShortcutStore.MIN_ICON_SIZE_PX, 1, " px");
         size.setMax(LauncherShortcutStore.MAX_ICON_SIZE_PX
                 - LauncherShortcutStore.MIN_ICON_SIZE_PX);
         size.setProgress(shortcut.iconSizePx - LauncherShortcutStore.MIN_ICON_SIZE_PX);
@@ -3963,7 +3963,7 @@ public class LauncherActivity extends LauncherProfileActivity {
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
         form.addView(size, new LinearLayout.LayoutParams(matchWidth(), dp(52)));
-        new androidx.appcompat.app.AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(shortcut.title)
                 .setView(form)
                 .setPositiveButton("Применить", (dialog, which) -> {
@@ -5344,7 +5344,7 @@ public class LauncherActivity extends LauncherProfileActivity {
         allAppsEditMode = false;
         allAppsUninstallInProgress = false;
         if (dialog == null) return;
-        try { dialog.dismiss(); }
+        try { dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog); }
         catch (RuntimeException ignored) {}
     }
 

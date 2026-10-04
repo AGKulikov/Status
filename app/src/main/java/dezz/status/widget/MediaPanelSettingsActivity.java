@@ -235,7 +235,7 @@ public final class MediaPanelSettingsActivity extends SettingsLauncherProfileAct
                 value -> config.accentColor = value);
 
         addButton(settings, "Вернуть медиаблок по умолчанию", v ->
-                new AlertDialog.Builder(this)
+                new dezz.status.widget.settings.SettingsDialogBuilder(this)
                         .setTitle("Сбросить медиаблок?")
                         .setMessage("Состав, порядок, размеры и оформление вернутся к исходным. Положение блока на HOME сохранится.")
                         .setPositiveButton("Сбросить", (dialog, which) -> {
@@ -276,7 +276,7 @@ public final class MediaPanelSettingsActivity extends SettingsLauncherProfileAct
         previewHost.addView(preview, new FrameLayout.LayoutParams(match(), match()));
         previewColumn.addView(previewHost, new LinearLayout.LayoutParams(match(), 0, 1f));
         TextView saved = new TextView(this);
-        saved.setText("✓ Изменения сохраняются автоматически");
+        saved.setText("Предпросмотр · сохранение по «Применить»");
         saved.setTextSize(13);
         saved.setGravity(Gravity.CENTER);
         saved.setAlpha(.72f);
@@ -445,7 +445,7 @@ public final class MediaPanelSettingsActivity extends SettingsLauncherProfileAct
         TextView label = new TextView(this);
         label.setText(title);
         label.setTextSize(13);
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, "");
         seek.setMax(maximum - minimum);
         seek.setProgress(Math.max(0, Math.min(maximum - minimum, initial - minimum)));
         TextView value = new TextView(this);
@@ -492,7 +492,7 @@ public final class MediaPanelSettingsActivity extends SettingsLauncherProfileAct
         TextView label = new TextView(this);
         label.setText(title);
         label.setTextSize(16);
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, "");
         seek.setMax(maximum - minimum);
         seek.setProgress(Math.max(0, Math.min(maximum - minimum, initial - minimum)));
         TextView value = new TextView(this);
@@ -538,7 +538,7 @@ public final class MediaPanelSettingsActivity extends SettingsLauncherProfileAct
         value.setText(formatter.format(initial));
         heading.addView(label, new LinearLayout.LayoutParams(0, wrap(), 1f));
         heading.addView(value, new LinearLayout.LayoutParams(dp(104), wrap()));
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, "");
         seek.setMax(maximum - minimum);
         seek.setProgress(Math.max(0, Math.min(maximum - minimum, initial - minimum)));
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -596,7 +596,7 @@ public final class MediaPanelSettingsActivity extends SettingsLauncherProfileAct
         List<LauncherAppCatalog.App> choices = preloadedMediaPlayerChoices;
         if (choices == null) {
             int generation = ++mediaPlayerPickerGeneration;
-            AlertDialog loading = new AlertDialog.Builder(this)
+            AlertDialog loading = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                     .setTitle("Музыкальный плеер")
                     .setMessage("Загружаю список…")
                     .setNegativeButton(android.R.string.cancel, null)
@@ -653,7 +653,7 @@ public final class MediaPanelSettingsActivity extends SettingsLauncherProfileAct
             labels[index] = app.label + "\n" + app.packageName;
             if (current.equals(app.packageName)) checked = index;
         }
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Музыкальный плеер")
                 .setSingleChoiceItems(labels, checked, null)
                 .setNeutralButton("Последний плеер", (value, which) -> {
@@ -668,7 +668,7 @@ public final class MediaPanelSettingsActivity extends SettingsLauncherProfileAct
                     LauncherAppCatalog.App app = choices.get(position);
                     preferences.launcherMediaFixedPlayerPackage.set(app.packageName);
                     preferences.launcherMediaFixedPlayerEnabled.set(true);
-                    dialog.dismiss();
+                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     recreate();
                 }));
         dialog.show();
@@ -740,6 +740,11 @@ public final class MediaPanelSettingsActivity extends SettingsLauncherProfileAct
         editScheduler.flush();
         saveNow();
         super.onStop();
+    }
+
+    @Override protected void flushSettingsDraft() {
+        if (editScheduler != null) editScheduler.flush();
+        if (config != null) saveNow();
     }
 
     @Override protected void onDestroy() {

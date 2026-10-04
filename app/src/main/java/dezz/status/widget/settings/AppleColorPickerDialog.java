@@ -379,7 +379,7 @@ public final class AppleColorPickerDialog {
             labels.addView(value, new LinearLayout.LayoutParams(dp(activity, 72), wrap()));
             root.addView(labels, topMargin(activity, 9));
 
-            SeekBar bar = new SeekBar(activity);
+            SeekBar bar = new dezz.status.widget.settings.SettingsSeekBar(activity, 0, 1, max == 360 ? "°" : "%");
             bar.setMax(max);
             bar.setProgress(progress);
             bar.setTag(value);

@@ -68,7 +68,7 @@ import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.VectorIconPickerDialog;
 
 /** Visual, slider-based appearance editor shared by the main row and popup tiles. */
-public final class VisualBrickEditorActivity extends AppCompatActivity {
+public final class VisualBrickEditorActivity extends dezz.status.widget.settings.SettingsActivity {
     public static final String SURFACE_MAIN = "main";
     public static final String SURFACE_POPUP = "popup";
     private static final String EXTRA_SURFACE = "surface";
@@ -207,8 +207,8 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
 
         String source = sourceLabel(popup == null ? main.sourceBinding : popup.sourceBinding);
         page.addView(label("Источник: " + source + "\nТехнический ID: " + id), topMargin(5));
-        TextView autoSave = label("Изменения сохраняются автоматически и сразу применяются "
-                + "к работающему виджету и оверлею.");
+        TextView autoSave = label("Изменения видны в предпросмотре. «Применить» сохранит их, "
+                + "«Отмена» вернёт исходное оформление.");
         autoSave.setTextColor(0xFF81C784);
         page.addView(autoSave, topMargin(8));
         liveStatus = label("Готово к настройке");
@@ -221,6 +221,7 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         }
 
         preview = column();
+        preview.setTag(dezz.status.widget.settings.SettingsEditorLayout.PREVIEW_TAG);
         preview.setGravity(Gravity.CENTER);
         preview.setMinimumHeight(dp(130));
         preview.setPadding(dp(16), dp(16), dp(16), dp(16));
@@ -244,7 +245,7 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         updatePreview();
 
         Button done = button("Готово");
-        done.setOnClickListener(v -> { flushLiveApply(); finish(); });
+        done.setOnClickListener(v -> dezz.status.widget.settings.SettingsEditSession.applyAndFinish(this));
         page.addView(done, topMargin(24));
         return scroll;
     }
@@ -695,7 +696,7 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         replacement.setAlpha(replaceText.isChecked() ? 1f : 0.45f);
         refreshInputs.run();
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(existing == null ? "Новое правило" : "Изменить правило")
                 .setView(form).setNegativeButton("Отмена", null)
                 .setPositiveButton(existing == null ? "Добавить" : "Применить", null)
@@ -742,7 +743,7 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
                                 ? nextRuleId(set) : existing.id, Input.FIELD_VALUE, selected,
                                 first, second, output);
                         replaceRule(index, replacementRule);
-                        dialog.dismiss();
+                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     } catch (IllegalArgumentException error) {
                         Toast.makeText(this, safeMessage(error), Toast.LENGTH_LONG).show();
                     }
@@ -785,7 +786,7 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
     private void deleteRule(int index) {
         RuleSet current = currentRules();
         if (current == null || index < 0 || index >= current.rules.size()) return;
-        new AlertDialog.Builder(this).setTitle("Удалить правило?")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Удалить правило?")
                 .setMessage(conditionSummary(current.rules.get(index)))
                 .setNegativeButton("Отмена", null).setPositiveButton("Удалить", (d, w) -> {
                     List<Rule> rules = new ArrayList<>(current.rules);
@@ -938,7 +939,7 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
     private void chooseRulePreset() {
         String[] labels = {"Автоматически по типу устройства", "Ворота / дверь",
                 "Включено / выключено", "Температура", "Показывать как есть"};
-        new AlertDialog.Builder(this).setTitle("Правила текста и цвета")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Правила текста и цвета")
                 .setItems(labels, (d, which) -> {
                     String presentation = sourcePresentation();
                     if (which == 1) presentation = SourceBinding.PRESENTATION_COVER;
@@ -997,7 +998,7 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         }
         String[] labels = {"Ничего не делать", "Переключить состояние",
                 "Включить / открыть", "Выключить / закрыть"};
-        new AlertDialog.Builder(this).setTitle("Действие по нажатию")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Действие по нажатию")
                 .setItems(labels, (d, which) -> {
                     if (which == 0) popup.actionBinding = ActionBinding.unbound();
                     else if (source.connectorType == ConnectorType.SPRUTHUB) {
@@ -1035,7 +1036,7 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
                 ? popup.actionBinding.payload : "ON";
         EditText topic = field(form, "Topic команды", currentTopic);
         EditText payload = field(form, "Что отправить", currentPayload);
-        new AlertDialog.Builder(this).setTitle("MQTT-команда")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("MQTT-команда")
                 .setView(form).setNeutralButton("Отключить", (d, w) -> {
                     popup.actionBinding = ActionBinding.unbound();
                     popup.actionId = "";
@@ -1064,7 +1065,7 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         for (int row = 0; row < rows; row++) for (int column = 0; column < columns; column++) {
             labels.add("Строка " + (row + 1) + ", столбец " + (column + 1));
         }
-        new AlertDialog.Builder(this).setTitle("Положение плитки")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Положение плитки")
                 .setItems(labels.toArray(new String[0]), (d, which) -> {
                     if (which == 0) { popup.row = -1; popup.column = -1; }
                     else { int index = which - 1; popup.row = index / columns; popup.column = index % columns; }
@@ -1255,7 +1256,7 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
     private void chooseIconAlignment(@NonNull Button button) {
         if (popup == null) return;
         String[] labels = {"Слева / сверху", "По центру", "Справа / снизу"};
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Выравнивание иконки")
                 .setSingleChoiceItems(labels, Math.max(0, Math.min(2, popup.iconAlignment)),
                         (dialog, which) -> {
@@ -1263,7 +1264,7 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
                             button.setText("Выравнивание иконки: "
                                     + iconAlignmentLabel(which));
                             onConfigChanged();
-                            dialog.dismiss();
+                            dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                         })
                 .setNegativeButton("Отмена", null)
                 .show();
@@ -1283,13 +1284,13 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
             labels[index] = getString(family.labelRes);
             if (family.key.equals(current)) selected = index;
         }
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Шрифт")
                 .setSingleChoiceItems(labels, selected, (dialog, which) -> {
                     String key = Fonts.ALL.get(which).key;
                     consumer.accept(key);
                     button.setText("Шрифт: " + fontLabel(key));
-                    dialog.dismiss();
+                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                 })
                 .setNegativeButton("Отмена", null)
                 .show();
@@ -1304,6 +1305,8 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         liveHandler.removeCallbacksAndMessages(null);
         persistLive();
     }
+
+    @Override protected void flushSettingsDraft() { flushLiveApply(); }
 
     private void persistLive() {
         liveApplyScheduled = false;
@@ -1324,9 +1327,9 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
                 // full pass because they can affect layout and built-in sensor subscriptions.
                 if (popup != null) WidgetService.getInstance().applyPopupItemPreferences();
                 else WidgetService.getInstance().applyMainItemPreferences();
-                if (liveStatus != null) liveStatus.setText("Сохранено и применено к виджету");
+                if (liveStatus != null) liveStatus.setText("Предпросмотр обновлён");
             } else if (liveStatus != null) {
-                liveStatus.setText("Сохранено — применится при запуске виджета");
+                liveStatus.setText("Предпросмотр обновлён · виджет не запущен");
             }
         } catch (Exception error) {
             if (liveStatus != null) liveStatus.setText("Не удалось применить изменения");
@@ -1355,7 +1358,7 @@ public final class VisualBrickEditorActivity extends AppCompatActivity {
         TextView value = label(clamp(current, min, max) + suffix);
         labels.addView(value);
         parent.addView(labels, topMargin(8));
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, min, 1, suffix);
         seek.setMax(max - min);
         seek.setProgress(clamp(current, min, max) - min);
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {

@@ -226,7 +226,7 @@ public final class NavigatorWindowSettingsActivity extends dezz.status.widget.se
                                int value, int minimum, int maximum,
                                @NonNull String suffix) {
         TextView caption = label("");
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, suffix);
         seek.setMax(maximum - minimum);
         seek.setProgress(Math.max(0, Math.min(maximum - minimum, value - minimum)));
         IntValue current = () -> minimum + seek.getProgress();

@@ -251,7 +251,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
         NestedScrollView scroll = new NestedScrollView(this);
         scroll.setPadding(dp(12), dp(8), dp(12), dp(8));
         scroll.addView(editor, matchWrap());
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Расширенный JSON сценариев")
                 .setMessage("Движок поддерживает ALL/ANY, до 128 условий и действий. "
                         + "Обычные сравнения не срабатывают на stale/unavailable.")
@@ -278,7 +278,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
                         if (WidgetService.isRunning()) {
                             WidgetService.getInstance().applyPreferences();
                         }
-                        dialog.dismiss();
+                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                         loadEntries();
                         // Rebuild the whole screen so a repaired JSON document also removes the
                         // old error banner and re-enables the Add button immediately.
@@ -422,7 +422,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
     }
 
     private void confirmDelete(Entry entry) {
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Удалить сценарий?")
                 .setMessage(entryTitle(entry, entries.indexOf(entry)))
                 .setNegativeButton("Отмена", null)
@@ -455,7 +455,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
         ScrollView scroll = new ScrollView(this);
         scroll.addView(views.root, matchWrap());
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(original == null ? "Новый сценарий" : "Изменить сценарий")
                 .setView(scroll)
                 .setNegativeButton("Отмена", null)
@@ -489,7 +489,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
                             }
                         }
                         renderEntries();
-                        dialog.dismiss();
+                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                         Toast.makeText(this, "Сценарий сохранён", Toast.LENGTH_SHORT).show();
                     } catch (Exception error) {
                         if (!views.hasSelectedSource()) {
@@ -1033,10 +1033,10 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
                     break;
                 }
             }
-            new AlertDialog.Builder(ScenarioSettingsActivity.this)
+            new dezz.status.widget.settings.SettingsDialogBuilder(ScenarioSettingsActivity.this)
                     .setTitle("1. Выберите коннектор")
                     .setSingleChoiceItems(CONNECTOR_LABELS, current, (dialog, which) -> {
-                        dialog.dismiss();
+                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                         switch (CONNECTORS[which]) {
                             case "HOME_ASSISTANT":
                                 showHomeAssistantSourcePicker();
@@ -1067,7 +1067,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
                     "HWGPS · DR активен («Найти меня» доступно)",
                     "Элемент другой автоматизации отображается"
             };
-            new AlertDialog.Builder(ScenarioSettingsActivity.this)
+            new dezz.status.widget.settings.SettingsDialogBuilder(ScenarioSettingsActivity.this)
                     .setTitle("Автомобиль и система")
                     .setItems(labels, (dialog, which) -> {
                         switch (which) {
@@ -1103,7 +1103,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
                     | InputType.TYPE_DATETIME_VARIATION_TIME);
             end.setInputType(InputType.TYPE_CLASS_DATETIME
                     | InputType.TYPE_DATETIME_VARIATION_TIME);
-            AlertDialog dialog = new AlertDialog.Builder(ScenarioSettingsActivity.this)
+            AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(ScenarioSettingsActivity.this)
                     .setTitle("Диапазон времени")
                     .setMessage("Диапазон может переходить через полночь. "
                             + "Одинаковое начало и окончание означает весь день.")
@@ -1119,7 +1119,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
                             applySystemSource(SystemConditionResolver.timeRangeResource(
                                             startValue, endValue),
                                     "Время · " + startValue + "–" + endValue);
-                            dialog.dismiss();
+                            dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                         } catch (RuntimeException error) {
                             showValidationError(error);
                         }
@@ -1128,7 +1128,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
         }
 
         private void showVisibleAutomationScopePicker() {
-            new AlertDialog.Builder(ScenarioSettingsActivity.this)
+            new dezz.status.widget.settings.SettingsDialogBuilder(ScenarioSettingsActivity.this)
                     .setTitle("Где находится элемент")
                     .setItems(TARGET_LABELS, (dialog, which) ->
                             showVisibleAutomationTargetPicker(
@@ -1149,7 +1149,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
             for (int index = 0; index < options.size(); index++) {
                 labels[index] = options.get(index).label;
             }
-            new AlertDialog.Builder(ScenarioSettingsActivity.this)
+            new dezz.status.widget.settings.SettingsDialogBuilder(ScenarioSettingsActivity.this)
                     .setTitle("Отображаемый элемент")
                     .setItems(labels, (dialog, which) -> {
                         TargetOption option = options.get(which);
@@ -1178,7 +1178,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
         private void showHomeAssistantSourcePicker() {
             HaApiController active = HaApiController.active();
             if (active == null || active.catalog().isEmpty()) {
-                new AlertDialog.Builder(ScenarioSettingsActivity.this)
+                new dezz.status.widget.settings.SettingsDialogBuilder(ScenarioSettingsActivity.this)
                         .setTitle("Каталог Home Assistant пуст")
                         .setMessage("Подключите Home Assistant и дождитесь загрузки полного "
                                 + "списка сущностей.")
@@ -1236,7 +1236,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
                 showSprutAccessoryPicker(active.catalog());
                 return;
             }
-            AlertDialog loading = new AlertDialog.Builder(ScenarioSettingsActivity.this)
+            AlertDialog loading = new dezz.status.widget.settings.SettingsDialogBuilder(ScenarioSettingsActivity.this)
                     .setTitle("Sprut.hub")
                     .setMessage("Загружаем сохранённый каталог…")
                     .setNegativeButton("Отмена", null)
@@ -1257,7 +1257,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
         }
 
         private void showMissingSprutCatalog() {
-            new AlertDialog.Builder(ScenarioSettingsActivity.this)
+            new dezz.status.widget.settings.SettingsDialogBuilder(ScenarioSettingsActivity.this)
                     .setTitle("Каталог Sprut.hub пуст")
                     .setMessage("Подключите Sprut.hub и обновите каталог устройств.")
                     .setPositiveButton("Настроить", (dialog, which) -> startActivity(
@@ -1475,7 +1475,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
             EditText topic = field(form, "Полный MQTT topic или scope/id", currentResource);
             EditText path = field(form, "Путь к атрибуту (необязательно)",
                     "MQTT".equals(selected(connector)) ? text(valuePath) : "");
-            AlertDialog dialog = new AlertDialog.Builder(ScenarioSettingsActivity.this)
+            AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(ScenarioSettingsActivity.this)
                     .setTitle("MQTT — ручной источник")
                     .setMessage("Для наблюдаемых сообщений предпочтителен scope/id. Полный topic "
                             + "также поддерживается.")
@@ -1495,7 +1495,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
                             applySource(binding, "MQTT · " + binding.resourceId
                                     + (binding.valuePath.isEmpty() ? ""
                                     : " · " + binding.valuePath));
-                            dialog.dismiss();
+                            dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                         } catch (RuntimeException error) {
                             showValidationError(error);
                         }
@@ -1618,7 +1618,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
             EditText width = field(form, "Толщина контура значка, 0–64 px",
                     text(falseBranch ? falseOutlineWidthValue : outlineWidthValue));
             width.setInputType(InputType.TYPE_CLASS_NUMBER);
-            AlertDialog dialog = new AlertDialog.Builder(ScenarioSettingsActivity.this)
+            AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(ScenarioSettingsActivity.this)
                     .setTitle("Контур значка")
                     .setMessage("Цвет и толщина применяются вместе к силуэту значка, "
                             + "а не к рамке всей кнопки.")
@@ -1640,7 +1640,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
                             }
                             destinationButton.setText("Выбрано: " + selectedColor[0]
                                     + " · " + selectedWidth + " px");
-                            dialog.dismiss();
+                            dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                         } catch (RuntimeException error) {
                             showValidationError(error);
                         }
@@ -1666,7 +1666,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
             for (int index = 0; index < options.size(); index++) {
                 labels[index] = options.get(index).label;
             }
-            new AlertDialog.Builder(ScenarioSettingsActivity.this)
+            new dezz.status.widget.settings.SettingsDialogBuilder(ScenarioSettingsActivity.this)
                     .setTitle("Цель сценария")
                     .setItems(labels, (dialog, which) -> {
                         targetId.setText(options.get(which).id);
@@ -1824,7 +1824,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
         };
         results.setAdapter(adapter);
 
-        AlertDialog.Builder builder = new AlertDialog.Builder(this)
+        AlertDialog.Builder builder = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(title)
                 .setView(content);
         if (back == null) {
@@ -1839,7 +1839,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
         results.setOnItemClickListener((parent, view, position, id) -> {
             if (position < 0 || position >= visible.size()) return;
             SearchChoice<T> selectedChoice = visible.get(position);
-            dialog.dismiss();
+            dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
             onSelected.onSelected(selectedChoice);
         });
 

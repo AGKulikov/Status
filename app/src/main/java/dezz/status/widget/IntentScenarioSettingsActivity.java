@@ -278,7 +278,7 @@ public final class IntentScenarioSettingsActivity extends dezz.status.widget.set
             showReferencedRuleDialog(rule, references);
             return;
         }
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Удалить правило?")
                 .setMessage(rule.intentAction)
                 .setNegativeButton("Отмена", null)
@@ -309,7 +309,7 @@ public final class IntentScenarioSettingsActivity extends dezz.status.widget.set
         EditorViews views = new EditorViews(source);
         ScrollView scroll = new ScrollView(this);
         scroll.addView(views.root, matchWrap());
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(source == null ? "Новая команда" : "Изменить команду")
                 .setView(scroll)
                 .setNegativeButton("Отмена", null)
@@ -331,7 +331,7 @@ public final class IntentScenarioSettingsActivity extends dezz.status.widget.set
                         }
                         if (!persist(candidate, true)) return;
                         renderRules();
-                        dialog.dismiss();
+                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     } catch (Exception error) {
                         showValidationError(error);
                     }
@@ -340,7 +340,7 @@ public final class IntentScenarioSettingsActivity extends dezz.status.widget.set
     }
 
     private void showUnsupportedConnectorDialog(@NonNull IntentActionRule rule) {
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Действие создано в кнопках HOME")
                 .setMessage("Это правило использует " + connectorLabel(rule.command.connectorType)
                         + ". Текущий редактор поддерживает только Sprut.hub, поэтому правило "
@@ -360,7 +360,7 @@ public final class IntentScenarioSettingsActivity extends dezz.status.widget.set
             names.append('«').append(references.get(index).title).append('»');
         }
         if (references.size() > shown) names.append(" и ещё ").append(references.size() - shown);
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Правило используется в кнопках")
                 .setMessage("Сначала измените или удалите "
                         + (references.size() == 1 ? "кнопку " : "кнопки ")
@@ -743,7 +743,7 @@ public final class IntentScenarioSettingsActivity extends dezz.status.widget.set
                         String.CASE_INSENSITIVE_ORDER)
                 .thenComparing(SprutCatalog.Accessory::name, String.CASE_INSENSITIVE_ORDER));
         if (accessories.isEmpty()) {
-            new AlertDialog.Builder(this)
+            new dezz.status.widget.settings.SettingsDialogBuilder(this)
                     .setTitle("Нет доступных целей")
                     .setMessage("Подключите Sprut.hub и обновите каталог. "
                             + "В список попадают только записываемые характеристики.")
@@ -760,7 +760,7 @@ public final class IntentScenarioSettingsActivity extends dezz.status.widget.set
             labels[index] = (room.isEmpty() ? "" : room + " → ") + accessoryDisplay(item)
                     + (item.online() ? "" : "  [offline]");
         }
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Устройство")
                 .setItems(labels, (dialog, which) -> chooseService(editor, accessories.get(which)))
                 .setNegativeButton("Отмена", null)
@@ -780,7 +780,7 @@ public final class IntentScenarioSettingsActivity extends dezz.status.widget.set
             labels[index] = serviceDisplay(service) + "\nтип: " + emptyDash(service.type())
                     + "  •  sId=" + service.id();
         }
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(accessoryDisplay(accessory) + " — сервис")
                 .setItems(labels, (dialog, which) -> chooseCharacteristic(editor, accessory,
                         services.get(which)))
@@ -803,7 +803,7 @@ public final class IntentScenarioSettingsActivity extends dezz.status.widget.set
                     + "  •  сейчас: " + valueOrDash(item.currentValue())
                     + "\npath: " + item.path().stableId();
         }
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(serviceDisplay(service) + " — что изменять")
                 .setItems(labels, (dialog, which) -> editor.setTarget(accessory, service,
                         values.get(which), false))

@@ -578,7 +578,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
             labels[index] = item.label;
             checked[index] = working.contains(item.id);
         }
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(R.string.phone_status_items_choose)
                 .setMultiChoiceItems(labels, checked, (dialog, which, selected) -> {
                     String id = items.get(which).id;
@@ -611,7 +611,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
             labels[index] = field.label;
             checked[index] = working.contains(field.id);
         }
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(R.string.phone_status_notification_fields_choose)
                 .setMultiChoiceItems(labels, checked, (dialog, which, selected) -> {
                     String id = fields.get(which).id;
@@ -645,7 +645,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
             labels[index] = category.label;
             checked[index] = working.contains(category.id);
         }
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(R.string.phone_filter_categories_choose)
                 .setMultiChoiceItems(labels, checked, (dialog, which, selected) -> {
                     int id = categories.get(which).id;
@@ -672,7 +672,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
                 getString(R.string.phone_filter_app_mode_only),
                 getString(R.string.phone_filter_app_mode_except)
         };
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(R.string.phone_filter_app_mode_choose)
                 .setSingleChoiceItems(labels,
                         PhoneNotificationFilter.normalizeMode(notificationAppFilterMode), null)
@@ -682,7 +682,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
                 (parent, view, position, id) -> {
                     notificationAppFilterMode =
                             PhoneNotificationFilter.normalizeMode(position);
-                    dialog.dismiss();
+                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     refreshFilterSummaries();
                 }));
         dialog.show();
@@ -698,7 +698,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
             labels[index] = app.label;
             checked[index] = working.contains(app.key);
         }
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(R.string.phone_filter_apps_choose)
                 .setMultiChoiceItems(labels, checked, (dialog, which, selected) -> {
                     String key = apps.get(which).key;
@@ -852,7 +852,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
         input.setSelectAllOnFocus(true);
         input.setHint(R.string.phone_status_notification_duration_prompt);
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(R.string.phone_status_notification_duration_title)
                 .setMessage(R.string.phone_status_notification_duration_prompt)
                 .setView(input)
@@ -876,7 +876,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
             }
             notificationDurationSeconds = requested;
             refreshStatusBarSummaries();
-            dialog.dismiss();
+            dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
         }));
         dialog.show();
     }
@@ -938,7 +938,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
         input.setSelectAllOnFocus(true);
         input.setHint(R.string.phone_low_battery_threshold_prompt);
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(second ? R.string.phone_low_battery_threshold_2_title
                         : R.string.phone_low_battery_threshold_1_title)
                 .setMessage(R.string.phone_low_battery_threshold_prompt)
@@ -968,7 +968,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
             if (second) lowBatteryThreshold2 = requested;
             else lowBatteryThreshold = requested;
             refreshAlertSummaries();
-            dialog.dismiss();
+            dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
         }));
         dialog.show();
     }
@@ -1010,7 +1010,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
     private void chooseBondedDevice() {
         List<BondedPhone> devices = bondedDevices();
         if (devices.isEmpty()) {
-            new AlertDialog.Builder(this)
+            new dezz.status.widget.settings.SettingsDialogBuilder(this)
                     .setTitle(R.string.phone_no_devices_title)
                     .setMessage(R.string.phone_no_devices_message)
                     .setPositiveButton(R.string.phone_open_bluetooth,
@@ -1026,7 +1026,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
             labels[index] = value.name + "\n" + maskedAddress(value.address);
             if (sameAddress(selectedDeviceAddress, value.address)) checked = index;
         }
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(R.string.phone_choose_device)
                 .setSingleChoiceItems(labels, checked, null)
                 .setNegativeButton(android.R.string.cancel, null)
@@ -1034,7 +1034,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
         dialog.setOnShowListener(ignored -> dialog.getListView().setOnItemClickListener(
                 (parent, view, position, id) -> {
                     selectedDeviceAddress = devices.get(position).address;
-                    dialog.dismiss();
+                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     refreshDeviceSummary();
                     refreshDiagnostics();
                 }));
@@ -1596,7 +1596,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
                                 "Устройство " + value.id()),
                         String.CASE_INSENSITIVE_ORDER));
         if (accessories.isEmpty()) {
-            new AlertDialog.Builder(this)
+            new dezz.status.widget.settings.SettingsDialogBuilder(this)
                     .setTitle(R.string.phone_sprut_no_targets_title)
                     .setMessage(R.string.phone_sprut_no_targets_message)
                     .setPositiveButton(R.string.phone_sprut_open_settings,
@@ -1614,7 +1614,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
                     + first(accessory.name(), accessory.model(),
                     "Устройство " + accessory.id());
         }
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(R.string.phone_sprut_accessory_title)
                 .setItems(labels, (dialog, which) ->
                         chooseSprutService(accessories.get(which), ancsTarget))
@@ -1637,7 +1637,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
             labels[index] = first(service.name(), service.type(), "Сервис " + service.id())
                     + "\n" + service.type() + " · sId=" + service.id();
         }
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(R.string.phone_sprut_service_title)
                 .setItems(labels, (dialog, which) ->
                         chooseSprutCharacteristic(
@@ -1661,7 +1661,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
                     + "\n" + value.type() + " · " + value.format()
                     + "\npath: " + value.path().stableId();
         }
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(R.string.phone_sprut_characteristic_title)
                 .setItems(labels, (dialog, which) -> {
                     String path = values.get(which).path().stableId();
@@ -1765,7 +1765,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
         }
         BluetoothState bluetooth = bluetoothState();
         if (!bluetooth.supported || !bluetooth.enabled) {
-            new AlertDialog.Builder(this)
+            new dezz.status.widget.settings.SettingsDialogBuilder(this)
                     .setTitle(R.string.phone_test_pairing_required_title)
                     .setMessage(R.string.phone_test_bluetooth_required)
                     .setPositiveButton(R.string.phone_open_bluetooth,
@@ -1775,7 +1775,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
             return;
         }
         if (selectedBondedPhone() == null) {
-            new AlertDialog.Builder(this)
+            new dezz.status.widget.settings.SettingsDialogBuilder(this)
                     .setTitle(R.string.phone_test_pairing_required_title)
                     .setMessage(R.string.phone_test_pairing_required)
                     .setPositiveButton(R.string.phone_open_bluetooth,
@@ -1790,7 +1790,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
                     Toast.LENGTH_LONG).show();
             return;
         }
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(R.string.phone_test_started_title)
                 .setMessage(R.string.phone_test_started)
                 .setPositiveButton(android.R.string.ok, null)
@@ -1855,7 +1855,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
 
         dismissEnrollmentSasDialog();
         leEnrollmentSasGeneration = snapshot.generation;
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(R.string.phone_le_enrollment_sas_title)
                 .setMessage(getString(R.string.phone_le_enrollment_sas_message, snapshot.sas))
                 .setPositiveButton(R.string.phone_le_enrollment_sas_matches,
@@ -1881,7 +1881,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
     }
 
     private void confirmForgetLeEnrollment() {
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(R.string.phone_le_enrollment_forget_title)
                 .setMessage(R.string.phone_le_enrollment_forget_message)
                 .setPositiveButton(R.string.phone_le_enrollment_forget_confirm,

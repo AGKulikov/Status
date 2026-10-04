@@ -162,7 +162,7 @@ public final class MediaButtonsSettingsActivity extends dezz.status.widget.setti
             @Override public void onNothingSelected(AdapterView<?> parent) {}
         }); visibility.run();
         ScrollView scroll = new ScrollView(this); scroll.addView(fields);
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle(title).setView(scroll)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle(title).setView(scroll)
                 .setNegativeButton("Отмена", null).setPositiveButton("Сохранить", null).create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(view -> {
             Object selectedAction = selector.getSelectedItem();
@@ -176,7 +176,7 @@ public final class MediaButtonsSettingsActivity extends dezz.status.widget.setti
             }
             String error = assignment.validationError();
             if (!error.isEmpty()) { toast(error); return; }
-            buttons.saveBinding(group, gesture, assignment, () -> { dialog.dismiss(); showTab(); });
+            buttons.saveBinding(group, gesture, assignment, () -> { dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog); showTab(); });
         }));
         dialog.show();
     }
@@ -192,7 +192,7 @@ public final class MediaButtonsSettingsActivity extends dezz.status.widget.setti
         catch (android.content.pm.PackageManager.NameNotFoundException ignored) { return false; }
     }
     private void chooseApp(EditText target) {
-        AlertDialog loading = new AlertDialog.Builder(this).setMessage("Загрузка приложений…").create(); loading.show();
+        AlertDialog loading = new dezz.status.widget.settings.SettingsDialogBuilder(this).setMessage("Загрузка приложений…").create(); loading.show();
         CompletableFuture.supplyAsync(() -> InstalledAppCatalog.load(this)).whenComplete((apps, failure) -> runOnUiThread(() -> {
             if (isDestroyed() || !loading.isShowing()) return; loading.dismiss();
             if (failure != null) { toast("Не удалось загрузить приложения"); return; }
@@ -200,7 +200,7 @@ public final class MediaButtonsSettingsActivity extends dezz.status.widget.setti
             for (InstalledAppCatalog.App app : apps) if (app.launchable()) available.add(app);
             String[] labels = new String[available.size()];
             for (int i = 0; i < labels.length; i++) labels[i] = available.get(i).label + " · " + available.get(i).packageName;
-            new AlertDialog.Builder(this).setTitle("Приложение").setItems(labels, (dialog, which) -> {
+            new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Приложение").setItems(labels, (dialog, which) -> {
                 InstalledAppCatalog.App app = available.get(which);
                 target.setText(app.label + " [" + app.component.getPackageName() + " / " + app.component.getClassName() + "]");
             }).setNegativeButton("Отмена", null).show();
@@ -232,7 +232,7 @@ public final class MediaButtonsSettingsActivity extends dezz.status.widget.setti
                 android.R.layout.simple_spinner_dropdown_item, new String[]{"Цикл: обычный → скрыть статус → скрыть всё", "Скрыть строку статуса", "Скрыть все панели"}));
         fullscreen.setSelection(buttons.integer("fullscreen.mode", 0)); values.addView(fullscreen);
         ScrollView scroll = new ScrollView(this); scroll.addView(values);
-        new AlertDialog.Builder(this).setTitle("Параметры действий").setView(scroll).setNegativeButton("Отмена", null)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Параметры действий").setView(scroll).setNegativeButton("Отмена", null)
                 .setPositiveButton("Сохранить", (dialog, which) -> {
                     buttons.put("wifi.ssid", wifi.getText().toString().trim()); buttons.put("wifi.connect", connect.isChecked());
                     buttons.put("camera.use_broadcast", camera.isChecked()); buttons.put("fullscreen.mode", fullscreen.getSelectedItemPosition());

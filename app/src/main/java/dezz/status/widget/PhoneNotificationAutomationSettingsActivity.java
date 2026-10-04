@@ -272,7 +272,7 @@ public final class PhoneNotificationAutomationSettingsActivity extends dezz.stat
             labels[index] = fields.get(index).label;
             checked[index] = working.contains(fields.get(index).id);
         }
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Состав текста уведомления")
                 .setMultiChoiceItems(labels, checked, (choice, which, selected) -> {
                     String id = fields.get(which).id;
@@ -291,7 +291,7 @@ public final class PhoneNotificationAutomationSettingsActivity extends dezz.stat
                     selectedFields.clear();
                     selectedFields.addAll(working);
                     persist();
-                    dialog.dismiss();
+                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                 }));
         dialog.show();
     }
@@ -302,7 +302,7 @@ public final class PhoneNotificationAutomationSettingsActivity extends dezz.stat
         input.setInputType(InputType.TYPE_CLASS_NUMBER);
         input.setText(String.valueOf(durationSeconds));
         input.setSelectAllOnFocus(true);
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Длительность показа")
                 .setMessage("От 1 до 120 секунд для одиночного уведомления. "
                         + "В серии каждое следующее уведомление показывается по очереди "
@@ -318,7 +318,7 @@ public final class PhoneNotificationAutomationSettingsActivity extends dezz.stat
                         if (value < 1 || value > 120) throw new NumberFormatException();
                         durationSeconds = value;
                         persist();
-                        dialog.dismiss();
+                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     } catch (NumberFormatException invalid) {
                         input.setError("Введите число от 1 до 120");
                     }
@@ -366,7 +366,7 @@ public final class PhoneNotificationAutomationSettingsActivity extends dezz.stat
             labels[index] = app.label;
             checked[index] = working.contains(app.packageName);
         }
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(R.string.phone_notification_delay_apps_choose)
                 .setMultiChoiceItems(labels, checked, (dialog, which, selected) -> {
                     String packageName = apps.get(which).packageName;
@@ -392,7 +392,7 @@ public final class PhoneNotificationAutomationSettingsActivity extends dezz.stat
         input.setInputType(InputType.TYPE_CLASS_NUMBER);
         input.setText(String.valueOf(delayMaxWaitSeconds));
         input.setSelectAllOnFocus(true);
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(R.string.phone_notification_delay_wait_title)
                 .setMessage(R.string.phone_notification_delay_wait_prompt)
                 .setView(input)
@@ -409,7 +409,7 @@ public final class PhoneNotificationAutomationSettingsActivity extends dezz.stat
                         }
                         delayMaxWaitSeconds = value;
                         persist();
-                        dialog.dismiss();
+                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     } catch (NumberFormatException invalid) {
                         input.setError(getString(
                                 R.string.phone_notification_delay_wait_invalid));
@@ -537,7 +537,7 @@ public final class PhoneNotificationAutomationSettingsActivity extends dezz.stat
     }
 
     private void showForegroundTrackingRequired() {
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(R.string.phone_notification_delay_access_title)
                 .setMessage(R.string.phone_notification_delay_access_message)
                 .setPositiveButton(R.string.phone_notification_delay_access_accessibility,

@@ -298,7 +298,7 @@ public final class FavoriteAppsSettingsActivity extends SettingsLauncherProfileA
 
     private void confirmRemove(@NonNull String packageName, @Nullable AppChoice app) {
         String label = app == null ? packageName : app.label;
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Убрать «" + label + "» из избранного?")
                 .setMessage("Оформление запомнится и восстановится, если добавить приложение снова.")
                 .setPositiveButton("Убрать", (dialog, which) ->
@@ -339,7 +339,7 @@ public final class FavoriteAppsSettingsActivity extends SettingsLauncherProfileA
         grid.setAdapter(adapter);
         body.addView(grid, new LinearLayout.LayoutParams(match(), dp(430)));
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Добавить приложение")
                 .setView(body)
                 .setNegativeButton(android.R.string.cancel, null)
@@ -351,7 +351,7 @@ public final class FavoriteAppsSettingsActivity extends SettingsLauncherProfileA
                 scheduleChangeNotification();
                 refreshRows();
             }
-            dialog.dismiss();
+            dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
         });
         search.addTextChangedListener(new TextWatcher() {
             @Override public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
@@ -426,7 +426,7 @@ public final class FavoriteAppsSettingsActivity extends SettingsLauncherProfileA
 
         ScrollView scroll = new ScrollView(this);
         scroll.addView(body, new ScrollView.LayoutParams(match(), wrap()));
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(app == null ? packageName : app.label)
                 .setView(scroll)
                 .setPositiveButton("Готово", null)
@@ -460,7 +460,7 @@ public final class FavoriteAppsSettingsActivity extends SettingsLauncherProfileA
         value.setGravity(Gravity.END);
         heading.addView(name, new LinearLayout.LayoutParams(0, wrap(), 1f));
         heading.addView(value, new LinearLayout.LayoutParams(dp(100), wrap()));
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, suffix);
         seek.setMax(maximum - minimum);
         seek.setProgress(Math.max(0, Math.min(maximum - minimum, initial - minimum)));
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {

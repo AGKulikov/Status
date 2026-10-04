@@ -172,7 +172,7 @@ public final class ClimatePanelSettingsActivity extends SettingsLauncherProfileA
         addHint(settings, launcherOnly
                 ? "Этот документ относится только к виджетам на лаунчере. Плавающая панель "
                 + "хранит отдельное оформление в разделе «Панели»."
-                : "Эта панель работает независимо от HOME. Все изменения сохраняются сразу; "
+                : "Эта панель работает независимо от HOME. Изменения видны в предпросмотре; "
                 + "справа показан живой вид с текущими значениями автомобиля.");
 
         if (!launcherOnly) {
@@ -324,7 +324,7 @@ public final class ClimatePanelSettingsActivity extends SettingsLauncherProfileA
         rebuildElementEditor();
 
         addButton(settings, "Вернуть оформление по умолчанию", v ->
-                new AlertDialog.Builder(this)
+                new dezz.status.widget.settings.SettingsDialogBuilder(this)
                         .setTitle(launcherOnly
                                 ? "Сбросить климатические виджеты HOME?"
                                 : "Сбросить плавающую климатическую панель?")
@@ -366,7 +366,7 @@ public final class ClimatePanelSettingsActivity extends SettingsLauncherProfileA
         previewHost.addView(preview, new FrameLayout.LayoutParams(match(), match()));
         previewColumn.addView(previewHost, new LinearLayout.LayoutParams(match(), 0, 1f));
         TextView saved = new TextView(this);
-        saved.setText("✓ Изменения сохраняются автоматически");
+        saved.setText("Предпросмотр · сохранение по «Применить»");
         saved.setTextSize(13);
         saved.setGravity(Gravity.CENTER);
         saved.setAlpha(.72f);
@@ -607,7 +607,7 @@ public final class ClimatePanelSettingsActivity extends SettingsLauncherProfileA
         value.setText(initial + "%");
         value.setTextSize(13);
         value.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
-        SeekBar slider = new SeekBar(this);
+        SeekBar slider = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, "");
         slider.setMax(maximum - minimum);
         slider.setProgress(Math.max(0, Math.min(maximum - minimum, initial - minimum)));
         slider.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -692,6 +692,8 @@ public final class ClimatePanelSettingsActivity extends SettingsLauncherProfileA
         if (editScheduler != null) editScheduler.flush();
     }
 
+    @Override protected void flushSettingsDraft() { flushLiveUpdate(); }
+
     @NonNull
     private MaterialButton orderButton(@NonNull String symbol, @NonNull String description) {
         MaterialButton button = new MaterialButton(this);
@@ -733,7 +735,7 @@ public final class ClimatePanelSettingsActivity extends SettingsLauncherProfileA
         value.setText(formatter.format(initial));
         heading.addView(label, new LinearLayout.LayoutParams(0, wrap(), 1f));
         heading.addView(value, new LinearLayout.LayoutParams(dp(104), wrap()));
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, "");
         seek.setMax(maximum - minimum);
         seek.setProgress(Math.max(0, Math.min(maximum - minimum, initial - minimum)));
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {

@@ -78,6 +78,8 @@ public final class PanelElementSettingsActivity extends dezz.status.widget.setti
         super.onStop();
     }
 
+    @Override protected void flushSettingsDraft() { if (editScheduler != null) editScheduler.flush(); }
+
     @Override
     protected void onDestroy() {
         if (editScheduler != null) editScheduler.cancel();
@@ -133,7 +135,7 @@ public final class PanelElementSettingsActivity extends dezz.status.widget.setti
         previewHost.setPadding(dp(18), dp(18), dp(18), dp(18));
         previewColumn.addView(previewHost, new LinearLayout.LayoutParams(match(), 0, 1f));
         TextView saved = new TextView(this);
-        saved.setText("✓ Сохраняется автоматически");
+        saved.setText("Предпросмотр · сохранение по «Применить»");
         saved.setGravity(Gravity.CENTER);
         saved.setTextSize(13);
         saved.setAlpha(.7f);
@@ -224,7 +226,7 @@ public final class PanelElementSettingsActivity extends dezz.status.widget.setti
         MaterialButton reset = new MaterialButton(this);
         reset.setAllCaps(false);
         reset.setText("Вернуть состав и размеры по умолчанию");
-        reset.setOnClickListener(v -> new AlertDialog.Builder(this)
+        reset.setOnClickListener(v -> new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Сбросить этот блок?")
                 .setMessage("Положение и размер самого блока сохранятся.")
                 .setPositiveButton("Сбросить", (dialog, which) -> {
@@ -300,7 +302,7 @@ public final class PanelElementSettingsActivity extends dezz.status.widget.setti
         scaleValue.setGravity(Gravity.END);
         scaleValue.setMinWidth(dp(72));
         scaleValue.setText(element.scalePercent + "%");
-        SeekBar scale = new SeekBar(this);
+        SeekBar scale = new dezz.status.widget.settings.SettingsSeekBar(this, PanelElementConfigStore.MIN_SCALE, 1, "%");
         scale.setMax(PanelElementConfigStore.MAX_SCALE - PanelElementConfigStore.MIN_SCALE);
         scale.setProgress(element.scalePercent - PanelElementConfigStore.MIN_SCALE);
         scale.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -346,7 +348,7 @@ public final class PanelElementSettingsActivity extends dezz.status.widget.setti
         }
         String[] labels = new String[hidden.size()];
         for (int index = 0; index < hidden.size(); index++) labels[index] = hidden.get(index).label;
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Добавить элемент")
                 .setItems(labels, (dialog, which) -> {
                     panel.setEnabled(hidden.get(which).id, true);
@@ -406,7 +408,7 @@ public final class PanelElementSettingsActivity extends dezz.status.widget.setti
         TextView label = new TextView(this);
         label.setText(title);
         label.setTextSize(15);
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, "");
         seek.setMax(maximum - minimum);
         seek.setProgress(Math.max(0, Math.min(maximum - minimum, preference.get() - minimum)));
         TextView value = new TextView(this);

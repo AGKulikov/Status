@@ -27,6 +27,22 @@ android {
     buildFeatures {
         buildConfig = true
     }
+    testOptions {
+        unitTests.includeAndroidResources = true
+        unitTests.all {
+            jvmArgs += [
+                    '--add-opens=java.base/java.lang=ALL-UNNAMED',
+                    '--add-opens=java.base/java.util=ALL-UNNAMED',
+                    '--add-opens=java.base/java.io=ALL-UNNAMED',
+                    '--add-opens=java.base/java.net=ALL-UNNAMED',
+                    '--add-opens=java.base/java.security=ALL-UNNAMED',
+                    '--add-opens=java.base/java.text=ALL-UNNAMED',
+                    '--add-opens=java.base/jdk.internal.access=ALL-UNNAMED',
+                    '--add-opens=java.desktop/java.awt.font=ALL-UNNAMED',
+                    '--add-opens=jdk.compiler/com.sun.tools.javac.api=ALL-UNNAMED'
+            ]
+        }
+    }
 
     defaultConfig {
         // Keep the historical HA fork package unchanged: together with the stable signing key
@@ -149,6 +165,7 @@ dependencies {
     // must not import com.ecarx.* — only app/src/geely may.
     geelyImplementation files('libs/geely/ecarx-adaptapi.jar')
     testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.17'
     // Android's local-unit-test stub throws from org.json methods. Protocol fixtures need the
     // real implementation so auth/catalog/event compatibility is tested on every CI build.
     testImplementation 'org.json:json:20240303'

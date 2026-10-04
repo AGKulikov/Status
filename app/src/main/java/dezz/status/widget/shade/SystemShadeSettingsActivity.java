@@ -116,7 +116,7 @@ public final class SystemShadeSettingsActivity extends dezz.status.widget.settin
                         Value listener) {
         TextView caption = text(label + ": " + current + suffix, 16);
         content.addView(caption);
-        SeekBar bar = new SeekBar(this);
+        SeekBar bar = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, suffix);
         bar.setMax(maximum - minimum);
         bar.setProgress(current - minimum);
         bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {

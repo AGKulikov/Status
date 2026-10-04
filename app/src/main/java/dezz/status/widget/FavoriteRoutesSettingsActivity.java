@@ -152,7 +152,7 @@ public final class FavoriteRoutesSettingsActivity extends SettingsLauncherProfil
         previewHost.setBackground(previewBackground);
         previewHost.setPadding(dp(12), dp(12), dp(12), dp(12));
         right.addView(previewHost, new LinearLayout.LayoutParams(match(), 0, 1f));
-        savedStatus = text("✓ Сохраняется автоматически", 13, false);
+        savedStatus = text("Предпросмотр · сохранение по «Применить»", 13, false);
         savedStatus.setGravity(Gravity.CENTER);
         savedStatus.setAlpha(.72f);
         right.addView(savedStatus, new LinearLayout.LayoutParams(match(), dp(42)));
@@ -221,7 +221,7 @@ public final class FavoriteRoutesSettingsActivity extends SettingsLauncherProfil
     }
 
     private void confirmDelete(@NonNull FavoriteRouteConfig route) {
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Удалить маршрут?")
                 .setMessage(route.title)
                 .setPositiveButton("Удалить", (dialog, which) -> {
@@ -443,7 +443,7 @@ public final class FavoriteRoutesSettingsActivity extends SettingsLauncherProfil
         value.setGravity(Gravity.END);
         heading.addView(name, new LinearLayout.LayoutParams(0, wrap(), 1f));
         heading.addView(value, new LinearLayout.LayoutParams(dp(88), wrap()));
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, suffix);
         seek.setMax(maximum - minimum);
         seek.setProgress(Math.max(0, Math.min(maximum - minimum, initial - minimum)));
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {

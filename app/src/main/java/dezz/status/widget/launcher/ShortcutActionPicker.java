@@ -94,7 +94,7 @@ public final class ShortcutActionPicker {
         String[] values = {"Без действия", "Приложение", "Готовая функция",
                 "Функция автомобиля", "Устройство умного дома / сценарий",
                 "Телефонный звонок", "Android Intent"};
-        new AlertDialog.Builder(activity).setTitle("Долгое нажатие")
+        new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle("Долгое нажатие")
                 .setItems(values, (dialog, which) -> {
                     if (which == 0) {
                         value.hasLongAction = false;
@@ -115,7 +115,7 @@ public final class ShortcutActionPicker {
                 "Устройство умного дома / сценарий", "Телефонный звонок", "Android Intent",
                 "Информационная плитка (без нажатия)", "Разделитель"};
         if (selection != null) values = java.util.Arrays.copyOf(values, 6);
-        new AlertDialog.Builder(activity).setTitle(title)
+        new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle(title)
                 .setItems(values, (dialog, which) -> chooseKindIndex(value, which))
                 .setNegativeButton("Отмена", null).show();
     }
@@ -175,7 +175,7 @@ public final class ShortcutActionPicker {
     }
 
     private void chooseApplication(@Nullable LauncherShortcutStore.Shortcut existing) {
-        AlertDialog loading = new AlertDialog.Builder(activity)
+        AlertDialog loading = new dezz.status.widget.settings.SettingsDialogBuilder(activity)
                 .setTitle("Все приложения · включая системные")
                 .setMessage("Загружаю список…").setNegativeButton("Отмена", null).create();
         loading.show();
@@ -200,7 +200,7 @@ public final class ShortcutActionPicker {
         }
         ArrayAdapter<String> adapter = new ArrayAdapter<>(activity,
                 android.R.layout.simple_list_item_1, labels);
-        new AlertDialog.Builder(activity).setTitle("Приложение")
+        new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle("Приложение")
                 .setAdapter(adapter, (dialog, which) -> {
                     InstalledAppCatalog.App app = apps.get(which);
                     if (!app.launchable() || app.component == null) {
@@ -233,7 +233,7 @@ public final class ShortcutActionPicker {
         for (int index = 0; index < actions.length; index++) {
             labels[index] = actions[index].label;
         }
-        new AlertDialog.Builder(activity).setTitle("Готовая функция")
+        new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle("Готовая функция")
                 .setItems(labels, (dialog, which) -> {
                     LauncherShortcutStore.Builtin action = actions[which];
                     LauncherShortcutStore.Shortcut value = existing == null
@@ -283,7 +283,7 @@ public final class ShortcutActionPicker {
             labels[index] = panel.title + "\n" + panel.columns + " × "
                     + panel.visibleRows + " видимых ячеек";
         }
-        new AlertDialog.Builder(activity)
+        new dezz.status.widget.settings.SettingsDialogBuilder(activity)
                 .setTitle("Какое избранное открыть")
                 .setItems(labels, (dialog, which) -> {
                     DriverFavoritesPanelConfig panel = panels.get(which);
@@ -324,7 +324,7 @@ public final class ShortcutActionPicker {
                     ? route.address : route.coordinates;
             labels[index] = route.title + "\n" + destination;
         }
-        new AlertDialog.Builder(activity).setTitle("Избранная точка")
+        new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle("Избранная точка")
                 .setItems(labels, (dialog, which) -> {
                     FavoriteRouteConfig route = enabled.get(which);
                     String target = LauncherShortcutStore.favoriteRouteTarget(route.id);
@@ -350,7 +350,7 @@ public final class ShortcutActionPicker {
     }
 
     private void chooseCarControl(@Nullable LauncherShortcutStore.Shortcut existing) {
-        AlertDialog loading = new AlertDialog.Builder(activity).setTitle("Функции автомобиля")
+        AlertDialog loading = new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle("Функции автомобиля")
                 .setMessage("Проверяю функции магнитолы…")
                 .setNegativeButton("Отмена", null).create();
         loading.show();
@@ -366,7 +366,7 @@ public final class ShortcutActionPicker {
                 CarControlDescriptor control = controls.get(index);
                 labels[index] = control.category + " · " + control.label;
             }
-            new AlertDialog.Builder(activity).setTitle("Функция автомобиля")
+            new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle("Функция автомобиля")
                     .setItems(labels, (dialog, which) ->
                             chooseCarBehavior(existing, controls.get(which)))
                     .setNegativeButton("Отмена", null).show();
@@ -409,7 +409,7 @@ public final class ShortcutActionPicker {
             operations.add(CarControlCommand.Operation.SET);
             values.add(option.value);
         }
-        new AlertDialog.Builder(activity).setTitle(control.label)
+        new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle(control.label)
                 .setItems(labels.toArray(new String[0]), (dialog, which) -> {
                     CarControlCommand.Operation operation = operations.get(which);
                     if (operation == null) {
@@ -433,7 +433,7 @@ public final class ShortcutActionPicker {
         for (CarControlDescriptor.Option option : control.options) {
             labels.add("Установить: " + option.label);
         }
-        new AlertDialog.Builder(activity).setTitle(control.label)
+        new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle(control.label)
                 .setItems(labels.toArray(new String[0]), (dialog, which) -> {
                     if (which == 0) {
                         saveCarCycle(existing, control, ascending);
@@ -464,7 +464,7 @@ public final class ShortcutActionPicker {
                     control, option.value) ? "0 · Выкл" : option.label;
             checked[index] = true;
         }
-        AlertDialog dialog = new AlertDialog.Builder(activity)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(activity)
                 .setTitle(control.label + " · цикл")
                 .setMultiChoiceItems(labels, checked,
                         (value, which, selected) -> {
@@ -491,7 +491,7 @@ public final class ShortcutActionPicker {
                         toast("Выберите минимум два режима");
                         return;
                     }
-                    dialog.dismiss();
+                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     saveCarCycle(existing, control, selected);
                 }));
         dialog.show();
@@ -503,7 +503,7 @@ public final class ShortcutActionPicker {
         TextView current = new TextView(activity);
         current.setTextColor(Color.WHITE);
         form.addView(current);
-        SeekBar seek = new SeekBar(activity);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(activity, control.minimum, control.step, "");
         int steps = Math.max(1, (int) Math.round(
                 (control.maximum - control.minimum) / control.step));
         seek.setMax(steps);
@@ -519,7 +519,7 @@ public final class ShortcutActionPicker {
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
         form.addView(seek, new LinearLayout.LayoutParams(match(), dp(56)));
-        new AlertDialog.Builder(activity).setTitle(control.label).setView(form)
+        new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle(control.label).setView(form)
                 .setPositiveButton("Выбрать", (dialog, which) -> saveCar(existing, control,
                         CarControlCommand.Operation.SET,
                         control.minimum + seek.getProgress() * control.step))
@@ -591,7 +591,7 @@ public final class ShortcutActionPicker {
 
     private void chooseSmartHome(@Nullable LauncherShortcutStore.Shortcut existing) {
         String[] sources = {"Новое действие из каталога", "Ранее настроенное действие"};
-        new AlertDialog.Builder(activity).setTitle("Умный дом / сценарий")
+        new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle("Умный дом / сценарий")
                 .setItems(sources, (dialog, which) -> {
                     if (which == 0) {
                         new SmartHomeShortcutPicker(activity,
@@ -622,7 +622,7 @@ public final class ShortcutActionPicker {
             IntentActionRule rule = enabled.get(index);
             labels[index] = rule.accessoryLabel.isEmpty() ? rule.id : rule.accessoryLabel;
         }
-        new AlertDialog.Builder(activity).setTitle("Готовое действие")
+        new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle("Готовое действие")
                 .setItems(labels, (dialog, which) -> {
                     IntentActionRule rule = enabled.get(which);
                     LauncherShortcutStore.Shortcut value = existing == null
@@ -714,7 +714,7 @@ public final class ShortcutActionPicker {
                         ? value.packageName : "");
         form.addView(action);
         form.addView(packageName);
-        AlertDialog dialog = new AlertDialog.Builder(activity).setTitle("Android Intent")
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle("Android Intent")
                 .setView(form).setPositiveButton("Сохранить", null)
                 .setNegativeButton("Отмена", null).create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
@@ -724,7 +724,7 @@ public final class ShortcutActionPicker {
                         action.setError("Укажите действие");
                         return;
                     }
-                    dialog.dismiss();
+                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     if (longPress) {
                         saveLong(value, LauncherShortcutStore.Kind.INTENT, target,
                                 packageName.getText().toString().trim(),
@@ -756,7 +756,7 @@ public final class ShortcutActionPicker {
         number.setInputType(InputType.TYPE_CLASS_PHONE);
         form.addView(title);
         form.addView(number);
-        AlertDialog dialog = new AlertDialog.Builder(activity).setTitle("Телефонный звонок")
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle("Телефонный звонок")
                 .setView(form).setPositiveButton("Сохранить", null)
                 .setNegativeButton("Отмена", null).create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
@@ -766,7 +766,7 @@ public final class ShortcutActionPicker {
                         number.setError("Укажите номер");
                         return;
                     }
-                    dialog.dismiss();
+                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     if (longPress) {
                         saveLong(value, LauncherShortcutStore.Kind.PHONE, target, "",
                                 CarControlCommand.Operation.TOGGLE, 0);

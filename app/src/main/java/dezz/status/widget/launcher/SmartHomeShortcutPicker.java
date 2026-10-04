@@ -84,7 +84,7 @@ public final class SmartHomeShortcutPicker {
 
     public void showConnectorPicker() {
         String[] values = {"Home Assistant", "MQTT", "Sprut.hub"};
-        new AlertDialog.Builder(activity).setTitle("Выберите коннектор")
+        new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle("Выберите коннектор")
                 .setItems(values, (dialog, which) -> {
                     if (which == 0) showHomeAssistant();
                     else if (which == 1) showMqtt();
@@ -102,7 +102,7 @@ public final class SmartHomeShortcutPicker {
             return;
         }
         if (active.catalog().isEmpty()) {
-            AlertDialog loading = new AlertDialog.Builder(activity)
+            AlertDialog loading = new dezz.status.widget.settings.SettingsDialogBuilder(activity)
                     .setTitle("Home Assistant")
                     .setMessage("Загружаю полный список сущностей…")
                     .setNegativeButton("Отмена", null)
@@ -180,7 +180,7 @@ public final class SmartHomeShortcutPicker {
                     ha(entity, ActionBinding.OPERATION_SET, "false"));
         }
         labels.add("Указать сервис и данные вручную…");
-        new AlertDialog.Builder(activity).setTitle(haName(entity) + " — действие")
+        new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle(haName(entity) + " — действие")
                 .setItems(labels.toArray(new String[0]), (dialog, which) -> {
                     if (which == bindings.size()) {
                         showCustomHaService(entity);
@@ -199,7 +199,7 @@ public final class SmartHomeShortcutPicker {
                 entity.domain() + ".toggle");
         EditText data = field(form, "JSON data без entity_id, например {\"temperature\":22}",
                 "{}");
-        AlertDialog dialog = new AlertDialog.Builder(activity)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(activity)
                 .setTitle(haName(entity) + " — сервис")
                 .setView(form).setPositiveButton("Выбрать", null)
                 .setNegativeButton("Отмена", null).create();
@@ -218,7 +218,7 @@ public final class SmartHomeShortcutPicker {
                                         + " · " + selectedService,
                                 SmartHomeIconResolver.suggest(entity.domain(),
                                         string(entity.attribute("device_class")), "", haName(entity)));
-                        dialog.dismiss();
+                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     } catch (Exception error) {
                         toast(message(error));
                     }
@@ -227,7 +227,7 @@ public final class SmartHomeShortcutPicker {
     }
 
     private void showMqtt() {
-        AlertDialog loading = new AlertDialog.Builder(activity).setTitle("MQTT")
+        AlertDialog loading = new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle("MQTT")
                 .setMessage("Загружаю каталог реально полученных ресурсов…")
                 .setNegativeButton("Отмена", null).create();
         loading.show();
@@ -294,7 +294,7 @@ public final class SmartHomeShortcutPicker {
         EditText title = field(form, "Название", value == null ? "MQTT" : resource);
         EditText topic = field(form, "Command topic или ID команды", suggestedCommand);
         EditText payload = field(form, "Payload", "TOGGLE");
-        AlertDialog dialog = new AlertDialog.Builder(activity).setTitle("MQTT — действие")
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle("MQTT — действие")
                 .setMessage("Список сформирован из всех retained/live значений брокера, а не "
                         + "только из ранее добавленных плиток. Сохранённый scope/ID подтверждает "
                         + "только реально полученное состояние: проверьте предложенный ID команды "
@@ -318,7 +318,7 @@ public final class SmartHomeShortcutPicker {
                                 value == null ? null : new SourceBinding(ConnectorType.MQTT,
                                         SourceBinding.DEFAULT_CONNECTOR_ID, value.resourceId,
                                         "", SourceBinding.PRESENTATION_AUTO, ""));
-                        dialog.dismiss();
+                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     } catch (RuntimeException error) {
                         toast(message(error));
                     }
@@ -332,7 +332,7 @@ public final class SmartHomeShortcutPicker {
             showSprutAccessories(active.catalog());
             return;
         }
-        AlertDialog loading = new AlertDialog.Builder(activity).setTitle("Sprut.hub")
+        AlertDialog loading = new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle("Sprut.hub")
                 .setMessage("Загружаю сохранённый полный каталог…")
                 .setNegativeButton("Отмена", null).create();
         loading.show();
@@ -472,7 +472,7 @@ public final class SmartHomeShortcutPicker {
             commands.add(sprut(characteristic, ActionBinding.OPERATION_SET, "0"));
         }
         labels.add("Указать значение вручную…");
-        new AlertDialog.Builder(activity).setTitle(characteristicName(characteristic))
+        new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle(characteristicName(characteristic))
                 .setItems(labels.toArray(new String[0]), (dialog, which) -> {
                     if (which == commands.size()) {
                         showManualSprutValue(catalog, accessory, service, characteristic);
@@ -487,7 +487,7 @@ public final class SmartHomeShortcutPicker {
                                       SprutCatalog.Characteristic characteristic) {
         LinearLayout form = form();
         EditText value = field(form, "JSON-примитив: число, true/false или \"текст\"", "");
-        AlertDialog dialog = new AlertDialog.Builder(activity)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(activity)
                 .setTitle(characteristicName(characteristic) + " — значение")
                 .setMessage("Значение будет проверено по типу, min/max, шагу и списку "
                         + "допустимых значений Sprut.hub.")
@@ -501,7 +501,7 @@ public final class SmartHomeShortcutPicker {
                                 ActionBinding.OPERATION_SET, payload);
                         SprutActionValue.resolve(command, characteristic);
                         finishSprut(catalog, accessory, service, characteristic, command);
-                        dialog.dismiss();
+                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     } catch (RuntimeException error) {
                         toast(message(error));
                     }
@@ -558,7 +558,7 @@ public final class SmartHomeShortcutPicker {
             }
         };
         list.setAdapter(adapter);
-        AlertDialog.Builder builder = new AlertDialog.Builder(activity).setTitle(title)
+        AlertDialog.Builder builder = new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle(title)
                 .setView(content);
         if (back == null) builder.setNegativeButton("Отмена", null);
         else builder.setNegativeButton("Назад", (dialog, which) -> back.run());
@@ -569,7 +569,7 @@ public final class SmartHomeShortcutPicker {
         list.setOnItemClickListener((parent, view, position, id) -> {
             if (position < 0 || position >= visible.size()) return;
             BoundedCatalogSearch.Item<T> choice = visible.get(position);
-            dialog.dismiss();
+            dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
             selected.onSelected(choice);
         });
         Runnable filter = () -> {
@@ -599,14 +599,14 @@ public final class SmartHomeShortcutPicker {
     }
 
     private void missingCatalog(String title, String message, Class<?> settings) {
-        new AlertDialog.Builder(activity).setTitle(title).setMessage(message)
+        new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle(title).setMessage(message)
                 .setPositiveButton("Настроить", (dialog, which) ->
                         activity.startActivity(new Intent(activity, settings)))
                 .setNegativeButton("Назад", (dialog, which) -> showConnectorPicker()).show();
     }
 
     private void showReadOnlySprut(String title, Runnable back) {
-        new AlertDialog.Builder(activity).setTitle(title)
+        new dezz.status.widget.settings.SettingsDialogBuilder(activity).setTitle(title)
                 .setMessage("Элемент показан, потому что это полный каталог Sprut.hub, "
                         + "но у него нет характеристик с правом записи. Его можно просматривать, "
                         + "но нельзя выбрать как действие HOME.")

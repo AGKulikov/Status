@@ -539,7 +539,7 @@ public class Preferences {
         }
     }
 
-    private final SharedPreferences prefs;
+    private SharedPreferences prefs;
     private volatile boolean startupMigrationsComplete;
     private final Context appContext;
 
@@ -1264,6 +1264,7 @@ public class Preferences {
         prefs = deviceContext.getSharedPreferences(context.getPackageName() + "_preferences",
                 AppProcessPolicy.preferenceMode());
         if (runStartupMigrations) completeDeferredStartupMigrations();
+        prefs = dezz.status.widget.settings.SettingsPreferences.wrap(context, prefs);
     }
 
     synchronized void completeDeferredStartupMigrations() {

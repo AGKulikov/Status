@@ -75,7 +75,7 @@ public final class InformationSourcePicker {
                 "Sprut.hub",
                 "Телефон"
         };
-        new AlertDialog.Builder(activity)
+        new dezz.status.widget.settings.SettingsDialogBuilder(activity)
                 .setTitle("Источник статуса")
                 .setItems(sources, (dialog, which) -> {
                     if (which == 0) showStatusBar();
@@ -480,7 +480,7 @@ public final class InformationSourcePicker {
             }
         };
         list.setAdapter(adapter);
-        AlertDialog dialog = new AlertDialog.Builder(activity)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(activity)
                 .setTitle(title)
                 .setView(content)
                 .setNegativeButton("Назад", (ignored, which) -> show())
@@ -514,7 +514,7 @@ public final class InformationSourcePicker {
         list.setOnItemClickListener((parent, view, position, id) -> {
             if (position < 0 || position >= visible.size()) return;
             InformationPanelConfig.Item selected = visible.get(position).item.copy();
-            dialog.dismiss();
+            dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
             callback.onSelected(selected);
         });
         filter.run();
@@ -523,7 +523,7 @@ public final class InformationSourcePicker {
 
     @NonNull
     private AlertDialog progress(@NonNull String title, @NonNull String message) {
-        AlertDialog dialog = new AlertDialog.Builder(activity)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(activity)
                 .setTitle(title)
                 .setMessage(message)
                 .setNegativeButton(android.R.string.cancel, null)

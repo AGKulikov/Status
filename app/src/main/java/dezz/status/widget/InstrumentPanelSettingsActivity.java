@@ -209,7 +209,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
             });
         });
         ScrollView scroll = new ScrollView(this); scroll.addView(body);
-        new AlertDialog.Builder(this).setTitle("Штатные элементы панели приборов")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Штатные элементы панели приборов")
                 .setView(scroll).setPositiveButton("Готово", null).show();
     }
 
@@ -246,7 +246,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         for (int index = 0; index < types.length; index++) {
             labels[index] = types[index].category + " · " + types[index].label;
         }
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Добавить элемент")
                 .setItems(labels, (dialog, which) -> addElement(types[which]))
                 .setNegativeButton("Отмена", null)
@@ -279,11 +279,11 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
             labels[index] = presets[index].label;
             if (presets[index].id.equals(config.presetId)) selected = index;
         }
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Базовая компоновка")
                 .setSingleChoiceItems(labels, selected, (dialog, which) -> {
                     config = store.switchPreset(presets[which], config);
-                    dialog.dismiss();
+                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     refresh(null, true);
                 })
                 .setNegativeButton("Отмена", null)
@@ -298,7 +298,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
             labels[index] = element.type.label + " · " + element.style.label;
             checked[index] = element.enabled;
         }
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Модули панели")
                 .setMultiChoiceItems(labels, checked,
                         (dialog, which, value) -> checked[which] = value)
@@ -320,7 +320,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         ColorField bottom = colorField(content, "Нижний цвет градиента",
                 config.backgroundBottomColor);
         TextView blackValue = label("Чисто чёрная зона: " + config.blackZonePercent + "%");
-        SeekBar blackZone = new SeekBar(this);
+        SeekBar blackZone = new dezz.status.widget.settings.SettingsSeekBar(this, 0, 1, "%");
         blackZone.setMax(95);
         blackZone.setProgress(config.blackZonePercent);
         blackZone.setOnSeekBarChangeListener(seekListener(value ->
@@ -330,7 +330,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         Switch transparent = switchView(
                 "Прозрачный фон (градиент отключён)", config.transparentBackground);
         content.addView(transparent);
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Фон приборной панели")
                 .setView(content)
                 .setPositiveButton("Применить", (dialog, which) -> {
@@ -362,7 +362,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         Switch visible = switchView("Показывать", element.enabled);
         content.addView(visible);
         TextView responseValue = label("Отклик стрелки: " + element.responseMillis + " мс");
-        SeekBar response = new SeekBar(this);
+        SeekBar response = new dezz.status.widget.settings.SettingsSeekBar(this, 0, 1, " мс");
         response.setMax(500);
         response.setProgress(element.responseMillis);
         response.setEnabled(element.type.isAnalogGauge());
@@ -491,7 +491,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         }
 
         TextView opacityValue = label("Непрозрачность: " + element.opacityPercent + "%");
-        SeekBar opacity = new SeekBar(this);
+        SeekBar opacity = new dezz.status.widget.settings.SettingsSeekBar(this, 10, 1, "%");
         opacity.setMax(90);
         opacity.setProgress(element.opacityPercent - 10);
         opacity.setOnSeekBarChangeListener(seekListener(value ->
@@ -499,7 +499,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         content.addView(opacityValue);
         content.addView(opacity);
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Настройка элемента")
                 .setView(scroll)
                 .setPositiveButton("Применить", (ignoredDialog, which) -> {
@@ -987,7 +987,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         SliderField trafficGradient = slider(content, "Длина перехода цветов пробок",
                 map.trafficGradientLength, 0, 100, 1, " %");
 
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Независимая карта приборной панели")
                 .setView(scroll)
                 .setPositiveButton("Применить", (dialog, which) -> {
@@ -1142,7 +1142,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
             content.addView(mode);
             controls.add(new RoadEventControl(spec.tag, mode));
         }
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Дорожные события приборной панели")
                 .setView(scroll)
                 .setPositiveButton("Применить", (dialog, which) -> {
@@ -1194,6 +1194,8 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
                 .setPackage(getPackageName()));
         if (toast) Toast.makeText(this, "Панель сохранена", Toast.LENGTH_SHORT).show();
     }
+
+    @Override protected void flushSettingsDraft() { persist(false); }
 
     private boolean containsMap() {
         for (InstrumentElementConfig element : config.elements) {
@@ -1586,7 +1588,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
                                         double step, @NonNull String suffix) {
         TextView valueLabel = label("");
         parent.addView(valueLabel, marginTop(7));
-        SeekBar control = new SeekBar(this);
+        SeekBar control = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, step, suffix);
         int steps = Math.max(1, (int) Math.round((maximum - minimum) / step));
         control.setMax(steps);
         SliderField result = new SliderField(

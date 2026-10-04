@@ -40,7 +40,8 @@ public final class InstrumentPanelStore {
         // QuickBoot. Keep the enable/autostart gate and layout readable before credential storage
         // is unlocked so opening Settings is never the event that makes the panel appear.
         Context storage = app.createDeviceProtectedStorageContext();
-        preferences = storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        preferences = dezz.status.widget.settings.SettingsPreferences.wrap(context,
+                storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE));
     }
 
     public boolean isEnabled() {

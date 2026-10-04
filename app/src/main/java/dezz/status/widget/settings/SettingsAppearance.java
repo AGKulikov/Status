@@ -18,6 +18,7 @@ public final class SettingsAppearance {
     public static final String PREFS="natro_settings_ui_v1";
     public static final String EXTRA_FOCUS="dezz.status.widget.SETTINGS_FOCUS_TEXT";
     private static final Map<View,Boolean> styled=Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Set<View> attached=Collections.newSetFromMap(new WeakHashMap<>());
     private SettingsAppearance(){}
     public static SharedPreferences preferences(Context context){return context.getSharedPreferences(PREFS,Context.MODE_PRIVATE);}
     public static void configure(AppCompatActivity activity) {
@@ -27,11 +28,13 @@ public final class SettingsAppearance {
     }
     public static void attach(AppCompatActivity activity) {
         View root=activity.findViewById(android.R.id.content);if(root==null)return;
+        if(!attached.add(root))return;
         root.getViewTreeObserver().addOnGlobalLayoutListener(()->apply(activity,root));
         root.post(()->{apply(activity,root);String query=activity.getIntent().getStringExtra(EXTRA_FOCUS);
             if(query!=null&&!query.isEmpty())focus(root,query);});
     }
     public static void apply(Context context,View view) {
+        if(SettingsEditorLayout.PREVIEW_TAG.equals(view.getTag()))return;
         String name=view.getClass().getName();
         if(name.startsWith("dezz.")&&!name.contains("Settings")&&!name.contains("OptionalColor"))return;
         if(styled.put(view,true)==null) {
@@ -68,10 +71,13 @@ public final class SettingsAppearance {
     public static boolean focus(View root,String query) {
         String normalized=query.toLowerCase(Locale.ROOT).replace('ё','е').trim();
         View found=find(root,normalized);if(found==null)return false;
+        android.view.ViewParent sectionParent=found.getParent();
+        while(sectionParent instanceof View){if(sectionParent instanceof SettingsEditorLayout)((SettingsEditorLayout)sectionParent).reveal(found);sectionParent=sectionParent.getParent();}
         found.requestFocus();View child=found;android.graphics.Rect bounds=new android.graphics.Rect();found.getDrawingRect(bounds);
         android.view.ViewParent parent=found.getParent();
         while(parent instanceof ViewGroup){((ViewGroup)parent).offsetDescendantRectToMyCoords(child,bounds);child=(View)parent;
-            if(parent instanceof ScrollView){((ScrollView)parent).smoothScrollTo(0,Math.max(0,bounds.top-24));break;}parent=parent.getParent();}
+            if(parent instanceof ScrollView){((ScrollView)parent).smoothScrollTo(0,Math.max(0,bounds.top-24));break;}
+            if(parent instanceof androidx.core.widget.NestedScrollView){((androidx.core.widget.NestedScrollView)parent).smoothScrollTo(0,Math.max(0,bounds.top-24));break;}parent=parent.getParent();}
         found.sendAccessibilityEvent(android.view.accessibility.AccessibilityEvent.TYPE_VIEW_FOCUSED);return true;
     }
     private static View find(View root,String query) {

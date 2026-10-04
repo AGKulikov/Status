@@ -121,7 +121,7 @@ public final class LiveActivityApnsSettingsActivity extends dezz.status.widget.s
             refresh();
             Toast.makeText(this, "APNs-ключ зашифрован", Toast.LENGTH_LONG).show();
         } catch (Exception error) {
-            new AlertDialog.Builder(this).setTitle("Ключ не сохранён")
+            new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Ключ не сохранён")
                     .setMessage(error.getMessage() == null ? "Проверьте .p8 и идентификаторы"
                             : error.getMessage())
                     .setPositiveButton(android.R.string.ok, null).show();
@@ -131,7 +131,7 @@ public final class LiveActivityApnsSettingsActivity extends dezz.status.widget.s
     }
 
     private void confirmRemove() {
-        new AlertDialog.Builder(this).setTitle("Удалить APNs-ключ?")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Удалить APNs-ключ?")
                 .setMessage("Push-to-start с магнитолы перестанет работать, пока ключ не будет "
                         + "импортирован снова.")
                 .setPositiveButton("Удалить", (dialog, which) -> {

@@ -427,7 +427,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
         sizeHeading.addView(sizeTitle, new LinearLayout.LayoutParams(0, wrap(), 1f));
         sizeHeading.addView(sizeValue, new LinearLayout.LayoutParams(dp(90), wrap()));
         block.addView(sizeHeading, new LinearLayout.LayoutParams(match(), wrap()));
-        SeekBar iconSize = new SeekBar(this);
+        SeekBar iconSize = new dezz.status.widget.settings.SettingsSeekBar(this, LauncherShortcutStore.MIN_ICON_SIZE_PX, 1, " px");
         iconSize.setMax(LauncherShortcutStore.MAX_ICON_SIZE_PX
                 - LauncherShortcutStore.MIN_ICON_SIZE_PX);
         iconSize.setProgress(Math.max(0,
@@ -843,7 +843,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
         row.setGravity(Gravity.CENTER_VERTICAL);
         TextView label = text(15, false);
         label.setText(title);
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, suffix);
         seek.setMax(maximum - minimum);
         TextView value = text(14, true);
         value.setGravity(Gravity.END | Gravity.CENTER_VERTICAL);
@@ -877,7 +877,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
         String[] choices = {"Приложение", "Готовая функция", "Функция автомобиля",
                 "Действие устройства / сценарий", "Android Intent",
                 "Информационная плитка (без нажатия)", "Разделитель"};
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Что добавить?")
                 .setItems(choices, (dialog, which) -> {
                     if (which == 0) chooseApplication(null);
@@ -894,7 +894,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
     private void showItemMenu(@NonNull LauncherShortcutStore.Shortcut shortcut) {
         String[] choices = {"Оформление и размер", "Действие по нажатию",
                 "Действие по долгому нажатию", "Удалить"};
-        new AlertDialog.Builder(this).setTitle(shortcut.title)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle(shortcut.title)
                 .setItems(choices, (dialog, which) -> {
                     if (which == 0) { editingLongAction = false; editAppearance(shortcut.copy()); }
                     else if (which == 1) chooseKindForExisting(shortcut.copy());
@@ -908,7 +908,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
         String[] choices = {"Приложение", "Готовая функция", "Функция автомобиля",
                 "Действие устройства / сценарий", "Android Intent",
                 "Информационная плитка (без нажатия)", "Разделитель"};
-        new AlertDialog.Builder(this).setTitle("Новое действие")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Новое действие")
                 .setItems(choices, (dialog, which) -> {
                     if (which == 0) chooseApplication(value);
                     else if (which == 1) chooseBuiltin(value);
@@ -960,7 +960,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
     private void chooseLongKind(@NonNull LauncherShortcutStore.Shortcut value) {
         String[] choices = {"Без действия", "Приложение", "Готовая функция",
                 "Функция автомобиля", "Действие устройства / сценарий", "Android Intent"};
-        new AlertDialog.Builder(this).setTitle("Долгое нажатие")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Долгое нажатие")
                 .setItems(choices, (dialog, which) -> {
                     if (which == 0) {
                         editingLongAction = false;
@@ -981,7 +981,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
     }
 
     private void chooseCarControl(@Nullable LauncherShortcutStore.Shortcut existing) {
-        AlertDialog loading = new AlertDialog.Builder(this)
+        AlertDialog loading = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Функции автомобиля")
                 .setMessage("Проверяю функции, которые поддерживает эта магнитола…")
                 .setNegativeButton(android.R.string.cancel, null).create();
@@ -991,7 +991,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
             if (!loading.isShowing()) return;
             loading.dismiss();
             if (controls.isEmpty()) {
-                new AlertDialog.Builder(this).setTitle("Функции пока недоступны")
+                new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Функции пока недоступны")
                         .setMessage("ECARX ещё не ответил или эта сборка запущена не на магнитоле. "
                                 + "Включите зажигание и повторите через несколько секунд.")
                         .setPositiveButton(android.R.string.ok, null).show();
@@ -1004,7 +1004,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
                         + (control.availability == CarControlDescriptor.Availability.UNKNOWN
                         ? "  (проверяется)" : "");
             }
-            new AlertDialog.Builder(this).setTitle("Выберите функцию автомобиля")
+            new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Выберите функцию автомобиля")
                     .setItems(labels, (dialog, which) ->
                             chooseCarControlBehavior(existing, controls.get(which)))
                     .setNegativeButton(android.R.string.cancel, null).show();
@@ -1048,7 +1048,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
             operations.add(CarControlCommand.Operation.SET);
             values.add(option.value);
         }
-        new AlertDialog.Builder(this).setTitle(control.label + " — нажатие")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle(control.label + " — нажатие")
                 .setItems(labels.toArray(new String[0]), (dialog, which) -> {
                     CarControlCommand.Operation operation = operations.get(which);
                     if (operation == null) chooseCarCycleSubset(existing, control);
@@ -1070,7 +1070,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
             labels.add("Установить: " + (CarThreeLevelCyclePolicy.isMandatoryOffValue(
                     control, option.value) ? "0 · Выкл" : option.label));
         }
-        new AlertDialog.Builder(this).setTitle(control.label + " — нажатие")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle(control.label + " — нажатие")
                 .setItems(labels.toArray(new String[0]), (dialog, which) -> {
                     if (which == 0) saveCarCycle(existing, control, ascending);
                     else if (which == 1) saveCarCycle(existing, control, descending);
@@ -1094,7 +1094,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
                     control, option.value) ? "0 · Выкл" : option.label;
             checked[index] = true;
         }
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(control.label + " · выбранный цикл")
                 .setMultiChoiceItems(labels, checked,
                         (value, which, selected) -> {
@@ -1124,7 +1124,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
                                 Toast.LENGTH_LONG).show();
                         return;
                     }
-                    dialog.dismiss();
+                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     saveCarCycle(existing, control, selected);
                 }));
         dialog.show();
@@ -1135,7 +1135,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
         LinearLayout form = dialogForm();
         TextView current = formLabel("");
         form.addView(current);
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, control.minimum, control.step, "");
         int steps = Math.max(1, (int) Math.round(
                 (control.maximum - control.minimum) / control.step));
         seek.setMax(steps);
@@ -1160,7 +1160,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
             @Override public void onStopTrackingTouch(SeekBar seekBar) {}
         });
         form.addView(seek, new LinearLayout.LayoutParams(match(), dp(54)));
-        new AlertDialog.Builder(this).setTitle("Целевая температура")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Целевая температура")
                 .setView(form).setPositiveButton("Выбрать", (dialog, which) -> {
                     double value = control.minimum + seek.getProgress() * control.step;
                     saveCarAction(existing, control, CarControlCommand.Operation.SET, value);
@@ -1238,7 +1238,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
     private void chooseRule(@Nullable LauncherShortcutStore.Shortcut existing) {
         String[] sources = {"Новое действие из полного каталога",
                 "Ранее настроенное Intent-действие"};
-        new AlertDialog.Builder(this).setTitle("Действие устройства / сценарий")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Действие устройства / сценарий")
                 .setItems(sources, (dialog, which) -> {
                     if (which == 0) {
                         new SmartHomeShortcutPicker(this,
@@ -1260,7 +1260,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
         List<IntentActionRule> enabled = new ArrayList<>();
         for (IntentActionRule rule : rules) if (rule.enabled) enabled.add(rule);
         if (enabled.isEmpty()) {
-            new AlertDialog.Builder(this)
+            new dezz.status.widget.settings.SettingsDialogBuilder(this)
                     .setTitle("Нет готовых действий")
                     .setMessage("Сначала создайте в визуальном редакторе Intent-действие для HA, MQTT или Sprut.hub, а затем выберите его здесь.")
                     .setPositiveButton("Открыть редактор", (dialog, which) ->
@@ -1276,7 +1276,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
             if (target.trim().isEmpty()) target = rule.id;
             labels[i] = target;
         }
-        new AlertDialog.Builder(this).setTitle("Выберите действие")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Выберите действие")
                 .setItems(labels, (dialog, which) -> {
                     IntentActionRule rule = enabled.get(which);
                     LauncherShortcutStore.Shortcut value = existing == null
@@ -1409,7 +1409,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
         List<AppChoice> apps = preloadedAppChoices;
         if (apps == null) {
             int generation = ++appPickerGeneration;
-            AlertDialog loading = new AlertDialog.Builder(this)
+            AlertDialog loading = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                     .setTitle("Выберите приложение")
                     .setMessage("Загружаю список…")
                     .setNegativeButton(android.R.string.cancel, null)
@@ -1427,7 +1427,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
         grid.setVerticalSpacing(dp(8));
         grid.setSelector(new ColorDrawable(Color.TRANSPARENT));
         grid.setAdapter(new AppChoiceAdapter(apps));
-        AlertDialog picker = new AlertDialog.Builder(this)
+        AlertDialog picker = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Выберите приложение")
                 .setView(grid).setNegativeButton(android.R.string.cancel, null).create();
         grid.setOnItemClickListener((parent, view, position, id) -> {
@@ -1472,7 +1472,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
         LauncherShortcutStore.Builtin[] actions = LauncherShortcutStore.Builtin.values();
         String[] labels = new String[actions.length];
         for (int i = 0; i < actions.length; i++) labels[i] = actions[i].label;
-        new AlertDialog.Builder(this).setTitle("Выберите функцию")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Выберите функцию")
                 .setItems(labels, (dialog, which) -> {
                     LauncherShortcutStore.Builtin action = actions[which];
                     LauncherShortcutStore.Shortcut value = existing == null
@@ -1506,7 +1506,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
         for (int index = 0; index < panels.size(); index++) {
             labels[index] = panels.get(index).title;
         }
-        new AlertDialog.Builder(this).setTitle(isPassengerLauncherProfile()
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle(isPassengerLauncherProfile()
                 ? "Избранное пассажира" : "Избранное водителя")
                 .setItems(labels, (dialog, which) -> {
                     DriverFavoritesPanelConfig panel = panels.get(which);
@@ -1541,7 +1541,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
         for (int index = 0; index < enabled.size(); index++) {
             labels[index] = enabled.get(index).title;
         }
-        new AlertDialog.Builder(this).setTitle("Избранная точка")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Избранная точка")
                 .setItems(labels, (dialog, which) -> {
                     FavoriteRouteConfig route = enabled.get(which);
                     String target = LauncherShortcutStore.favoriteRouteTarget(route.id);
@@ -1578,7 +1578,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
                         : value.kind == LauncherShortcutStore.Kind.INTENT ? value.packageName : "");
         form.addView(action);
         form.addView(packageName);
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Android Intent")
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Android Intent")
                 .setView(scrollDialog(form)).setPositiveButton("Далее", null)
                 .setNegativeButton(android.R.string.cancel, null).create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
@@ -1587,7 +1587,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
                         action.setError("Укажите действие");
                         return;
                     }
-                    dialog.dismiss();
+                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     if (editingLongAction) {
                         saveLongAction(value, LauncherShortcutStore.Kind.INTENT,
                                 action.getText().toString().trim(), packageName.getText().toString().trim());
@@ -1699,7 +1699,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
         enabled.setChecked(value.enabled);
         form.addView(enabled);
 
-        new AlertDialog.Builder(this).setTitle("Оформление иконки")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Оформление иконки")
                 .setView(scrollDialog(form)).setPositiveButton("Применить", (dialog, which) -> {
                     value.title = title.getText().toString().trim();
                     value.icon = selectedIconKey[0];
@@ -1767,7 +1767,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
     }
 
     private void confirmDelete(LauncherShortcutStore.Shortcut value) {
-        new AlertDialog.Builder(this).setTitle("Удалить «" + value.title + "»?")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Удалить «" + value.title + "»?")
                 .setPositiveButton("Удалить", (dialog, which) -> {
                     store.remove(value.id);
                     refresh();
@@ -1851,7 +1851,7 @@ public final class LauncherShortcutSettingsActivity extends SettingsLauncherProf
     private SeekValue seek(LinearLayout parent, String label, int min, int max, int current, String suffix) {
         TextView title = formLabel(label + ": " + current + suffix);
         parent.addView(title);
-        SeekBar bar = new SeekBar(this);
+        SeekBar bar = new dezz.status.widget.settings.SettingsSeekBar(this, min, 1, suffix);
         bar.setMax(max - min);
         bar.setProgress(Math.max(0, Math.min(max - min, current - min)));
         SeekValue value = new SeekValue(current);

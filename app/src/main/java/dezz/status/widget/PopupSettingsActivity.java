@@ -387,7 +387,7 @@ public final class PopupSettingsActivity extends dezz.status.widget.settings.Set
         EditText name = new EditText(this);
         name.setSingleLine(true);
         name.setHint("Например: Подъезд к дому");
-        new AlertDialog.Builder(this).setTitle("Новый всплывающий оверлей")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Новый всплывающий оверлей")
                 .setView(name).setNegativeButton("Отмена", null)
                 .setPositiveButton("Создать", (d, w) -> {
                     try {
@@ -408,7 +408,7 @@ public final class PopupSettingsActivity extends dezz.status.widget.settings.Set
         EditText name = new EditText(this);
         name.setSingleLine(true);
         name.setText(overlay.name);
-        new AlertDialog.Builder(this).setTitle("Название оверлея")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Название оверлея")
                 .setView(name).setNegativeButton("Отмена", null)
                 .setPositiveButton("Сохранить", (d, w) -> {
                     try {
@@ -456,7 +456,7 @@ public final class PopupSettingsActivity extends dezz.status.widget.settings.Set
     }
 
     private void deleteOverlay(PopupOverlayConfig overlay) {
-        new AlertDialog.Builder(this).setTitle("Удалить оверлей?")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Удалить оверлей?")
                 .setMessage(overlay.name + "\n\nБудут удалены все его плитки. Сценарии, "
                         + "которые ссылались на этот оверлей, потребуется перенастроить.")
                 .setNegativeButton("Отмена", null)
@@ -487,7 +487,7 @@ public final class PopupSettingsActivity extends dezz.status.widget.settings.Set
         form.setPadding(dp(18), dp(4), dp(18), 0);
         EditText name = field(form, "Название плитки", "MQTT");
         EditText topic = field(form, "Topic состояния", "");
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Новая MQTT-плитка")
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Новая MQTT-плитка")
                 .setView(form).setNegativeButton("Отмена", null)
                 .setPositiveButton("Далее", null).create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
@@ -509,7 +509,7 @@ public final class PopupSettingsActivity extends dezz.status.widget.settings.Set
                         item.actionBinding = ActionBinding.unbound();
                         items.add(item);
                         persistItems();
-                        dialog.dismiss();
+                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                         startActivity(VisualBrickEditorActivity.intent(this,
                                 VisualBrickEditorActivity.SURFACE_POPUP, item.id));
                     } catch (Exception error) {
@@ -524,7 +524,7 @@ public final class PopupSettingsActivity extends dezz.status.widget.settings.Set
         BrickType[] types = BrickType.values();
         String[] labels = new String[types.length];
         for (int i = 0; i < types.length; i++) labels[i] = friendlyBrick(types[i]);
-        new AlertDialog.Builder(this).setTitle("Штатный элемент")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Штатный элемент")
                 .setItems(labels, (d, which) -> {
                     try {
                         BrickType type = types[which];
@@ -556,7 +556,7 @@ public final class PopupSettingsActivity extends dezz.status.widget.settings.Set
     }
 
     private void confirmDeleteItem(PopupItemConfig item) {
-        new AlertDialog.Builder(this).setTitle("Удалить плитку?").setMessage(item.name)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Удалить плитку?").setMessage(item.name)
                 .setNegativeButton("Отмена", null).setPositiveButton("Удалить", (d, w) -> {
                     items.remove(item);
                     persistItems();
@@ -571,7 +571,7 @@ public final class PopupSettingsActivity extends dezz.status.widget.settings.Set
         TextView value = label(current + suffix);
         labels.addView(value);
         parent.addView(labels, topMargin(8));
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, min, 1, suffix);
         seek.setMax(max - min);
         seek.setProgress(clamp(current, min, max) - min);
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {

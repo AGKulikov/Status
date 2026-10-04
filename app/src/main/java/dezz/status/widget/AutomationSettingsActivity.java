@@ -155,7 +155,7 @@ public final class AutomationSettingsActivity extends dezz.status.widget.setting
                 + "на следующем экране."));
         EditText name = field(form, "Понятное название", "Новый MQTT-элемент");
         EditText topic = field(form, "Topic состояния", "");
-        AlertDialog dialog = new AlertDialog.Builder(this).setTitle("Добавить MQTT-элемент")
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Добавить MQTT-элемент")
                 .setView(form).setNegativeButton("Отмена", null)
                 .setPositiveButton("Далее", null).create();
         dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
@@ -175,7 +175,7 @@ public final class AutomationSettingsActivity extends dezz.status.widget.setting
                         item.displayRules = ScenarioPresets.raw();
                         items.add(item);
                         persist();
-                        dialog.dismiss();
+                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                         startActivity(VisualBrickEditorActivity.intent(this,
                                 VisualBrickEditorActivity.SURFACE_MAIN, item.id));
                     } catch (Exception error) {
@@ -195,7 +195,7 @@ public final class AutomationSettingsActivity extends dezz.status.widget.setting
     }
 
     private void confirmDelete(HaBrickConfig item) {
-        new AlertDialog.Builder(this).setTitle("Удалить элемент?")
+        new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Удалить элемент?")
                 .setMessage(item.name + "\nИсточник останется в вашей системе умного дома.")
                 .setNegativeButton("Отмена", null).setPositiveButton("Удалить", (d, w) -> {
                     items.remove(item);

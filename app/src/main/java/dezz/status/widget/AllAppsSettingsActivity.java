@@ -181,7 +181,7 @@ public class AllAppsSettingsActivity extends dezz.status.widget.settings.Setting
         block.setOrientation(LinearLayout.VERTICAL);
         TextView heading = text(label + ": " + current + suffix, 15, 0xFFC7C7CC);
         block.addView(heading);
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, suffix);
         seek.setMax(maximum - minimum);
         seek.setProgress(current - minimum);
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {

@@ -716,7 +716,7 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
         }
 
         private void confirmResetBrick(BrickType type) {
-            new androidx.appcompat.app.AlertDialog.Builder(activity)
+            new dezz.status.widget.settings.SettingsDialogBuilder(activity)
                     .setTitle(R.string.brick_reset_title)
                     .setMessage(R.string.brick_reset_message)
                     .setNegativeButton(android.R.string.cancel, null)
@@ -1204,7 +1204,7 @@ public class BrickListAdapter extends RecyclerView.Adapter<BrickListAdapter.Bric
             title = activity.getString(R.string.value_edit_title);
         }
 
-        new androidx.appcompat.app.AlertDialog.Builder(activity)
+        new dezz.status.widget.settings.SettingsDialogBuilder(activity)
                 .setTitle(title)
                 .setView(frame)
                 .setNegativeButton(android.R.string.cancel, null)

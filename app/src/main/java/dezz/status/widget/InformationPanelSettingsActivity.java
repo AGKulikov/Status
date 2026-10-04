@@ -82,6 +82,8 @@ public final class InformationPanelSettingsActivity extends SettingsLauncherProf
         super.onStop();
     }
 
+    @Override protected void flushSettingsDraft() { if (config != null) persist(); }
+
     @NonNull
     private View buildScreen() {
         LinearLayout root = new LinearLayout(this);
@@ -161,7 +163,7 @@ public final class InformationPanelSettingsActivity extends SettingsLauncherProf
         preview = new InformationPanelView(this, carIntegration, store);
         previewHost.addView(preview, new FrameLayout.LayoutParams(match(), match()));
         previewColumn.addView(previewHost, new LinearLayout.LayoutParams(match(), 0, 1f));
-        TextView saved = text("✓ Сохраняется автоматически · устаревший кэш не показывается",
+        TextView saved = text("Предпросмотр · сохранение по «Применить» · устаревший кэш не показывается",
                 12, false);
         saved.setGravity(Gravity.CENTER);
         saved.setAlpha(.68f);
@@ -302,7 +304,7 @@ public final class InformationPanelSettingsActivity extends SettingsLauncherProf
 
         TextView scaleValue = text("Масштаб: " + item.scalePercent + "%", 14, false);
         form.addView(scaleValue);
-        SeekBar scale = new SeekBar(this);
+        SeekBar scale = new dezz.status.widget.settings.SettingsSeekBar(this, InformationPanelConfig.MIN_SCALE, 1, "%");
         scale.setMax(InformationPanelConfig.MAX_SCALE - InformationPanelConfig.MIN_SCALE);
         scale.setProgress(item.scalePercent - InformationPanelConfig.MIN_SCALE);
         scale.setOnSeekBarChangeListener(new SimpleSeekListener(progress ->
@@ -347,7 +349,7 @@ public final class InformationPanelSettingsActivity extends SettingsLauncherProf
         dialogBody.addView(scroll, new LinearLayout.LayoutParams(match(), formHeight));
         dialogBody.addView(actions, new LinearLayout.LayoutParams(match(), dp(68)));
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(item.sourceLabel)
                 .setMessage("Источник доступен только для чтения: нажатие на статус не отправляет "
                         + "команду.")
@@ -376,7 +378,7 @@ public final class InformationPanelSettingsActivity extends SettingsLauncherProf
                 item.showIcon = showIcon.isChecked();
                 item.showLabel = showLabel.isChecked();
                 changed(true);
-                dialog.dismiss();
+                dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
             } catch (IllegalArgumentException error) {
                 Toast.makeText(this, error.getMessage(), Toast.LENGTH_SHORT).show();
             }
@@ -454,7 +456,7 @@ public final class InformationPanelSettingsActivity extends SettingsLauncherProf
     }
 
     private void confirmDelete(@NonNull InformationPanelConfig.Item item) {
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Удалить «" + item.displayLabel() + "»?")
                 .setPositiveButton("Удалить", (dialog, which) -> {
                     config.remove(item.id);
@@ -465,7 +467,7 @@ public final class InformationPanelSettingsActivity extends SettingsLauncherProf
     }
 
     private void confirmReset() {
-        new AlertDialog.Builder(this)
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle("Сбросить информационный блок?")
                 .setMessage("Все выбранные статусы и их расположение будут удалены.")
                 .setPositiveButton("Сбросить", (dialog, which) -> {
@@ -487,7 +489,7 @@ public final class InformationPanelSettingsActivity extends SettingsLauncherProf
         TextView value = text(String.valueOf(initial), 14, false);
         value.setGravity(Gravity.END);
         value.setMinWidth(dp(52));
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, "");
         seek.setMax(maximum - minimum);
         seek.setProgress(Math.max(0, Math.min(maximum - minimum, initial - minimum)));
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
@@ -515,7 +517,7 @@ public final class InformationPanelSettingsActivity extends SettingsLauncherProf
         TextView value = text(initial + suffix, 14, false);
         value.setGravity(Gravity.END);
         value.setMinWidth(dp(72));
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, suffix);
         seek.setMax(maximum - minimum);
         seek.setProgress(Math.max(0, Math.min(maximum - minimum, initial - minimum)));
         seek.setOnSeekBarChangeListener(new SimpleSeekListener(progress ->

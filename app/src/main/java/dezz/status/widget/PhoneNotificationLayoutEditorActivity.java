@@ -40,7 +40,7 @@ import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
 /** Dedicated WYSIWYG editor for the single-piece CarPlay notification hierarchy. */
-public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivity {
+public final class PhoneNotificationLayoutEditorActivity extends dezz.status.widget.settings.SettingsActivity {
     private static final String EXTRA_OVERLAY_ID = "phone_notification_layout_overlay_id";
 
     private Preferences prefs;
@@ -294,7 +294,7 @@ public final class PhoneNotificationLayoutEditorActivity extends AppCompatActivi
         LinearLayout block = column();
         TextView value = text(label + ": " + current + suffix, 13, 0xFFC7C7CC);
         block.addView(value);
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, min, 1, suffix);
         seek.setMax(max - min);
         seek.setProgress(Math.max(0, Math.min(max - min, current - min)));
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {

@@ -23,7 +23,7 @@ import dezz.status.widget.Preferences;
 import dezz.status.widget.launcher.LauncherElementFrame;
 
 /** Direct move/resize editor for every shade module. */
-public final class SystemShadeEditorActivity extends AppCompatActivity {
+public final class SystemShadeEditorActivity extends dezz.status.widget.settings.SettingsActivity {
     private SystemShadeStore store;
     private SystemShadeConfig config;
     private FrameLayout canvas;
@@ -68,6 +68,8 @@ public final class SystemShadeEditorActivity extends AppCompatActivity {
         SystemShadeService.reconcile(this, false);
         super.onPause();
     }
+
+    @Override protected void flushSettingsDraft() { if (config != null) store.save(config); }
 
     private void buildFrames() {
         canvas.removeAllViews();
@@ -155,7 +157,7 @@ public final class SystemShadeEditorActivity extends AppCompatActivity {
         label.setText(name + ": " + current);
         label.setTextSize(15);
         controls.addView(label);
-        SeekBar bar = new SeekBar(this);
+        SeekBar bar = new dezz.status.widget.settings.SettingsSeekBar(this, min, 1, "");
         bar.setMax(max - min);
         bar.setProgress(current - min);
         bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {

@@ -161,7 +161,7 @@ public final class ViewBinder {
             title = context.getString(R.string.value_edit_title);
         }
 
-        new AlertDialog.Builder(context)
+        new dezz.status.widget.settings.SettingsDialogBuilder(context)
                 .setTitle(title)
                 .setView(frame)
                 .setNegativeButton(android.R.string.cancel, null)

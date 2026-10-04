@@ -92,6 +92,8 @@ public final class VehicleInfoPanelSettingsActivity extends SettingsLauncherProf
         super.onStop();
     }
 
+    @Override protected void flushSettingsDraft() { if (editScheduler != null) editScheduler.flush(); }
+
     @Override
     protected void onDestroy() {
         destroyed = true;
@@ -113,7 +115,7 @@ public final class VehicleInfoPanelSettingsActivity extends SettingsLauncherProf
         settingsScroll.addView(settings, new ScrollView.LayoutParams(match(), wrap()));
 
         addTitle(settings, "Данные автомобиля / HUD");
-        addHint(settings, "Выберите только нужные показатели. Изменения сохраняются сразу и "
+        addHint(settings, "Выберите только нужные показатели. Изменения видны в предпросмотре и "
                 + "показываются справа на реальных данных автомобиля.");
         MaterialSwitch visible = addSwitch(settings, "Показывать блок на HOME",
                 preferences.launcherVehicleInfoVisible.get(), checked ->
@@ -162,7 +164,7 @@ public final class VehicleInfoPanelSettingsActivity extends SettingsLauncherProf
         rebuildMetricControls();
 
         addButton(settings, "Вернуть настройки блока по умолчанию", v ->
-                new AlertDialog.Builder(this)
+                new dezz.status.widget.settings.SettingsDialogBuilder(this)
                         .setTitle("Сбросить блок?")
                         .setMessage("Состав, порядок и оформление вернутся к исходным. "
                                 + "Положение и размер блока на HOME сохранятся.")
@@ -272,7 +274,7 @@ public final class VehicleInfoPanelSettingsActivity extends SettingsLauncherProf
         TextView sizeTitle = new TextView(this);
         sizeTitle.setText("Размер");
         sizeTitle.setTextSize(14);
-        SeekBar scale = new SeekBar(this);
+        SeekBar scale = new dezz.status.widget.settings.SettingsSeekBar(this, 55, 1, "%");
         scale.setMax(165);
         scale.setProgress(metric.scalePercent - 55);
         TextView scaleValue = new TextView(this);
@@ -405,7 +407,7 @@ public final class VehicleInfoPanelSettingsActivity extends SettingsLauncherProf
         watchNumber(multiplier, value -> metric.multiplier = value);
         watchNumber(offset, value -> metric.offset = value);
 
-        AlertDialog dialog = new AlertDialog.Builder(this)
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
                 .setTitle(displayName(metric))
                 .setView(scroll)
                 .setPositiveButton("Готово", null)
@@ -422,7 +424,7 @@ public final class VehicleInfoPanelSettingsActivity extends SettingsLauncherProf
                     metric.labelColor = "#AEB9C8";
                     metric.warningColor = "#FF3B30";
                     persistAndPreview();
-                    dialog.dismiss();
+                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                     rebuildMetricControls();
                     showMetricDialog(metric);
                 }));
@@ -464,7 +466,7 @@ public final class VehicleInfoPanelSettingsActivity extends SettingsLauncherProf
         value.setGravity(Gravity.END);
         heading.addView(label, new LinearLayout.LayoutParams(0, wrap(), 1f));
         heading.addView(value, new LinearLayout.LayoutParams(dp(104), wrap()));
-        SeekBar seek = new SeekBar(this);
+        SeekBar seek = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, 1, "");
         seek.setMax(maximum - minimum);
         seek.setProgress(Math.max(0, Math.min(maximum - minimum, initial - minimum)));
         seek.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
