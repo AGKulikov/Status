@@ -56,7 +56,7 @@ public final class DimMenuIntegrationContractTest {
         String executor = read(root.resolve("app/src/main/java/dezz/status/widget/driver/"
                 + "DriverPanelActionExecutor.java"));
         String launcher = read(root.resolve("app/src/main/java/dezz/status/widget/"
-                + "LauncherActivity.java"));
+                + "LauncherHomeSurface.java"));
         String launcherStore = read(root.resolve("app/src/main/java/dezz/status/widget/launcher/"
                 + "LauncherShortcutStore.java"));
         String boot = read(root.resolve("app/src/main/java/dezz/status/widget/BootReceiver.java"));

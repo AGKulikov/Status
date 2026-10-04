@@ -65,7 +65,6 @@ public final class HudModeFallbackBootReceiver extends BroadcastReceiver {
     }
 
     private static SharedPreferences state(Context context) {
-        return context.createDeviceProtectedStorageContext()
-                .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        return dezz.status.widget.backup.BackupPreferences.open(context.createDeviceProtectedStorageContext(),PREFS, Context.MODE_PRIVATE);
     }
 }

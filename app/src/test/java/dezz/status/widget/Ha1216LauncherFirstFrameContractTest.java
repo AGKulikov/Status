@@ -15,9 +15,9 @@ import static org.junit.Assert.assertTrue;
 public final class Ha1216LauncherFirstFrameContractTest {
     @Test public void onCreateAttachesOpaqueShellBeforeSubmittingAllStartupCommands()
             throws Exception {
-        String launcher = source("LauncherActivity.java");
-        String create = between(launcher, "protected void onCreate(",
-                "protected void onNewIntent(");
+        String launcher = source("LauncherHomeSurface.java");
+        String create = between(launcher, "public void onCreate(",
+                "public void onNewIntent(");
         int deferredPreferences = create.indexOf("createLauncherPreferences(false)");
         int setContent = create.indexOf("setContentView(root);");
         int bootstrap = create.indexOf("startLauncherBootstrapNow();");
@@ -39,7 +39,7 @@ public final class Ha1216LauncherFirstFrameContractTest {
 
     @Test public void migrationAndVendorConstructionRunOnOneImmediateBackgroundLane()
             throws Exception {
-        String launcher = source("LauncherActivity.java");
+        String launcher = source("LauncherHomeSurface.java");
         assertTrue(launcher.contains("Executors.newSingleThreadExecutor"));
         assertFalse(launcher.contains("Executors.newFixedThreadPool"));
 
@@ -66,7 +66,7 @@ public final class Ha1216LauncherFirstFrameContractTest {
     }
 
     @Test public void panelAndRuntimeStagesYieldWithoutArtificialTimers() throws Exception {
-        String launcher = source("LauncherActivity.java");
+        String launcher = source("LauncherHomeSurface.java");
         String panels = between(launcher, "private void continuePanelInitialization()",
                 "private void makePanelTransparent");
         assertTrue(panels.contains("navigationUiHandler.post(panelInitializationStep)"));
@@ -74,7 +74,7 @@ public final class Ha1216LauncherFirstFrameContractTest {
 
         String runtime = between(launcher,
                 "private final Runnable deferredLauncherRuntimeStep",
-                "protected void onCreate(");
+                "public void onCreate(");
         assertTrue(runtime.contains("navigationUiHandler.post(this)"));
         assertTrue(runtime.contains("startLauncherCarRuntimeAsync()"));
         assertFalse(runtime.contains("postDelayed"));
@@ -87,7 +87,7 @@ public final class Ha1216LauncherFirstFrameContractTest {
 
     @Test public void liveUiUsesInvalidationAndCallbacksInsteadOf500msScans()
             throws Exception {
-        String launcher = source("LauncherActivity.java");
+        String launcher = source("LauncherHomeSurface.java");
         assertFalse(launcher.contains("SAFE_AREA_REFRESH_MS"));
         assertFalse(launcher.contains("GLOBAL_ELEMENT_REFRESH_MS"));
         assertTrue(launcher.contains("setDescendantInvalidationListener"));

@@ -58,7 +58,7 @@ class DriveSelectorPortTests(unittest.TestCase):
         icons = (JAVA / "drivemode/ui/DriveModeIcons.java").read_text()
         self.assertIn("if (!mode.iconIsColored)", icons)
         for file in ("VehicleControlActivity.java", "MediaButtonsSettingsActivity.java",
-                     "LauncherActivity.java", "driver/DriverPanelOverlayController.java",
+                     "LauncherHomeSurface.java", "driver/DriverPanelOverlayController.java",
                      "launcher/LauncherIconResolver.java"):
             self.assertIn("DriveModeIcons", (JAVA / file).read_text(), file)
 

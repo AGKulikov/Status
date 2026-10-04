@@ -98,8 +98,7 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
             @Override public void starHeld() { submit(() -> actionExecutor().starHeld(), "star:10s"); }
         });
         input.post(() -> {
-            storage = context.createDeviceProtectedStorageContext()
-                    .getSharedPreferences("vehicle_buttons", Context.MODE_PRIVATE);
+            storage = dezz.status.widget.backup.BackupPreferences.open(context.createDeviceProtectedStorageContext(),"vehicle_buttons", Context.MODE_PRIVATE);
             values = new HashMap<>(storage.getAll()); ready = true;
             IntentFilter filter = new IntentFilter("dezz.monjaro.drive_modes.ISSHOWING");
             if (Build.VERSION.SDK_INT >= 33) context.registerReceiver(driveReceiver, filter,
@@ -108,7 +107,8 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
             status = "Настройки загружены";
             reconcile();
             if (needed() || bool("temperature.visible") || bool("drive.restore")) submit(() -> actionExecutor(), null);
-            if (bool(VehicleButton.STAR.key + ".disable_default")) setDisableDefault(VehicleButton.STAR, true, null);
+            if (bool(VehicleButton.STAR.key + ".disable_default")
+                    &&!dezz.status.widget.backup.BackupMaintenance.systemOperationNeedsReview(context,VehicleButton.STAR.name())) setDisableDefault(VehicleButton.STAR, true, null);
         });
     }
     private ButtonActionExecutor actionExecutor() {
@@ -118,6 +118,16 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
     void whenInputReady(Runnable callback) { input.post(callback); }
     public void whenReady(Runnable callback) { input.post(() -> main.post(callback)); }
     public boolean ready() { return ready; }
+    /** Called only after the editor's durable Apply; keep unrelated live state from this owner. */
+    public void reloadSettings(java.util.Set<String> keys) {
+        java.util.Set<String> requested=new java.util.HashSet<>(keys);
+        input.post(()->{
+            Map<String,?> stored=storage.getAll();Map<String,Object> next=new HashMap<>(values);
+            for(String key:requested){if(stored.containsKey(key))next.put(key,stored.get(key));else next.remove(key);}
+            values=Collections.unmodifiableMap(next);generation++;engine.reset();reconcile();
+            if(executor!=null||needed()||bool("drive.restore"))submit(()->actionExecutor().settingsChanged(),null);
+        });
+    }
     public String status() { return status; }
     @Override public boolean enabled(VehicleButton button) { return bool(button.key + ".enabled"); }
     public boolean disabledDefault(VehicleButton button) { return Boolean.TRUE.equals(verifiedDefault.get(button)); }
@@ -368,6 +378,7 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
                                 : "Применение штатного пути не подтверждено") : detail;
                 if (success) {
                     verifiedDefault.put(button, disabled);
+                    dezz.status.widget.backup.BackupMaintenance.systemOperationVerified(context,button.name());
                     save(false, button.key + ".disable_default", disabled);
                 } else verifiedDefault.remove(button);
                 defaultDetails.put(button, resolved);

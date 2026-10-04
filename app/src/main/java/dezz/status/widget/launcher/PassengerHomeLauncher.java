@@ -14,7 +14,7 @@ import android.widget.Toast;
 import dezz.status.widget.PassengerLauncherActivity;
 import dezz.status.widget.diagnostics.DiagnosticJournal;
 
-/** A distinct task on the passenger screen. Never launches HOME through the global resolver. */
+/** Requests the independent passenger overlay; external applications remain display-scoped. */
 public final class PassengerHomeLauncher {
     public static final int DISPLAY_ID = 3;
     private PassengerHomeLauncher() {}
@@ -32,20 +32,50 @@ public final class PassengerHomeLauncher {
         return result;
     }
 
-    public static boolean open(Context context) {
-        Context app = context.getApplicationContext();
-        try {
-            Intent intent = new Intent(app, PassengerLauncherActivity.class)
-                    .setAction(Intent.ACTION_MAIN)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP
-                            | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-            app.startActivity(intent, options(app, null));
-            DiagnosticJournal.infoAsync("passenger-home", "launch_submitted display=3; pixels=unobserved");
-            return true;
-        } catch (RuntimeException error) {
-            reportFailure(context, error);
-            return false;
+    public static boolean isHomeIntent(Intent intent) {
+        android.content.ComponentName component=intent.getComponent();
+        return component!=null && (component.getClassName().equals(dezz.status.widget.LauncherActivity.class.getName())
+                || component.getClassName().equals(PassengerLauncherActivity.class.getName()))
+                || Intent.ACTION_MAIN.equals(intent.getAction()) && intent.hasCategory(Intent.CATEGORY_HOME);
+    }
+    public static boolean isOwnActivity(Context context,Intent intent) {
+        android.content.ComponentName component=intent.getComponent();
+        return component!=null && context.getPackageName().equals(component.getPackageName())
+                || context.getPackageName().equals(intent.getPackage());
+    }
+    public static Intent profileIntent(Context context,Intent source) {
+        Intent target=new Intent(source);
+        if(isOwnActivity(context,target)) {
+            if(target.getComponent()!=null && target.getComponent().getClassName()
+                    .equals(dezz.status.widget.LauncherSettingsActivity.class.getName()))
+                target.setClass(context,dezz.status.widget.PassengerLauncherSettingsActivity.class);
+            target.putExtra(dezz.status.widget.LauncherProfileActivity.EXTRA_PASSENGER_PROFILE,true);
         }
+        return target;
+    }
+    /** Editors belong on MAIN; the transparent Package Installer result owner stays on PASS. */
+    public static int targetDisplay(Context context, Intent intent) {
+        android.content.ComponentName component = intent.getComponent();
+        boolean uninstallProxy = component != null
+                && AppUninstallProxyActivity.class.getName().equals(component.getClassName());
+        return isOwnActivity(context, intent) && !uninstallProxy ? 0 : DISPLAY_ID;
+    }
+    public static Bundle targetOptions(Context context,Bundle original,int displayId) {
+        if(displayId==DISPLAY_ID)return options(context,original);
+        if(displayId!=0)throw new IllegalArgumentException("Unexpected HOME display");
+        Bundle result=original==null?new Bundle():new Bundle(original);
+        result.putAll(ActivityOptions.makeBasic().setLaunchDisplayId(0).toBundle());
+        return result;
+    }
+    public static boolean open(Context context) {return open(context,new Intent(Intent.ACTION_MAIN));}
+    public static boolean open(Context context,Intent request) {
+        Context app=context.getApplicationContext();
+        try {
+            androidx.core.content.ContextCompat.startForegroundService(app,
+                    new Intent(app,PassengerHomeService.class).putExtra(PassengerHomeService.EXTRA_REQUEST,new Intent(request)));
+            DiagnosticJournal.infoAsync("passenger-home","overlay_requested display=3; attachment=pending");
+            return true;
+        } catch(RuntimeException error) {reportFailure(context,error);return false;}
     }
 
     public static void reportFailure(Context context, RuntimeException error) {

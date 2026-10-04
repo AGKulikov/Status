@@ -18,7 +18,7 @@ import java.nio.file.Paths;
 public final class LauncherGlobalElementContractTest {
     @Test
     public void homeEditorUsesOneScreenWideElementLayer() throws Exception {
-        String activity = read("LauncherActivity.java");
+        String activity = read("LauncherHomeSurface.java");
 
         assertTrue(activity.contains("globalElementFrames"));
         assertTrue(activity.contains("LauncherGlobalElementProxyView"));
@@ -54,7 +54,7 @@ public final class LauncherGlobalElementContractTest {
 
     @Test
     public void homeBackdropsAreIndependentUnlimitedLayersBelowWidgets() throws Exception {
-        String activity = read("LauncherActivity.java");
+        String activity = read("LauncherHomeSurface.java");
         String store = read("launcher/LauncherBackdropStore.java");
         String surface = read("launcher/LauncherBackdropView.java");
         String frame = read("launcher/LauncherElementFrame.java");

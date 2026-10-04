@@ -15,7 +15,7 @@ import static org.junit.Assert.assertTrue;
 public final class Ha1209LauncherStartupContractTest {
     @Test public void sourcePanelsAreHiddenBeforeAttachAndOnlyScopedEditorMayRevealOne()
             throws Exception {
-        String launcher = javaSource("LauncherActivity.java");
+        String launcher = javaSource("LauncherHomeSurface.java");
         String add = between(launcher, "private void addPanel(",
                 "/** One optional integration");
         int alpha = add.indexOf("frame.setAlpha(0f);");
@@ -41,9 +41,9 @@ public final class Ha1209LauncherStartupContractTest {
 
     @Test public void backdropAsyncAppsAndReboundSourcesCannotExposeLegacyLayout()
             throws Exception {
-        String launcher = javaSource("LauncherActivity.java");
+        String launcher = javaSource("LauncherHomeSurface.java");
         String layout = between(launcher, "workspace.addOnLayoutChangeListener",
-                "@Override\n    protected void onNewIntent");
+                "public void onNewIntent");
         assertTrue(layout.indexOf("scheduleInitialLauncherBackdrops();") >= 0);
         assertFalse(layout.contains("syncLauncherBackdrops();"));
         assertTrue(layout.indexOf("scheduleInitialLauncherBackdrops();")
@@ -71,11 +71,11 @@ public final class Ha1209LauncherStartupContractTest {
     }
 
     @Test public void rootHomeConsumesBackWithoutPackageManagerRace() throws Exception {
-        String launcher = javaSource("LauncherActivity.java");
+        String launcher = javaSource("LauncherHomeSurface.java");
         String back = between(launcher, "public void onBackPressed()",
                 "private void configureWindow");
         assertTrue(back.contains("!isTaskRoot() || !homeRootInvocation"));
-        assertTrue(back.contains("super.onBackPressed();"));
+        assertTrue(back.contains("host.back();"));
         assertFalse(back.contains("isSelectedHome"));
         assertTrue(launcher.contains("private static boolean isHomeInvocation"));
         assertTrue(launcher.contains("Intent.CATEGORY_HOME"));
@@ -116,13 +116,13 @@ public final class Ha1209LauncherStartupContractTest {
         assertFalse(coordinator.contains("automaticReconcileDelayMillis"));
         assertFalse(coordinator.contains("startupInitializationDelayMillis"));
 
-        String launcher = javaSource("LauncherActivity.java");
+        String launcher = javaSource("LauncherHomeSurface.java");
         String panelStep = between(launcher, "private void continuePanelInitialization()",
                 "private void makePanelTransparent");
         assertFalse(panelStep.contains("launcherPanelDelayMillis"));
         String runtimeStep = between(launcher,
                 "private final Runnable deferredLauncherRuntimeStep",
-                "@Override\n    protected void onCreate");
+                "public void onCreate");
         assertFalse(runtimeStep.contains("launcherRuntimeDelayMillis("));
         assertFalse(runtimeStep.contains("DEFERRED_LAUNCHER_STAGE_MS"));
         assertTrue(runtimeStep.contains("navigationUiHandler.post(this)"));
@@ -136,13 +136,13 @@ public final class Ha1209LauncherStartupContractTest {
 
     @Test public void visibleHomeUsesExactHostHandoffButHiddenHomeKeepsAlarmOwnership()
             throws Exception {
-        String launcher = javaSource("LauncherActivity.java");
+        String launcher = javaSource("LauncherHomeSurface.java");
         String handoff = between(launcher,
                 "private final Runnable visibleIntegrationHostHandoff",
                 "private boolean launcherFirstDrawCompleted");
         assertTrue(handoff.contains("pendingIntegrationHostDelayMillis"));
         assertTrue(handoff.contains("dispatchPendingIntegrationHostIfDue"));
-        String stop = between(launcher, "protected void onStop()",
+        String stop = between(launcher, "public void onStop()",
                 "/** Starts migration immediately");
         assertTrue(stop.contains("removeCallbacks(visibleIntegrationHostHandoff)"));
 
@@ -217,7 +217,7 @@ public final class Ha1209LauncherStartupContractTest {
         assertTrue(starter.contains("startIfNeededAutomatically"));
         assertTrue(starter.contains("requiresAutomaticIntegrationHost"));
         assertTrue(starter.contains("hudPanelEnabled && hudPanelAutostart"));
-        assertTrue(javaSource("LauncherActivity.java")
+        assertTrue(javaSource("LauncherHomeSurface.java")
                 .contains("WidgetServiceStarter.startVisibleSurfaceImmediatelyAutomatically(this)"));
     }
 

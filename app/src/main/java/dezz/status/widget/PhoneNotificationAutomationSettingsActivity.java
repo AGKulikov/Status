@@ -514,9 +514,11 @@ public final class PhoneNotificationAutomationSettingsActivity extends dezz.stat
                     prefs.brickOrder.set(BrickType.serializeOrder(order));
                 }
             }
-            WidgetService running = WidgetService.getInstance();
-            if (running != null) running.applyPreferences();
-            else WidgetServiceStarter.startIfNeeded(this);
+            android.content.Context app=getApplicationContext();
+            dezz.status.widget.settings.SettingsEditSession.afterApply(this,"phone-notification-runtime",()->{
+                WidgetService running=WidgetService.getInstance();
+                if(running!=null)running.applyPreferences();else WidgetServiceStarter.startIfNeeded(app);
+            });
             refreshSummaries();
         } catch (Exception error) {
             showError(error);

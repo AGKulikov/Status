@@ -101,8 +101,7 @@ public final class MediaButtonController {
     private MediaButtonController(Context context) {
         this.context = context;
         control(() -> {
-            preferences = context.createDeviceProtectedStorageContext()
-                    .getSharedPreferences("media_buttons", Context.MODE_PRIVATE);
+            preferences = dezz.status.widget.backup.BackupPreferences.open(context.createDeviceProtectedStorageContext(),"media_buttons", Context.MODE_PRIVATE);
             enabled = preferences.getBoolean("enabled", false);
             defaultSource = preferences.getBoolean("default_source", false);
             isolated = preferences.getBoolean("disable_default", false);
@@ -151,6 +150,10 @@ public final class MediaButtonController {
     void whenInputReady(Runnable callback) { control(callback); }
 
     public boolean isReady() { return ready; }
+    /** Route changes remain separate explicit operations; applying the editor only reloads enable. */
+    public void reloadEnabledSetting() {
+        control(()->{synchronized(this){enabled=preferences.getBoolean("enabled",false);generation++;reconcileReceiver();}});
+    }
     public void whenReady(Runnable callback) {
         control(() -> new Handler(context.getMainLooper()).post(callback));
     }
@@ -213,6 +216,7 @@ public final class MediaButtonController {
                         && !output.contains("NATRO_MEDIA_ERROR=");
                 if (success) {
                     routeVerified = true;
+                    dezz.status.widget.backup.BackupMaintenance.systemOperationVerified(context,VehicleButton.MEDIA.name());
                     isolated = value;
                     control(() -> RuntimePreferenceWriter.put(preferences, "disable_default", value));
                     status = (value ? "Путь MEDIA в Natro записан и проверен" : "Штатный путь MEDIA записан и проверен")

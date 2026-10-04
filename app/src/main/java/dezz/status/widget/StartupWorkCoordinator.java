@@ -503,8 +503,7 @@ public final class StartupWorkCoordinator {
 
     @NonNull
     private static SharedPreferences state(@NonNull Context context) {
-        return context.createDeviceProtectedStorageContext()
-                .getSharedPreferences(PREFS, AppProcessPolicy.preferenceMode());
+        return dezz.status.widget.backup.BackupPreferences.open(context.createDeviceProtectedStorageContext(),PREFS, AppProcessPolicy.preferenceMode());
     }
 
     @NonNull

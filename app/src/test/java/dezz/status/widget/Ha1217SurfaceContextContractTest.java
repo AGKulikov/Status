@@ -136,7 +136,7 @@ public final class Ha1217SurfaceContextContractTest {
     @Test public void pickerAndLauncherUseAnExplicitLifecycleSurface() throws Exception {
         String picker = source("AppSelectionActivity.java");
         String brickPicker = source("BrickListAdapter.java");
-        String launcher = source("LauncherActivity.java");
+        String launcher = source("LauncherHomeSurface.java");
         String widget = source("WidgetService.java");
         String windowLauncher = source("launcher/YandexWindowLauncher.java");
 
@@ -149,8 +149,8 @@ public final class Ha1217SurfaceContextContractTest {
         String hidePicker = brickPicker.substring(openPicker, nextMethod);
         assertFalse(hidePicker.contains("Permissions.isUsageAccessGranted"));
         assertTrue(launcher.contains("StatusBarSurfaceContext.setLauncherHomeForeground(false)"));
-        int resume = launcher.indexOf("protected void onResume()");
-        int pause = launcher.indexOf("protected void onPause()", resume);
+        int resume = launcher.indexOf("public void onResume()");
+        int pause = launcher.indexOf("public void onPause()", resume);
         String resumeBody = launcher.substring(resume, pause);
         assertFalse(resumeBody.contains("setLauncherHomeForeground("));
         int focus = launcher.indexOf("public void onWindowFocusChanged(boolean hasFocus)");

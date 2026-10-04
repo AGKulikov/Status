@@ -53,7 +53,6 @@ public final class PackageReplaceBleRecoveryGate {
     private static SharedPreferences state(@NonNull Context context) {
         Context app = context.getApplicationContext();
         if (app == null) app = context;
-        return app.createDeviceProtectedStorageContext()
-                .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        return dezz.status.widget.backup.BackupPreferences.open(app.createDeviceProtectedStorageContext(),PREFS, Context.MODE_PRIVATE);
     }
 }

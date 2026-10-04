@@ -59,7 +59,7 @@ public final class SettingsDialogBuilder extends AlertDialog.Builder {
             }
             super.setView(wrapped);
         }
-        AlertDialog dialog = super.create();
+        AlertDialog dialog = SettingsWindowOwner.attach(getContext(),super.create());
         SettingsEditSession session=SettingsEditSession.find(getContext());
         if(session!=null){
             SettingsEditSession.Savepoint checkpoint=session.checkpoint();checkpoints.put(dialog,checkpoint);

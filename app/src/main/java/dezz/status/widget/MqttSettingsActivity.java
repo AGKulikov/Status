@@ -98,38 +98,40 @@ public final class MqttSettingsActivity extends dezz.status.widget.settings.Sett
         page.addView(hint, topMargin(14));
 
         Button save = new Button(this);
-        save.setText("Сохранить и подключиться");
+        save.setText("Применить и подключиться");
         save.setOnClickListener(v -> save());
         page.addView(save, topMargin(18));
         return scroll;
     }
 
     private void save() {
-        try {
+        dezz.status.widget.settings.SettingsEditSession session=dezz.status.widget.settings.SettingsEditSession.find(this);
+        if(session!=null&&session.apply(this)){
+            Toast.makeText(this,session.isNested()?"Подключение выполнится после применения в основном редакторе":"Настройки MQTT сохранены",Toast.LENGTH_SHORT).show();
+            password.setText("");refreshStatus();
+        }
+    }
+    @Override protected void flushSettingsDraft() {
+        if(enabled==null)return;
             String hostValue = text(host);
-            if (enabled.isChecked() && hostValue.isEmpty()) {
-                throw new IllegalArgumentException("Укажите адрес брокера");
+            if (enabled.isChecked() && (hostValue.isEmpty()||hostValue.length()>255||hostValue.contains("://"))) {
+                host.setError("Укажите имя или IP брокера без mqtt://");
+                throw new IllegalArgumentException("Укажите имя или IP брокера без mqtt://");
             }
+            int portValue=number(port,"Порт",1,65535),qosValue=number(qos,"QoS",0,1),keepAliveValue=number(keepAlive,"Проверка связи",10,600);
+            if (!text(password).isEmpty()&&!text(password).equals(prefs.mqttPassword.get())) prefs.mqttPassword.set(text(password));
             prefs.mqttEnabled.set(enabled.isChecked());
             prefs.mqttHost.set(hostValue);
-            prefs.mqttPort.set(clamp(number(port, 1883), 1, 65535));
+            prefs.mqttPort.set(portValue);
             prefs.mqttTls.set(tls.isChecked());
             prefs.mqttUsername.set(text(username));
-            if (!text(password).isEmpty()) prefs.mqttPassword.set(text(password));
             prefs.mqttClientId.set(text(clientId));
             prefs.mqttDeviceId.set(text(deviceId).isEmpty() ? "geely" : text(deviceId));
             prefs.mqttBaseTopic.set(text(baseTopic).isEmpty()
                     ? "statuswidget/v1" : text(baseTopic));
-            prefs.mqttQos.set(clamp(number(qos, 1), 0, 1));
-            prefs.mqttKeepAliveSeconds.set(clamp(number(keepAlive, 30), 10, 600));
+            prefs.mqttQos.set(qosValue);
+            prefs.mqttKeepAliveSeconds.set(keepAliveValue);
             prefs.mqttKeepAwake.set(keepAwake.isChecked());
-            if (WidgetService.isRunning()) WidgetService.getInstance().applyPreferences();
-            Toast.makeText(this, "Настройки MQTT сохранены", Toast.LENGTH_SHORT).show();
-            refreshStatus();
-        } catch (Exception error) {
-            Toast.makeText(this, "Проверьте настройки: " + safeMessage(error),
-                    Toast.LENGTH_LONG).show();
-        }
     }
 
     private void refreshStatus() {
@@ -184,9 +186,10 @@ public final class MqttSettingsActivity extends dezz.status.widget.settings.Sett
     private int dp(int value) { return Math.round(value * getResources().getDisplayMetrics().density); }
     private static String text(EditText value) { return value.getText() == null ? ""
             : value.getText().toString().trim(); }
-    private static int number(EditText value, int fallback) { try {
-        return Integer.parseInt(text(value)); } catch (NumberFormatException ignored) { return fallback; } }
-    private static int clamp(int value, int min, int max) { return Math.max(min, Math.min(max, value)); }
+    private static int number(EditText field,String label,int min,int max) {
+        try {int value=Integer.parseInt(text(field));if(value<min||value>max)throw new NumberFormatException();field.setError(null);return value;}
+        catch(NumberFormatException invalid){String message=label+": введите целое число от "+min+" до "+max;field.setError(message);throw new IllegalArgumentException(message);}
+    }
     private static String safeMessage(Throwable error) { return error.getMessage() == null
             ? error.getClass().getSimpleName() : error.getMessage(); }
 }

@@ -42,7 +42,14 @@ public class SettingsScreensInteractionTest {
                 NavigationPanelSettingsActivity.class,ClimatePanelSettingsActivity.class,VehicleInfoPanelSettingsActivity.class,
                 InformationPanelSettingsActivity.class,DriverPanelSettingsActivity.class,PassengerPanelSettingsActivity.class,
                 LauncherShortcutSettingsActivity.class,PanelElementSettingsActivity.class,SystemShadeSettingsActivity.class,
-                NavigatorWindowSettingsActivity.class,DriverFavoritesSettingsActivity.class,PassengerFavoritesSettingsActivity.class))
+                NavigatorWindowSettingsActivity.class,DriverFavoritesSettingsActivity.class,PassengerFavoritesSettingsActivity.class,
+                AllAppsSettingsActivity.class,PassengerAllAppsSettingsActivity.class,FavoriteAppsSettingsActivity.class,
+                FavoriteRoutesSettingsActivity.class,DimMenuPanelSettingsActivity.class,VisualBrickEditorActivity.class,
+                PopupSettingsActivity.class,PhoneNotificationLayoutEditorActivity.class,dezz.status.widget.shade.SystemShadeEditorActivity.class,
+                MqttSettingsActivity.class,HomeAssistantSettingsActivity.class,SprutHubSettingsActivity.class,
+                PhoneConnectorSettingsActivity.class,LiveActivityApnsSettingsActivity.class,MediaButtonsSettingsActivity.class,
+                ScenarioSettingsActivity.class,IntentScenarioSettingsActivity.class,PhoneNotificationAutomationSettingsActivity.class,
+                AutomationSettingsActivity.class))
             for(int theme:new int[]{1,2})result.add(new Object[]{type,theme});
         return result;
     }
@@ -56,7 +63,15 @@ public class SettingsScreensInteractionTest {
         org.robolectric.shadows.ShadowChoreographer.setFrameDelay(java.time.Duration.ofMillis(16));
         ReflectionHelpers.setStaticField(CarIntegrations.class,"instance",new NoCarIntegration());
         SettingsAppearance.preferences(RuntimeEnvironment.getApplication()).edit().putInt("theme",theme).putInt("textSp",26).commit();
-        try(ActivityController<? extends Activity> controller=Robolectric.buildActivity(type)){
+        android.content.Intent intent=new android.content.Intent(RuntimeEnvironment.getApplication(),type);
+        if(type==VisualBrickEditorActivity.class){
+            dezz.status.widget.ha.HaBrickConfig fixture=new dezz.status.widget.ha.HaBrickConfig();fixture.id="editor-fixture";fixture.name="Тестовый элемент";
+            new dezz.status.widget.ha.HaBrickConfigStore(new Preferences(RuntimeEnvironment.getApplication())).saveMain(Collections.singletonList(fixture));
+            intent=VisualBrickEditorActivity.intent(RuntimeEnvironment.getApplication(),VisualBrickEditorActivity.SURFACE_MAIN,fixture.id);
+        }
+        if(type==PhoneNotificationLayoutEditorActivity.class)
+            intent=PhoneNotificationLayoutEditorActivity.intent(RuntimeEnvironment.getApplication(),dezz.status.widget.phone.PhoneNotificationAutomation.OVERLAY_ID);
+        try(ActivityController<? extends Activity> controller=Robolectric.buildActivity(type,intent)){
             System.out.println("EDITOR_BEGIN "+type.getSimpleName()+" theme="+theme);
             Activity activity=controller.setup().visible().get();System.out.println("EDITOR_CREATED "+type.getSimpleName());idle();
             View decor=activity.getWindow().getDecorView();measure(decor);idle();measure(decor);System.out.println("EDITOR_MEASURED "+type.getSimpleName());
@@ -66,8 +81,13 @@ public class SettingsScreensInteractionTest {
             Map<String,?> before=disk.getAll();
             snapshot(decor,type.getSimpleName()+"-"+(theme==1?"light":"dark"));
             Button apply=find(decor,"Применить");assertNotNull("Reachable Apply",apply);assertTrue(apply.isShown());
+            if(type==PhoneConnectorSettingsActivity.class)for(String section:new String[]{"Состав","Поведение","Дополнительно"}){
+                Button tab=find(decor,section);assertNotNull(section,tab);assertTrue(section,tab.isShown());
+            }
             assertNotNull("Reachable Cancel",find(decor,"Отмена"));
             View back=activity.findViewById(dezz.status.widget.R.id.settings_back_button);
+            if(back==null)back=find(decor,"‹ Назад");
+            if(back==null)back=find(decor,"‹");
             for(SettingsSection section:SettingsSection.values()){
                 Button tab=find(decor,section.title);if(tab==null||!tab.isShown())continue;
                 assertEquals("Section label must fit on one line: "+section.title,1,tab.getLineCount());
@@ -77,6 +97,7 @@ public class SettingsScreensInteractionTest {
                     assertFalse("Back must not cover a section",android.graphics.Rect.intersects(backBounds,tabBounds));
                 }
                 tab.performClick();measure(decor);assertTrue(tab.isSelected());assertReadableSwitches(decor);
+                if(back!=null)assertTrue("Back remains available on every section",back.isShown());
             }
             session.cancel(activity);controller.pause().stop().destroy();idle();
             assertTrue("Destroyed editor must leave only a closed, view-free marker",SettingsEditSession.find(activity).isClosed());

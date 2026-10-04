@@ -45,7 +45,7 @@ public final class DriveModeSettings {
         // because LOCKED_BOOT_COMPLETED is delivered before unlock and we need
         // to read settings (e.g. to decide whether to start the service).
         Context dps = context.getApplicationContext().createDeviceProtectedStorageContext();
-        this.prefs = dps.getSharedPreferences(PreferenceKeys.PREFS_NAME, Context.MODE_PRIVATE);
+        this.prefs = dezz.status.widget.backup.BackupPreferences.open(dps,PreferenceKeys.PREFS_NAME, Context.MODE_PRIVATE);
     }
 
     public SharedPreferences getPrefs() {

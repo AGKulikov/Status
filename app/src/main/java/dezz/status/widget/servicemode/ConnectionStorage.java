@@ -44,7 +44,7 @@ public class ConnectionStorage {
 
     public ConnectionStorage(Context context) {
         final Context deviceContext = context.getApplicationContext().createDeviceProtectedStorageContext();
-        this.prefs = deviceContext.getSharedPreferences(
+        this.prefs = dezz.status.widget.backup.BackupPreferences.open(deviceContext,
                 context.getPackageName() + "_connection", Context.MODE_PRIVATE);
     }
 

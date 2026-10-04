@@ -52,6 +52,7 @@ public final class BackupStorage {
                 .put("sourceVersionCode",BuildConfig.VERSION_CODE).put("installation",installation())
                 .put("createdAt",System.currentTimeMillis()).put("defaultsSchema",BuildConfig.VERSION_CODE)
                 .put("consistency","processes-flushed-and-stopped");
+        metadata.put("externalSystemFiles",BackupExternalState.capture(snapshot));
         JSONArray namespaces=new JSONArray();for(String root:roots.keySet())namespaces.put(root);
         metadata.put("namespaces",namespaces);
         metadata.put("declaredMainDefaults",BackupPreferencesXml.encode(dezz.status.widget.PortableBackupDefaults.capture(context)));
@@ -119,9 +120,9 @@ public final class BackupStorage {
 
     public void validate(File snapshot,JSONObject metadata)throws Exception {
         if(!context.getPackageName().equals(metadata.getString("package")))throw new IOException("Копия другого приложения");
-        if(metadata.getInt("defaultsSchema")!=BuildConfig.VERSION_CODE)
-            throw new IOException("Для копии другой версии требуется отдельная миграция; рабочие данные не изменены");
-        BackupPreferencesXml.decode(metadata.getJSONArray("declaredMainDefaults"));
+        BackupDefaultsMigration.validate(metadata,BuildConfig.VERSION_CODE);
+        if(metadata.has("externalSystemFiles"))BackupExternalState.validate(snapshot,metadata.getJSONArray("externalSystemFiles"));
+        else if(metadata.getInt("sourceVersionCode")>=208021337)throw new IOException("В копии отсутствует отчёт о системных оригиналах");
         JSONObject navigator=metadata.getJSONObject("navigator");
         if(navigator.getBoolean("installed"))BackupPreferencesXml.decode(navigator.getJSONArray("values"));
         Set<String> names=new HashSet<>();JSONArray namespaces=metadata.getJSONArray("namespaces");
@@ -161,6 +162,7 @@ public final class BackupStorage {
     /** Transforms only isolated files. Current prefs, credentials and UI remain untouched until apply. */
     public void prepareRestore(File snapshot,JSONObject metadata)throws Exception {
         validate(snapshot,metadata);
+        BackupDefaultsMigration.materialize(snapshot,context.getPackageName(),metadata,BuildConfig.VERSION_CODE);
         JSONObject secrets=new JSONObject(new String(BackupFiles.read(new File(snapshot,PORTABLE),16*1024*1024),StandardCharsets.UTF_8));
         JSONArray entries=secrets.getJSONArray("preferences");
         for(int index=0;index<entries.length();index++) {

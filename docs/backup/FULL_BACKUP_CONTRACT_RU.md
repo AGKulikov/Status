@@ -302,3 +302,67 @@ CompoundButton в теме настроек; пользовательские re
 PREVIEW_TAG. HudLcaPatchActivity блокирует запись до полного подтверждения
 совместимости; путь/назначение last-report.txt и внешний оригинал не меняются.
 Новых namespaces, ключей, defaults или экспортных исключений эти изменения не вводят.
+
+### 04.10 — результат проверки HUD/LCA в общем журнале
+
+HudLcaPatchActivity добавляет к уже существующему DiagnosticJournal этап, exit,
+truncation, режим и класс ошибки. Источник/назначение last-report.txt, системные
+оригиналы и политика их восстановления прежние; shell output в общий журнал
+не копируется. Fingerprint этого владельца пересмотрен по этому изменению.
+
+
+### 04.10 — черновики подключений и полный путь копии, кандидат 3.0.4
+
+Эта ревизия заменяет приведённое выше ограничение «только одна defaultsSchema»
+и статус отсутствия runtime-адаптера; прежние записи сохранены как история.
+Схемы 3.0.2/208021335 и 3.0.3/208021336 явно принимаются версией 3.0.4/208021337.
+Старые отсутствующие main/passenger keys материализуются из declaredMainDefaults;
+явные и неизвестные значения имеют приоритет, новые поля получают свои defaults.
+Неизвестная/будущая схема и несовпадение sourceVersionCode/defaultsSchema запрещены.
+Форматы документов, namespace, значения defaults и пути действующих настроек
+этой ревизией не переименованы. PortableBackupDefaults исправляет Object-методы
+изолированного proxy: сбор defaults больше не падает при регистрации в WeakHashMap.
+
+Ревизия владельцев хранения перед обновлением fingerprints:
+
+| Владельцы | Данные и политика |
+|---|---|
+| Preferences, RuntimeSnapshotPreferences, StartupWorkCoordinator, AutomationStateStore, AutoHoldStateRepository, ScreenReservationStateStore, DriveModeSettings, InstrumentPanelStore/InstrumentOemController | Все прежние CE/DE имена и типы. Открытие через BackupPreferences сохраняет runtime-снимки/историю и добавляет общий барьер записи. |
+| MediaAutoResumeController, MediaPlaybackHistoryStore, NavigationCollectionDemand, MqttShortcutCatalogStore, PackageReplaceBleRecoveryGate, LiveActivityProvisioningStore, Geely HudModeFallbackStore/BootReceiver | Та же замена способа открытия; defaults/назначения не изменены. Исторические таймеры и показания не становятся свежими. |
+| servicemode AppsToHideStorage/ConnectionStorage/ExcludeAppsStorage/NatroSelfVisibility/PinStorage/ServiceModeJournal, shell ConnectionStorage | Прежние endpoints/PIN/журналы владения; барьер без переименования. Правила устройства и запрет считать endpoint разрешением прежние. |
+| ButtonRouteRestorer, VehicleButtonController, MediaButtonController, новый ButtonSettingsDraft | Существующие vehicle_buttons/media_buttons целиком; UI пишет черновик, Apply обновляет только затронутые настройки runtime. drive.selected и другие независимые записи сохраняются. |
+| PhoneConnectorSettingsActivity, LiveActivityApnsSettingsActivity, ApnsCredentialStore | Те же поля телефона и CE metadata/APNs blob; ввод не меняет связь. Ключ и метаданные фиксируются вместе по root Apply, отмена не удаляет исходный файл. |
+| SettingsApplyJournal, новый SettingsFileChange | Schema 2 принимает schema 1 при recovery. Журнал хранит до 64 малых частных ресурсов вместе с touched preference keys. APNs payload в журнале уже зашифрован, plaintext туда не попадает. Все paths предварительно проверены, maintenance-root запрещён. |
+| SettingsAppearance, BackupPreferences, BackupMaintenance | Прежние настройки вида; реестр открытых stores включает ещё не созданные XML. Общий барьер удерживается до остановки процесса, ошибки снимают его. Прямой обход барьера в новом production-коде блокирует source gate. |
+| BackupStorage, BackupDefaultsMigration, BackupExternalState, FullBackupActivity | Перенос всей файловой области и строгих typed keys; явная миграция старых defaults. Только известные внешние пути патчей читаются для availability/size/SHA-256; доступные оригиналы копируются в ce_files/restored-system-originals с хешем в имени. Они никогда не устанавливаются в системный путь при импорте. Недоступность/символьные ссылки отмечены явно. |
+
+RuntimePreferenceWriter перед общим барьером сбрасывает принятую очередь;
+поздние события удерживаются отдельно, при неудаче обслуживания очередь продолжается.
+RuntimeSnapshotPreferences checkpoint выполняется до захвата общего барьера,
+чтобы не инвертировать порядок diskLock/write-lock. Фактические процессы затем
+останавливаются прежним протоколом same-UID/lease; snapshot сверяет состав и хеши.
+Отсутствие DocumentsUI для иконок и архивов покрывает ранее добавленный выбор файлов.
+
+APNs encryption теперь получает случайный IV от Cipher/Keystore, а не передаёт
+свой IV при randomizedEncryptionRequired. При удалении удаляются файл и метаданные;
+AES alias без APNs signing key сохраняется для возможного rollback зашифрованного
+поколения. Путь .p8 и версия encrypted blob остаются прежними. Keystore-адаптер
+полной копии переносит секрет и шифрует его новым локальным ключом.
+
+После restore отдельный локальный маркер запрещает автоматический повтор
+системных операций MEDIA/SRC/VA/DM/POWER/STAR из импортированных flags. Параметры
+не стираются: каждый маршрут снова допускается только после его явного успешного
+применения. Ручной запуск музыки не снимает этот запрет. Маркеры проверки находятся
+в уже исключённом maintenance-root и сбрасываются новым восстановлением.
+
+LOCAL: исполняемые проверки охватывают ключ+metadata на каждом durable boundary,
+удаление/ошибку/conflict, отмену/вложенные ресурсы/старый экран, новые namespaces,
+очередь runtime, типы/Unicode/неизвестные значения, миграцию defaults, SHA-256
+системного оригинала и отсутствие записи в исходный системный файл. В полном
+archive -> decrypt -> validate -> stage -> apply тесте исходные Keystore-ключи
+удалены: секреты, APNs, CE/DE файлы и URI восстановлены под новыми тестовыми ключами.
+Ключи тестового AndroidKeyStore находятся только в памяти; AES-GCM и EC выполняет
+JCE. Это не приёмка аппаратного Keystore/согласования процессов/IPC Navigator на KX11.
+Прежние JVM crash-recovery/participant-проверки сохраняются. Финальный CI и
+физическое восстановление учитываются отдельно, статический inventory не служит
+сертификатом полноты данных на конкретной магнитоле.

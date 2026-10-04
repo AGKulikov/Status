@@ -18,8 +18,7 @@ final class ServiceModeJournal {
 
     ServiceModeJournal(Context context) {
         this.context = context.getApplicationContext(); packages = context.getPackageManager();
-        original = context.createDeviceProtectedStorageContext()
-                .getSharedPreferences("natro_service_mode_original", Context.MODE_PRIVATE);
+        original = dezz.status.widget.backup.BackupPreferences.open(context.createDeviceProtectedStorageContext(),"natro_service_mode_original", Context.MODE_PRIVATE);
         tracked = new AppsToHideStorage(context);
     }
 

@@ -23,8 +23,7 @@ final class NatroSelfVisibility {
     NatroSelfVisibility(Context context) {
         this.context = context.getApplicationContext();
         packages = context.getPackageManager();
-        baseline = context.createDeviceProtectedStorageContext()
-                .getSharedPreferences("natro_service_mode_self", Context.MODE_PRIVATE);
+        baseline = dezz.status.widget.backup.BackupPreferences.open(context.createDeviceProtectedStorageContext(),"natro_service_mode_self", Context.MODE_PRIVATE);
         tracked = new AppsToHideStorage(context);
     }
 

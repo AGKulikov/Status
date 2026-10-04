@@ -19,11 +19,13 @@ import dezz.status.widget.settings.SettingsBackNavigation;
 public final class MediaButtonsSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     private VehicleButtonController buttons;
     private MediaButtonController media;
+    private ButtonSettingsDraft draft;
     private LinearLayout body;
     private VehicleButton selected = VehicleButton.MEDIA;
     @Override protected void onCreate(Bundle saved) {
         super.onCreate(saved);
         buttons = VehicleButtonController.get(this); media = MediaButtonController.get(this);
+        draft=new ButtonSettingsDraft(this);
         if (saved != null) try { selected = VehicleButton.valueOf(saved.getString("tab", "MEDIA")); }
         catch (IllegalArgumentException ignored) {}
         LinearLayout content = column(); content.setPadding(24, 18, 24, 24); content.setBackgroundColor(0xFF0B0D12);
@@ -49,34 +51,32 @@ public final class MediaButtonsSettingsActivity extends dezz.status.widget.setti
         body.removeAllViews(); VehicleButton tab = selected; body.addView(text(tab.title, 21));
         if (tab == VehicleButton.DM) {
             LinearLayout row = new LinearLayout(this);
-            Switch volume = toggle("Регулировка громкости", buttons.knobVolume());
+            Switch volume = toggle("Регулировка громкости", draft.knobVolume());
             row.addView(volume, new LinearLayout.LayoutParams(0, -2, 1));
             NumberPicker steps = new NumberPicker(this); steps.setMinValue(1); steps.setMaxValue(20);
-            steps.setValue(buttons.volumeSteps()); row.addView(steps);
-            steps.setOnValueChangedListener((picker, old, value) -> buttons.setVolume(volume.isChecked(), value));
-            volume.setOnCheckedChangeListener((view, enabled) -> buttons.setVolume(enabled, steps.getValue()));
+            steps.setValue(draft.volumeSteps()); row.addView(steps);
+            steps.setOnValueChangedListener((picker, old, value) -> draft.setVolume(volume.isChecked(), value));
+            volume.setOnCheckedChangeListener((view, enabled) -> draft.setVolume(enabled, steps.getValue()));
             body.addView(row);
         }
         Switch enabled = toggle(tab == VehicleButton.DM ? "Пользовательские действия" : "Включить",
-                tab == VehicleButton.MEDIA ? media.isEnabled() : buttons.enabled(tab));
+                draft.enabled(tab));
         enabled.setOnCheckedChangeListener((view, value) -> {
-            if (tab == VehicleButton.MEDIA) media.setEnabled(value); else buttons.setEnabled(tab, value);
+            draft.setEnabled(tab,value);
         }); body.addView(enabled);
         Switch disable = toggle("Отключить действие по умолчанию",
-                tab == VehicleButton.MEDIA ? media.isDisableDefault() : buttons.disabledDefault(tab));
+                dezz.status.widget.settings.SettingsEditSession.pendingBoolean(this,"button-default."+tab.name(),
+                        tab == VehicleButton.MEDIA ? media.isDisableDefault() : buttons.disabledDefault(tab)));
         TextView status = text(tab == VehicleButton.MEDIA ? media.status() : buttons.defaultStatus(tab), 15);
-        boolean[] updating = {false};
         disable.setOnCheckedChangeListener((view, value) -> {
-            if (updating[0]) return;
-            disable.setEnabled(false); status.setText("Применение…");
-            VehicleButtonController.Result callback = (success, detail) -> {
-                if (isDestroyed()) return;
-                updating[0] = true;
-                disable.setChecked(tab == VehicleButton.MEDIA ? media.isDisableDefault() : buttons.disabledDefault(tab));
-                updating[0] = false; disable.setEnabled(true); status.setText(detail);
-            };
-            if (tab == VehicleButton.MEDIA) media.setDisableDefault(value, callback::finished);
-            else buttons.setDisableDefault(tab, value, callback);
+            status.setText("Изменение штатного действия выполнится после «Применить»");
+            android.content.Context app=getApplicationContext();
+            dezz.status.widget.settings.SettingsEditSession.afterApply(this,"button-default."+tab.name(),value,()->{
+                VehicleButtonController.Result callback=(success,detail)->dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync(
+                        "button-settings","default_route group="+tab.name()+", confirmed="+success);
+                if(tab==VehicleButton.MEDIA)MediaButtonController.get(app).setDisableDefault(value,callback::finished);
+                else VehicleButtonController.get(app).setDisableDefault(tab,value,callback);
+            });
         }); body.addView(disable); body.addView(status);
         if (tab == VehicleButton.MEDIA) return;
         LinearLayout gestures = new LinearLayout(this);
@@ -93,7 +93,7 @@ public final class MediaButtonsSettingsActivity extends dezz.status.widget.setti
         body.addView(horizontal(gestures)); body.addView(button("Параметры действий…", this::actionOptions));
     }
     private void editBinding(String group, String gesture, String title) {
-        ButtonBinding original = buttons.binding(group, gesture);
+        ButtonBinding original = draft.binding(group, gesture);
         LinearLayout fields = column(); fields.setPadding(20, 12, 20, 12);
         List<Object> actions = new ArrayList<>();
         for (ButtonAction action : ButtonAction.values()) {
@@ -176,12 +176,13 @@ public final class MediaButtonsSettingsActivity extends dezz.status.widget.setti
             }
             String error = assignment.validationError();
             if (!error.isEmpty()) { toast(error); return; }
-            buttons.saveBinding(group, gesture, assignment, () -> { dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog); showTab(); });
+            draft.saveBinding(group,gesture,assignment);
+            dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);showTab();
         }));
         dialog.show();
     }
     private String bindingLabel(String gesture, String group, String key) {
-        ButtonBinding binding = buttons.binding(group, key);
+        ButtonBinding binding = draft.binding(group, key);
         DriveSelectorButtonPreset preset = DriveSelectorButtonPreset.fromBinding(binding);
         if (preset != null) return gesture + "\n" + preset.title;
         return gesture + "\n" + (binding.action == ButtonAction.DRIVER_MENU
@@ -208,11 +209,11 @@ public final class MediaButtonsSettingsActivity extends dezz.status.widget.setti
     }
     private void actionOptions() {
         LinearLayout values = column(); values.setPadding(20, 12, 20, 12);
-        EditText wifi = edit(buttons.string("wifi.ssid"), "Имя сохранённой сети Wi-Fi (SSID)");
-        Switch connect = toggle("Подключение к выбранной сети Wi-Fi", buttons.bool("wifi.connect"));
-        Switch camera = toggle("Камера 360 через broadcast", buttons.bool("camera.use_broadcast"));
+        EditText wifi = edit(draft.string("wifi.ssid"), "Имя сохранённой сети Wi-Fi (SSID)");
+        Switch connect = toggle("Подключение к выбранной сети Wi-Fi", draft.bool("wifi.connect"));
+        Switch camera = toggle("Камера 360 через broadcast", draft.bool("camera.use_broadcast"));
         values.addView(connect); values.addView(wifi); values.addView(camera);
-        Switch restore = toggle("Запоминать и восстанавливать режим движения", buttons.bool("drive.restore"));
+        Switch restore = toggle("Запоминать и восстанавливать режим движения", draft.bool("drive.restore"));
         values.addView(restore);
         int[] driveModes = {-1, 570491138, 570491158, 570491137, 570491139, 570491155, 570491149, 570491145};
         Spinner startupMode = new Spinner(this);
@@ -225,19 +226,19 @@ public final class MediaButtonsSettingsActivity extends dezz.status.widget.setti
                 return decorateDrive(super.getDropDownView(position, recycled, parent), driveModes[position] < 0 ? null : driveModes[position]);
             }
         });
-        for (int i = 0; i < driveModes.length; i++) if (driveModes[i] == buttons.integer("drive.start_mode", -1)) startupMode.setSelection(i);
+        for (int i = 0; i < driveModes.length; i++) if (driveModes[i] == draft.integer("drive.start_mode", -1)) startupMode.setSelection(i);
         values.addView(startupMode);
         values.addView(text("Полноэкранный режим", 16));
         Spinner fullscreen = new Spinner(this); fullscreen.setAdapter(new ArrayAdapter<>(this,
                 android.R.layout.simple_spinner_dropdown_item, new String[]{"Цикл: обычный → скрыть статус → скрыть всё", "Скрыть строку статуса", "Скрыть все панели"}));
-        fullscreen.setSelection(buttons.integer("fullscreen.mode", 0)); values.addView(fullscreen);
+        fullscreen.setSelection(draft.integer("fullscreen.mode", 0)); values.addView(fullscreen);
         ScrollView scroll = new ScrollView(this); scroll.addView(values);
         new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Параметры действий").setView(scroll).setNegativeButton("Отмена", null)
                 .setPositiveButton("Сохранить", (dialog, which) -> {
-                    buttons.put("wifi.ssid", wifi.getText().toString().trim()); buttons.put("wifi.connect", connect.isChecked());
-                    buttons.put("camera.use_broadcast", camera.isChecked()); buttons.put("fullscreen.mode", fullscreen.getSelectedItemPosition());
-                    buttons.put("drive.start_mode", driveModes[startupMode.getSelectedItemPosition()]);
-                    buttons.put("drive.restore", restore.isChecked());
+                    draft.put("wifi.ssid", wifi.getText().toString().trim()); draft.put("wifi.connect", connect.isChecked());
+                    draft.put("camera.use_broadcast", camera.isChecked()); draft.put("fullscreen.mode", fullscreen.getSelectedItemPosition());
+                    draft.put("drive.start_mode", driveModes[startupMode.getSelectedItemPosition()]);
+                    draft.put("drive.restore", restore.isChecked());
                 }).show();
     }
     private View decorateAction(View view, Object choice) {

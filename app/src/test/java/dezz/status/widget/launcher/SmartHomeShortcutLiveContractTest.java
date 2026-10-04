@@ -14,7 +14,7 @@ import java.nio.file.Paths;
 /** Guards the live subscription and full-card interaction contract for smart-home RULE tiles. */
 public final class SmartHomeShortcutLiveContractTest {
     @Test public void ruleTileHasLiveBadgeWithoutReplacingItsClickAction() throws IOException {
-        String source = source("dezz/status/widget/LauncherActivity.java");
+        String source = source("dezz/status/widget/LauncherHomeSurface.java");
         assertTrue(source.contains("shortcut.kind == LauncherShortcutStore.Kind.RULE)"));
         assertTrue(source.contains("smartHomeShortcutBindings.put(shortcut.id, binding)"));
         assertTrue(source.contains("applySmartHomeState(binding)"));
@@ -24,7 +24,7 @@ public final class SmartHomeShortcutLiveContractTest {
 
     @Test public void launcherRebindsAfterServiceStartupAndReceivesInitialSnapshot()
             throws IOException {
-        String launcher = source("dezz/status/widget/LauncherActivity.java");
+        String launcher = source("dezz/status/widget/LauncherHomeSurface.java");
         String service = source("dezz/status/widget/WidgetService.java");
         assertTrue(launcher.contains("ensureSmartHomeValueSubscription"));
         assertTrue(launcher.contains("current.addConnectorValueListener(smartHomeValueListener)"));
@@ -43,7 +43,7 @@ public final class SmartHomeShortcutLiveContractTest {
 
     @Test public void resolvedActiveStateDrivesIconTintBackgroundAndStatusText()
             throws IOException {
-        String launcher = source("dezz/status/widget/LauncherActivity.java");
+        String launcher = source("dezz/status/widget/LauncherHomeSurface.java");
         assertTrue(launcher.contains("state.activeKnown && state.active"));
         assertTrue(launcher.contains(
                 "? shortcut.activeBackgroundColor : shortcut.backgroundColor"));

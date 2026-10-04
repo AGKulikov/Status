@@ -12,7 +12,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CONTRACT = ROOT / 'docs/backup/storage-inventory.json'
 PATTERNS = {
-    'preferences': r'\b(?:getSharedPreferences|getDefaultSharedPreferences)\s*\(|RuntimeSnapshotPreferences\s*\.\s*open\s*\(',
+    'preferences': r'\b(?:getSharedPreferences|getDefaultSharedPreferences)\s*\(|(?:RuntimeSnapshotPreferences|BackupPreferences)\s*\.\s*open\s*\(',
     'files': r'\b(?:getFilesDir|getNoBackupFilesDir|getExternalFilesDir|getExternalFilesDirs|getExternalStorageDirectory|openFileOutput|openFileInput)\s*\(|\bnew\s+(?:File|FileOutputStream|FileWriter|RandomAccessFile|AtomicFile)\s*\(|\bFiles\s*\.\s*(?:write|move|copy|newOutputStream|createFile)\s*\(',
     'database': r'\b(?:SQLiteOpenHelper|RoomDatabase|DataStore|openOrCreateDatabase|getDatabasePath)\b',
     'external_resource': r'\b(?:takePersistableUriPermission|openInputStream|openOutputStream|openFileDescriptor)\s*\(',
@@ -53,10 +53,20 @@ def compare(expected, actual):
             failures.append('CHANGED storage owner (review data/defaults/adapters): ' + path)
     return failures
 
+def uncoordinated_preferences(root):
+    allowed = {'app/src/main/java/dezz/status/widget/backup/BackupPreferences.java',
+               'app/src/main/java/dezz/status/widget/backup/BackupMaintenance.java',
+               'app/src/main/java/dezz/status/widget/PortableBackupDefaults.java'}
+    return ['Preference write barrier bypass: ' + path.relative_to(root).as_posix()
+            for path in production_sources(root)
+            if path.relative_to(root).as_posix().startswith('app/src/')
+            and path.relative_to(root).as_posix() not in allowed
+            and re.search(r'\b(?:getSharedPreferences|getDefaultSharedPreferences)\s*\(',path.read_text())]
+
 
 def main():
     contract = json.loads(CONTRACT.read_text(encoding='utf-8'))
-    failures = compare(contract['source_owners'], discover(ROOT))
+    failures = compare(contract['source_owners'], discover(ROOT)) + uncoordinated_preferences(ROOT)
     if failures:
         print('\n'.join(failures))
         return 1

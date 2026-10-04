@@ -210,7 +210,7 @@ public final class SprutHubSettingsActivity extends dezz.status.widget.settings.
         page.addView(status, topMargin(8));
         LinearLayout connectionActions = row();
         Button save = new Button(this);
-        save.setText("Сохранить и подключиться");
+        save.setText("Применить и подключиться");
         save.setOnClickListener(v -> saveConnection());
         connectionActions.addView(save, weighted());
         Button refresh = new Button(this);
@@ -222,7 +222,7 @@ public final class SprutHubSettingsActivity extends dezz.status.widget.settings.
         autoHub.setText("Автовыбор живого хаба (очистить сохранённый serial)");
         autoHub.setOnClickListener(v -> {
             serial.setText("");
-            saveConnection();
+            dezz.status.widget.settings.SettingsEditSession.find(this).flushChanges();
         });
         page.addView(autoHub, topMargin(8));
 
@@ -249,41 +249,25 @@ public final class SprutHubSettingsActivity extends dezz.status.widget.settings.
     }
 
     private void saveConnection() {
-        try {
-            String endpoint = text(url);
-            String account = text(email);
-            String replacementPassword = text(password);
-            String preservedPassword = prefs.sprutPassword.get();
-            if (enabled.isChecked()) {
-                validateWebSocketUrl(endpoint);
-                if (account.isEmpty()) {
-                    throw new IllegalArgumentException("Укажите email Sprut.hub");
-                }
-                if (replacementPassword.isEmpty() && preservedPassword.isEmpty()) {
-                    throw new IllegalArgumentException("Укажите пароль Sprut.hub");
-                }
-            }
-            // Encrypt a replacement secret before enabling the connector or changing its other
-            // settings. A Keystore failure therefore cannot leave a half-enabled connection.
-            if (!replacementPassword.isEmpty()) prefs.sprutPassword.set(replacementPassword);
-            prefs.sprutEnabled.set(enabled.isChecked());
-            prefs.sprutWebSocketUrl.set(endpoint);
-            prefs.sprutEmail.set(account);
-            prefs.sprutHubSerial.set(text(serial));
-            prefs.sprutKeepAwake.set(keepAwake.isChecked());
+        dezz.status.widget.settings.SettingsEditSession session=dezz.status.widget.settings.SettingsEditSession.find(this);
+        if(session!=null&&session.apply(this)){
             password.setText("");
-            WidgetService running = WidgetService.getInstance();
-            if (running != null) {
-                running.applyPreferences();
-            } else {
-                WidgetServiceStarter.startIfNeeded(this);
-            }
-            Toast.makeText(this, "Настройки Sprut.hub сохранены", Toast.LENGTH_SHORT).show();
-            main.removeCallbacks(delayedReload);
-            main.postDelayed(delayedReload, 1_500L);
-        } catch (Exception e) {
-            Toast.makeText(this, "Sprut.hub: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this,session.isNested()?"Подключение выполнится после применения в основном редакторе":"Настройки Sprut.hub сохранены",Toast.LENGTH_SHORT).show();
+            main.removeCallbacks(delayedReload);main.postDelayed(delayedReload,1_500L);
         }
+    }
+    @Override protected void flushSettingsDraft() {
+        if(enabled==null)return;
+        String endpoint=text(url),account=text(email),replacementPassword=text(password),preservedPassword=prefs.sprutPassword.get();
+        if(enabled.isChecked()){
+            validateWebSocketUrl(endpoint);
+            if(account.isEmpty())throw new IllegalArgumentException("Укажите email Sprut.hub");
+            if(replacementPassword.isEmpty()&&preservedPassword.isEmpty())throw new IllegalArgumentException("Укажите пароль Sprut.hub");
+        }
+        // Encrypt before changing the other draft values; no connection starts during editing.
+        if(!replacementPassword.isEmpty()&&!replacementPassword.equals(preservedPassword))prefs.sprutPassword.set(replacementPassword);
+        prefs.sprutEnabled.set(enabled.isChecked());prefs.sprutWebSocketUrl.set(endpoint);prefs.sprutEmail.set(account);
+        prefs.sprutHubSerial.set(text(serial));prefs.sprutKeepAwake.set(keepAwake.isChecked());
     }
 
     private void refreshStatus() {
@@ -862,12 +846,10 @@ public final class SprutHubSettingsActivity extends dezz.status.widget.settings.
     }
 
     private void applyLiveSettings() {
-        WidgetService running = WidgetService.getInstance();
-        if (running != null) {
-            running.applyPreferences();
-        } else {
-            WidgetServiceStarter.startIfNeeded(this);
-        }
+        android.content.Context app=getApplicationContext();
+        dezz.status.widget.settings.SettingsEditSession.afterApply(this,"sprut-runtime",()->{
+            WidgetService service=WidgetService.getInstance();if(service!=null)service.applyPreferences();else WidgetServiceStarter.startIfNeeded(app);
+        });
     }
 
     private static String uniqueMainId(String base, List<HaBrickConfig> items) {

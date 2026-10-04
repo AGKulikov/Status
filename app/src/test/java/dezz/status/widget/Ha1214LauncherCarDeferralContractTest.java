@@ -14,7 +14,7 @@ import static org.junit.Assert.assertTrue;
 /** Guards the HA1214 rule: visual HOME inflation must not initialize the vendor car SDK. */
 public final class Ha1214LauncherCarDeferralContractTest {
     @Test public void panelInflationCarriesSuppliersWithoutResolvingEcarx() throws Exception {
-        String launcher = source("LauncherActivity.java");
+        String launcher = source("LauncherHomeSurface.java");
         String initialize = between(launcher, "private void initializePanels()",
                 "private void continuePanelInitialization()");
         assertFalse(initialize.contains("CarIntegrations.get"));
@@ -36,10 +36,10 @@ public final class Ha1214LauncherCarDeferralContractTest {
 
     @Test public void automaticCarResolutionUsesTheSerialWorkerFromRuntimeStageTwo()
             throws Exception {
-        String launcher = source("LauncherActivity.java");
+        String launcher = source("LauncherHomeSurface.java");
         String runtime = between(launcher,
                 "private final Runnable deferredLauncherRuntimeStep",
-                "@Override\n    protected void onCreate");
+                "public void onCreate");
         int stageTwo = runtime.indexOf("case 2:");
         int asyncStart = runtime.indexOf("startLauncherCarRuntimeAsync();", stageTwo);
         assertTrue(stageTwo >= 0 && asyncStart > stageTwo);
@@ -67,7 +67,7 @@ public final class Ha1214LauncherCarDeferralContractTest {
         String command = between(launcher, "private void executeCarControl(",
                 "/** Constructs the process-wide vendor bridge");
         assertTrue(command.contains("requireLauncherCarIntegration().executeControl"));
-        String stop = between(launcher, "protected void onStop()",
+        String stop = between(launcher, "public void onStop()",
                 "/** Starts migration immediately");
         assertFalse(stop.contains("requireLauncherCarIntegration"));
         assertFalse(stop.contains("CarIntegrations.get"));

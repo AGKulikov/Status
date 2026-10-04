@@ -97,7 +97,7 @@ public final class ScreenReservationStateStore {
     public ScreenReservationStateStore(@NonNull Context context) {
         Context app = context.getApplicationContext();
         Context device = app.createDeviceProtectedStorageContext();
-        SharedPreferences preferences = device.getSharedPreferences(
+        SharedPreferences preferences = dezz.status.widget.backup.BackupPreferences.open(device,
                 app.getPackageName() + PREF_SUFFIX, Context.MODE_PRIVATE);
         backend = new SharedPreferencesBackend(preferences);
     }

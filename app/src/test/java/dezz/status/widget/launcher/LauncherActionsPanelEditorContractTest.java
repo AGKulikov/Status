@@ -25,7 +25,7 @@ public final class LauncherActionsPanelEditorContractTest {
 
     @BeforeClass
     public static void loadSourcesOnce() throws IOException {
-        launcherSource = source("dezz/status/widget/LauncherActivity.java");
+        launcherSource = source("dezz/status/widget/LauncherHomeSurface.java");
         shortcutStoreSource =
                 source("dezz/status/widget/launcher/LauncherShortcutStore.java");
     }

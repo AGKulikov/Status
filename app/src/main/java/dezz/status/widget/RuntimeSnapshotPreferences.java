@@ -44,14 +44,14 @@ public final class RuntimeSnapshotPreferences implements SharedPreferences {
     public static SharedPreferences open(Context context, String name) {
         // The legacy isolated HUD is a disk reader; preserve its explicit cross-process reload.
         if (AppProcessPolicy.isHudProcess()) {
-            return context.getSharedPreferences(name, AppProcessPolicy.preferenceMode());
+            return dezz.status.widget.backup.BackupPreferences.open(context,name, AppProcessPolicy.preferenceMode());
         }
         String key = context.getDataDir().getAbsolutePath() + "/" + name;
         synchronized (STORES) {
             RuntimeSnapshotPreferences store = STORES.get(key);
             if (store == null) {
                 Handler main = new Handler(Looper.getMainLooper());
-                store = new RuntimeSnapshotPreferences(context.getSharedPreferences(name, Context.MODE_PRIVATE),
+                store = new RuntimeSnapshotPreferences(dezz.status.widget.backup.BackupPreferences.open(context,name, Context.MODE_PRIVATE),
                         task -> DISK.schedule(task, 5L, TimeUnit.SECONDS),
                         task -> { if (Looper.myLooper() == main.getLooper()) task.run(); else main.post(task); },
                         detail -> DiagnosticJournal.warn("runtime-cache", "store=" + name + ", " + detail));

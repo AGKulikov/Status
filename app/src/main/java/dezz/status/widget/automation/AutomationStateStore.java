@@ -36,7 +36,7 @@ public final class AutomationStateStore {
 
     public AutomationStateStore(@NonNull Context context) {
         Context device = context.getApplicationContext().createDeviceProtectedStorageContext();
-        prefs = device.getSharedPreferences(context.getPackageName() + PREF_SUFFIX,
+        prefs = dezz.status.widget.backup.BackupPreferences.open(device,context.getPackageName() + PREF_SUFFIX,
                 AppProcessPolicy.preferenceMode());
     }
 

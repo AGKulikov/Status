@@ -135,7 +135,7 @@ public final class HomeAssistantSettingsActivity extends dezz.status.widget.sett
         page.addView(status, topMargin(8));
         LinearLayout connectionActions = row();
         Button save = new Button(this);
-        save.setText("Сохранить и подключиться");
+        save.setText("Применить и подключиться");
         save.setOnClickListener(view -> saveConnection());
         connectionActions.addView(save, weighted());
         Button refresh = new Button(this);
@@ -164,27 +164,22 @@ public final class HomeAssistantSettingsActivity extends dezz.status.widget.sett
     }
 
     private void saveConnection() {
-        try {
-            String endpoint = text(baseUrl);
-            String replacementToken = text(token);
-            String preservedToken = prefs.haAccessToken.get();
-            if (enabled.isChecked()) {
-                HaWebSocketConnector.Config.deriveWebSocketUrl(endpoint);
-                if (replacementToken.isEmpty() && preservedToken.isEmpty()) {
-                    throw new IllegalArgumentException("Укажите Long-Lived Access Token");
-                }
-            }
-            prefs.haApiEnabled.set(enabled.isChecked());
-            prefs.haBaseUrl.set(endpoint);
-            if (!replacementToken.isEmpty()) prefs.haAccessToken.set(replacementToken);
-            prefs.haKeepAwake.set(keepAwake.isChecked());
+        dezz.status.widget.settings.SettingsEditSession session=dezz.status.widget.settings.SettingsEditSession.find(this);
+        if(session!=null&&session.apply(this)){
             token.setText("");
-            if (WidgetService.isRunning()) WidgetService.getInstance().applyPreferences();
-            Toast.makeText(this, "Настройки Home Assistant сохранены", Toast.LENGTH_SHORT).show();
-            main.postDelayed(this::reloadCatalog, 1_500L);
-        } catch (Exception error) {
-            Toast.makeText(this, "Home Assistant: " + safeMessage(error), Toast.LENGTH_LONG).show();
+            Toast.makeText(this,session.isNested()?"Подключение выполнится после применения в основном редакторе":"Настройки Home Assistant сохранены",Toast.LENGTH_SHORT).show();
+            main.postDelayed(this::reloadCatalog,1_500L);
         }
+    }
+    @Override protected void flushSettingsDraft() {
+        if(enabled==null)return;
+        String endpoint=text(baseUrl),replacementToken=text(token),preservedToken=prefs.haAccessToken.get();
+        if(enabled.isChecked()){
+            HaWebSocketConnector.Config.deriveWebSocketUrl(endpoint);
+            if(replacementToken.isEmpty()&&preservedToken.isEmpty())throw new IllegalArgumentException("Укажите Long-Lived Access Token");
+        }
+        if(!replacementToken.isEmpty()&&!replacementToken.equals(preservedToken))prefs.haAccessToken.set(replacementToken);
+        prefs.haApiEnabled.set(enabled.isChecked());prefs.haBaseUrl.set(endpoint);prefs.haKeepAwake.set(keepAwake.isChecked());
     }
 
     private void refreshStatus() {
@@ -450,7 +445,10 @@ public final class HomeAssistantSettingsActivity extends dezz.status.widget.sett
     }
 
     private void applyLiveSettings() {
-        if (WidgetService.isRunning()) WidgetService.getInstance().applyPreferences();
+        android.content.Context app=getApplicationContext();
+        dezz.status.widget.settings.SettingsEditSession.afterApply(this,"ha-runtime",()->{
+            WidgetService service=WidgetService.getInstance();if(service!=null)service.applyPreferences();else WidgetServiceStarter.startIfNeeded(app);
+        });
     }
 
     private static String friendlyName(HaEntity entity) {

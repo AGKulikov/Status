@@ -61,8 +61,7 @@ public final class InstrumentOemController {
 
     private InstrumentOemController(Context context) {
         this.context = context;
-        preferences = context.createDeviceProtectedStorageContext()
-                .getSharedPreferences(InstrumentPanelStore.PREFS, Context.MODE_PRIVATE);
+        preferences = dezz.status.widget.backup.BackupPreferences.open(context.createDeviceProtectedStorageContext(),InstrumentPanelStore.PREFS, Context.MODE_PRIVATE);
         whiteBarEnabled = preferences.getBoolean("hide_oem_white_bar", false);
         whiteOwned = preferences.getBoolean("oem_white_bar_owned", false);
         tsrHidden = preferences.getBoolean("hide_oem_speed_sign", false);

@@ -70,7 +70,7 @@ final class HudModeFallbackStore {
             Context device = base.createDeviceProtectedStorageContext();
             if (device != null) base = device;
         }
-        return base.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        return dezz.status.widget.backup.BackupPreferences.open(base,PREFS, Context.MODE_PRIVATE);
     }
 
     static final class Config {

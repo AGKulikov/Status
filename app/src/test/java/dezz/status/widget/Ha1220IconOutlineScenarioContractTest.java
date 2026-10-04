@@ -45,7 +45,7 @@ public final class Ha1220IconOutlineScenarioContractTest {
 
     @Test public void driverAndHomeRenderTheOutlineOnTheGlyphMask() throws IOException {
         String driver = source("driver/DriverPanelOverlayController.java");
-        String launcher = source("LauncherActivity.java");
+        String launcher = source("LauncherHomeSurface.java");
         assertTrue(driver.contains("new OutlineImageView(context)"));
         assertTrue(driver.contains("applyGlyphOutline(binding.icon, style)"));
         assertTrue(driver.contains("@NonNull final OutlineImageView icon"));

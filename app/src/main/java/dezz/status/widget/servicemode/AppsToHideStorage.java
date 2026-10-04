@@ -15,7 +15,7 @@ public class AppsToHideStorage {
 
     public AppsToHideStorage(Context context) {
         final Context deviceContext = context.getApplicationContext().createDeviceProtectedStorageContext();
-        this.prefs = deviceContext.getSharedPreferences(context.getPackageName() + "_apps_to_hide", Context.MODE_PRIVATE);
+        this.prefs = dezz.status.widget.backup.BackupPreferences.open(deviceContext,context.getPackageName() + "_apps_to_hide", Context.MODE_PRIVATE);
     }
 
     /**

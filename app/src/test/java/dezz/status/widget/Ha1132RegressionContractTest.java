@@ -15,7 +15,7 @@ import java.nio.file.Paths;
 public final class Ha1132RegressionContractTest {
     @Test public void homeEditorHasNoLongPressEntryOrTechnicalFrameContours()
             throws Exception {
-        String launcher = source("LauncherActivity.java");
+        String launcher = source("LauncherHomeSurface.java");
         String frame = source("launcher/LauncherElementFrame.java");
         String proxy = source("launcher/LauncherGlobalElementProxyView.java");
 
@@ -32,7 +32,7 @@ public final class Ha1132RegressionContractTest {
     @Test public void flatCatalogContainsConcreteWidgetsAndNeverRequiresGridSpace()
             throws Exception {
         String catalog = source("launcher/LauncherWidgetCatalog.java");
-        String launcher = source("LauncherActivity.java");
+        String launcher = source("LauncherHomeSurface.java");
         String navigation = source(
                 "launcher/navigation/NavigationPanelConfig.java");
 
@@ -65,7 +65,7 @@ public final class Ha1132RegressionContractTest {
 
     @Test public void horizontalRowsAreRealFreeFramesWithZeroSpacingControls()
             throws Exception {
-        String launcher = source("LauncherActivity.java");
+        String launcher = source("LauncherHomeSurface.java");
         String store = source("launcher/LauncherHorizontalGroupStore.java");
         String layout = source("launcher/HorizontalGroupLayout.java");
         assertTrue(launcher.contains("syncLauncherHorizontalGroups()"));

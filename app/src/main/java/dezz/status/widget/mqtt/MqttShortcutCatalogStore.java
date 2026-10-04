@@ -48,7 +48,7 @@ public final class MqttShortcutCatalogStore {
     public MqttShortcutCatalogStore(@NonNull Context context,
                                     @NonNull Preferences preferences) {
         Context device = context.getApplicationContext().createDeviceProtectedStorageContext();
-        prefs = device.getSharedPreferences(context.getPackageName() + PREF_SUFFIX,
+        prefs = dezz.status.widget.backup.BackupPreferences.open(device,context.getPackageName() + PREF_SUFFIX,
                 Context.MODE_PRIVATE);
         profilePrefix = KEY_PREFIX + profileId(preferences) + "|";
     }

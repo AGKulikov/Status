@@ -193,7 +193,7 @@ public class DriverPanelOverlayContractTest {
         }
         String controller = read(widget.resolve(
                 "driver/DriverPanelOverlayController.java"));
-        String launcher = read(widget.resolve("LauncherActivity.java"));
+        String launcher = read(widget.resolve("LauncherHomeSurface.java"));
         String catalog = read(widget.resolve(
                 "launcher/LauncherAppCatalog.java"));
         String renderer = read(widget.resolve(

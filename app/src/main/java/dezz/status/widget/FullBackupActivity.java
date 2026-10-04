@@ -146,7 +146,9 @@ public final class FullBackupActivity extends dezz.status.widget.settings.Settin
             JSONObject metadata=BackupArchive.read(input,key,stage);new BackupStorage(this).validate(new File(stage,"data"),metadata);
             checkedStage=stage;checkedMetadata=metadata;
             runOnUiThread(()->apply.setEnabled(true));
-            return "Архив проверен. Версия "+metadata.getString("sourceVersion")+", файлов: "+metadata.getJSONArray("files").length()+". Рабочие данные не изменены. После восстановления музыка не запустится автоматически; разрешения и подключения нужно проверить.";
+            return "Архив проверен. Версия "+metadata.getString("sourceVersion")+", файлов: "+metadata.getJSONArray("files").length()+". Рабочие данные не изменены. После восстановления музыка не запустится автоматически; разрешения и подключения нужно проверить. Системные патчи не устанавливаются. "
+                    +(metadata.has("externalSystemFiles")?"Сведения о доступности и хешах системных файлов есть в копии; доступные оригиналы сохранены отдельно.":"В этой старой копии нет сведений о системных оригиналах.")
+                    +" Отключение штатных действий кнопок нужно явно применить в их настройках; импорт не повторяет эти операции.";
         }catch(Exception failure){BackupFiles.removeTree(stage);throw failure;}
     }
     private void confirmRestore() {

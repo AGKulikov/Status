@@ -24,6 +24,13 @@ import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Locale;
+import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.Collections;
+import dezz.status.widget.settings.SettingsApplyJournal;
+import dezz.status.widget.settings.SettingsFileChange;
+import dezz.status.widget.settings.SettingsEditSession;
+import dezz.status.widget.settings.SettingsPreferences;
 
 import javax.crypto.Cipher;
 import javax.crypto.KeyGenerator;
@@ -47,6 +54,7 @@ public final class ApnsCredentialStore {
     private static final String KEYSTORE = "AndroidKeyStore";
     private static final String KEY_ALIAS = "natro_live_activity_apns_p8_v1";
     private static final String FILE_NAME = "live_activity_apns_p8_v1.bin";
+    private static final String FILE_PATH = "ce_no_backup/" + FILE_NAME;
     private static final byte FILE_VERSION = 1;
     private static final int MAX_P8_BYTES = 16 * 1024;
 
@@ -78,58 +86,80 @@ public final class ApnsCredentialStore {
 
     private final Context context;
     private final SharedPreferences prefs;
-    private final SecureRandom random = new SecureRandom();
+    private final SharedPreferences durable;
+    private final SettingsEditSession.FileDraft files;
 
     public ApnsCredentialStore(@NonNull Context context) {
         Context app = context.getApplicationContext();
         this.context = app == null ? context : app;
-        this.prefs = this.context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        durable = dezz.status.widget.backup.BackupPreferences.open(this.context,PREFS, Context.MODE_PRIVATE);
+        prefs = SettingsPreferences.wrap(context, durable, PREFS, false);
+        files = SettingsEditSession.files(context);
     }
 
     public synchronized void save(@NonNull String teamId, @NonNull String keyId,
                                   @NonNull String topic, boolean production,
                                   @NonNull byte[] privateKeyPem) throws Exception {
-        String exactTeam = normalizedIdentifier(teamId, "Team ID");
-        String exactKey = normalizedIdentifier(keyId, "Key ID");
-        String exactTopic = topic.trim();
-        if (exactTopic.isEmpty() || exactTopic.length() > 255
-                || !exactTopic.endsWith(".push-type.liveactivity")) {
-            throw new IllegalArgumentException("Некорректный Live Activity topic");
-        }
+        Map<String,Object> metadata = metadata(teamId,keyId,topic,production);
         if (privateKeyPem.length < 64 || privateKeyPem.length > MAX_P8_BYTES) {
             throw new IllegalArgumentException("Некорректный размер APNs .p8");
         }
         // Reject a wrong/corrupt key before replacing the last working configuration.
         parsePrivateKey(privateKeyPem);
         SecretKey wrappingKey = wrappingKey();
-        byte[] iv = new byte[12];
-        random.nextBytes(iv);
         Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-        cipher.init(Cipher.ENCRYPT_MODE, wrappingKey, new GCMParameterSpec(128, iv));
+        // Android Keystore's randomized-encryption policy rejects caller-provided IVs.
+        cipher.init(Cipher.ENCRYPT_MODE, wrappingKey);
+        byte[] iv = cipher.getIV();
         byte[] encrypted = cipher.doFinal(privateKeyPem);
         ByteArrayOutputStream encoded = new ByteArrayOutputStream(2 + iv.length + encrypted.length);
         encoded.write(FILE_VERSION);
         encoded.write(iv.length);
         encoded.write(iv);
         encoded.write(encrypted);
-        writeAtomically(encoded.toByteArray());
-        if (!prefs.edit().putString(KEY_TEAM, exactTeam).putString(KEY_ID, exactKey)
-                .putString(KEY_TOPIC, exactTopic).putBoolean(KEY_PRODUCTION, production)
-                .commit()) {
-            throw new IOException("Не удалось сохранить метаданные APNs");
+        replace(metadata, encoded.toByteArray());
+    }
+
+    public synchronized void updateMetadata(String team,String key,String topic,boolean production)throws Exception {
+        byte[] encrypted=files.read(FILE_PATH);
+        if(encrypted==null){
+            if(team.trim().isEmpty()&&key.trim().isEmpty())return;
+            throw new IllegalArgumentException("Сначала выберите APNs-ключ .p8");
         }
+        replace(metadata(team,key,topic,production),encrypted);
+    }
+    private static Map<String,Object> metadata(String team,String key,String topic,boolean production){
+        String exact=topic.trim();
+        if(exact.isEmpty()||exact.length()>255||!exact.endsWith(".push-type.liveactivity"))
+            throw new IllegalArgumentException("Некорректный Live Activity topic");
+        Map<String,Object> result=new LinkedHashMap<>();
+        result.put(KEY_TEAM,normalizedIdentifier(team,"Team ID"));result.put(KEY_ID,normalizedIdentifier(key,"Key ID"));
+        result.put(KEY_TOPIC,exact);result.put(KEY_PRODUCTION,production);return result;
+    }
+    private void replace(Map<String,Object> metadata,byte[] encrypted)throws IOException{
+        if(files.isDraft()){
+            files.stage(FILE_PATH,encrypted);
+            SharedPreferences.Editor editor=prefs.edit();
+            metadata.forEach((key,value)->{if(value==null)editor.remove(key);else if(value instanceof Boolean)editor.putBoolean(key,(Boolean)value);else editor.putString(key,(String)value);});
+            if(!editor.commit())throw new IOException("Не удалось сохранить метаданные APNs");
+        }else if(!SettingsApplyJournal.commit(context,Collections.singletonMap(durable,metadata),
+                Collections.singletonMap(FILE_PATH,SettingsFileChange.capture(context,FILE_PATH,encrypted))))
+            throw new IOException("Не удалось сохранить APNs-ключ и метаданные");
     }
 
     @Nullable
     public synchronized Credentials load() {
+        try{return SettingsApplyJournal.readAtomically(this::loadGeneration);}catch(Exception unavailable){return null;}
+    }
+    private Credentials loadGeneration() {
         String team = prefs.getString(KEY_TEAM, "").trim();
         String keyId = prefs.getString(KEY_ID, "").trim();
         String topic = prefs.getString(KEY_TOPIC, DEFAULT_TOPIC).trim();
         if (team.isEmpty() || keyId.isEmpty() || topic.isEmpty()) return null;
         byte[] encoded;
         try {
-            encoded = readAll(secretFile());
-            if (encoded.length < 3 || encoded[0] != FILE_VERSION) return null;
+            encoded = files.read(FILE_PATH);
+            if (encoded==null || encoded.length < 3 || encoded.length>MAX_P8_BYTES+128 || encoded[0] != FILE_VERSION) return null;
             int ivLength = encoded[1] & 0xff;
             if (ivLength < 12 || ivLength > 16 || encoded.length <= 2 + ivLength) return null;
             byte[] iv = Arrays.copyOfRange(encoded, 2, 2 + ivLength);
@@ -137,7 +167,7 @@ public final class ApnsCredentialStore {
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
             cipher.init(Cipher.DECRYPT_MODE, wrappingKey(), new GCMParameterSpec(128, iv));
             byte[] plaintext = cipher.doFinal(ciphertext);
-            parsePrivateKey(plaintext);
+            try{parsePrivateKey(plaintext);}catch(Exception invalid){Arrays.fill(plaintext,(byte)0);throw invalid;}
             return new Credentials(team, keyId, topic,
                     prefs.getBoolean(KEY_PRODUCTION, false), plaintext);
         } catch (Exception unavailable) {
@@ -160,15 +190,12 @@ public final class ApnsCredentialStore {
     }
     public boolean production() { return prefs.getBoolean(KEY_PRODUCTION, false); }
 
-    public synchronized void clear() {
-        prefs.edit().clear().commit();
-        File secret = secretFile();
-        if (secret.isFile() && !secret.delete()) secret.deleteOnExit();
-        try {
-            KeyStore store = KeyStore.getInstance(KEYSTORE);
-            store.load(null);
-            if (store.containsAlias(KEY_ALIAS)) store.deleteEntry(KEY_ALIAS);
-        } catch (Exception ignored) { }
+    public synchronized void clear() throws IOException {
+        Map<String,Object> changes=new LinkedHashMap<>();
+        for(String key:prefs.getAll().keySet())changes.put(key,null);
+        replace(changes,null);
+        // The AES wrapping alias contains no APNs signing key. Keep it so crash recovery can
+        // decrypt the prior encrypted generation until its undo journal is durably removed.
     }
 
     @NonNull
@@ -212,39 +239,6 @@ public final class ApnsCredentialStore {
                 .setRandomizedEncryptionRequired(true)
                 .build());
         return generator.generateKey();
-    }
-
-    private void writeAtomically(@NonNull byte[] bytes) throws IOException {
-        File target = secretFile();
-        File temporary = new File(target.getParentFile(), FILE_NAME + ".tmp");
-        try (FileOutputStream output = new FileOutputStream(temporary, false)) {
-            output.write(bytes);
-            output.flush();
-            output.getFD().sync();
-        }
-        if (target.exists() && !target.delete()) {
-            throw new IOException("Не удалось заменить APNs secret");
-        }
-        if (!temporary.renameTo(target)) {
-            throw new IOException("Не удалось зафиксировать APNs secret");
-        }
-    }
-
-    @NonNull private File secretFile() {
-        return new File(context.getNoBackupFilesDir(), FILE_NAME);
-    }
-
-    @NonNull private static byte[] readAll(@NonNull File file) throws IOException {
-        if (!file.isFile() || file.length() <= 0 || file.length() > MAX_P8_BYTES + 128) {
-            throw new IOException("APNs secret отсутствует");
-        }
-        try (FileInputStream input = new FileInputStream(file);
-             ByteArrayOutputStream output = new ByteArrayOutputStream((int) file.length())) {
-            byte[] buffer = new byte[4096];
-            int count;
-            while ((count = input.read(buffer)) >= 0) output.write(buffer, 0, count);
-            return output.toByteArray();
-        }
     }
 
     @NonNull private static String normalizedIdentifier(@NonNull String value,

@@ -18,7 +18,7 @@ public class ExcludeAppsStorage {
 
     public ExcludeAppsStorage(Context context) {
         final Context deviceContext = context.getApplicationContext().createDeviceProtectedStorageContext();
-        this.prefs = deviceContext.getSharedPreferences(context.getPackageName() + "_exclude", Context.MODE_PRIVATE);
+        this.prefs = dezz.status.widget.backup.BackupPreferences.open(deviceContext,context.getPackageName() + "_exclude", Context.MODE_PRIVATE);
     }
 
     public void add(String packageName) {

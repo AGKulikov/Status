@@ -16,14 +16,14 @@ public final class LauncherStartupPriorityContractTest {
     @Test public void optionalVehicleRuntimeCannotQueueAheadOfRequiredGeometry()
             throws Exception {
         String source = launcherSource();
-        String create = between(source, "protected void onCreate(",
-                "protected void onNewIntent(");
+        String create = between(source, "public void onCreate(",
+                "public void onNewIntent(");
         assertTrue(create.contains("startLauncherBootstrapNow()"));
         assertFalse(create.contains("startLauncherCarRuntimeAsync()"));
 
         String deferred = between(source,
                 "private final Runnable deferredLauncherRuntimeStep",
-                "@Override\n    protected void onCreate(");
+                "public void onCreate(");
         assertTrue(deferred.contains("case 2:"));
         assertTrue(deferred.indexOf("startLauncherCarRuntimeAsync()")
                 > deferred.indexOf("case 2:"));
@@ -76,8 +76,8 @@ public final class LauncherStartupPriorityContractTest {
         assertTrue(backdrops.contains("++initialBackdropLoadGeneration"));
         assertTrue(backdrops.contains("generation != initialBackdropLoadGeneration"));
 
-        String resume = between(source, "protected void onResume()",
-                "protected void onPause()");
+        String resume = between(source, "public void onResume()",
+                "public void onPause()");
         assertTrue(resume.contains("reloadAppCatalogAsync(false)"));
     }
 
@@ -107,9 +107,9 @@ public final class LauncherStartupPriorityContractTest {
 
     private static String launcherSource() throws Exception {
         Path fromRoot = Paths.get("app", "src", "main", "java", "dezz", "status",
-                "widget", "LauncherActivity.java");
+                "widget", "LauncherHomeSurface.java");
         Path fromApp = Paths.get("src", "main", "java", "dezz", "status", "widget",
-                "LauncherActivity.java");
+                "LauncherHomeSurface.java");
         Path file = Files.isRegularFile(fromRoot) ? fromRoot : fromApp;
         return new String(Files.readAllBytes(file), StandardCharsets.UTF_8);
     }

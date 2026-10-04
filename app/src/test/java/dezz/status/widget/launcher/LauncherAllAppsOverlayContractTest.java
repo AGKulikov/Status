@@ -48,14 +48,14 @@ public final class LauncherAllAppsOverlayContractTest {
 
     @Test public void overlayDialogIsReleasedWhenLauncherStops() throws IOException {
         String launcher = source();
-        int start = launcher.indexOf("protected void onStop()");
-        int end = launcher.indexOf("protected void onDestroy()", start);
+        int start = launcher.indexOf("public void onStop()");
+        int end = launcher.indexOf("public void onDestroy()", start);
         String stop = launcher.substring(start, end);
         assertTrue(stop.contains("if (!allAppsUninstallInProgress) dismissAllAppsDialog()"));
     }
 
     private static String source() throws IOException {
-        String relative = "dezz/status/widget/LauncherActivity.java";
+        String relative = "dezz/status/widget/LauncherHomeSurface.java";
         Path fromRoot = Paths.get("app", "src", "main", "java").resolve(relative);
         Path fromApp = Paths.get("src", "main", "java").resolve(relative);
         Path file = Files.isRegularFile(fromRoot) ? fromRoot : fromApp;

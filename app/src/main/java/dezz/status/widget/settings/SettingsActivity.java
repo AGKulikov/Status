@@ -38,7 +38,7 @@ public abstract class SettingsActivity extends AppCompatActivity implements Sett
         super.onDestroy();
     }
     @Override protected void onPause(){
-        if(settingsSession!=null){flushSettingsDraft();pausedRevision=settingsSession.revision();wasPaused=true;}
+        if(settingsSession!=null){settingsSession.flushChanges();pausedRevision=settingsSession.revision();wasPaused=true;}
         super.onPause();
     }
     @Override protected void onResume(){

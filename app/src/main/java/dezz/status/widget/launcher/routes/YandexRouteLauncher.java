@@ -42,8 +42,7 @@ public final class YandexRouteLauncher {
             return false;
         }
 
-        if (context instanceof dezz.status.widget.LauncherProfileActivity
-                && ((dezz.status.widget.LauncherProfileActivity) context).isPassengerLauncherProfile()) {
+        if (dezz.status.widget.launcher.LauncherProfile.passenger(context)) {
             // The ECARX ddnavwin/MAIN bridge owns the driver's window only.
             String pkg = route.product == FavoriteRouteConfig.Product.MAPS
                     ? "ru.yandex.yandexmaps" : "ru.yandex.yandexnavi";

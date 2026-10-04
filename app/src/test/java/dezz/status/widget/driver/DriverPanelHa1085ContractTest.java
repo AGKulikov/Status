@@ -153,7 +153,7 @@ public final class DriverPanelHa1085ContractTest {
     public void runtimeAllAppsIsSharedAndIncludesLaunchableSystemPackages() throws Exception {
         Path widget = widgetRoot();
         String catalog = read(widget.resolve("launcher/LauncherAppCatalog.java"));
-        String launcher = read(widget.resolve("LauncherActivity.java"));
+        String launcher = read(widget.resolve("LauncherHomeSurface.java"));
         String overlay = read(widget.resolve("driver/DriverPanelOverlayController.java"));
         String preferences = read(widget.resolve("Preferences.java"));
         String intentRules = read(widget.resolve("IntentScenarioSettingsActivity.java"));
@@ -224,8 +224,10 @@ public final class DriverPanelHa1085ContractTest {
         assertTrue(editor.contains("keepDriverActionSupported()"));
         assertTrue(editor.contains("targetScope == TargetScope.DRIVER"));
         assertTrue(editor.contains("!isDriverFieldSupported(selectedTargetId, field, TargetScope.PASSENGER"));
-        assertTrue(editor.contains("WidgetServiceStarter.startIfNeeded(this)"));
-        assertTrue(intentRules.contains("DriverPanelService.apply(this)"));
+        assertTrue(editor.contains("SettingsEditSession.afterApply(this,\"scenario-runtime\""));
+        assertTrue(editor.contains("WidgetServiceStarter.startIfNeeded(app)"));
+        assertTrue(intentRules.contains("SettingsEditSession.afterApply(this,\"intent-runtime\""));
+        assertTrue(intentRules.contains("DriverPanelService.apply(app)"));
     }
 
     @Test

@@ -276,9 +276,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
                             Scenario.fromJson(item);
                         }
                         prefs.localScenariosJson.set(array.toString());
-                        if (WidgetService.isRunning()) {
-                            WidgetService.getInstance().applyPreferences();
-                        }
+                        notifyRuntimeAfterApply();
                         dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                         loadEntries();
                         // Rebuild the whole screen so a repaired JSON document also removes the
@@ -580,14 +578,7 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
             JSONArray array = new JSONArray();
             for (Entry entry : entries) array.put(entry.raw);
             prefs.localScenariosJson.set(array.toString());
-            WidgetService running = WidgetService.getInstance();
-            if (running != null) {
-                running.applyPreferences();
-            } else {
-                WidgetServiceStarter.startIfNeeded(this);
-            }
-            DriverPanelService.apply(this);
-            HudPresentationService.notifyAutomationChanged(this);
+            notifyRuntimeAfterApply();
             if (showSuccess) {
                 Toast.makeText(this, "Сценарии сохранены", Toast.LENGTH_SHORT).show();
             }
@@ -597,6 +588,15 @@ public final class ScenarioSettingsActivity extends dezz.status.widget.settings.
                     Toast.LENGTH_LONG).show();
             return false;
         }
+    }
+
+    private void notifyRuntimeAfterApply() {
+        android.content.Context app=getApplicationContext();
+        dezz.status.widget.settings.SettingsEditSession.afterApply(this,"scenario-runtime",()->{
+            WidgetService running=WidgetService.getInstance();
+            if(running!=null)running.applyPreferences();else WidgetServiceStarter.startIfNeeded(app);
+            DriverPanelService.apply(app);HudPresentationService.notifyAutomationChanged(app);
+        });
     }
 
     private void ensureUniqueId(String id, int editedIndex) {

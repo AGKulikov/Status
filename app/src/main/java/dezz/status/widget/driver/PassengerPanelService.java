@@ -46,14 +46,16 @@ public final class PassengerPanelService extends Service implements DisplayManag
         ContextCompat.startForegroundService(context, new Intent(context, PassengerPanelService.class)
                 .setAction(ACTION_FAVORITES).putExtra(EXTRA_PANEL, panelId));
     }
-    public static void triggerStockClimate(Context context) {
+    public static boolean triggerStockClimate(Context context) {
         Intent intent = context.getPackageManager().getLaunchIntentForPackage(
                 dezz.status.widget.climate.StockHvacPopupClient.SERVICE_PACKAGE);
         try {
             if (intent == null) throw new IllegalStateException("No passenger climate Activity");
             PanelDisplayLauncher.start(context.getApplicationContext(), intent, PassengerPanelPlacement.DISPLAY_ID);
+            return true;
         } catch (RuntimeException error) {
             dezz.status.widget.launcher.PassengerHomeLauncher.reportFailure(context, error);
+            return false;
         }
     }
     @Override public void onCreate() {

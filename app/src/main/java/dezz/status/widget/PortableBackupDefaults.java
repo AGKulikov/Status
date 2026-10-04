@@ -14,13 +14,16 @@ public final class PortableBackupDefaults {
         SharedPreferences empty=(SharedPreferences)Proxy.newProxyInstance(SharedPreferences.class.getClassLoader(),
                 new Class<?>[]{SharedPreferences.class},(proxy,method,args)->{
                     String name=method.getName();
+                    if(name.equals("hashCode"))return System.identityHashCode(proxy);
+                    if(name.equals("equals"))return proxy==args[0];
+                    if(name.equals("toString"))return "Isolated declared preference defaults";
                     if(name.equals("getAll"))return Collections.emptyMap();
                     if(name.equals("contains"))return false;
                     if(name.startsWith("get")&&args!=null&&args.length==2)return args[1];
                     if(name.equals("edit"))throw new IllegalStateException("Default inspection attempted a write");
                     return null;
                 });
-        Context isolated=new ContextWrapper(source) {
+        Context isolated=new dezz.status.widget.backup.BackupPreferences.ReadOnlyDefaultsContext(source) {
             @Override public Context getApplicationContext(){return this;}
             @Override public Context createDeviceProtectedStorageContext(){return this;}
             @Override public SharedPreferences getSharedPreferences(String name,int mode){return empty;}

@@ -12,6 +12,9 @@ import dezz.status.widget.diagnostics.DiagnosticJournal;
 /** Coalesced runtime writes. commit runs off MAIN/input and creates no apply() finisher. */
 public final class RuntimePreferenceWriter {
     private static final Map<SharedPreferences, Map<String, Object>> pending = new IdentityHashMap<>();
+    private static final Map<SharedPreferences, Map<String, Object>> afterFreeze = new IdentityHashMap<>();
+    private static final Object flushing=new Object();
+    private static boolean frozen;
     private static final Handler writer;
     static {
         HandlerThread thread = new HandlerThread("natro-runtime-preferences");
@@ -25,6 +28,7 @@ public final class RuntimePreferenceWriter {
     }
     public static void put(SharedPreferences preferences, Map<String, ?> changes) {
         synchronized (pending) {
+            if(frozen){afterFreeze.computeIfAbsent(preferences,ignored->new HashMap<>()).putAll(changes);return;}
             Map<String, Object> queued = pending.get(preferences);
             if (queued == null) {
                 queued = new HashMap<>(); pending.put(preferences, queued);
@@ -34,9 +38,31 @@ public final class RuntimePreferenceWriter {
         }
     }
     private static void flush(SharedPreferences preferences, int attempt) {
+        synchronized(flushing){synchronized(pending){if(frozen)return;}flushNow(preferences,attempt,false);}
+    }
+    /** Drain accepted input changes before the general preference barrier; later input is fenced. */
+    public static AutoCloseable freezeForBackup()throws java.io.IOException{
+        synchronized(flushing){
+            synchronized(pending){frozen=true;}
+            try{
+                for(SharedPreferences store:new java.util.ArrayList<>(pending.keySet()))
+                    if(!flushNow(store,0,true))throw new java.io.IOException("Runtime settings flush failed");
+            }catch(java.io.IOException failure){resume();throw failure;}
+        }
+        return RuntimePreferenceWriter::resume;
+    }
+    private static void resume(){
+        synchronized(pending){
+            frozen=false;
+            afterFreeze.forEach((store,changes)->pending.computeIfAbsent(store,ignored->new HashMap<>()).putAll(changes));
+            afterFreeze.clear();
+            for(SharedPreferences store:pending.keySet())writer.postDelayed(()->flush(store,0),200);
+        }
+    }
+    private static boolean flushNow(SharedPreferences preferences, int attempt,boolean maintenance) {
         Map<String, Object> changes;
         synchronized (pending) { changes = pending.remove(preferences); }
-        if (changes == null) return;
+        if (changes == null) return true;
         SharedPreferences.Editor editor = preferences.edit();
         for (Map.Entry<String, Object> e : changes.entrySet()) {
             Object v = e.getValue();
@@ -53,15 +79,16 @@ public final class RuntimePreferenceWriter {
         long duration = android.os.SystemClock.uptimeMillis() - start;
         if (!saved || duration >= 250) DiagnosticJournal.infoAsync("runtime-preferences",
                 "commit success=" + saved + ", duration_ms=" + duration + ", keys=" + changes.keySet());
-        if (!saved && attempt < 2) {
+        if (!saved) {
             synchronized (pending) {
                 Map<String, Object> newer = pending.get(preferences);
                 if (newer != null) { changes.putAll(newer); pending.put(preferences, changes); }
                 else {
                     pending.put(preferences, changes);
-                    writer.postDelayed(() -> flush(preferences, attempt + 1), 500);
+                    if(!maintenance&&attempt<2)writer.postDelayed(() -> flush(preferences, attempt + 1), 500);
                 }
             }
         }
+        return saved;
     }
 }

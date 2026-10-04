@@ -24,7 +24,7 @@ public class PinStorage {
 
     public PinStorage(Context context) {
         final Context deviceContext = context.getApplicationContext().createDeviceProtectedStorageContext();
-        this.prefs = deviceContext.getSharedPreferences(context.getPackageName() + "_pin", Context.MODE_PRIVATE);
+        this.prefs = dezz.status.widget.backup.BackupPreferences.open(deviceContext,context.getPackageName() + "_pin", Context.MODE_PRIVATE);
     }
 
     public int validate(String pin) {

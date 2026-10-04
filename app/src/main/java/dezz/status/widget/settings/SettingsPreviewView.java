@@ -24,8 +24,10 @@ public final class SettingsPreviewView extends View {
         if(expandable)setOnClickListener(v->{
             SettingsPreviewView large=new SettingsPreviewView(context,source,false);
             large.setMinimumHeight(Math.max(260,getResources().getDisplayMetrics().heightPixels-180));
-            androidx.appcompat.app.AlertDialog dialog=new androidx.appcompat.app.AlertDialog.Builder(context)
-                    .setTitle("Предпросмотр").setView(large).setPositiveButton("Закрыть",null).create();
+            SettingsWindowOwner owner=SettingsWindowOwner.find(context);
+            if(owner!=null&&owner.windowOwnerDestroyed())return;
+            androidx.appcompat.app.AlertDialog dialog=SettingsWindowOwner.attach(context,new androidx.appcompat.app.AlertDialog.Builder(context)
+                    .setTitle("Предпросмотр").setView(large).setPositiveButton("Закрыть",null).create());
             dialog.show();dialog.getWindow().setLayout(Math.max(320,getResources().getDisplayMetrics().widthPixels-80),-2);
             SettingsAppearance.apply(context,dialog.getWindow().getDecorView());
         });

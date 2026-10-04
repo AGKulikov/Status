@@ -32,7 +32,7 @@ public final class Ha1131RegressionContractTest {
         assertFalse(proxy.contains("compensateTextScale"));
         assertFalse(proxy.contains("card.setCardBackgroundColor(Color.TRANSPARENT)"));
 
-        String activity = source("LauncherActivity.java");
+        String activity = source("LauncherHomeSurface.java");
         assertTrue(activity.contains("proxy.refreshFromSource()"));
         assertFalse(between(activity, "private void refreshGlobalElementVisibility()",
                 "private void applyStoredGlobalGeometry()")
@@ -41,7 +41,7 @@ public final class Ha1131RegressionContractTest {
 
     @Test public void allAppsRemainsOpaqueAndAttachedDuringStandardConfirmation()
             throws Exception {
-        String launcher = source("LauncherActivity.java");
+        String launcher = source("LauncherHomeSurface.java");
         String driver = source("driver/DriverPanelOverlayController.java");
         String uninstall = source("launcher/AppUninstallProxyActivity.java");
         assertTrue(launcher.contains("root.setBackgroundColor(Color.rgb(10, 13, 18))"));

@@ -8,7 +8,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import dezz.status.widget.launcher.PassengerHomeLauncher;
 
 /** Carries the HOME profile through the existing contextual editors and their return paths. */
-public abstract class LauncherProfileActivity extends AppCompatActivity {
+public abstract class LauncherProfileActivity extends AppCompatActivity implements dezz.status.widget.launcher.LauncherProfile {
     public static final String EXTRA_PASSENGER_PROFILE = "dezz.status.widget.extra.PASSENGER_HOME";
 
     public boolean isPassengerLauncherProfile() {
@@ -19,27 +19,14 @@ public abstract class LauncherProfileActivity extends AppCompatActivity {
         return Preferences.forLauncher(this, isPassengerLauncherProfile(), migrate);
     }
 
-    private Intent passengerIntent(Intent source) {
-        Intent intent = new Intent(source);
-        ComponentName component = intent.getComponent();
-        if (component != null && getPackageName().equals(component.getPackageName())) {
-            String name = component.getClassName();
-            if (name.equals(LauncherActivity.class.getName())) {
-                intent.setClass(this, PassengerLauncherActivity.class);
-            } else if (name.equals(LauncherSettingsActivity.class.getName())) {
-                intent.setClass(this, PassengerLauncherSettingsActivity.class);
-            }
-            intent.putExtra(EXTRA_PASSENGER_PROFILE, true);
-        }
-        return intent;
-    }
-
     @Override public void startActivity(Intent intent) { startActivity(intent, null); }
 
     @Override public void startActivity(Intent intent, Bundle options) {
         if (!isPassengerLauncherProfile()) { super.startActivity(intent, options); return; }
+        if(PassengerHomeLauncher.isHomeIntent(intent)){PassengerHomeLauncher.open(this,intent);return;}
         try {
-            super.startActivity(passengerIntent(intent), PassengerHomeLauncher.options(this, options));
+            super.startActivity(PassengerHomeLauncher.profileIntent(this,intent), PassengerHomeLauncher.targetOptions(
+                    this, options, PassengerHomeLauncher.targetDisplay(this,intent)));
         } catch (RuntimeException error) { PassengerHomeLauncher.reportFailure(this, error); }
     }
 
@@ -47,9 +34,10 @@ public abstract class LauncherProfileActivity extends AppCompatActivity {
         if (!isPassengerLauncherProfile()) {
             super.startActivityForResult(intent, requestCode, options); return;
         }
+        if(PassengerHomeLauncher.isHomeIntent(intent)){PassengerHomeLauncher.open(this,intent);return;}
         try {
-            super.startActivityForResult(passengerIntent(intent), requestCode,
-                    PassengerHomeLauncher.options(this, options));
+            super.startActivityForResult(PassengerHomeLauncher.profileIntent(this,intent), requestCode,
+                    PassengerHomeLauncher.targetOptions(this,options,PassengerHomeLauncher.targetDisplay(this,intent)));
         } catch (RuntimeException error) { PassengerHomeLauncher.reportFailure(this, error); }
     }
 }

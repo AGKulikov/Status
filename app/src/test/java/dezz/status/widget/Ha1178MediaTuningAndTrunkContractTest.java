@@ -49,7 +49,7 @@ public final class Ha1178MediaTuningAndTrunkContractTest {
     @Test public void trunkUsesExactVendorProtocolConfirmationAndLiveIcons() throws Exception {
         String geely = project("app/src/geely/java/dezz/status/widget/car/GeelyCarIntegration.java");
         String safety = source("car/TrunkControlSafety.java");
-        String launcher = source("LauncherActivity.java");
+        String launcher = source("LauncherHomeSurface.java");
         String driver = source("driver/DriverPanelActionExecutor.java");
 
         assertTrue(geely.contains("TRUNK_FUNCTION_ID = 0x21020100"));

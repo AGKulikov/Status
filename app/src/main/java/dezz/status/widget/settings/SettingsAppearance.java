@@ -20,7 +20,7 @@ public final class SettingsAppearance {
     private static final Map<View,Boolean> styled=Collections.synchronizedMap(new WeakHashMap<>());
     private static final Set<View> attached=Collections.newSetFromMap(new WeakHashMap<>());
     private SettingsAppearance(){}
-    public static SharedPreferences preferences(Context context){return context.getSharedPreferences(PREFS,Context.MODE_PRIVATE);}
+    public static SharedPreferences preferences(Context context){return dezz.status.widget.backup.BackupPreferences.open(context,PREFS,Context.MODE_PRIVATE);}
     public static void configure(AppCompatActivity activity) {
         int mode=preferences(activity).getInt("theme",AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM);
         if(mode!=-1&&mode!=1&&mode!=2)mode=-1;

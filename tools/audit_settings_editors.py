@@ -8,11 +8,12 @@ import argparse
 import hashlib
 import json
 import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 JAVA = ROOT / 'app/src/main/java/dezz/status/widget'
-EXTRA = {'MainActivity.java', 'LauncherActivity.java', 'BrickListAdapter.java', 'ViewBinder.java',
+EXTRA = {'MainActivity.java', 'LauncherHomeSurface.java', 'BrickListAdapter.java', 'ViewBinder.java',
          'ShortcutActionPicker.java', 'SmartHomeShortcutPicker.java', 'InformationSourcePicker.java',
          'AppleColorPickerDialog.java', 'VectorIconPickerDialog.java', 'PhoneAppIconsActivity.java'}
 METHOD = re.compile(r'^\s*(?:@[^\n]+\s+)?(?:public|private|protected)\s+(?:(?:static|final|synchronized)\s+)*'
@@ -28,7 +29,7 @@ def destination(label):
     # These rules generate a reviewable, exact-label map. Android never infers by keywords.
     text = label.lower().replace('ё', 'е')
     if re.search(r'json|токен|парол|порт\b|адрес сервера|url|id подключения|id цели|id телеметрии|entity|topic|characteristic|отлад|диагност|сброс|экспорт|импорт|расширенн|дополнительн|техническ', text): return 'ADVANCED'
-    if re.search(r'цвет|шрифт|фон|непрозрач|прозрач|скругл|контур|тень|оформлен|жирн|курсив|насыщен|палитр|градиент|оттенок|яркость|стиль|обводк', text): return 'APPEARANCE'
+    if re.search(r'цвет|шрифт|\bфон|непрозрач|прозрач|скругл|контур|тень|оформлен|жирн|курсив|насыщен|палитр|градиент|оттенок|яркость|стиль|обводк', text): return 'APPEARANCE'
     if re.search(r'положен|ширин|высот|отступ|размер|масштаб|координат|сетка|сетке|ячей|ячеек|колонк|столб|слева|справа|сверху|снизу|выравнив|интервал|поворот|геометр|компоновк', text): return 'POSITION'
     if re.search(r'действ|нажат|автозап|после загрузки|тайм|задерж|поведен|скрыва|жест|при касании|отклик|анимац|порог|ожидание|повтор|длительн|услови|событи|предикат|триггер', text): return 'BEHAVIOR'
     if re.search(r'элемент|добав|удал|состав|порядок|иконк|значок|показыва|видимость|плитк|содержимое|каталог|список|источник|строка [123]|обложк', text): return 'CONTENT'
@@ -37,10 +38,21 @@ def destination(label):
 def build():
     fields = {}
     inventory = []
+    resources = {}
+    for xml in sorted((ROOT/'app/src/main/res').glob('values*/strings.xml')):
+        for node in ET.parse(xml).getroot().findall('string'):
+            text=''.join(node.itertext()).replace('\\n','\n').strip()
+            resources.setdefault(node.attrib['name'],{})[xml.parent.name]=text
     for path in sources():
         source = path.read_text()
         package = re.search(r'package\s+([\w.]+);', source).group(1)
         labels = set()
+        for name in set(re.findall(r'R\.string\.(\w+)',source)):
+            translations=resources.get(name,{})
+            section=destination(translations.get('values-ru',translations.get('values','')))
+            for text in translations.values():
+                if 3<=len(text)<=140 and '\n' not in text:
+                    labels.add(text);fields[text]=section
         for match in STRING.finditer(source):
             try: text = json.loads('"' + match[1] + '"').strip()
             except ValueError: continue

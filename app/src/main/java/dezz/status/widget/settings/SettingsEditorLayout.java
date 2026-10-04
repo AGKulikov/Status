@@ -27,6 +27,8 @@ public final class SettingsEditorLayout extends LinearLayout {
     private final Map<SettingsSection, Integer> positions = new EnumMap<>(SettingsSection.class);
     private SettingsSection selected = SettingsSection.MAIN;
     private boolean organizing;
+    /** Explicit form boundaries work in every locale and keep related dependent controls together. */
+    public static <T extends View>T section(T heading,SettingsSection section){heading.setTag(R.id.settings_editor_section,section);return heading;}
 
     private static final class FieldGroup extends LinearLayout {
         final SettingsSection section;
@@ -138,14 +140,17 @@ public final class SettingsEditorLayout extends LinearLayout {
         }
         form.removeAllViews(); groups.clear();
         SettingsSection section = SettingsSection.MAIN;
+        SettingsSection explicitSection=null;
         FieldGroup last = null;
         for (View control : controls) {
+            Object explicit=control.getTag(R.id.settings_editor_section);
+            if(explicit instanceof SettingsSection)explicitSection=(SettingsSection)explicit;
             String label = label(control);
             boolean unlabelledInput = label.isEmpty() && (control instanceof EditText
                     || control instanceof Spinner || control instanceof SeekBar
                     || CONTROL_ROW_TAG.equals(control.getTag()));
             if (!unlabelledInput || last == null) {
-                section = SettingsEditorCatalog.section(getContext(), label, section);
+                section = explicitSection==null?SettingsEditorCatalog.section(getContext(), label, section):explicitSection;
                 last = new FieldGroup(getContext(), section);
                 last.setPadding(dp(14), dp(8), dp(14), dp(8));
                 GradientDrawable background = new GradientDrawable();
@@ -216,7 +221,7 @@ public final class SettingsEditorLayout extends LinearLayout {
     private static boolean hasBackControl(View view) {
         if (view instanceof Button) {
             String text = ((Button)view).getText().toString();
-            return text.equals("‹") || text.startsWith("←") || text.equals("Назад");
+            return text.equals("‹") || text.startsWith("‹ ") || text.startsWith("←") || text.equals("Назад");
         }
         if (view instanceof ViewGroup) for (int i=0;i<((ViewGroup)view).getChildCount();i++)
             if (hasBackControl(((ViewGroup)view).getChildAt(i))) return true;

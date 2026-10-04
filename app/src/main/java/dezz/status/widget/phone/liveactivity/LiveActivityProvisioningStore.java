@@ -99,7 +99,7 @@ public final class LiveActivityProvisioningStore {
     private final SharedPreferences prefs;
 
     public LiveActivityProvisioningStore(@NonNull Context context) {
-        prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        prefs = dezz.status.widget.backup.BackupPreferences.open(context,PREFS, Context.MODE_PRIVATE);
     }
 
     public synchronized boolean accept(@NonNull LiveActivityPushProtocolV1.Message message) {

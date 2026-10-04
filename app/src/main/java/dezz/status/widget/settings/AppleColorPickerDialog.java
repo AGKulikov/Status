@@ -124,10 +124,12 @@ public final class AppleColorPickerDialog {
         }
     }
 
-    public static void show(@NonNull Activity activity, @NonNull String title,
+    public static void show(@NonNull Context activity, @NonNull String title,
                             @Nullable String current, @NonNull Options options,
                             @NonNull Listener listener) {
-        if (activity.isFinishing() || activity.isDestroyed()) return;
+        if (activity instanceof Activity && (((Activity)activity).isFinishing() || ((Activity)activity).isDestroyed())) return;
+        SettingsWindowOwner owner=SettingsWindowOwner.find(activity);
+        if(owner!=null&&owner.windowOwnerDestroyed())return;
         new Controller(activity, title, current, options, listener).show();
     }
 
@@ -153,7 +155,7 @@ public final class AppleColorPickerDialog {
     }
 
     private static final class Controller {
-        private final Activity activity;
+        private final Context activity;
         private final String title;
         @Nullable private final String original;
         private final Options options;
@@ -177,7 +179,7 @@ public final class AppleColorPickerDialog {
         private SeekBar opacity;
         private AlertDialog dialog;
 
-        Controller(@NonNull Activity activity, @NonNull String title, @Nullable String current,
+        Controller(@NonNull Context activity, @NonNull String title, @Nullable String current,
                    @NonNull Options options, @NonNull Listener listener) {
             this.activity = activity;
             this.title = title;

@@ -77,7 +77,7 @@ public final class Ha1217HwgpsMediaDriverContractTest {
         String contract = source("dezz/status/widget/automation/AutomationContract.java");
         String scenarios = source("dezz/status/widget/integration/LocalScenarioController.java");
         String service = source("dezz/status/widget/WidgetService.java");
-        String launcher = source("dezz/status/widget/LauncherActivity.java");
+        String launcher = source("dezz/status/widget/LauncherHomeSurface.java");
         assertTrue(contract.contains("SCOPE_LAUNCHER = \"launcher\""));
         assertTrue(scenarios.contains("case LAUNCHER: stateScope = "
                 + "AutomationContract.SCOPE_LAUNCHER"));

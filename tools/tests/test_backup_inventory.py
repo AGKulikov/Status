@@ -8,6 +8,13 @@ audit = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(audit)
 
 class BackupInventoryTest(unittest.TestCase):
+    def test_new_registered_store_is_discovered_and_raw_framework_bypass_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);path=root/'app/src/geely/java/NewStore.java';path.parent.mkdir(parents=True)
+            path.write_text('class Store { Object p=BackupPreferences.open(context,"future",0); }')
+            self.assertEqual([],audit.uncoordinated_preferences(root));self.assertIn('preferences',audit.discover(root)[path.relative_to(root).as_posix()]['access_kinds'])
+            path.write_text('class Store { Object p=context.getSharedPreferences("future",0); }')
+            self.assertIn('barrier bypass',audit.uncoordinated_preferences(root)[0])
     def test_new_store_in_new_module_is_not_silently_accepted(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

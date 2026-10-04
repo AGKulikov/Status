@@ -709,8 +709,7 @@ public final class MediaAutoResumeController {
 
     @NonNull
     private static SharedPreferences state(@NonNull Context context) {
-        return context.createDeviceProtectedStorageContext()
-                .getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        return dezz.status.widget.backup.BackupPreferences.open(context.createDeviceProtectedStorageContext(),PREFS, Context.MODE_PRIVATE);
     }
 
     @NonNull

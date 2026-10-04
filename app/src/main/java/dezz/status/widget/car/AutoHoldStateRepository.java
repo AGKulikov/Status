@@ -106,6 +106,6 @@ public final class AutoHoldStateRepository {
     @NonNull
     private static SharedPreferences preferences(@NonNull Context context) {
         Context storage = context.createDeviceProtectedStorageContext();
-        return storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        return dezz.status.widget.backup.BackupPreferences.open(storage,PREFS, Context.MODE_PRIVATE);
     }
 }

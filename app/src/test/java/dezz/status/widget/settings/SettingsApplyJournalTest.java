@@ -16,6 +16,46 @@ import static org.junit.Assert.*;
 @Config(sdk=28,application=Application.class)
 public class SettingsApplyJournalTest {
     private static final class ProcessStopped extends Error {}
+    @Test public void encryptedResourceAndMetadataRecoverTogetherAtEveryBoundary()throws Exception {
+        Context context=RuntimeEnvironment.getApplication();
+        SharedPreferences prefs=context.getSharedPreferences("resource-metadata",0);
+        SettingsApplyJournal.register(prefs,"resource-metadata",false);
+        String path="ce_no_backup/credential-fixture.bin";
+        for(boolean deleting:new boolean[]{false,true})for(String stop:new String[]{"prepared","file:0","store:0","applied"}){
+            byte[] before={1,2,3},after=deleting?null:new byte[]{4,5,6};
+            dezz.status.widget.backup.BackupFiles.atomicWrite(SettingsFileChange.resolve(context,path),before);
+            prefs.edit().clear().putString("keyId","old").commit();
+            Map<String,Object> metadata=new LinkedHashMap<>();metadata.put("keyId",deleting?null:"new");
+            try{SettingsApplyJournal.commit(context,Collections.singletonMap(prefs,metadata),
+                    Collections.singletonMap(path,SettingsFileChange.capture(context,path,after)),stage->{if(stage.equals(stop))throw new ProcessStopped();});fail(stop);}
+            catch(ProcessStopped expected){}
+            SettingsApplyJournal.recover(context);SettingsApplyJournal.recover(context);
+            boolean applied=stop.equals("applied");
+            assertArrayEquals(stop,applied?after:before,SettingsFileChange.read(context,path));
+            assertEquals(stop,applied?(deleting?null:"new"):"old",prefs.getString("keyId",null));
+        }
+    }
+    @Test public void resourceConflictOrInvalidPathCannotMutateAnyParticipant()throws Exception {
+        Context context=RuntimeEnvironment.getApplication();String path="ce_files/resource-fixture.bin";
+        SettingsFileChange change=SettingsFileChange.capture(context,path,new byte[]{2});
+        dezz.status.widget.backup.BackupFiles.atomicWrite(SettingsFileChange.resolve(context,path),new byte[]{3});
+        SharedPreferences prefs=context.getSharedPreferences("resource-conflict",0);
+        SettingsApplyJournal.register(prefs,"resource-conflict",false);prefs.edit().putInt("v",1).commit();
+        assertFalse(SettingsApplyJournal.commit(context,Collections.singletonMap(prefs,Collections.singletonMap("v",2)),Collections.singletonMap(path,change)));
+        assertEquals(1,prefs.getInt("v",0));assertArrayEquals(new byte[]{3},SettingsFileChange.read(context,path));
+        for(String invalid:new String[]{"ce_files/../escape","de_no_backup/natro-backup/settings-apply-v1.json","ce_prefs/metadata.xml"}){
+            try{SettingsFileChange.capture(context,invalid,new byte[]{1});fail(invalid);}catch(java.io.IOException expected){}
+        }
+        assertFalse(SettingsApplyJournal.commit(context,Collections.emptyMap(),Collections.singletonMap("wrong-key",SettingsFileChange.capture(context,path,new byte[]{9}))));
+        assertArrayEquals(new byte[]{3},SettingsFileChange.read(context,path));
+    }
+    @Test public void resourceWriteFailureRollsBackBeforeReturning()throws Exception {
+        Context context=RuntimeEnvironment.getApplication();String path="ce_files/ordinary-failure.bin";
+        try{SettingsApplyJournal.commit(context,Collections.emptyMap(),Collections.singletonMap(path,SettingsFileChange.capture(context,path,new byte[]{8})),
+                stage->{if(stage.equals("file:0"))throw new IllegalStateException("fixture");});fail();}
+        catch(IllegalStateException expected){}
+        assertNull(SettingsFileChange.read(context,path));
+    }
     @Test public void everyDurableBoundaryRecoversOneWholeGeneration()throws Exception {
         for(String stop:new String[]{"prepared","store:0","store:1","applied"}){
             Context context=RuntimeEnvironment.getApplication();Context device=context.createDeviceProtectedStorageContext();

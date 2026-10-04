@@ -64,9 +64,14 @@ public final class BackupMaintenance implements AutoCloseable {
                         try {
                             JSONObject leaseState=new JSONObject(new String(BackupFiles.read(lease,4096),StandardCharsets.UTF_8));
                             if(!leaseState.getString("token").equals(intent.getStringExtra("token")))throw new IOException("Invalid maintenance token");
-                            flushPreferences(receiverContext);
-                            result.setResultCode(android.app.Activity.RESULT_OK);result.finish();
-                            android.os.Process.killProcess(android.os.Process.myPid());
+                            try(AutoCloseable runtime=dezz.status.widget.media.RuntimePreferenceWriter.freezeForBackup()){
+                              dezz.status.widget.RuntimeSnapshotPreferences.flushForBackup();
+                              try(AutoCloseable writes=BackupPreferences.freezeAndFlush()){
+                                flushPreferences(receiverContext);
+                                result.setResultCode(android.app.Activity.RESULT_OK);result.finish();
+                                android.os.Process.killProcess(android.os.Process.myPid());
+                              }
+                            }
                         } catch(Exception error) {result.setResultCode(android.app.Activity.RESULT_CANCELED);result.finish();}
                     },"backup-flush").start();
                 }
@@ -129,12 +134,13 @@ public final class BackupMaintenance implements AutoCloseable {
     }
 
     private static void flushPreferences(Context context)throws IOException {
-        dezz.status.widget.RuntimeSnapshotPreferences.flushForBackup();
         for(Context storage:new Context[]{context.getApplicationContext(),context.createDeviceProtectedStorageContext()}) {
             File directory=new File(storage.getDataDir(),"shared_prefs");File[] files=directory.listFiles();
             if(files==null){if(directory.exists())throw new IOException("Cannot read preferences");continue;}
-            for(File file:files)if(file.getName().endsWith(".xml")) {
-                String name=file.getName().substring(0,file.getName().length()-4);
+            Set<String> names=new HashSet<>();
+            for(File file:files){String name=file.getName();if(name.endsWith(".xml.bak"))name=name.substring(0,name.length()-4);
+                if(name.endsWith(".xml"))names.add(name.substring(0,name.length()-4));}
+            for(String name:names) {
                 // commit waits for earlier apply writes of this actual framework store.
                 if(!storage.getSharedPreferences(name,Context.MODE_PRIVATE).edit().commit())
                     throw new IOException("Preference flush failed");
@@ -143,8 +149,22 @@ public final class BackupMaintenance implements AutoCloseable {
     }
 
     public static void markRestored(Context context)throws IOException {
+        File reviewed=new File(control(context),"reviewed-system-operations");BackupFiles.removeTree(reviewed);
+        BackupFiles.atomicWrite(new File(control(context),"restored-system-operations"),new byte[]{1});
         BackupFiles.atomicWrite(new File(control(context),"restored-session"),new byte[]{1});
         restoredSession=true;
+    }
+    /** Archived route flags are desired settings, not permission to replay a native patch. */
+    public static boolean systemOperationNeedsReview(Context context,String operation){
+        if(!operation.matches("[A-Z_]{1,40}"))throw new IllegalArgumentException("Unknown system operation");
+        File root=control(context);
+        return new File(root,"restored-system-operations").isFile()
+                &&!new File(root,"reviewed-system-operations/"+operation).isFile();
+    }
+    public static void systemOperationVerified(Context context,String operation){
+        if(!systemOperationNeedsReview(context,operation))return;
+        try{BackupFiles.atomicWrite(new File(control(context),"reviewed-system-operations/"+operation),new byte[]{1});}
+        catch(IOException unavailable){android.util.Log.e("BackupMaintenance","System operation needs review again on next start",unavailable);}
     }
     public static void acknowledgePlayback(Context context)throws IOException {
         BackupFiles.delete(new File(control(context),"restored-session"));restoredSession=false;

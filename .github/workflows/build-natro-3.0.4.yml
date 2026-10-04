@@ -1,23 +1,23 @@
-name: Build Natro 3.0.3 update candidate
+name: Build Natro 3.0.4 update candidate
 on:
   push:
     branches: ['feature/natro-settings-complete-20261004']
-    paths: ['app/**', 'navigator-mod/**', 'tools/**', 'wechat-compat/**', 'settings.gradle', 'build.gradle', '.github/workflows/build-natro-3.0.3.yml']
+    paths: ['app/**', 'navigator-mod/**', 'tools/**', 'wechat-compat/**', 'settings.gradle', 'build.gradle', '.github/workflows/build-natro-3.0.4.yml']
 permissions:
   contents: read
 concurrency:
-  group: build-natro-303-${{ github.ref }}
+  group: build-natro-304-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   candidate:
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     env:
-      VERSION_NAME: '3.0.3'
-      VERSION_CODE: '208021336'
+      VERSION_NAME: '3.0.4'
+      VERSION_CODE: '208021337'
       ALLOW_UNSIGNED_RELEASE: 'true'
       REUSE_NAVIGATOR_302: 'true'
-      HELPER_CHANGED: 'true'
+      HELPER_CHANGED: 'false'
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
@@ -51,17 +51,17 @@ jobs:
       - name: Upload verified unsigned candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Natro-3.0.3-offline-signing-${{ github.run_number }}
+          name: Natro-3.0.4-offline-signing-${{ github.run_number }}
           path: |
-            ${{ runner.temp }}/natro-3.0.3-candidate/*
-            !${{ runner.temp }}/natro-3.0.3-candidate/tools/**
+            ${{ runner.temp }}/natro-3.0.4-candidate/*
+            !${{ runner.temp }}/natro-3.0.4-candidate/tools/**
           if-no-files-found: error
           retention-days: 7
       - name: Upload signing tools separately
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Natro-3.0.3-signing-tools-${{ github.run_number }}
-          path: ${{ runner.temp }}/natro-3.0.3-candidate/tools/*
+          name: Natro-3.0.4-signing-tools-${{ github.run_number }}
+          path: ${{ runner.temp }}/natro-3.0.4-candidate/tools/*
           if-no-files-found: error
           retention-days: 7
       - name: Upload candidate and reports

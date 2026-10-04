@@ -28,8 +28,11 @@ public final class HudLcaPatchActivity extends SettingsActivity {
         if(session.busy())return;
         if(mode!=null&&!moduleVerified){status.setText("Совместимость модуля не подтверждена. Доступна только проверка.");return;}
         moduleVerified=false;submit(mode==null?"Проверка модуля":"Применение "+mode.label,s->{
-        s.connect();if(mode!=null)s.daemonRoot(true);
+        s.connect();dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("hud-lca","stage=connected operation="+(mode==null?"inspect":mode.name()));
+        if(mode!=null)s.daemonRoot(true);
         AdbShellResult.Result result=s.command(mode==null?HudLcaPatch.inspect():HudLcaPatch.install(mode));
+        dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("hud-lca","stage=shell_result operation="+(mode==null?"inspect":mode.name())
+                +", exit="+result.exitCode+", truncated="+result.truncated+", inspected_mode="+HudLcaPatch.inspectedMode(result.output));
         if(!result.success()||result.truncated)throw new IOException(result.describe());
         if(mode==null&&HudLcaPatch.inspectedMode(result.output)==null)throw new IOException("Нет подтверждения полной проверки модуля\n"+result.describe());
         if(mode!=null&&!result.output.contains("NATRO_HUD_PATCH_VERIFIED_"+mode.name()))throw new IOException("Нет подтверждения финального чтения");
@@ -48,11 +51,15 @@ public final class HudLcaPatchActivity extends SettingsActivity {
     private void submit(String name,AdbConsoleSession.Operation operation,String completed){
         if(session.busy()){Toast.makeText(this,"Дождитесь завершения текущей операции",Toast.LENGTH_SHORT).show();return;}
         CharSequence previous=status.getText();status.setText(name+"…\nОперация выполняется один раз; ожидание — до 60 секунд.");setOperationBusy(true);
-        boolean accepted=session.submit(operation,error->runOnUiThread(()->{
+        dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("hud-lca","stage=submitted operation="+name);
+        boolean accepted=session.submit(operation,error->{
+            dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("hud-lca","stage=completed operation="+name
+                    +", result="+(error==null?"success":"failed")+", reason="+(error==null?"none":error.getClass().getSimpleName()));
+            runOnUiThread(()->{
             if(isDestroyed()||isFinishing())return;
             if(error!=null){moduleVerified=false;status.setText(failureMessage(name,error));}else if(completed!=null)status.setText(completed);
             setOperationBusy(false);
-        }));
+        });});
         if(!accepted){setOperationBusy(false);status.setText(previous);Toast.makeText(this,"Операция не запущена: сеанс занят или закрыт",Toast.LENGTH_LONG).show();}
     }
     @Override protected void onDestroy(){if(session!=null)session.close();super.onDestroy();}

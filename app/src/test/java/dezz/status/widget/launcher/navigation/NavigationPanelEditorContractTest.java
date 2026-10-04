@@ -19,7 +19,7 @@ import java.nio.file.Paths;
 public final class NavigationPanelEditorContractTest {
     @Test public void launcherUsesActualNavigationRectangleAndGenericOverlay()
             throws IOException {
-        String launcher = source("dezz/status/widget/LauncherActivity.java");
+        String launcher = source("dezz/status/widget/LauncherHomeSurface.java");
         assertTrue(launcher.contains("new PanelGridLayout(this)"));
         assertTrue(launcher.contains("new PanelContentEditOverlay(this)"));
         assertTrue(launcher.contains("EXTRA_EDIT_NAVIGATION_CONTENT"));
@@ -31,7 +31,7 @@ public final class NavigationPanelEditorContractTest {
 
     @Test public void maneuverAndLaneBitmapsAreRenderedAndClearedSeparately()
             throws IOException {
-        String launcher = source("dezz/status/widget/LauncherActivity.java");
+        String launcher = source("dezz/status/widget/LauncherHomeSurface.java");
         assertTrue(launcher.contains("showNavigationImage(navigationManeuverImage"));
         assertTrue(launcher.contains("showNavigationImage(navigationLanesImage"));
         assertTrue(launcher.contains("hideNavigationImage(navigationManeuverImage)"));
@@ -40,7 +40,7 @@ public final class NavigationPanelEditorContractTest {
     }
 
     @Test public void liveModulesRequireTheirOwnCurrentPayload() throws IOException {
-        String launcher = source("dezz/status/widget/LauncherActivity.java");
+        String launcher = source("dezz/status/widget/LauncherHomeSurface.java");
         assertTrue(launcher.contains("hasVisibleNavigationData(state)"));
         assertTrue(launcher.contains("hasTrafficLightData(state)"));
         assertTrue(launcher.contains("validTrafficSignal"));
@@ -52,7 +52,7 @@ public final class NavigationPanelEditorContractTest {
     }
 
     @Test public void directBridgeOutranksLegacyAndExpiresWithoutPolling() throws IOException {
-        String launcher = source("dezz/status/widget/LauncherActivity.java");
+        String launcher = source("dezz/status/widget/LauncherHomeSurface.java");
         String endpoint = source("dezz/status/widget/navigation/"
                 + "NavigationHudEndpointService.java");
         assertTrue(launcher.contains("NavigationBridgeStateStore.snapshot()"));
@@ -65,7 +65,7 @@ public final class NavigationPanelEditorContractTest {
     }
 
     @Test public void bothHomeEditorsShareAllLiveSafeEdges() throws IOException {
-        String launcher = source("dezz/status/widget/LauncherActivity.java");
+        String launcher = source("dezz/status/widget/LauncherHomeSurface.java");
         assertTrue(launcher.contains("LauncherSafeAreaResolver.resolveInsets"));
         assertTrue(launcher.contains("applySafeMargins(workspace, safe)"));
         assertTrue(launcher.contains("applySafeMargins(editorGrid, safe)"));

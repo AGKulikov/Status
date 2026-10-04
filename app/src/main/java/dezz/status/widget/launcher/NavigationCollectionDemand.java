@@ -44,7 +44,7 @@ public final class NavigationCollectionDemand
         if (app == null) app = context;
         preferences = new Preferences(app);
         Context device = app.createDeviceProtectedStorageContext();
-        storage = device.getSharedPreferences(app.getPackageName() + "_preferences",
+        storage = dezz.status.widget.backup.BackupPreferences.open(device,app.getPackageName() + "_preferences",
                 Context.MODE_PRIVATE);
         needed = compute();
     }

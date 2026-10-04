@@ -75,6 +75,6 @@ public final class MediaPlaybackHistoryStore {
         Context app = context.getApplicationContext();
         if (app == null) app = context;
         Context storage = app.createDeviceProtectedStorageContext();
-        return storage.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        return dezz.status.widget.backup.BackupPreferences.open(storage,PREFS, Context.MODE_PRIVATE);
     }
 }

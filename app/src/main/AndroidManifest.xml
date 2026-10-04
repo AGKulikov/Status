@@ -208,6 +208,7 @@
 
         <activity
             android:name=".PassengerLauncherActivity"
+            android:noHistory="true"
             android:label="Лаунчер пассажира"
             android:excludeFromRecents="true"
             android:exported="false"
@@ -695,5 +696,6 @@
                 <action android:name="plus.monjaro.AUTOHOLD" />
             </intent-filter>
         </receiver>
+        <service android:name=".launcher.PassengerHomeService" android:exported="false" />
     </application>
 </manifest>

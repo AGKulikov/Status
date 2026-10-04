@@ -41,7 +41,7 @@ public class ConnectionStorage {
         // Device-protected storage so we can run the privileged shell pre-unlock if the
         // widget service ever needs it. Matches the other prefs files in this app.
         Context deviceContext = context.getApplicationContext().createDeviceProtectedStorageContext();
-        this.prefs = deviceContext.getSharedPreferences(
+        this.prefs = dezz.status.widget.backup.BackupPreferences.open(deviceContext,
                 context.getPackageName() + "_privileged_shell", Context.MODE_PRIVATE);
     }
 

@@ -21,13 +21,15 @@ final class ButtonRouteRestorer {
         new Thread(() -> {
           try {
             Context storage = app.createDeviceProtectedStorageContext();
-            SharedPreferences media = storage.getSharedPreferences("media_buttons", Context.MODE_PRIVATE);
-            SharedPreferences vehicle = storage.getSharedPreferences("vehicle_buttons", Context.MODE_PRIVATE);
+            SharedPreferences media = dezz.status.widget.backup.BackupPreferences.open(storage,"media_buttons", Context.MODE_PRIVATE);
+            SharedPreferences vehicle = dezz.status.widget.backup.BackupPreferences.open(storage,"vehicle_buttons", Context.MODE_PRIVATE);
             java.util.List<VehicleButton> requested = new java.util.ArrayList<>();
-            if (media.getBoolean("disable_default", false)) requested.add(VehicleButton.MEDIA);
+            if (media.getBoolean("disable_default", false)
+                    &&!dezz.status.widget.backup.BackupMaintenance.systemOperationNeedsReview(app,VehicleButton.MEDIA.name())) requested.add(VehicleButton.MEDIA);
             for (VehicleButton b : VehicleButton.values())
                 if (b != VehicleButton.MEDIA && b != VehicleButton.STAR
-                        && vehicle.getBoolean(b.key + ".disable_default", false)) requested.add(b);
+                        && vehicle.getBoolean(b.key + ".disable_default", false)
+                        &&!dezz.status.widget.backup.BackupMaintenance.systemOperationNeedsReview(app,b.name())) requested.add(b);
             if (requested.isEmpty()) { completed(app, true); return; }
             MediaButtonController m = MediaButtonController.get(app);
             VehicleButtonController v = VehicleButtonController.get(app);

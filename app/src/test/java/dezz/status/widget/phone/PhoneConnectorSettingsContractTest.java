@@ -140,9 +140,11 @@ public final class PhoneConnectorSettingsContractTest {
                 "PhoneNotificationAutomationSettingsActivity.java");
 
         assertTrue(source.contains("SettingsBackNavigation.install(this, screen)"));
-        assertTrue(source.contains("if (service != null) {"));
-        assertTrue(source.contains("service.applyPreferences();"));
-        assertTrue(source.contains("WidgetServiceStarter.startIfNeeded(this);"));
+        assertTrue(source.contains("session.apply(this)"));
+        assertTrue(source.contains("protected void flushSettingsDraft()"));
+        String applyOwner=javaSource("settings/SettingsEditSession.java");
+        assertTrue(applyOwner.contains("service.applyPreferences()"));
+        assertTrue(applyOwner.contains("WidgetServiceStarter.startIfNeeded(activity.getApplicationContext())"));
         assertTrue(source.contains("chooseSprutAccessory()"));
         assertTrue(source.contains("chooseSprutService("));
         assertTrue(source.contains("chooseSprutCharacteristic("));

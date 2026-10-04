@@ -247,7 +247,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
         page.addView(secondary(getString(R.string.phone_connector_subtitle), 15),
                 topMargin(5));
 
-        page.addView(sectionTitle(getString(R.string.phone_section_connection)),
+        page.addView(sectionTitle(getString(R.string.phone_section_connection), dezz.status.widget.settings.SettingsSection.MAIN),
                 topMargin(24));
         LinearLayout connectionRows = column();
         connectorEnabled = new MaterialSwitch(this);
@@ -297,7 +297,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
         page.addView(actionButton(getString(R.string.phone_le_enrollment_forget),
                 this::confirmForgetLeEnrollment), topMargin(8));
 
-        page.addView(sectionTitle("Live Activity · APNs"), topMargin(24));
+        page.addView(sectionTitle("Live Activity · APNs", dezz.status.widget.settings.SettingsSection.ADVANCED), topMargin(24));
         TextView apnsHint = secondary(
                 "Push-to-start отправляет магнитола только пока выбранный iPhone подключён "
                         + "по Bluetooth. Ключ импортируется после установки и не входит в APK.",
@@ -308,7 +308,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
                 startActivity(new Intent(this, LiveActivityApnsSettingsActivity.class))),
                 topMargin(9));
 
-        page.addView(sectionTitle(getString(R.string.phone_section_data)), topMargin(24));
+        page.addView(sectionTitle(getString(R.string.phone_section_data), dezz.status.widget.settings.SettingsSection.CONTENT), topMargin(24));
         LinearLayout dataRows = column();
         notificationsEnabled = new MaterialSwitch(this);
         notificationsEnabled.setChecked(preferences.phoneNotificationsEnabled.get());
@@ -341,7 +341,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
         notificationsEnabled.setOnCheckedChangeListener((button, checked) ->
                 refreshDiagnostics());
 
-        page.addView(sectionTitle(getString(R.string.phone_section_status_bar)),
+        page.addView(sectionTitle(getString(R.string.phone_section_status_bar), dezz.status.widget.settings.SettingsSection.CONTENT),
                 topMargin(24));
         LinearLayout statusBarRows = column();
         LinearLayout statusItemsRow = clickableRow(this::chooseStatusItems);
@@ -365,7 +365,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
                         PhoneNotificationAutomationSettingsActivity.class))), topMargin(10));
         refreshStatusBarSummaries();
 
-        page.addView(sectionTitle(getString(R.string.phone_section_alerts)), topMargin(24));
+        page.addView(sectionTitle(getString(R.string.phone_section_alerts), dezz.status.widget.settings.SettingsSection.BEHAVIOR), topMargin(24));
         LinearLayout alertRows = column();
         lowBatteryAlertEnabled = new MaterialSwitch(this);
         lowBatteryAlertEnabled.setChecked(preferences.phoneLowBatteryAlertEnabled.get());
@@ -397,7 +397,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
         page.addView(lowBatteryHint, topMargin(8));
         refreshAlertSummaries();
 
-        page.addView(sectionTitle(getString(R.string.phone_section_sprut)), topMargin(24));
+        page.addView(sectionTitle(getString(R.string.phone_section_sprut), dezz.status.widget.settings.SettingsSection.BEHAVIOR), topMargin(24));
         LinearLayout sprutRows = column();
         sprutPresenceEnabled = new MaterialSwitch(this);
         sprutPresenceEnabled.setChecked(preferences.phoneSprutPresenceEnabled.get());
@@ -456,7 +456,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
                 this::clearAncsSprutTarget), weighted());
         page.addView(sprutAncsActions, topMargin(10));
 
-        page.addView(sectionTitle(getString(R.string.phone_section_diagnostics)),
+        page.addView(sectionTitle(getString(R.string.phone_section_diagnostics), dezz.status.widget.settings.SettingsSection.ADVANCED),
                 topMargin(24));
         diagnostics = secondary("", 15);
         diagnostics.setPadding(dp(16), dp(13), dp(16), dp(13));
@@ -468,7 +468,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
         page.addView(actionButton(getString(R.string.phone_notification_settings),
                 this::openPhoneNotificationSettings), topMargin(8));
 
-        page.addView(sectionTitle("Журнал подключения к телефону"), topMargin(24));
+        page.addView(sectionTitle("Журнал подключения к телефону", dezz.status.widget.settings.SettingsSection.ADVANCED), topMargin(24));
         connectionJournal = secondary("", 12);
         connectionJournal.setTypeface(Typeface.MONOSPACE);
         connectionJournal.setTextIsSelectable(true);
@@ -1968,6 +1968,16 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
     }
 
     private boolean persistSettings(boolean showConfirmation) {
+        dezz.status.widget.settings.SettingsEditSession session=dezz.status.widget.settings.SettingsEditSession.find(this);
+        if(session==null||!session.apply(this))return false;
+        if(session.isNested()){
+            Toast.makeText(this,"Сначала примените изменения в основном редакторе",Toast.LENGTH_LONG).show();return false;
+        }
+        if(showConfirmation)Toast.makeText(this,R.string.phone_saved,Toast.LENGTH_LONG).show();
+        refreshDiagnostics();return true;
+    }
+    @Override protected void flushSettingsDraft() {
+        if(preferences==null||connectorEnabled==null)return;
         boolean connectorRequested = checked(connectorEnabled,
                 preferences.phoneConnectorEnabled.get());
         boolean notificationsRequested = checked(notificationsEnabled,
@@ -1992,56 +2002,40 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
         }
         if ((notificationsRequested || messagesRequested)
                 && selectedNotificationCategories.isEmpty()) {
-            Toast.makeText(this, R.string.phone_filter_categories_required,
-                    Toast.LENGTH_LONG).show();
-            return false;
+            throw new IllegalArgumentException(getString(R.string.phone_filter_categories_required));
         }
         if ((notificationsRequested || messagesRequested)
                 && notificationAppFilterMode
                 == PhoneNotificationFilter.MODE_ONLY_SELECTED
                 && selectedNotificationApps.isEmpty()) {
-            Toast.makeText(this, R.string.phone_filter_apps_required,
-                    Toast.LENGTH_LONG).show();
-            return false;
+            throw new IllegalArgumentException(getString(R.string.phone_filter_apps_required));
         }
         if (connectorRequested && selectedDeviceAddress.isEmpty()) {
-            Toast.makeText(this, R.string.phone_choose_required,
-                    Toast.LENGTH_LONG).show();
-            return false;
+            throw new IllegalArgumentException(getString(R.string.phone_choose_required));
         }
         if (sprutPresenceRequested) {
             if (selectedSprutPath.isEmpty()) {
-                Toast.makeText(this, R.string.phone_sprut_choose_required,
-                        Toast.LENGTH_LONG).show();
-                return false;
+                throw new IllegalArgumentException(getString(R.string.phone_sprut_choose_required));
             }
             try {
                 SprutPath.parse(selectedSprutPath);
             } catch (IllegalArgumentException invalid) {
-                Toast.makeText(this, R.string.phone_sprut_invalid_saved,
-                        Toast.LENGTH_LONG).show();
-                return false;
+                throw new IllegalArgumentException(getString(R.string.phone_sprut_invalid_saved));
             }
         }
         if (sprutAncsPresenceRequested) {
             if (selectedSprutAncsPath.isEmpty()) {
-                Toast.makeText(this, R.string.phone_sprut_ancs_choose_required,
-                        Toast.LENGTH_LONG).show();
-                return false;
+                throw new IllegalArgumentException(getString(R.string.phone_sprut_ancs_choose_required));
             }
             try {
                 SprutPath.parse(selectedSprutAncsPath);
             } catch (IllegalArgumentException invalid) {
-                Toast.makeText(this, R.string.phone_sprut_invalid_saved,
-                        Toast.LENGTH_LONG).show();
-                return false;
+                throw new IllegalArgumentException(getString(R.string.phone_sprut_invalid_saved));
             }
         }
         if (sprutPresenceRequested && sprutAncsPresenceRequested
                 && selectedSprutPath.equals(selectedSprutAncsPath)) {
-            Toast.makeText(this, R.string.phone_sprut_targets_must_differ,
-                    Toast.LENGTH_LONG).show();
-            return false;
+            throw new IllegalArgumentException(getString(R.string.phone_sprut_targets_must_differ));
         }
 
         int savedLowBatteryThreshold =
@@ -2051,9 +2045,7 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
         if (lowBatteryAlertRequested
                 && !PhoneLowBatteryAlertPolicy.validOrderedThresholds(
                 savedLowBatteryThreshold, savedLowBatteryThreshold2)) {
-            Toast.makeText(this, R.string.phone_low_battery_threshold_order_invalid,
-                    Toast.LENGTH_LONG).show();
-            return false;
+            throw new IllegalArgumentException(getString(R.string.phone_low_battery_threshold_order_invalid));
         }
         boolean resetLowBatteryLatch =
                 preferences.phoneLowBatteryAlertEnabled.get()
@@ -2102,20 +2094,6 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
         preferences.phoneSprutAncsPresenceEnabled.set(sprutAncsPresenceRequested);
         preferences.phoneSprutAncsPresencePath.set(selectedSprutAncsPath);
 
-        WidgetService service = WidgetService.getInstance();
-        if (service != null) {
-            service.applyPreferences();
-        } else {
-            // Enabling the phone connector must also work when every visual surface is disabled.
-            // The shared foreground host is idempotent and safely no-ops when no consumer remains.
-            WidgetServiceStarter.startIfNeeded(this);
-        }
-
-        if (showConfirmation) {
-            Toast.makeText(this, R.string.phone_saved, Toast.LENGTH_LONG).show();
-        }
-        refreshDiagnostics();
-        return true;
     }
 
     @SuppressLint("MissingPermission")
@@ -2215,11 +2193,11 @@ public final class PhoneConnectorSettingsActivity extends dezz.status.widget.set
     }
 
     @NonNull
-    private TextView sectionTitle(@NonNull String value) {
+    private TextView sectionTitle(@NonNull String value, dezz.status.widget.settings.SettingsSection section) {
         TextView view = text(value.toUpperCase(Locale.getDefault()), 13, Typeface.BOLD);
         view.setTextColor(color(R.color.settings_secondary_text));
         view.setPadding(dp(8), 0, dp(8), 0);
-        return view;
+        return dezz.status.widget.settings.SettingsEditorLayout.section(view,section);
     }
 
     @NonNull

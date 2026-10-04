@@ -1,188 +1,216 @@
 {
   "schema_version": 1,
-  "status": "SOURCE_IMPLEMENTATION_ANDROID_AND_DEVICE_GATES_PENDING",
+  "status": "SOURCE_IMPLEMENTED_LOCAL_RUNTIME_TESTED_KX11_GATES_PENDING",
   "baseline_commit": "c4d3ffc121a0a69ba21094abe2987f889926505c",
-  "scope": "Production owners reviewed for the 2026-10-04 continuation toward 3.0.3; see FULL_BACKUP_CONTRACT_RU.md. Runtime archive/recovery certification remains a separate gate.",
+  "scope": "Production storage owners reviewed for 3.0.4 in FULL_BACKUP_CONTRACT_RU.md: write barrier, APNs transaction, defaults migration, external originals and explicit system-operation review. Static fingerprints do not certify runtime/device completeness.",
   "shared_preferences": [
     {
       "name": "{package}_preferences",
       "contents": "Основные настройки, JSON документов, маршруты, сценарии, назначения экранных кнопок, HUD, DIM, шторка, телефон, ADB-флаги. Пассажирская панель, независимое избранное/документы ячеек, каталог приложений и PASSENGER-сценарии.",
-      "restore_policy_to_implement": "Частично: исключены 13 секретных/локальных ключей и 9 ключей SystemUI.",
-      "source": "app/src/main/java/dezz/status/widget/Preferences.java"
+      "source": "app/src/main/java/dezz/status/widget/Preferences.java",
+      "historical_restore_policy_to_implement": "Частично: исключены 13 секретных/локальных ключей и 9 ключей SystemUI.",
+      "restore_policy": "Все ключи; секреты перешифровываются, URI переносятся, документы проверяются. Идентичности/SystemUI ownership другого устройства не активируются. Миграция defaults 3.0.2/3.0.3 объявлена отдельно."
     },
     {
       "name": "instrument_panel",
       "contents": "Включение/автозапуск, активный и пять сохранённых вариантов приборки, карта, OEM-настройки; также временный launch token.",
-      "restore_policy_to_implement": "Нет. Пользовательскую часть включить; временный token не активировать.",
-      "source": "app/src/main/java/dezz/status/widget/instrument/InstrumentPanelStore.java"
+      "source": "app/src/main/java/dezz/status/widget/instrument/InstrumentPanelStore.java",
+      "historical_restore_policy_to_implement": "Нет. Пользовательскую часть включить; временный token не активировать.",
+      "restore_policy": "Все настройки и сохранённые варианты включаются; временные launch tokens удаляются из активного импорта."
     },
     {
       "name": "media_buttons",
       "contents": "Включение MEDIA, отключение штатного действия, текущий SRC-режим.",
-      "restore_policy_to_implement": "Нет. Настройки и проверку системного применения разделить.",
-      "source": "app/src/main/java/dezz/status/widget/media/MediaButtonController.java"
+      "source": "app/src/main/java/dezz/status/widget/media/MediaButtonController.java",
+      "historical_restore_policy_to_implement": "Нет. Настройки и проверку системного применения разделить.",
+      "restore_policy": "Все настройки, включая неактивные назначения; импортированные system patch flags требуют отдельного явного применения каждого маршрута."
     },
     {
       "name": "vehicle_buttons",
       "contents": "Все остальные физические кнопки, жесты, параметры действий, DM и громкость.",
-      "restore_policy_to_implement": "Нет. Включить все назначения и связи.",
-      "source": "app/src/main/java/dezz/status/widget/media/VehicleButtonController.java"
+      "source": "app/src/main/java/dezz/status/widget/media/VehicleButtonController.java",
+      "historical_restore_policy_to_implement": "Нет. Включить все назначения и связи.",
+      "restore_policy": "Все настройки, включая неактивные назначения; импортированные system patch flags требуют отдельного явного применения каждого маршрута."
     },
     {
       "name": "monjaro_drive_modes_prefs",
       "contents": "Наблюдение режимов, порядок/включённость, карусель, таймеры, скрытие меню, отладка.",
-      "restore_policy_to_implement": "Нет. Включить пользовательские значения.",
-      "source": "app/src/main/java/dezz/status/widget/drivemode/settings/DriveModeSettings.java"
+      "source": "app/src/main/java/dezz/status/widget/drivemode/settings/DriveModeSettings.java",
+      "historical_restore_policy_to_implement": "Нет. Включить пользовательские значения.",
+      "restore_policy": "Все typed keys переносятся рекурсивным адаптером; неизвестные поля сохраняются. Аппаратная действительность и разрешения проверяются отдельно."
     },
     {
       "name": "{package}_apps_to_hide",
       "contents": "Отслеживаемые скрытые приложения и подписи.",
-      "restore_policy_to_implement": "Нет. Включить в привязанный к устройству блок восстановления.",
-      "source": "app/src/main/java/dezz/status/widget/servicemode/AppsToHideStorage.java"
+      "source": "app/src/main/java/dezz/status/widget/servicemode/AppsToHideStorage.java",
+      "historical_restore_policy_to_implement": "Нет. Включить в привязанный к устройству блок восстановления.",
+      "restore_policy": "На том же устройстве сохраняется целиком; на другом импортированная история архивируется отдельно, действующий локальный журнал сохраняется."
     },
     {
       "name": "{package}_exclude",
       "contents": "Исключения сервисного режима.",
-      "restore_policy_to_implement": "Нет. Включить.",
-      "source": "app/src/main/java/dezz/status/widget/servicemode/ExcludeAppsStorage.java"
+      "source": "app/src/main/java/dezz/status/widget/servicemode/ExcludeAppsStorage.java",
+      "historical_restore_policy_to_implement": "Нет. Включить.",
+      "restore_policy": "Все typed keys переносятся рекурсивным адаптером; неизвестные поля сохраняются. Аппаратная действительность и разрешения проверяются отдельно."
     },
     {
       "name": "{package}_pin",
       "contents": "Хеш пользовательского PIN сервисного режима.",
-      "restore_policy_to_implement": "Нет. Сохранить в зашифрованной личной копии.",
-      "source": "app/src/main/java/dezz/status/widget/servicemode/PinStorage.java"
+      "source": "app/src/main/java/dezz/status/widget/servicemode/PinStorage.java",
+      "historical_restore_policy_to_implement": "Нет. Сохранить в зашифрованной личной копии.",
+      "restore_policy": "Все typed keys переносятся рекурсивным адаптером; неизвестные поля сохраняются. Аппаратная действительность и разрешения проверяются отдельно."
     },
     {
       "name": "{package}_connection",
       "contents": "Найденные ADB/Telnet endpoints сервисного режима.",
-      "restore_policy_to_implement": "Нет. Архивировать как локальное состояние; адреса проверять заново.",
-      "source": "app/src/main/java/dezz/status/widget/servicemode/ConnectionStorage.java"
+      "source": "app/src/main/java/dezz/status/widget/servicemode/ConnectionStorage.java",
+      "historical_restore_policy_to_implement": "Нет. Архивировать как локальное состояние; адреса проверять заново.",
+      "restore_policy": "Все typed keys переносятся рекурсивным адаптером; неизвестные поля сохраняются. Аппаратная действительность и разрешения проверяются отдельно."
     },
     {
       "name": "natro_service_mode_original",
       "contents": "Исходные состояния пакетов перед скрытием.",
-      "restore_policy_to_implement": "Нет. Для отката той же установки критично; чужой машине не применять.",
-      "source": "app/src/main/java/dezz/status/widget/servicemode/ServiceModeJournal.java"
+      "source": "app/src/main/java/dezz/status/widget/servicemode/ServiceModeJournal.java",
+      "historical_restore_policy_to_implement": "Нет. Для отката той же установки критично; чужой машине не применять.",
+      "restore_policy": "На том же устройстве сохраняется целиком; на другом импортированная история архивируется отдельно, действующий локальный журнал сохраняется."
     },
     {
       "name": "natro_service_mode_self",
       "contents": "Исходная видимость входов Natro и история скрытия.",
-      "restore_policy_to_implement": "Нет. Локальный журнал возврата, не команда скрыть приложение.",
-      "source": "app/src/main/java/dezz/status/widget/servicemode/NatroSelfVisibility.java"
+      "source": "app/src/main/java/dezz/status/widget/servicemode/NatroSelfVisibility.java",
+      "historical_restore_policy_to_implement": "Нет. Локальный журнал возврата, не команда скрыть приложение.",
+      "restore_policy": "На том же устройстве сохраняется целиком; на другом импортированная история архивируется отдельно, действующий локальный журнал сохраняется."
     },
     {
       "name": "{package}_privileged_shell",
       "contents": "Сохранённый endpoint привилегированного shell.",
-      "restore_policy_to_implement": "Нет. Архивировать отдельно от действительного разрешения Android.",
-      "source": "app/src/main/java/dezz/status/widget/shell/ConnectionStorage.java"
+      "source": "app/src/main/java/dezz/status/widget/shell/ConnectionStorage.java",
+      "historical_restore_policy_to_implement": "Нет. Архивировать отдельно от действительного разрешения Android.",
+      "restore_policy": "Все typed keys переносятся рекурсивным адаптером; неизвестные поля сохраняются. Аппаратная действительность и разрешения проверяются отдельно."
     },
     {
       "name": "live_activity_apns_metadata_v1",
       "contents": "Team ID, Key ID, topic и окружение APNs.",
-      "restore_policy_to_implement": "Нет. Включить вместе с переносимым секретом .p8.",
-      "source": "app/src/main/java/dezz/status/widget/phone/liveactivity/ApnsCredentialStore.java"
+      "source": "app/src/main/java/dezz/status/widget/phone/liveactivity/ApnsCredentialStore.java",
+      "historical_restore_policy_to_implement": "Нет. Включить вместе с переносимым секретом .p8.",
+      "restore_policy": "Метаданные вместе с зашифрованным APNs-файлом; перенос секрета под новым локальным ключом и журналируемый Apply."
     },
     {
       "name": "live_activity_push_provisioning_v1",
       "contents": "Настройки Live Activity и выданные iPhone push/activity tokens.",
-      "restore_policy_to_implement": "Нет. Настройки сохранить; действительность tokens перепроверить.",
-      "source": "app/src/main/java/dezz/status/widget/phone/liveactivity/LiveActivityProvisioningStore.java"
+      "source": "app/src/main/java/dezz/status/widget/phone/liveactivity/LiveActivityProvisioningStore.java",
+      "historical_restore_policy_to_implement": "Нет. Настройки сохранить; действительность tokens перепроверить.",
+      "restore_policy": "Архивируются настройки и сохранённые токены; их действительность архив не подтверждает, маршрут требует текущего соединения Helper."
     },
     {
       "name": "{package}_mqtt_shortcut_catalog_v1",
       "contents": "Метаданные известных MQTT ресурсов для выбора в редакторах.",
-      "restore_policy_to_implement": "Нет. Включить как каталог с пометкой устаревших данных.",
-      "source": "app/src/main/java/dezz/status/widget/mqtt/MqttShortcutCatalogStore.java"
+      "source": "app/src/main/java/dezz/status/widget/mqtt/MqttShortcutCatalogStore.java",
+      "historical_restore_policy_to_implement": "Нет. Включить как каталог с пометкой устаревших данных.",
+      "restore_policy": "Все typed keys переносятся рекурсивным адаптером; неизвестные поля сохраняются. Аппаратная действительность и разрешения проверяются отдельно."
     },
     {
       "name": "{package}_automation_state_v1",
       "contents": "Последние состояния коннекторов и управление видимостью.",
-      "restore_policy_to_implement": "Нет. Это не определения сценариев; после восстановления не считать свежими.",
-      "source": "app/src/main/java/dezz/status/widget/automation/AutomationStateStore.java"
+      "source": "app/src/main/java/dezz/status/widget/automation/AutomationStateStore.java",
+      "historical_restore_policy_to_implement": "Нет. Это не определения сценариев; после восстановления не считать свежими.",
+      "restore_policy": "Сохраняется в restored-history при импорте; старые показания/таймеры/очереди не активируются."
     },
     {
       "name": "{package}_screen_reservation_state_v1",
       "contents": "Исходное/управляемое резервирование экрана под климат.",
-      "restore_policy_to_implement": "Нет. Локальный журнал возврата, привязанный к устройству.",
-      "source": "app/src/main/java/dezz/status/widget/climate/ScreenReservationStateStore.java"
+      "source": "app/src/main/java/dezz/status/widget/climate/ScreenReservationStateStore.java",
+      "historical_restore_policy_to_implement": "Нет. Локальный журнал возврата, привязанный к устройству.",
+      "restore_policy": "На том же устройстве сохраняется целиком; на другом импортированная история архивируется отдельно, действующий локальный журнал сохраняется."
     },
     {
       "name": "launcher_media_playback_history",
       "contents": "Последний плеер и факт воспроизведения для возобновления.",
-      "restore_policy_to_implement": "Нет. Можно сохранить историю; восстановление не должно само запускать музыку.",
-      "source": "app/src/main/java/dezz/status/widget/launcher/MediaPlaybackHistoryStore.java"
+      "source": "app/src/main/java/dezz/status/widget/launcher/MediaPlaybackHistoryStore.java",
+      "historical_restore_policy_to_implement": "Нет. Можно сохранить историю; восстановление не должно само запускать музыку.",
+      "restore_policy": "Все typed keys переносятся рекурсивным адаптером; неизвестные поля сохраняются. Аппаратная действительность и разрешения проверяются отдельно."
     },
     {
       "name": "launcher_media_auto_resume_state",
       "contents": "Состояние текущей процедуры автозапуска медиа.",
-      "restore_policy_to_implement": "Нет. Старую процедуру не воспроизводить.",
-      "source": "app/src/main/java/dezz/status/widget/launcher/MediaAutoResumeController.java"
+      "source": "app/src/main/java/dezz/status/widget/launcher/MediaAutoResumeController.java",
+      "historical_restore_policy_to_implement": "Нет. Старую процедуру не воспроизводить.",
+      "restore_policy": "Архив хранит прежнее состояние; после импорта активный checkpoint пуст, музыка автоматически не запускается."
     },
     {
       "name": "launcher_navigation",
       "contents": "Последний снимок навигационных данных.",
-      "restore_policy_to_implement": "Нет. Кэш, не текущий маршрут после восстановления.",
-      "source": "app/src/main/java/dezz/status/widget/launcher/NavigationDataRepository.java"
+      "source": "app/src/main/java/dezz/status/widget/launcher/NavigationDataRepository.java",
+      "historical_restore_policy_to_implement": "Нет. Кэш, не текущий маршрут после восстановления.",
+      "restore_policy": "Сохраняется в restored-history при импорте; старые показания/таймеры/очереди не активируются."
     },
     {
       "name": "launcher_media_broadcast_v1",
       "contents": "Последний снимок медиаданных.",
-      "restore_policy_to_implement": "Нет. Кэш; заново получить живую сессию.",
-      "source": "app/src/main/java/dezz/status/widget/launcher/MediaBroadcastRepository.java"
+      "source": "app/src/main/java/dezz/status/widget/launcher/MediaBroadcastRepository.java",
+      "historical_restore_policy_to_implement": "Нет. Кэш; заново получить живую сессию.",
+      "restore_policy": "Сохраняется в restored-history при импорте; старые показания/таймеры/очереди не активируются."
     },
     {
       "name": "{package}_phone_telemetry",
       "contents": "Последняя телеметрия телефона.",
-      "restore_policy_to_implement": "Нет. Кэш; не выдавать старые данные за актуальные.",
-      "source": "app/src/main/java/dezz/status/widget/phone/PhoneTelemetryStore.java"
+      "source": "app/src/main/java/dezz/status/widget/phone/PhoneTelemetryStore.java",
+      "historical_restore_policy_to_implement": "Нет. Кэш; не выдавать старые данные за актуальные.",
+      "restore_policy": "Сохраняется в restored-history при импорте; старые показания/таймеры/очереди не активируются."
     },
     {
       "name": "vehicle_external_state",
       "contents": "Подтверждённые ранее внешние состояния автомобиля.",
-      "restore_policy_to_implement": "Нет. Кэш; получить фактическое состояние заново.",
-      "source": "app/src/main/java/dezz/status/widget/car/AutoHoldStateRepository.java"
+      "source": "app/src/main/java/dezz/status/widget/car/AutoHoldStateRepository.java",
+      "historical_restore_policy_to_implement": "Нет. Кэш; получить фактическое состояние заново.",
+      "restore_policy": "Сохраняется в restored-history при импорте; старые показания/таймеры/очереди не активируются."
     },
     {
       "name": "startup_work_state",
       "contents": "Поколения и этапы запуска.",
-      "restore_policy_to_implement": "Нет. Восстанавливать старую очередь запуска не требуется.",
-      "source": "app/src/main/java/dezz/status/widget/StartupWorkCoordinator.java"
+      "source": "app/src/main/java/dezz/status/widget/StartupWorkCoordinator.java",
+      "historical_restore_policy_to_implement": "Нет. Восстанавливать старую очередь запуска не требуется.",
+      "restore_policy": "Сохраняется в restored-history при импорте; старые показания/таймеры/очереди не активируются."
     },
     {
       "name": "phone_package_replace_recovery",
       "contents": "Состояние восстановления BLE после обновления пакета.",
-      "restore_policy_to_implement": "Нет. Истёкшие таймеры и старые операции не активировать.",
-      "source": "app/src/main/java/dezz/status/widget/phone/PackageReplaceBleRecoveryGate.java"
+      "source": "app/src/main/java/dezz/status/widget/phone/PackageReplaceBleRecoveryGate.java",
+      "historical_restore_policy_to_implement": "Нет. Истёкшие таймеры и старые операции не активировать.",
+      "restore_policy": "Сохраняется в restored-history при импорте; старые показания/таймеры/очереди не активируются."
     },
     {
       "name": "status_widget_hud_mode_fallback_v1",
       "contents": "Сохранённое включение/целевой режим штатного HUD и статус fallback.",
-      "restore_policy_to_implement": "Нет. Включить настройки; применение к ECARX проверять отдельно.",
-      "source": "app/src/geely/java/dezz/status/widget/car/HudModeFallbackStore.java"
+      "source": "app/src/geely/java/dezz/status/widget/car/HudModeFallbackStore.java",
+      "historical_restore_policy_to_implement": "Нет. Включить настройки; применение к ECARX проверять отдельно.",
+      "restore_policy": "Все typed keys переносятся рекурсивным адаптером; неизвестные поля сохраняются. Аппаратная действительность и разрешения проверяются отдельно."
     },
     {
       "name": "hud_fallback_startup_lane",
       "contents": "Таймер отложенного запуска fallback.",
-      "restore_policy_to_implement": "Нет. Не переносить как действующую задачу.",
-      "source": "app/src/geely/java/dezz/status/widget/car/HudModeFallbackBootReceiver.java"
+      "source": "app/src/geely/java/dezz/status/widget/car/HudModeFallbackBootReceiver.java",
+      "historical_restore_policy_to_implement": "Нет. Не переносить как действующую задачу.",
+      "restore_policy": "Сохраняется в restored-history при импорте; старые показания/таймеры/очереди не активируются."
     }
   ],
   "navigator_owned_preferences": [
     {
       "name": "natro_floating_window_v3",
       "source": "navigator-mod/src/main/java/ru/natro/navigation/FloatingWindowController.java",
-      "restore_policy_to_implement": "Export own window geometry via authenticated module bridge; no Yandex private data."
+      "historical_restore_policy_to_implement": "Export own window geometry via authenticated module bridge; no Yandex private data.",
+      "restore_policy": "Own module geometry participates in authenticated freeze/apply/commit/rollback; Navigator must be available. No Yandex private-data export; physical IPC acceptance remains open."
     }
   ],
   "source_owners": {
     "app/src/geely/java/dezz/status/widget/car/HudModeFallbackBootReceiver.java": {
-      "sha256": "073aa2ab8635a0f1e94a8b0659cea10991b594f92bf48b7b7fd4de8355f5e234",
+      "sha256": "7186f67ea218ef097769546681e0aed317095727202d5e577e0f45bb4dce03d2",
       "access_kinds": [
         "preferences"
       ]
     },
     "app/src/geely/java/dezz/status/widget/car/HudModeFallbackStore.java": {
-      "sha256": "647eda389980bfd16ffac41c80a60c200792148b7c5e010dd4d7176945959fcd",
+      "sha256": "73997a433536140d69027082b2d88c3d38b78b95daf7bdac730609899b3ebd74",
       "access_kinds": [
         "preferences"
       ]
@@ -194,14 +222,14 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/FullBackupActivity.java": {
-      "sha256": "e877c02c42cc699353a0b559c9d7d198c1d3727cc1a000cefc9b3caea3a3fc4a",
+      "sha256": "6faff12dd51f73b6ad2d108aa8c41f2cb2e8b654422b4cc293451d3ecf81de31",
       "access_kinds": [
         "external_resource",
         "files"
       ]
     },
     "app/src/main/java/dezz/status/widget/HudLcaPatchActivity.java": {
-      "sha256": "ce3768537e1a4d8e1720830a96d5d73af489dfd690b02338a09967faba85fd57",
+      "sha256": "7fb62141a532e86428a49954abed8e3a56e5cd843ac036472655b7a7f233ee48",
       "access_kinds": [
         "files"
       ]
@@ -213,19 +241,19 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/LiveActivityApnsSettingsActivity.java": {
-      "sha256": "9e7575d0574fe7a43db60404eb19c01c06c57284d8dbcf1b07a7b60aaa3beb29",
+      "sha256": "ba67d7cb758664bab0568169bf979b16243437c9ef8d6f493db108c61185833b",
       "access_kinds": [
         "external_resource"
       ]
     },
     "app/src/main/java/dezz/status/widget/PhoneConnectorSettingsActivity.java": {
-      "sha256": "ed0e2bf72ca3520d3d310ce81dc0870f521707b13b16180baa5db94573825a5b",
+      "sha256": "128bdfb39ecd101b7035c674556c0f0be5a2dbad9d6dd5cca987b168af1d24b1",
       "access_kinds": [
         "files"
       ]
     },
     "app/src/main/java/dezz/status/widget/PortableBackupDefaults.java": {
-      "sha256": "8d55373858b5722999eabcf17a26e80023d7b33978b82c1301a96fb8b379da87",
+      "sha256": "98b5510fbc5190856711875da8dbaf5f29861b75c3229a91982a429943b72005",
       "access_kinds": [
         "preferences"
       ]
@@ -237,7 +265,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/Preferences.java": {
-      "sha256": "eec759819f7d00699610e8ac5e92e4171dbf161ffea28eaf2a160e8f58b373db",
+      "sha256": "505d1407e0a3126d4d3a3259d604e1b9f5489a88babf1ec057f7f5a7f9a6c391",
       "access_kinds": [
         "keystore",
         "preferences"
@@ -251,7 +279,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/RuntimeSnapshotPreferences.java": {
-      "sha256": "8f665cf8bf05f1937bd7767c46828a1cc61e0ed87b29779a12e942970445348d",
+      "sha256": "f76ec225a1a84ffa0f5fac89a5501b680bfa81cd4b5f979b3b902c458cba8624",
       "access_kinds": [
         "preferences"
       ]
@@ -270,7 +298,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/StartupWorkCoordinator.java": {
-      "sha256": "dad35787f1b913dcb6c81ad81ae9d219b24afcb7b6d439c61455fcfc2110c56f",
+      "sha256": "d2ebf1a3d9ec44db1520e82a1082c2cfb1b9cba5d39c0ce94e604b50129c82a3",
       "access_kinds": [
         "preferences"
       ]
@@ -294,13 +322,25 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/automation/AutomationStateStore.java": {
-      "sha256": "1ead8e03105575b04324ab7175e3c8c3d7536c47eb3d8d2b421028797eea4700",
+      "sha256": "ebe9646c3e9291ad6665109b2f80c94dab2734604afec314fdfadfdb1c2aff9b",
       "access_kinds": [
         "preferences"
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupArchive.java": {
       "sha256": "0ea6976b01ead18d8ec02dba875ca05473dbbfdf0d075f1990609bafd70894d5",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
+      "sha256": "3b76b1bba37aa38293948270937f9b9fbb5c40832b84d9573d69654701438ca5",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/backup/BackupExternalState.java": {
+      "sha256": "a5d176b067aa683d164b02160da958067a050ca1b8b97d4d00c03ce1db40f8ea",
       "access_kinds": [
         "files"
       ]
@@ -324,14 +364,20 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupMaintenance.java": {
-      "sha256": "071d6baa14b35caf18ba57f1f061d3731390beac3bce8a4b8f3dbc9af27cb8d1",
+      "sha256": "ddcfc67d800ed6d7cd4c35e759fbd09457f5d8a7fbb40f9f3418958083e34c46",
       "access_kinds": [
         "files",
         "preferences"
       ]
     },
+    "app/src/main/java/dezz/status/widget/backup/BackupPreferences.java": {
+      "sha256": "d3653118908ab182d7ee87470ab5906f0de8a4c4a13e6d2db78bcb32994803f6",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
     "app/src/main/java/dezz/status/widget/backup/BackupStorage.java": {
-      "sha256": "937744ee3b2ceba0eb127a3fb56f000eb07c310580d1017567f7d7d3f19639c1",
+      "sha256": "e91ff6602460df277feceb6b743149493c6df4e7799c19742e8b7a2751ffc8ed",
       "access_kinds": [
         "external_resource",
         "files"
@@ -350,13 +396,13 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/car/AutoHoldStateRepository.java": {
-      "sha256": "ccab46cf546e11e8e48455839e7fc1290fd9d98cdd403f9c15866f32b84a36b3",
+      "sha256": "8101c969015fadfc2e48665698478bca841347caacc4d8947aaa3d1bc103fdaf",
       "access_kinds": [
         "preferences"
       ]
     },
     "app/src/main/java/dezz/status/widget/climate/ScreenReservationStateStore.java": {
-      "sha256": "a9faa359934bf25c8176743af1a9079fb715490fc399a5cfd9d071f41b93a090",
+      "sha256": "ded8a81b2dfbfe4719891dcde3d1a95ccbe1b90445a49325a6485a4d0f236658",
       "access_kinds": [
         "preferences"
       ]
@@ -380,7 +426,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/drivemode/settings/DriveModeSettings.java": {
-      "sha256": "fa7638066c1c1e44f818e569c7b34b8bd4e91f64b385d0c3675c3f911e0a3294",
+      "sha256": "8a53165930aeaa934429fd41862824a8fa4e5a164c6cdcb2ca05aeb224a07b8e",
       "access_kinds": [
         "preferences"
       ]
@@ -398,19 +444,19 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/instrument/InstrumentOemController.java": {
-      "sha256": "95cebf881893d51cf6a72d0ddffca36d322acf1eaf0eab15f5626875caefe12b",
+      "sha256": "73bfba0e8ebf8c167c32db3c27059ecd93ca4f941756aa504464362ca0ca808a",
       "access_kinds": [
         "preferences"
       ]
     },
     "app/src/main/java/dezz/status/widget/instrument/InstrumentPanelStore.java": {
-      "sha256": "37027a1e8b19f327cc1abb17974bd06feca0cc33f54d3bf6bb9b8b44a185264f",
+      "sha256": "f90ec0dc6c205371ca84002f40ae26169b24d2b8969400166fc481fade11f8b5",
       "access_kinds": [
         "preferences"
       ]
     },
     "app/src/main/java/dezz/status/widget/launcher/MediaAutoResumeController.java": {
-      "sha256": "ea58ff3dbc3ca06ea269463fedf75dd00eb92d066eff57c252c454ab847d2457",
+      "sha256": "ba0ee08020646060eb8deaf09b717aa9ece8cd941f0a678a5cc6570be8ec6b71",
       "access_kinds": [
         "preferences"
       ]
@@ -424,13 +470,13 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/launcher/MediaPlaybackHistoryStore.java": {
-      "sha256": "46039a4febf7c8c0befd5699c1a8d1638d311225d3f40cc1d367e5947b33a70a",
+      "sha256": "61732bda7c441f00408127dc6493580f0bd3874b9cd59e00c11e84de0ae458a9",
       "access_kinds": [
         "preferences"
       ]
     },
     "app/src/main/java/dezz/status/widget/launcher/NavigationCollectionDemand.java": {
-      "sha256": "c68e2fd608a41613d887b3ca2a560b16846c2393570b9c88e159272fae6a3bd0",
+      "sha256": "08649e5e7e1d5d6391c146005afd717dcc3f0fcc2ae6453797961e5ba83fe49a",
       "access_kinds": [
         "preferences"
       ]
@@ -448,13 +494,19 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/media/ButtonRouteRestorer.java": {
-      "sha256": "bb6f938259230b9e0e3f17c06e49ffdedaf5898a08b7d7b36903618a9ada47ec",
+      "sha256": "833f12aedd944ed79e417dda65000b1b192db943b1f4f3945b4e1ced10554c16",
+      "access_kinds": [
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/media/ButtonSettingsDraft.java": {
+      "sha256": "580a373e3991f7f730c3f6cec23d57649c3b5cbba9861cf0bd3a5b7ed1a12c26",
       "access_kinds": [
         "preferences"
       ]
     },
     "app/src/main/java/dezz/status/widget/media/MediaButtonController.java": {
-      "sha256": "1b310e4d49f58e65eb013a5e76f99bf6a9305abbb453a3dfff2da28e76a724fb",
+      "sha256": "24ebb88f7381699b3d7e52093a0d363a21fb35d80c6a54910a6bb51d930905e1",
       "access_kinds": [
         "preferences"
       ]
@@ -466,13 +518,13 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/media/VehicleButtonController.java": {
-      "sha256": "3fdecaa83713513768c0c2a4d7ed7678b743fc451c75efaa9ead867c68fd7cf4",
+      "sha256": "6936c55e7f1ca2de15ae87a0de3a7ff3505b2952ceddd0908e93ef7482b923e2",
       "access_kinds": [
         "preferences"
       ]
     },
     "app/src/main/java/dezz/status/widget/mqtt/MqttShortcutCatalogStore.java": {
-      "sha256": "72446b6315cf20793a443618daf0eba3e7df5e2d111b025dcc7848adff487de9",
+      "sha256": "1cf7840961082b80cc367db766c645698245111b89949b767ce818297582327d",
       "access_kinds": [
         "preferences"
       ]
@@ -484,7 +536,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/phone/PackageReplaceBleRecoveryGate.java": {
-      "sha256": "98bd23e03d5f1cfdb5475725c42c0f68b9370790448f13b82bc3d114feaf3880",
+      "sha256": "79d105d5387d9b9d3f471b411d587d8f1c676a8f1c77ca56f47a96503f6c4fdf",
       "access_kinds": [
         "preferences"
       ]
@@ -520,15 +572,14 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/phone/liveactivity/ApnsCredentialStore.java": {
-      "sha256": "f38df47b4ff7b12a74e17c0a1a46336f987b4ec5f9e2c0d3e2b66bab2e2f63ee",
+      "sha256": "a749ff409646b07bfd9ad63b6885d027c66e4bb6288653df5b24760a56f65b21",
       "access_kinds": [
-        "files",
         "keystore",
         "preferences"
       ]
     },
     "app/src/main/java/dezz/status/widget/phone/liveactivity/LiveActivityProvisioningStore.java": {
-      "sha256": "10ea490eb5c292bc63076589fb47fd171f8cefc22bf316ca2b5aa417b8858276",
+      "sha256": "995dd291e91d07ce9dd8fdc04afdfd79197051ddef507b07df95c826af0c19cb",
       "access_kinds": [
         "preferences"
       ]
@@ -540,52 +591,58 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/servicemode/AppsToHideStorage.java": {
-      "sha256": "75ed31752d49b53b20e09abb0e15ff0320e142242d54cb57e5b92d13d282c8cf",
+      "sha256": "d28a48d0bab71f06cb8b9d97cb37a02467561dfab0c4d8608d5be84782e48de1",
       "access_kinds": [
         "preferences"
       ]
     },
     "app/src/main/java/dezz/status/widget/servicemode/ConnectionStorage.java": {
-      "sha256": "ac430b111a07b7ebf039fe99748448f76548ea0362653059b32e7a0085f0a4b7",
+      "sha256": "fcb31f3dbd42e9c63e9efbbf9660e170128ca3b56c335d5e52c465a74f8033b6",
       "access_kinds": [
         "preferences"
       ]
     },
     "app/src/main/java/dezz/status/widget/servicemode/ExcludeAppsStorage.java": {
-      "sha256": "ec614e1ee0a7da5263cfc205fe80e3b4de5478360f88e2f7e62b3544fc9547e5",
+      "sha256": "87e0693c2be8c9387feb4db63d712db97d93f5832e56a27d7d771463998d1063",
       "access_kinds": [
         "preferences"
       ]
     },
     "app/src/main/java/dezz/status/widget/servicemode/NatroSelfVisibility.java": {
-      "sha256": "bbe489f7e8a1826281963edb280b00658dde0e275f7b047028419ebc28e1a5b4",
+      "sha256": "68d2b63a8084434046a9293f8acc96ce912b6614b49999ab87c13b8d23100627",
       "access_kinds": [
         "preferences"
       ]
     },
     "app/src/main/java/dezz/status/widget/servicemode/PinStorage.java": {
-      "sha256": "077f74e8ec631380292c8c69e96a7b32016d1693e0c18ab83d9566d0af17b814",
+      "sha256": "b627860604d1300d0870a9467e776d5ae1db357a2a8df71c288eb7d83d363c7b",
       "access_kinds": [
         "preferences"
       ]
     },
     "app/src/main/java/dezz/status/widget/servicemode/ServiceModeJournal.java": {
-      "sha256": "2b46c3a16995681c801af3ab53a78ab4a2e2181ec7341fdb85b6cba6373b6570",
+      "sha256": "2cdd5087c3ec61ebf667b881f322e3c256e407978dbfc25b0b669358786ce5cf",
       "access_kinds": [
         "preferences"
       ]
     },
     "app/src/main/java/dezz/status/widget/settings/SettingsAppearance.java": {
-      "sha256": "e8fc472c0921acc4e9212c0a904fc1a1304ca3bbe01239a7ecd0095ba78359cb",
+      "sha256": "ec4a747d293e9a3e043a141fd0b486777978545b6a881c0231c17dffcaa356e4",
       "access_kinds": [
         "preferences"
       ]
     },
     "app/src/main/java/dezz/status/widget/settings/SettingsApplyJournal.java": {
-      "sha256": "863bc987b3df20b95ddecb163aec495ad1ba00fbcb5fb54ecf6797bc1765c21e",
+      "sha256": "07ee6f2313460fff2acb80475ad13c8bdd489020aef2b47aabe8f6f58c52d234",
       "access_kinds": [
         "files",
         "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/settings/SettingsFileChange.java": {
+      "sha256": "441da6916d6881d0142c76472e93e68a147d3eb29e815082297db3831f8f0f05",
+      "access_kinds": [
+        "files"
       ]
     },
     "app/src/main/java/dezz/status/widget/shell/AdbTransport.java": {
@@ -595,7 +652,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/shell/ConnectionStorage.java": {
-      "sha256": "6869a8769b4d89623e2c831fa10b1b307d1bd3c53ff387d4540765950f989965",
+      "sha256": "8de4d6f3b8194bf6748676d7daf7554887d3c9db0b1aac944f7151d8c813b8b4",
       "access_kinds": [
         "preferences"
       ]
@@ -638,6 +695,7 @@
     "include": "catalog.json and all referenced PNG files; preserve explicit custom priority",
     "automatic_download_manifest": "PhoneAppIconStore.automaticDownloadManifest(); ANCS-icons/catalog.json source_url",
     "restore": "Read activated catalog and enqueue missing automatic images; no network during isolated verification",
-    "status": "Runtime full backup adapter not implemented"
-  }
+    "status": "Recursive file/URI adapter implemented; Android archive round-trip tested, physical KX11 acceptance pending."
+  },
+  "reviewed_continuation_parent": "c2d26ece7292f8c64020fb7fdea9f39155a86099"
 }

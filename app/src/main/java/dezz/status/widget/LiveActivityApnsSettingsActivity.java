@@ -64,7 +64,7 @@ public final class LiveActivityApnsSettingsActivity extends dezz.status.widget.s
         page.addView(label("APNs для Live Activity", 30, Typeface.BOLD));
         TextView explanation = label(
                 "Ключ импортируется после установки, шифруется Android Keystore и не входит "
-                        + "в APK, Git или резервную копию. Используйте отдельный Topic Specific "
+                        + "в APK или Git. Полная резервная копия защищает его вашим паролем. Используйте отдельный Topic Specific "
                         + "ключ только для Helper.", 14, Typeface.NORMAL);
         explanation.setTextColor(getColor(R.color.settings_secondary_text));
         page.addView(explanation, margin(7));
@@ -117,9 +117,8 @@ public final class LiveActivityApnsSettingsActivity extends dezz.status.widget.s
             pem = readBounded(uri);
             credentials.save(teamId.getText().toString(), keyId.getText().toString(),
                     topic.getText().toString(), production.isChecked(), pem);
-            notifyRuntime();
             refresh();
-            Toast.makeText(this, "APNs-ключ зашифрован", Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Ключ выбран. Сохраните изменения кнопкой «Применить».", Toast.LENGTH_LONG).show();
         } catch (Exception error) {
             new dezz.status.widget.settings.SettingsDialogBuilder(this).setTitle("Ключ не сохранён")
                     .setMessage(error.getMessage() == null ? "Проверьте .p8 и идентификаторы"
@@ -135,9 +134,8 @@ public final class LiveActivityApnsSettingsActivity extends dezz.status.widget.s
                 .setMessage("Push-to-start с магнитолы перестанет работать, пока ключ не будет "
                         + "импортирован снова.")
                 .setPositiveButton("Удалить", (dialog, which) -> {
-                    credentials.clear();
-                    notifyRuntime();
-                    refresh();
+                    try{credentials.clear();refresh();}
+                    catch(Exception failure){Toast.makeText(this,"Не удалось подготовить удаление ключа",Toast.LENGTH_LONG).show();}
                 })
                 .setNegativeButton(android.R.string.cancel, null).show();
     }
@@ -155,10 +153,11 @@ public final class LiveActivityApnsSettingsActivity extends dezz.status.widget.s
                 + "\nPush-to-start: " + (keyReady && helperReady ? "готов" : "не готов"));
     }
 
-    private void notifyRuntime() {
-        WidgetService service = WidgetService.getInstance();
-        if (service != null) service.applyPreferences();
-        else WidgetServiceStarter.startIfNeeded(this);
+    @Override protected void flushSettingsDraft() {
+        if(credentials==null||teamId==null)return;
+        try{credentials.updateMetadata(teamId.getText().toString(),keyId.getText().toString(),
+                topic.getText().toString(),production.isChecked());}
+        catch(Exception invalid){throw new IllegalArgumentException(invalid.getMessage(),invalid);}
     }
 
     @NonNull private byte[] readBounded(@NonNull Uri uri) throws Exception {

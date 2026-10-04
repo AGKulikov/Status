@@ -311,7 +311,7 @@ public final class MediaPanelInteractionContractTest {
     @Test public void settingsOpenHomeContentEditorAndOfferSynchronizedLiveEditor()
             throws IOException {
         String settings = source("dezz/status/widget/MediaPanelSettingsActivity.java");
-        String launcher = source("dezz/status/widget/LauncherActivity.java");
+        String launcher = source("dezz/status/widget/LauncherHomeSurface.java");
         assertTrue(settings.contains("LauncherActivity.EXTRA_EDIT_MODE"));
         assertTrue(settings.contains("LauncherActivity.EXTRA_EDIT_MEDIA_CONTENT"));
         assertTrue(settings.contains("Расположение элементов внутри блока на HOME"));

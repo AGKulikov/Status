@@ -54,7 +54,7 @@ public final class DriverPanelPost1117ContractTest {
     public void applicationDrawerPreservesDriverRailAndIncludesSystemPhone() throws Exception {
         String overlay = read("driver/DriverPanelOverlayController.java");
         String catalog = read("launcher/LauncherAppCatalog.java");
-        String launcher = read("LauncherActivity.java");
+        String launcher = read("LauncherHomeSurface.java");
         String settings = read("AllAppsSettingsActivity.java");
 
         assertTrue(overlay.contains("if (drawerEditMode) setDrawerEditMode(false)"));
@@ -115,7 +115,7 @@ public final class DriverPanelPost1117ContractTest {
     @Test
     public void driverAndLauncherWindowButtonsKeepTheNormalClickSound() throws Exception {
         String overlay = read("driver/DriverPanelOverlayController.java");
-        String launcher = read("LauncherActivity.java");
+        String launcher = read("LauncherHomeSurface.java");
 
         assertTrue(overlay.contains("button.setSoundEffectsEnabled(true)"));
         assertTrue(overlay.contains("content.setSoundEffectsEnabled(true)"));

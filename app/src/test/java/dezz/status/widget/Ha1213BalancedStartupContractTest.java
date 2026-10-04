@@ -113,8 +113,8 @@ public final class Ha1213BalancedStartupContractTest {
         assertFalse(coordinator.contains("coalescingActiveBootLane"));
         assertFalse(coordinator.contains("retainedPhaseNotBefore"));
 
-        String launcher = javaSource("LauncherActivity.java");
-        String stop = between(launcher, "protected void onStop()",
+        String launcher = javaSource("LauncherHomeSurface.java");
+        String stop = between(launcher, "public void onStop()",
                 "private void scheduleDeferredLauncherRuntimeStart()");
         assertTrue(stop.contains("ensureIntegrationHostScheduledAfter"));
         assertTrue(stop.contains("requiresAutomaticIntegrationHost(preferences)"));
@@ -131,7 +131,7 @@ public final class Ha1213BalancedStartupContractTest {
 
         String application = javaSource("StatusWidgetApplication.java");
         String receiver = javaSource("BootReceiver.java");
-        String launcher = javaSource("LauncherActivity.java");
+        String launcher = javaSource("LauncherHomeSurface.java");
         String settings = javaSource("MainActivity.java");
         String service = javaSource("WidgetService.java");
         assertTrue(application.contains("StartupPerformanceTrace.beginProcess"));
@@ -208,7 +208,7 @@ public final class Ha1213BalancedStartupContractTest {
 
     @Test public void immediateHomeWorkKeepsUiAttachmentBehindBootstrapReadiness()
             throws Exception {
-        String launcher = javaSource("LauncherActivity.java");
+        String launcher = javaSource("LauncherHomeSurface.java");
         String start = between(launcher, "private void startImmediateHomeRuntime()",
                 "private boolean launcherRuntimeStageReached");
         assertTrue(start.contains("registerNavigationReceiver()"));
@@ -216,14 +216,14 @@ public final class Ha1213BalancedStartupContractTest {
         assertTrue(start.contains("startVisibleSurfaceImmediatelyAutomatically"));
         assertTrue(start.contains("if (!launcherBootstrapReady)"));
 
-        String onStart = between(launcher, "protected void onStart()",
-                "protected void onStop()");
+        String onStart = between(launcher, "public void onStart()",
+                "public void onStop()");
         assertTrue(onStart.contains("navigationUiHandler.post(this::startImmediateHomeRuntime)"));
         String bootstrap = between(launcher, "private void startLauncherBootstrapNow()",
                 "private void finishLauncherBootstrap(");
         assertTrue(bootstrap.contains("launcherWorker.execute"));
         assertTrue(bootstrap.contains("preferences.completeDeferredStartupMigrations()"));
-        String stop = between(launcher, "protected void onStop()",
+        String stop = between(launcher, "public void onStop()",
                 "/** Starts migration immediately");
         assertTrue(stop.contains("ensureIntegrationHostScheduledAfter"));
         assertFalse(stop.contains("startIfNeededAutomatically"));

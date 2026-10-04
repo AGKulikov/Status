@@ -448,15 +448,12 @@ public final class IntentScenarioSettingsActivity extends dezz.status.widget.set
     }
 
     private void notifyRuntimeConfigurationChanged() {
-        WidgetService running = WidgetService.getInstance();
-        if (running != null) {
-            running.applyPreferences();
-        } else {
-            WidgetServiceStarter.startIfNeeded(this);
-        }
-        // Driver shortcut labels/icons cache the referenced rule for live-state rendering.
-        // Rebuild immediately after a rule edit; click dispatch independently reloads the store.
-        DriverPanelService.apply(this);
+        android.content.Context app=getApplicationContext();
+        dezz.status.widget.settings.SettingsEditSession.afterApply(this,"intent-runtime",()->{
+            WidgetService running=WidgetService.getInstance();
+            if(running!=null)running.applyPreferences();else WidgetServiceStarter.startIfNeeded(app);
+            DriverPanelService.apply(app);
+        });
     }
 
     private final class EditorViews {

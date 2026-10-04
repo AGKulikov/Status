@@ -31,7 +31,7 @@ public final class Ha1152RegressionContractTest {
     }
 
     @Test public void launcherDeviceNameUsesTheSameLiveStateColour() throws Exception {
-        String launcher = source("LauncherActivity.java");
+        String launcher = source("LauncherHomeSurface.java");
         assertTrue(launcher.contains("@Nullable final TextView titleLabel"));
         assertTrue(launcher.contains("SmartHomeTileColorPolicy.contentColor("));
         assertTrue(launcher.contains("binding.titleLabel.setTextColor(Color.parseColor(contentColor))"));

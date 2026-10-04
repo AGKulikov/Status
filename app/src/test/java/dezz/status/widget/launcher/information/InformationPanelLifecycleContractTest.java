@@ -73,7 +73,7 @@ public final class InformationPanelLifecycleContractTest {
     }
 
     @Test public void launcherOwnsIndependentFrameVisibilityAndLifecycle() throws IOException {
-        String launcher = source("dezz/status/widget/LauncherActivity.java");
+        String launcher = source("dezz/status/widget/LauncherHomeSurface.java");
         String layout = source("dezz/status/widget/launcher/LauncherLayoutStore.java");
         assertTrue(layout.contains("public static final String INFORMATION = \"information\""));
         assertTrue(launcher.contains("LauncherLayoutStore.INFORMATION, \"Информация\""));

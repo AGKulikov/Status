@@ -45,7 +45,7 @@ public final class YandexWindowLauncherContractTest {
     public void serviceLaunchStagesOurLauncherUnderTheWindowAndHomeChainIsOptional()
             throws IOException {
         String window = source();
-        String launcher = source("dezz/status/widget/LauncherActivity.java");
+        String launcher = source("dezz/status/widget/LauncherHomeSurface.java");
         String settings = source("dezz/status/widget/LauncherSettingsActivity.java");
         String preferences = source("dezz/status/widget/Preferences.java");
 

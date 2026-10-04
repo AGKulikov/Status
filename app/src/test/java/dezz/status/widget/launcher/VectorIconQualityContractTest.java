@@ -21,7 +21,7 @@ public final class VectorIconQualityContractTest {
     @Test public void scalableSurfacesUseLocalVectorDrawables() throws IOException {
         assertNoFrameworkDrawable("dezz/status/widget/launcher/LauncherIconResolver.java");
         assertNoFrameworkDrawable("dezz/status/widget/launcher/media/MediaPanelView.java");
-        assertNoFrameworkDrawable("dezz/status/widget/LauncherActivity.java");
+        assertNoFrameworkDrawable("dezz/status/widget/LauncherHomeSurface.java");
         assertNoFrameworkDrawable("dezz/status/widget/MainActivity.java");
         assertNoFrameworkDrawable("dezz/status/widget/FavoriteAppsSettingsActivity.java");
 

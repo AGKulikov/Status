@@ -1261,7 +1261,7 @@ public class Preferences {
     Preferences(Context context, boolean runStartupMigrations) {
         appContext = context.getApplicationContext();
         final Context deviceContext = context.getApplicationContext().createDeviceProtectedStorageContext();
-        prefs = deviceContext.getSharedPreferences(context.getPackageName() + "_preferences",
+        prefs = dezz.status.widget.backup.BackupPreferences.open(deviceContext,context.getPackageName() + "_preferences",
                 AppProcessPolicy.preferenceMode());
         if (runStartupMigrations) completeDeferredStartupMigrations();
         prefs = dezz.status.widget.settings.SettingsPreferences.wrap(context, prefs);
@@ -1379,7 +1379,7 @@ public class Preferences {
     static boolean isStatusWidgetEnabledForVisualBootstrap(@NonNull Context context) {
         Context app = context.getApplicationContext();
         Context device = app.createDeviceProtectedStorageContext();
-        return device.getSharedPreferences(context.getPackageName() + "_preferences",
+        return dezz.status.widget.backup.BackupPreferences.open(device,context.getPackageName() + "_preferences",
                 AppProcessPolicy.preferenceMode()).getBoolean("enabled", false);
     }
 

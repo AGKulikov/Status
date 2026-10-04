@@ -80,6 +80,10 @@ public final class AppUninstallLauncher {
                     .setPositiveButton("Удалить", null)
                     .setNegativeButton("Отмена", null)
                     .create();
+            dezz.status.widget.settings.SettingsWindowOwner owner =
+                    dezz.status.widget.settings.SettingsWindowOwner.find(context);
+            if (owner != null && owner.windowOwnerDestroyed()) return false;
+            dezz.status.widget.settings.SettingsWindowOwner.attach(context, dialog);
             Window window = dialog.getWindow();
             boolean canOverlay = Build.VERSION.SDK_INT < Build.VERSION_CODES.M
                     || Settings.canDrawOverlays(context);
@@ -89,7 +93,7 @@ public final class AppUninstallLauncher {
                 // would hide this dialog behind the still-visible app grid.
                 window.setType(windowType);
                 window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
-            } else if (!(context instanceof Activity)) {
+            } else if (!hasActivity(context)) {
                 return launchSystemConfirmation(context, target, label);
             }
             dialog.setOnShowListener(ignored -> {
@@ -103,6 +107,11 @@ public final class AppUninstallLauncher {
                     PrivilegedShell.get(context).runCommand(
                             "pm uninstall --user 0 " + target,
                             (output, error) -> {
+                                if (owner != null && owner.windowOwnerDestroyed()) {
+                                    terminal.set(true);
+                                    notifyFinished(context.getApplicationContext());
+                                    return;
+                                }
                                 if (commandSucceeded(context, target, output, error)) {
                                     terminal.set(true);
                                     dialog.dismiss();
@@ -131,6 +140,16 @@ public final class AppUninstallLauncher {
         } catch (RuntimeException failure) {
             return launchSystemConfirmation(context, target, label);
         }
+    }
+
+    private static boolean hasActivity(Context context) {
+        while (context instanceof android.content.ContextWrapper) {
+            if (context instanceof Activity) return true;
+            Context next = ((android.content.ContextWrapper) context).getBaseContext();
+            if (next == context) break;
+            context = next;
+        }
+        return false;
     }
 
     private static boolean launchSystemConfirmation(

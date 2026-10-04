@@ -133,6 +133,7 @@ public final class PhoneNotificationLayoutEditorActivity extends dezz.status.wid
         preview.setBackground(previewBackground);
         preview.setPadding(dp(12), dp(12), dp(12), dp(12));
         previewCard = new PhoneNotificationCardView(this);
+        previewCard.setTag(dezz.status.widget.settings.SettingsEditorLayout.PREVIEW_TAG);
         previewCard.setPresentation(config, PhoneNotificationCardView.Model.preview());
         preview.addView(previewCard, new FrameLayout.LayoutParams(match(), match()));
         editOverlay = new PanelContentEditOverlay(this);
@@ -217,8 +218,10 @@ public final class PhoneNotificationLayoutEditorActivity extends dezz.status.wid
         for (PhoneNotificationLayoutConfig.Element element : config.elements()) {
             page.addView(elementCard(element), top(9));
         }
+        page.addView(new dezz.status.widget.settings.SettingsPreviewView(this,previewCard));
         return scroll;
     }
+    @Override public View settingsPreview(){return previewCard;}
 
     private void rebuild() {
         View screen = buildScreen();
