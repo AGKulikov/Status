@@ -50,6 +50,10 @@ public class SettingsScreensInteractionTest {
     private final int theme;
     public SettingsScreensInteractionTest(Class<? extends Activity> type,int theme){this.type=type;this.theme=theme;}
     @Test(timeout=30000) public void screenAndRealSectionsRemainUsableAndCancelDoesNotWrite()throws Exception {
+        // A marquee intentionally schedules frames forever. Do not auto-advance
+        // vsync until it finishes: advance a finite interval for each observation.
+        org.robolectric.shadows.ShadowChoreographer.setPaused(true);
+        org.robolectric.shadows.ShadowChoreographer.setFrameDelay(java.time.Duration.ofMillis(16));
         ReflectionHelpers.setStaticField(CarIntegrations.class,"instance",new NoCarIntegration());
         SettingsAppearance.preferences(RuntimeEnvironment.getApplication()).edit().putInt("theme",theme).putInt("textSp",26).commit();
         try(ActivityController<? extends Activity> controller=Robolectric.buildActivity(type)){
@@ -70,7 +74,7 @@ public class SettingsScreensInteractionTest {
             assertEquals("Cancellation and late callbacks keep working settings",before,disk.getAll());
         }
     }
-    static void idle(){Shadows.shadowOf(Looper.getMainLooper()).idle();}
+    static void idle(){Shadows.shadowOf(Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(32));}
     static void measure(View view){view.measure(View.MeasureSpec.makeMeasureSpec(1760,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(656,View.MeasureSpec.EXACTLY));view.layout(0,0,1760,656);}
     static Button find(View root,String text){
         if(root instanceof Button&&text.equals(((TextView)root).getText().toString()))return(Button)root;

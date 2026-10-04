@@ -23,6 +23,7 @@ import dezz.status.widget.shell.PrivilegedShell;
 
 /** Dispatches button assignments; shares Natro actions with the DIM and driver menus. */
 final class ButtonActionExecutor {
+    private static final java.util.concurrent.atomic.AtomicLong traceSequence=new java.util.concurrent.atomic.AtomicLong();
     private final Context context;
     private final VehicleButtonController settings;
     private final Handler main;
@@ -127,9 +128,28 @@ final class ButtonActionExecutor {
                 try {
                 LauncherShortcutStore.Shortcut shortcut = LauncherShortcutStore.decodeAction(binding.shortcutJson);
                 ButtonActionDeadline deadline = ButtonActionDeadline.current();
-                if (shortcut.enabled && LauncherShortcutStore.isInteractive(shortcut)) main.post(() -> {
-                    if (deadline.valid()) driver.execute(shortcut);
-                });
+                long trace=traceSequence.incrementAndGet(),queued=android.os.SystemClock.uptimeMillis();
+                String action=shortcut.kind.name()+(shortcut.kind==LauncherShortcutStore.Kind.BUILTIN
+                        ?":"+LauncherShortcutStore.Builtin.fromKey(shortcut.target).name():"");
+                if (shortcut.enabled && LauncherShortcutStore.isInteractive(shortcut)) {
+                    dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("button-action",
+                            "trace="+trace+", stage=main_queued, action="+action);
+                    boolean posted=main.post(() -> {
+                        long delay=android.os.SystemClock.uptimeMillis()-queued;
+                        if(!deadline.valid()){
+                            dezz.status.widget.diagnostics.DiagnosticJournal.warn("button-action",
+                                    "trace="+trace+", stage=dropped_expired_or_stale, main_wait_ms="+delay+", action="+action);
+                            return;
+                        }
+                        dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("button-action",
+                                "trace="+trace+", stage=handler_started, main_wait_ms="+delay+", action="+action);
+                        driver.execute(shortcut);
+                        dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("button-action",
+                                "trace="+trace+", stage=handler_returned, action="+action+", effect=unobserved");
+                    });
+                    if(!posted)dezz.status.widget.diagnostics.DiagnosticJournal.warn("button-action","trace="+trace+", stage=main_rejected");
+                }else dezz.status.widget.diagnostics.DiagnosticJournal.warn("button-action",
+                        "trace="+trace+", stage=disabled_or_noninteractive, action="+action);
                 } catch (org.json.JSONException invalid) { throw new IllegalArgumentException("Некорректное действие меню", invalid); }
                 return;
         }

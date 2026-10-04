@@ -116,6 +116,8 @@ public final class DriverPanelActionExecutor {
                             shortcut.target, anchor);
             }
         } catch (RuntimeException error) {
+            dezz.status.widget.diagnostics.DiagnosticJournal.warn("button-action",
+                    "stage=driver_handler_failed, kind="+shortcut.kind.name()+", reason="+error.getClass().getSimpleName());
             toast("Действие не выполнено: " + shortcut.title);
         }
     }
