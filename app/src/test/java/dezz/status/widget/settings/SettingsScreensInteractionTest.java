@@ -66,8 +66,15 @@ public class SettingsScreensInteractionTest {
             snapshot(decor,type.getSimpleName()+"-"+(theme==1?"light":"dark"));
             Button apply=find(decor,"Применить");assertNotNull("Reachable Apply",apply);assertTrue(apply.isShown());
             assertNotNull("Reachable Cancel",find(decor,"Отмена"));
+            View back=activity.findViewById(dezz.status.widget.R.id.settings_back_button);
             for(SettingsSection section:SettingsSection.values()){
                 Button tab=find(decor,section.title);if(tab==null||!tab.isShown())continue;
+                assertEquals("Section label must fit on one line: "+section.title,1,tab.getLineCount());
+                if(back!=null){
+                    android.graphics.Rect backBounds=new android.graphics.Rect(),tabBounds=new android.graphics.Rect();
+                    back.getGlobalVisibleRect(backBounds);tab.getGlobalVisibleRect(tabBounds);
+                    assertFalse("Back must not cover a section",android.graphics.Rect.intersects(backBounds,tabBounds));
+                }
                 tab.performClick();measure(decor);assertTrue(tab.isSelected());
             }
             session.cancel(activity);controller.pause().stop();idle();

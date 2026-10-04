@@ -172,13 +172,22 @@ public final class SettingsBackNavigation {
         final int[] baseTop = {initialBaseTop};
         final int[] lastAppliedTop = {Integer.MIN_VALUE};
         final int[] appliedExtra = {Integer.MIN_VALUE};
+        final View[] insetHost = {content};
         final Runnable[] updater = new Runnable[1];
         updater[0] = () -> {
             if (!content.isAttachedToWindow() || activity.isFinishing()
                     || activity.isDestroyed()) {
                 return;
             }
-            int observedTop = content.getPaddingTop();
+            View host = reservedTop > 0 ? SettingsEditorLayout.safeInsetHost(content) : content;
+            if (host != insetHost[0]) {
+                View old = insetHost[0];
+                old.setPadding(old.getPaddingLeft(), baseTop[0], old.getPaddingRight(), old.getPaddingBottom());
+                insetHost[0] = host;
+                baseTop[0] = host.getPaddingTop();
+                lastAppliedTop[0] = Integer.MIN_VALUE;
+            }
+            int observedTop = host.getPaddingTop();
             if (lastAppliedTop[0] == Integer.MIN_VALUE
                     ? observedTop != baseTop[0] : observedTop != lastAppliedTop[0]) {
                 // Edge-to-edge screens may apply their system-bar padding after this helper is
@@ -192,8 +201,8 @@ public final class SettingsBackNavigation {
             int desiredTop = baseTop[0] + reservedTop + extra;
             if (desiredTop != lastAppliedTop[0]) {
                 lastAppliedTop[0] = desiredTop;
-                content.setPadding(content.getPaddingLeft(), desiredTop,
-                        content.getPaddingRight(), content.getPaddingBottom());
+                host.setPadding(host.getPaddingLeft(), desiredTop,
+                        host.getPaddingRight(), host.getPaddingBottom());
             }
             if (extra != appliedExtra[0]) {
                 appliedExtra[0] = extra;

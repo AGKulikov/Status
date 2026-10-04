@@ -33,6 +33,8 @@ public final class NavigatorWindowSettingsActivity extends dezz.status.widget.se
     private Preferences preferences;
     private NavigationIntegrationConfig navigation;
     private NavigationIntegrationConfig.FloatingWindowProfile window;
+    private String originalRaw;
+    private String originalCanonical;
 
     private MaterialSwitch enabled;
     private MaterialSwitch locked;
@@ -57,8 +59,18 @@ public final class NavigatorWindowSettingsActivity extends dezz.status.widget.se
     protected void onCreate(@Nullable Bundle state) {
         super.onCreate(state);
         preferences = new Preferences(this);
-        navigation = NavigationIntegrationConfig.fromJson(
-                preferences.navigationIntegrationConfigJson.get());
+        originalRaw = preferences.navigationIntegrationConfigJson.get();
+        try {
+            navigation = originalRaw.trim().isEmpty() ? new NavigationIntegrationConfig()
+                    : NavigationIntegrationConfig.fromJson(originalRaw);
+            originalCanonical = navigation.toJson().toString();
+        } catch (IllegalArgumentException | JSONException invalid) {
+            TextView error = hint("Не удалось прочитать настройки Навигатора. "
+                    + "Сохранённые данные не изменены. Восстановите совместимую копию настроек.");
+            error.setPadding(dp(24), dp(24), dp(24), dp(24));
+            setContentView(error);
+            return;
+        }
         window = navigation.mainFloatingWindow;
         View content = buildContent();
         setContentView(content);
@@ -137,12 +149,6 @@ public final class NavigatorWindowSettingsActivity extends dezz.status.widget.se
                 + "скрывается вместе с ними в обоих режимах. Размер, фон и прозрачность "
                 + "берутся у штатного блока Навигатора."), topMargin(6));
 
-        MaterialButton save = new MaterialButton(this);
-        save.setAllCaps(false);
-        save.setText("Сохранить и применить");
-        save.setTextSize(17);
-        save.setOnClickListener(view -> save());
-        page.addView(save, topMargin(24));
         return scroll;
     }
 
@@ -158,7 +164,8 @@ public final class NavigatorWindowSettingsActivity extends dezz.status.widget.se
         return row;
     }
 
-    private void save() {
+    @Override protected void flushSettingsDraft() {
+        if (window == null || enabled == null) return;
         window.enabled = enabled.isChecked();
         boolean fullyLocked = locked.isChecked();
         window.movementLocked = fullyLocked;
@@ -181,21 +188,15 @@ public final class NavigatorWindowSettingsActivity extends dezz.status.widget.se
         window.closeButtonVisible = closeButtonVisible.isChecked();
         navigation.normalize();
         try {
-            String encoded = navigation.toJson().toString();
-            if (!preferences.navigationIntegrationConfigJson.commit(encoded)
-                    || !encoded.equals(preferences.navigationIntegrationConfigJson.get())) {
-                throw new JSONException("контрольное чтение настроек не совпало");
-            }
+            String canonical = navigation.toJson().toString();
+            // Opening, leaving, or undoing all edits preserves the original bytes,
+            // including the absent/default configuration. Only the session commits.
+            String encoded = canonical.equals(originalCanonical) ? originalRaw : canonical;
+            if (!encoded.equals(preferences.navigationIntegrationConfigJson.get()))
+                preferences.navigationIntegrationConfigJson.set(encoded);
         } catch (JSONException error) {
-            Toast.makeText(this, "Не удалось сохранить настройки окна",
-                    Toast.LENGTH_LONG).show();
-            return;
+            throw new IllegalStateException("Cannot encode navigation window draft", error);
         }
-        NavigationHudEndpointService.requestConfigurationRefresh(this);
-        Toast.makeText(this, fullyLocked
-                        ? "Окно зафиксировано, ручки скрыты"
-                        : "Настройки окна Навигатора применены",
-                Toast.LENGTH_SHORT).show();
     }
 
     @NonNull

@@ -4501,11 +4501,6 @@
   },
   {
     "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
-    "text": "Сохранить и применить",
-    "route": ""
-  },
-  {
-    "activity": "dezz.status.widget.NavigatorWindowSettingsActivity",
     "text": "Сохранять пропорции при изменении размера",
     "route": ""
   },

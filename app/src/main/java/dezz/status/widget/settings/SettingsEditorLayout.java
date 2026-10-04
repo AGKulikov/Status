@@ -54,7 +54,7 @@ public final class SettingsEditorLayout extends LinearLayout {
         ScrollView rail = new ScrollView(context); rail.setFillViewport(false);
         navigation = new LinearLayout(context); navigation.setOrientation(VERTICAL);
         navigation.setPadding(dp(8), dp(8), dp(8), dp(8)); rail.addView(navigation);
-        split.addView(rail, new LayoutParams(dp(194), ViewGroup.LayoutParams.MATCH_PARENT));
+        split.addView(rail, new LayoutParams(dp(258), ViewGroup.LayoutParams.MATCH_PARENT));
         split.addView(scroll, new LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1));
         if (preview != null) split.addView(preview, new LayoutParams(dp(280), ViewGroup.LayoutParams.MATCH_PARENT));
         addView(split, new LayoutParams(-1, 0, 1));
@@ -75,6 +75,17 @@ public final class SettingsEditorLayout extends LinearLayout {
         });
         post(() -> scroll.scrollTo(0, SettingsAppearance.preferences(context)
                 .getInt("editor." + owner + "." + selected.name(), 0)));
+    }
+
+    /** The fixed Back button must reserve space above the rail as well as the form. */
+    static View safeInsetHost(View content) {
+        android.view.ViewParent parent = content.getParent();
+        while (parent instanceof View) {
+            if (parent instanceof SettingsEditorLayout
+                    && ((SettingsEditorLayout) parent).scroll == content) return (View) parent;
+            parent = parent.getParent();
+        }
+        return content;
     }
 
     /** Only explicit vertical settings forms are transformed. Canvas/preview siblings stay put. */
