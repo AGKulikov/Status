@@ -954,55 +954,55 @@
         },
         {
           "dialogs": 1,
-          "line": 467,
+          "line": 475,
           "method": "editMapSurface",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 990,
+          "line": 1006,
           "method": "editHudRoadEvents",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1064,
+          "line": 1080,
           "method": "editNavigatorIntegration",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1645,
+          "line": 1661,
           "method": "editHorizontalGroup",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1873,
+          "line": 1897,
           "method": "editBackdrop",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2052,
+          "line": 2084,
           "method": "editGlobalOptions",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2152,
+          "line": 2192,
           "method": "editStockHudControls",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2289,
+          "line": 2329,
           "method": "confirmReset",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2340,
+          "line": 2380,
           "method": "deleteSelected",
           "numeric_controls": 0
         }
@@ -1455,7 +1455,7 @@
       ],
       "numeric_controls": 1,
       "path": "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java",
-      "sha256": "8332d554dde6175e5e354d19eae4be8c64135b535334a551ce9990485591613b"
+      "sha256": "1bf1fb3e2b46ad40daba48bd18a01b433ce19e5a5fd56b5e9427598c9ce004f4"
     },
     {
       "class": "dezz.status.widget.InformationPanelSettingsActivity",
@@ -1597,19 +1597,19 @@
         },
         {
           "dialogs": 1,
-          "line": 345,
+          "line": 348,
           "method": "editSelected",
           "numeric_controls": 2
         },
         {
           "dialogs": 1,
-          "line": 633,
+          "line": 639,
           "method": "editMapPerformance",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1114,
+          "line": 1123,
           "method": "editClusterRoadEvents",
           "numeric_controls": 0
         }
@@ -1905,7 +1905,7 @@
       ],
       "numeric_controls": 4,
       "path": "app/src/main/java/dezz/status/widget/InstrumentPanelSettingsActivity.java",
-      "sha256": "af33ec82c060151c7f5766fc47c5b115dc4f85c51daead8be223f49e8859f330"
+      "sha256": "49c7c32cac00e070db5bc20b6515109de82b3f1be21cd6e97dc1448ec8c8bd8f"
     },
     {
       "class": "dezz.status.widget.IntentScenarioSettingsActivity",
@@ -5109,13 +5109,13 @@
       "forms": [
         {
           "dialogs": 1,
-          "line": 197,
+          "line": 198,
           "method": "validKind",
           "numeric_controls": 0
         },
         {
           "dialogs": 0,
-          "line": 228,
+          "line": 236,
           "method": "buildContent",
           "numeric_controls": 0
         }
@@ -5140,7 +5140,7 @@
       ],
       "numeric_controls": 1,
       "path": "app/src/main/java/dezz/status/widget/settings/AppleColorPickerDialog.java",
-      "sha256": "57d18ade6e5186430e348741d62d1cac5b4d5841de0e9b31f7d99ef47fca242c"
+      "sha256": "cf8fdd87a5d23d215def1bffa20bb1a0e0330f5db8e963c06ed9ab2bc2a1a0aa"
     },
     {
       "class": "dezz.status.widget.settings.SettingsActivity",
@@ -5148,7 +5148,7 @@
       "labels": [],
       "numeric_controls": 0,
       "path": "app/src/main/java/dezz/status/widget/settings/SettingsActivity.java",
-      "sha256": "bece488f981c6a7e8c0b808cf7b1b6b47bdeb022b9f60f093684715058fc104c"
+      "sha256": "f3852bf06ab41731088ec67c1a34cdaab8bc914b4f1a4bc3ca10241074ffe6b8"
     },
     {
       "class": "dezz.status.widget.settings.VectorIconPickerDialog",

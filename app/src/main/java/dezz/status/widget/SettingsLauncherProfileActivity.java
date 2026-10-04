@@ -6,7 +6,7 @@ import dezz.status.widget.settings.SettingsAppearance;
 import dezz.status.widget.settings.SettingsEditSession;
 import dezz.status.widget.settings.SettingsEditorLayout;
 /** Settings-only profile host; the actual HOME activity keeps its own rendering policy. */
-public abstract class SettingsLauncherProfileActivity extends LauncherProfileActivity {
+public abstract class SettingsLauncherProfileActivity extends LauncherProfileActivity implements dezz.status.widget.settings.SettingsPreviewProvider {
     private SettingsEditSession settingsSession;
     private boolean settingsReady;
     @Override protected void onCreate(Bundle state){
@@ -24,6 +24,7 @@ public abstract class SettingsLauncherProfileActivity extends LauncherProfileAct
     }
     @Override public void onContentChanged(){super.onContentChanged();if(settingsReady)getWindow().getDecorView().post(()->{if(!isDestroyed())installSettings();});}
     protected void flushSettingsDraft() {}
+    @Override public android.view.View settingsPreview(){return null;}
     @Override public Object onRetainCustomNonConfigurationInstance(){return settingsSession;}
     @Override public void finish(){
         if(settingsSession==null||!settingsSession.requestFinish(this,()->super.finish()))super.finish();

@@ -1697,7 +1697,7 @@ public final class NavigationHudV2ContractTest {
         assertTrue(settings.contains("Цвет рекомендуемой полосы"));
         assertTrue(settings.contains("Красный сигнал"));
         assertTrue(settings.contains("Тяжёлая пробка"));
-        assertTrue(settings.contains("SeekBar control = new SeekBar(this)"));
+        assertTrue(settings.contains("SeekBar control = new dezz.status.widget.settings.SettingsSeekBar(this, minimum, step, suffix)"));
         assertTrue(settings.contains("SliderField fontSize = slider"));
         assertTrue(settings.contains("SliderField brightness = slider"));
         assertTrue(settings.contains("SliderField borderOpacity = slider"));

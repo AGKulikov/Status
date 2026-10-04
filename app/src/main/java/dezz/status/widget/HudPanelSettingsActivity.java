@@ -412,8 +412,9 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
             dialog.setOnDismissListener(ignored ->
                     canvas.setMaximumManeuverCardPreview(null));
         }
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(view -> {
+        final boolean[] draftValid = {false};
+        Runnable updateDraftPreview = () -> {
+            draftValid[0] = false;
                     try {
                         // Validate the whole draft before changing any live element or shared fuel state.
                         HudFuelSettings fuelDraft = fuelControls == null ? null : fuelControls.read();
@@ -454,11 +455,18 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                         canvas.updateConfig(config);
                         updateSelection(item);
                         persist(false);
-                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
+                        draftValid[0] = true;
                     } catch (Exception error) {
-                        Toast.makeText(this, "Проверьте параметры: " + error.getMessage(),
+                        if (!dezz.status.widget.settings.SettingsLivePreview.running()) Toast.makeText(this, "Проверьте параметры: " + error.getMessage(),
                                 Toast.LENGTH_LONG).show();
                     }
+                
+        };
+        dezz.status.widget.settings.SettingsLivePreview.bind(scroll, updateDraftPreview);
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> {
+                    updateDraftPreview.run();
+                    if (draftValid[0]) dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                 }));
         showSafeDialog(dialog);
     }
@@ -828,8 +836,9 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                 .setPositiveButton("Применить", null)
                 .setNegativeButton("Отмена", null)
                 .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(view -> {
+        final boolean[] draftValid = {false};
+        Runnable updateDraftPreview = () -> {
+            draftValid[0] = false;
                     try {
                         item.title = value(title);
                         item.x = x.intValue();
@@ -979,11 +988,18 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                         canvas.updateConfig(config);
                         updateSelection(item);
                         persist(false);
-                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
+                        draftValid[0] = true;
                     } catch (Exception error) {
-                        Toast.makeText(this, "Проверьте параметры: " + error.getMessage(),
+                        if (!dezz.status.widget.settings.SettingsLivePreview.running()) Toast.makeText(this, "Проверьте параметры: " + error.getMessage(),
                                 Toast.LENGTH_LONG).show();
                     }
+                
+        };
+        dezz.status.widget.settings.SettingsLivePreview.bind(scroll, updateDraftPreview);
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> {
+                    updateDraftPreview.run();
+                    if (draftValid[0]) dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                 }));
         showSafeDialog(dialog);
     }
@@ -1719,8 +1735,9 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                 .setPositiveButton("Применить", null)
                 .setNegativeButton("Отмена", null)
                 .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(view -> {
+        final boolean[] draftValid = {false};
+        Runnable updateDraftPreview = () -> {
+            draftValid[0] = false;
                     try {
                         ArrayList<String> memberIds = new ArrayList<>();
                         for (HudElementConfig candidate : candidates) {
@@ -1729,7 +1746,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                             }
                         }
                         if (memberIds.size() < 2) {
-                            Toast.makeText(this, "Выберите минимум два элемента",
+                            if (!dezz.status.widget.settings.SettingsLivePreview.running()) Toast.makeText(this, "Выберите минимум два элемента",
                                     Toast.LENGTH_SHORT).show();
                             return;
                         }
@@ -1760,11 +1777,18 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                         canvas.updateConfig(config);
                         updateSelection(group);
                         persist(false);
-                        dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
+                        draftValid[0] = true;
                     } catch (RuntimeException error) {
-                        Toast.makeText(this, "Проверьте параметры: " + error.getMessage(),
+                        if (!dezz.status.widget.settings.SettingsLivePreview.running()) Toast.makeText(this, "Проверьте параметры: " + error.getMessage(),
                                 Toast.LENGTH_LONG).show();
                     }
+                
+        };
+        dezz.status.widget.settings.SettingsLivePreview.bind(scroll, updateDraftPreview);
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> {
+                    updateDraftPreview.run();
+                    if (draftValid[0]) dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                 }));
         showSafeDialog(dialog);
     }
@@ -1910,8 +1934,9 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                 .setPositiveButton("Применить", null)
                 .setNegativeButton("Отмена", null)
                 .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(view -> {
+        final boolean[] draftValid = {false};
+        Runnable updateDraftPreview = () -> {
+            draftValid[0] = false;
                     item.title = value(title);
                     item.x = x.intValue();
                     item.y = y.intValue();
@@ -1928,7 +1953,14 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                     canvas.updateConfig(config);
                     updateSelection(item);
                     persist(false);
-                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
+                    draftValid[0] = true;
+                
+        };
+        dezz.status.widget.settings.SettingsLivePreview.bind(scroll, updateDraftPreview);
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> {
+                    updateDraftPreview.run();
+                    if (draftValid[0]) dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                 }));
         showSafeDialog(dialog);
     }
@@ -2115,15 +2147,16 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                 .setPositiveButton("Применить", null)
                 .setNegativeButton("Отмена", null)
                 .create();
-        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
-                .setOnClickListener(view -> {
+        final boolean[] draftValid = {false};
+        Runnable updateDraftPreview = () -> {
+            draftValid[0] = false;
                     HudFuelSettings fuelDraft;
                     boolean fuelChanged;
                     try {
                         fuelDraft = fuelControls.read();
                         fuelChanged = fuelControls.changed(fuelDraft);
                     } catch (Exception invalid) {
-                        Toast.makeText(this, invalid.getMessage(), Toast.LENGTH_LONG).show();
+                        if (!dezz.status.widget.settings.SettingsLivePreview.running()) Toast.makeText(this, invalid.getMessage(), Toast.LENGTH_LONG).show();
                         return;
                     }
                     config.gridColumns = columns.intValue();
@@ -2145,7 +2178,14 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                     config.normalize();
                     canvas.updateConfig(config);
                     persist(false);
-                    dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
+                    draftValid[0] = true;
+                
+        };
+        dezz.status.widget.settings.SettingsLivePreview.bind(scroll, updateDraftPreview);
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(view -> {
+                    updateDraftPreview.run();
+                    if (draftValid[0]) dezz.status.widget.settings.SettingsDialogBuilder.commitAndDismiss(dialog);
                 }));
         showSafeDialog(dialog);
     }
@@ -2372,6 +2412,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
     }
 
     @Override protected void flushSettingsDraft() { persist(false); }
+    @Override public View settingsPreview() { return canvas; }
 
     private void updateStatus() {
         if (status == null) return;

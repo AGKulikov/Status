@@ -163,6 +163,7 @@ public final class AppleColorPickerDialog {
         private boolean explicitAlpha;
         @NonNull private SettingsColorValue.Kind kind;
         private boolean internalUpdate;
+        private boolean accepted, cancelled;
 
         private PreviewView preview;
         private EditText hex;
@@ -206,10 +207,11 @@ public final class AppleColorPickerDialog {
             dialog = new AlertDialog.Builder(activity)
                     .setTitle(title)
                     .setView(buildContent())
-                    .setNegativeButton("Отмена", (d, which) -> listener.onCancelled(original))
+                    .setNegativeButton("Отмена", (d, which) -> cancelPreview())
                     .setPositiveButton("Применить", null)
                     .create();
-            dialog.setOnCancelListener(d -> listener.onCancelled(original));
+            dialog.setOnCancelListener(d -> cancelPreview());
+            dialog.setOnDismissListener(d -> { if (!accepted) cancelPreview(); });
             dialog.setOnShowListener(ignored -> {
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(APPLE_BLUE);
                 dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
@@ -220,10 +222,16 @@ public final class AppleColorPickerDialog {
                     }
                     applyParsed(typed, false);
                     listener.onSelected(serialized());
+                    accepted = true;
                     dialog.dismiss();
                 });
             });
             dialog.show();
+            SettingsAppearance.apply(activity, dialog.getWindow().getDecorView());
+        }
+
+        private void cancelPreview() {
+            if (!cancelled && !accepted) { cancelled = true; listener.onCancelled(original); }
         }
 
         @NonNull

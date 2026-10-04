@@ -40,6 +40,8 @@ public final class SettingsEditSession {
     private Runnable flush=()->{};
     private Runnable reload=()->{};
     private int generation;
+    private boolean primed;
+    private final Map<SharedPreferences,Map<String,Object>> initialChanges=new HashMap<>();
     private TextView state;
 
     private SettingsEditSession(SettingsEditSession parent){this.parent=parent;}
@@ -106,10 +108,21 @@ public final class SettingsEditSession {
         for(Map.Entry<String,Object> entry:edits.entrySet())draft.put(entry.getKey(),entry.getValue(),original);
         updateState();
     }
-    public synchronized boolean dirty(){for(SettingsDraft draft:drafts.values())if(draft.dirty())return true;return false;}
+    public synchronized boolean dirty(){
+        for(Map.Entry<SharedPreferences,SettingsDraft> entry:drafts.entrySet()){
+            Map<String,Object> initial=initialChanges.get(entry.getKey());
+            if(initial==null)initial=Collections.emptyMap();
+            if(!entry.getValue().changes().equals(initial))return true;
+        }
+        return false;
+    }
     public synchronized boolean apply(Activity activity) {
         if(closed)return true;
         flush.run();
+        if(!dirty())return true;
+        if(parent!=null&&parent.closed){
+            Toast.makeText(activity,"Родительский редактор уже закрыт. Откройте настройки заново.",Toast.LENGTH_LONG).show();return false;
+        }
         for(Map.Entry<SharedPreferences,SettingsDraft> entry:drafts.entrySet()){
             Map<String,?> current=parent==null?entry.getKey().getAll():parent.read(entry.getKey());
             if(!entry.getValue().conflicts(current).isEmpty()){
@@ -129,16 +142,21 @@ public final class SettingsEditSession {
                 Toast.makeText(activity,"Не удалось сохранить. Черновик остаётся открыт.",Toast.LENGTH_LONG).show();return false;
             }
         }
-        for(SettingsDraft draft:drafts.values())draft.applied();updateState();refresh(activity);
+        for(SettingsDraft draft:drafts.values())draft.applied();initialChanges.clear();updateState();refresh(activity);
         return true;
     }
     public synchronized void cancel(Activity activity){
-        if(closed)return;closed=true;for(SettingsDraft draft:drafts.values())draft.close();
+        if(closed)return;boolean changed=dirty();closed=true;for(SettingsDraft draft:drafts.values())draft.close();
         active.remove(this);
-        refresh(activity);
+        if(changed)refresh(activity);
     }
     public void install(Activity activity,Runnable flush,Runnable reload,Runnable finish) {
         this.flush=flush;this.reload=reload;
+        if(!primed){
+            flush.run();
+            for(Map.Entry<SharedPreferences,SettingsDraft> entry:drafts.entrySet())initialChanges.put(entry.getKey(),entry.getValue().changes());
+            primed=true;
+        }
         ViewGroup content=activity.findViewById(android.R.id.content);
         if(content==null||content.getChildCount()==0)return;
         if("natro.settings.draft".equals(content.getChildAt(0).getTag()))return;
@@ -208,8 +226,19 @@ public final class SettingsEditSession {
     private void updateState(){if(state!=null)state.setText(dirty()?"Предпросмотр · есть изменения":"Изменений нет");}
     private static void refresh(Activity activity){
         WidgetService service=WidgetService.getInstance();if(service!=null)service.applyPreferences();
-        HudPresentationService.apply(activity.getApplicationContext());
-        InstrumentDisplayLauncher.apply(activity.getApplicationContext());
-        activity.sendBroadcast(new Intent(InstrumentPanelStore.ACTION_CONFIG_CHANGED).setPackage(activity.getPackageName()));
+        String owner=activity.getClass().getSimpleName();
+        if(owner.equals("HudPanelSettingsActivity"))HudPresentationService.apply(activity.getApplicationContext());
+        if(owner.equals("InstrumentPanelSettingsActivity")){
+            InstrumentDisplayLauncher.apply(activity.getApplicationContext());
+            activity.sendBroadcast(new Intent(InstrumentPanelStore.ACTION_CONFIG_CHANGED).setPackage(activity.getPackageName()));
+        }
+        if(owner.equals("HudPanelSettingsActivity")||owner.equals("InstrumentPanelSettingsActivity")
+                ||owner.equals("NavigatorWindowSettingsActivity")||owner.equals("NavigationPanelSettingsActivity"))
+            dezz.status.widget.navigation.NavigationHudEndpointService.requestConfigurationRefresh(activity.getApplicationContext());
+        if(owner.equals("DriverPanelSettingsActivity")||owner.equals("DriverFavoritesSettingsActivity"))
+            dezz.status.widget.driver.DriverPanelService.apply(activity.getApplicationContext());
+        if(owner.equals("PassengerPanelSettingsActivity")||owner.equals("PassengerFavoritesSettingsActivity"))
+            dezz.status.widget.driver.PassengerPanelService.apply(activity.getApplicationContext());
+        if(owner.startsWith("SystemShade"))dezz.status.widget.shade.SystemShadeService.reconcile(activity.getApplicationContext(),false);
     }
 }

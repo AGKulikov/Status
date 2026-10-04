@@ -54,7 +54,7 @@ public final class LauncherShortcutSettingsGridContractTest {
 
         assertTrue(source.contains("MaterialSwitch visible = new MaterialSwitch(this)"));
         assertTrue(source.contains("setShortcutVisible(shortcut.id, checked)"));
-        assertTrue(source.contains("SeekBar iconSize = new SeekBar(this)"));
+        assertTrue(source.contains("SeekBar iconSize = new dezz.status.widget.settings.SettingsSeekBar(this, LauncherShortcutStore.MIN_ICON_SIZE_PX, 1, \" px\")"));
         assertTrue(source.contains("setShortcutIconSize(shortcut.id, selected)"));
         assertTrue(source.contains("LauncherShortcutStore.MIN_ICON_SIZE_PX"));
         assertTrue(source.contains("LauncherShortcutStore.MAX_ICON_SIZE_PX"));

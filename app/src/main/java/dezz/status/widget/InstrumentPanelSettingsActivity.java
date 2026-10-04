@@ -330,15 +330,18 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         Switch transparent = switchView(
                 "Прозрачный фон (градиент отключён)", config.transparentBackground);
         content.addView(transparent);
-        new dezz.status.widget.settings.SettingsDialogBuilder(this)
-                .setTitle("Фон приборной панели")
-                .setView(content)
-                .setPositiveButton("Применить", (dialog, which) -> {
+        Runnable updateDraftPreview = () -> {
                     config.backgroundBottomColor = bottom.value;
                     config.blackZonePercent = blackZone.getProgress();
                     config.transparentBackground = transparent.isChecked();
                     refresh(null, true);
-                })
+                
+        };
+        dezz.status.widget.settings.SettingsLivePreview.bind(content, updateDraftPreview);
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
+                .setTitle("Фон приборной панели")
+                .setView(content)
+                .setPositiveButton("Применить", (dialog, which) -> { updateDraftPreview.run(); })
                 .setNegativeButton("Отмена", null)
                 .show();
     }
@@ -499,10 +502,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         content.addView(opacityValue);
         content.addView(opacity);
 
-        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
-                .setTitle("Настройка элемента")
-                .setView(scroll)
-                .setPositiveButton("Применить", (ignoredDialog, which) -> {
+        Runnable updateDraftPreview = () -> {
                     element.style = styles[style.getSelectedItemPosition()];
                     element.enabled = visible.isChecked();
                     element.responseMillis = response.getProgress();
@@ -556,7 +556,13 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
                     }
                     element.normalize(config.columns, config.rows);
                     refresh(element.id, true);
-                })
+                
+        };
+        dezz.status.widget.settings.SettingsLivePreview.bind(scroll, updateDraftPreview);
+        AlertDialog dialog = new dezz.status.widget.settings.SettingsDialogBuilder(this)
+                .setTitle("Настройка элемента")
+                .setView(scroll)
+                .setPositiveButton("Применить", (ignoredDialog, which) -> { updateDraftPreview.run(); })
                 .setNegativeButton("Отмена", null)
                 .create();
         if (element.type == InstrumentElementType.NAV_MANEUVER_CARD) {
@@ -987,10 +993,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         SliderField trafficGradient = slider(content, "Длина перехода цветов пробок",
                 map.trafficGradientLength, 0, 100, 1, " %");
 
-        new dezz.status.widget.settings.SettingsDialogBuilder(this)
-                .setTitle("Независимая карта приборной панели")
-                .setView(scroll)
-                .setPositiveButton("Применить", (dialog, which) -> {
+        Runnable updateDraftPreview = () -> {
                     map.enabled = mapEnabled.isChecked();
                     map.cameraMode = navigationCameraModeValue(
                             cameraMode.getSelectedItemPosition());
@@ -1107,7 +1110,13 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
                                 .setPackage(getPackageName()));
                         preview.updateConfig(config);
                     }
-                })
+                
+        };
+        dezz.status.widget.settings.SettingsLivePreview.bind(scroll, updateDraftPreview);
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
+                .setTitle("Независимая карта приборной панели")
+                .setView(scroll)
+                .setPositiveButton("Применить", (dialog, which) -> { updateDraftPreview.run(); })
                 .setNegativeButton("Отмена", null)
                 .show();
     }
@@ -1142,16 +1151,19 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
             content.addView(mode);
             controls.add(new RoadEventControl(spec.tag, mode));
         }
-        new dezz.status.widget.settings.SettingsDialogBuilder(this)
-                .setTitle("Дорожные события приборной панели")
-                .setView(scroll)
-                .setPositiveButton("Применить", (dialog, which) -> {
+        Runnable updateDraftPreview = () -> {
                     for (RoadEventControl control : controls) {
                         profile.setRoadEventMode(control.tag, roadEventModeValue(
                                 control.mode.getSelectedItemPosition()));
                     }
                     persistNavigationConfiguration(navigation, preferences);
-                })
+                
+        };
+        dezz.status.widget.settings.SettingsLivePreview.bind(scroll, updateDraftPreview);
+        new dezz.status.widget.settings.SettingsDialogBuilder(this)
+                .setTitle("Дорожные события приборной панели")
+                .setView(scroll)
+                .setPositiveButton("Применить", (dialog, which) -> { updateDraftPreview.run(); })
                 .setNegativeButton("Отмена", null)
                 .show();
     }
@@ -1196,6 +1208,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
     }
 
     @Override protected void flushSettingsDraft() { persist(false); }
+    @Override public View settingsPreview() { return preview; }
 
     private boolean containsMap() {
         for (InstrumentElementConfig element : config.elements) {
