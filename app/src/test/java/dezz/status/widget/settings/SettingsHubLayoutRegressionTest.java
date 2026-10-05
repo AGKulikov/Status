@@ -15,13 +15,15 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.android.controller.ActivityController;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.GraphicsMode;
 import org.robolectric.util.ReflectionHelpers;
 import static org.junit.Assert.*;
 
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=28,application=Application.class,qualifiers="w1760dp-h656dp-land-mdpi")
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
 public class SettingsHubLayoutRegressionTest {
-    @Test public void hubKeepsItsOwnCategoriesAndNeverAddsEditorRails() {
+    @Test public void hubKeepsItsOwnCategoriesAndNeverAddsEditorRails() throws Exception {
         org.robolectric.shadows.ShadowChoreographer.setPaused(true);
         ReflectionHelpers.setStaticField(CarIntegrations.class,"instance",new NoCarIntegration());
         for(int theme : new int[]{1,2}) {
@@ -29,6 +31,11 @@ public class SettingsHubLayoutRegressionTest {
                     .putInt("theme",theme).putInt("textSp",26).commit();
             try(ActivityController<SettingsHubActivity> controller=Robolectric.buildActivity(SettingsHubActivity.class)) {
                 SettingsHubActivity activity=controller.setup().visible().get();
+                View decor=activity.getWindow().getDecorView();
+                SettingsScreensInteractionTest.measure(decor);
+                SettingsScreensInteractionTest.idle();
+                SettingsScreensInteractionTest.measure(decor);
+                SettingsScreensInteractionTest.snapshot(decor,"SettingsHub-"+theme);
                 assertNoEditorRail(activity.getWindow().getDecorView());
                 Map<?,?> categories=ReflectionHelpers.getField(activity,"categoryViews");
                 assertEquals(SettingsDestinationCatalog.Group.values().length,categories.size());

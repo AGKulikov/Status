@@ -286,7 +286,7 @@ public final class SettingsHubActivity extends dezz.status.widget.settings.Setti
         for (Group group : Group.values()) categories.addView(categoryRow(group), topMargin(4));
         sidebar.addView(categoryScroll, new LinearLayout.LayoutParams(match(), 0, 1f));
 
-        TextView autosave = secondary("Изменения сохраняются автоматически", 12);
+        TextView autosave = secondary("В редакторе: «Применить» или «Отмена»", 12);
         autosave.setGravity(Gravity.CENTER);
         sidebar.addView(autosave, new LinearLayout.LayoutParams(match(), dp(34)));
         return sidebar;

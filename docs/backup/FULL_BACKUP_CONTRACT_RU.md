@@ -10,7 +10,7 @@ namespace, default false. Полный typed snapshot и PortableBackupDefaults 
 чтение/проверка архива не запускают HOME. Решение принимается один раз основным
 процессом после unlock из durable application-context, не из черновика редактора.
 
-SettingsHubActivity меняет только выбор layout, не свои файловые операции.
+SettingsHubActivity меняет выбор layout и пояснение Apply/Cancel, не свои файловые операции.
 StatusWidgetApplication добавляет процессный запуск сервиса, crash/archive пути
 не меняются. VehicleButtonController различает закрытие устаревшего reader и
 реальный отказ текущего; namespace/buttons/policies не меняются. BackupDefaultsMigration
