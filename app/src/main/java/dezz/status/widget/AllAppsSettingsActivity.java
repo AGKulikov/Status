@@ -122,9 +122,11 @@ public class AllAppsSettingsActivity extends dezz.status.widget.settings.Setting
         Set<String> hidden = (passengerPanel() ? preferences.passengerAllAppsHiddenComponents : preferences.launcherAllAppsHiddenComponents).get();
         for (LauncherAppCatalog.App app : values) {
             MaterialCardView card = new MaterialCardView(this);
-            card.setCardBackgroundColor(0xFF1C1C1E);
+            card.setCardBackgroundColor(androidx.core.content.ContextCompat.getColor(this,
+                    R.color.settings_group_background));
             card.setRadius(dp(14));
-            card.setStrokeColor(0xFF38383A);
+            card.setStrokeColor(androidx.core.content.ContextCompat.getColor(this,
+                    R.color.settings_separator));
             card.setStrokeWidth(dp(1));
 
             LinearLayout row = new LinearLayout(this);
@@ -135,9 +137,10 @@ public class AllAppsSettingsActivity extends dezz.status.widget.settings.Setting
             row.addView(icon, new LinearLayout.LayoutParams(dp(44), dp(44)));
             LinearLayout labels = new LinearLayout(this);
             labels.setOrientation(LinearLayout.VERTICAL);
-            TextView name = text(app.label, 16, Color.WHITE);
+            TextView name = text(app.label, 16, androidx.core.content.ContextCompat.getColor(this,
+                    R.color.text_primary));
             TextView component = text(app.component.flattenToShortString(),
-                    11, 0xFF8E8E93);
+                    11, androidx.core.content.ContextCompat.getColor(this, R.color.settings_secondary_text));
             labels.addView(name);
             labels.addView(component);
             LinearLayout.LayoutParams labelsParams = new LinearLayout.LayoutParams(
@@ -147,7 +150,7 @@ public class AllAppsSettingsActivity extends dezz.status.widget.settings.Setting
             MaterialSwitch visible = new MaterialSwitch(this);
             String key = app.component.flattenToString();
             visible.setText(hidden.contains(key) ? "Скрыто" : "В меню");
-            visible.setTextColor(Color.WHITE);
+            visible.setTextColor(androidx.core.content.ContextCompat.getColor(this, R.color.text_primary));
             visible.setChecked(!hidden.contains(key));
             visible.setOnCheckedChangeListener((button, checked) -> {
                 Set<String> current = (passengerPanel() ? preferences.passengerAllAppsHiddenComponents : preferences.launcherAllAppsHiddenComponents).get();
@@ -159,6 +162,9 @@ public class AllAppsSettingsActivity extends dezz.status.widget.settings.Setting
             });
             row.addView(visible, new LinearLayout.LayoutParams(dp(150), dp(52)));
             card.addView(row);
+            // The catalog arrives asynchronously, possibly after the last global-layout style
+            // pass. Apply the settings font/colours before this new card can become visible.
+            dezz.status.widget.settings.SettingsAppearance.apply(this, card);
             applications.addView(card, rowParams());
         }
         updateCount(values);
