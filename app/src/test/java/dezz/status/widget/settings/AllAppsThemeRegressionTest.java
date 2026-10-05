@@ -51,6 +51,16 @@ public class AllAppsThemeRegressionTest {
                 CompoundButton control=findSwitch(card);assertNotNull(control);
                 assertTrue(ColorUtils.calculateContrast(control.getCurrentTextColor(),background)>=4.5);
                 assertTrue(control.getTextSize()/activity.getResources().getDisplayMetrics().scaledDensity>=26);
+                assertEquals(ViewGroup.LayoutParams.WRAP_CONTENT,control.getLayoutParams().height);
+                for(String label:new String[]{"В меню","Скрыто"}) {
+                    control.setText(label);
+                    control.measure(View.MeasureSpec.makeMeasureSpec(control.getLayoutParams().width,View.MeasureSpec.EXACTLY),
+                            View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
+                    control.layout(0,0,control.getMeasuredWidth(),control.getMeasuredHeight());
+                    assertNotNull(control.getLayout());
+                    assertTrue("Switch label must fit at large font",control.getMeasuredHeight()>=
+                            control.getLayout().getHeight()+control.getCompoundPaddingTop()+control.getCompoundPaddingBottom());
+                }
             }
         }
     }

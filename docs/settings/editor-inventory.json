@@ -89,7 +89,7 @@
       ],
       "numeric_controls": 1,
       "path": "app/src/main/java/dezz/status/widget/AllAppsSettingsActivity.java",
-      "sha256": "258572a32d15edd4b602f6b55107100388966a15496dfe9bcb6643b94e0ace72"
+      "sha256": "fb1bb6984316e478f0839da187daa0cc5f694d94155e349ebbf7d1ea3e4ca09e"
     },
     {
       "class": "dezz.status.widget.AutomationSettingsActivity",

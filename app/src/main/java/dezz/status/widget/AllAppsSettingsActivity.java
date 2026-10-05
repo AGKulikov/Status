@@ -160,7 +160,8 @@ public class AllAppsSettingsActivity extends dezz.status.widget.settings.Setting
                 visible.setText(checked ? "В меню" : "Скрыто");
                 updateCount(values);
             });
-            row.addView(visible, new LinearLayout.LayoutParams(dp(150), dp(52)));
+            visible.setMinimumHeight(dp(52));
+            row.addView(visible, new LinearLayout.LayoutParams(dp(150), wrap()));
             card.addView(row);
             // The catalog arrives asynchronously, possibly after the last global-layout style
             // pass. Apply the settings font/colours before this new card can become visible.
