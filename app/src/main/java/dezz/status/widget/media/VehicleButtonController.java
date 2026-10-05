@@ -348,9 +348,14 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
                 }
             }
         } catch (Exception failed) {
-            DiagnosticJournal.warn("vehicle-buttons", "input_reader_failed owner=" + owner + ", error=" + CausalDiagnostics.failure(failed));
-            CausalDiagnostics.capture("input_reader_failed", false);
-            if (owner == logGeneration) status = "События кнопок недоступны: " + failed.getClass().getSimpleName();
+            if (owner == logGeneration) {
+                DiagnosticJournal.warn("vehicle-buttons", "input_reader_failed owner=" + owner + ", error=" + CausalDiagnostics.failure(failed));
+                CausalDiagnostics.capture("input_reader_failed", false);
+                status = "События кнопок недоступны: " + failed.getClass().getSimpleName();
+            } else {
+                DiagnosticJournal.infoAsync("vehicle-buttons", "retired_reader_closed owner=" + owner
+                        + ", current_owner=" + logGeneration + ", error=" + CausalDiagnostics.failure(failed));
+            }
         } finally {
             if (process != null) process.destroy();
             input.post(() -> {

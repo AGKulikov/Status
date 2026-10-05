@@ -18,12 +18,15 @@ public abstract class SettingsActivity extends AppCompatActivity implements Sett
     }
     private void installSettings(){
         if(settingsPreview()!=null)settingsPreview().setTag(SettingsEditorLayout.PREVIEW_TAG);
-        SettingsEditorLayout.install(findViewById(android.R.id.content),getClass().getName());
+        if (usesEditorSections())
+            SettingsEditorLayout.install(findViewById(android.R.id.content),getClass().getName());
         if(settingsSession!=null)settingsSession.install(this,this::flushSettingsDraft,this::recreate,()->super.finish());
         SettingsAppearance.attach(this);
     }
     @Override public void onContentChanged(){super.onContentChanged();if(settingsReady)getWindow().getDecorView().post(()->{if(!isDestroyed())installSettings();});}
     protected void flushSettingsDraft() {}
+    /** Navigation hubs already own their layout; only actual forms need field grouping. */
+    protected boolean usesEditorSections() { return true; }
     @Override public android.view.View settingsPreview(){return null;}
     @Override public Object onRetainCustomNonConfigurationInstance(){return settingsSession;}
     @Override public void finish(){

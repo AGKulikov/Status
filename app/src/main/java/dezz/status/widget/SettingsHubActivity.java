@@ -93,6 +93,7 @@ import dezz.status.widget.systemui.SystemStatusBarContentPolicy;
  * update does not migrate or reset a single user setting.</p>
  */
 public final class SettingsHubActivity extends dezz.status.widget.settings.SettingsActivity {
+    @Override protected boolean usesEditorSections() { return false; }
     public static final String EXTRA_GROUP = "dezz.status.widget.extra.SETTINGS_GROUP";
     public static final String EXTRA_SHOW_BACK = "dezz.status.widget.extra.SETTINGS_SHOW_BACK";
     private static final String TAG = "SettingsHub";

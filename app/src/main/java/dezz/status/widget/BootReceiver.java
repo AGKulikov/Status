@@ -169,6 +169,7 @@ public class BootReceiver extends BroadcastReceiver {
             return;
         }
         if (Intent.ACTION_USER_UNLOCKED.equals(action)) {
+            StatusWidgetApplication.requestPassengerHomeStartup(context);
             // Unlock opens only the Keystore-dependent connector gate. It must not rebuild the
             // Driver, HUD and Climate windows that the same boot token already restored.
             StartupWorkCoordinator.scheduleForLifecycle(context, action);

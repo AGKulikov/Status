@@ -265,7 +265,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/Preferences.java": {
-      "sha256": "505d1407e0a3126d4d3a3259d604e1b9f5489a88babf1ec057f7f5a7f9a6c391",
+      "sha256": "e4fd431e95509152b2be99a2371b85972e3e9bb69f02a358e323421e9da9f000",
       "access_kinds": [
         "keystore",
         "preferences"
@@ -291,7 +291,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/SettingsHubActivity.java": {
-      "sha256": "801d7861f1c601607d385e8a0f952b064112cb1c574b48d9291539b9a162dfb0",
+      "sha256": "74bd1a2a0200c726b7e82cce3fb4b757891e62753cd4e0f2c258a129774f152b",
       "access_kinds": [
         "external_resource",
         "files"
@@ -304,7 +304,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/StatusWidgetApplication.java": {
-      "sha256": "e97bf07166e280170840599f777c2e64991165bd62f482f80e9bb14b9c2059b7",
+      "sha256": "60bb96eab5dfbbc15ffd2ced5aea2e5580ccb9e3d8963cde6396f9e802c7dc62",
       "access_kinds": [
         "files"
       ]
@@ -334,7 +334,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "f9f1908eabb666626ea4992ec2c1c79f62ae876b56c5d3e6d26b6c246eb73aad",
+      "sha256": "45a7df45fc2c81c4e8e017af66e79384886fdd07660f79bed29f2367d48aa33a",
       "access_kinds": [
         "files"
       ]
@@ -530,7 +530,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/media/VehicleButtonController.java": {
-      "sha256": "9a5a618c6f220132239e0ccb2d0227c0589f39ff2d8efb26dff239bb53ab251f",
+      "sha256": "2b048e8e4eb4d4644af0616df454e617fa3eed8b7bff94ae2995941704420acc",
       "access_kinds": [
         "preferences"
       ]

@@ -664,6 +664,8 @@ public class Preferences {
     public final Bool launcherShowGrid = new Bool(this, "launcherShowGrid", true);
     public final Int launcherSnapPx = new Int(this, "launcherSnapPx", 20);
     public final Bool launcherImmersive = new Bool(this, "launcherImmersive", true);
+    /** Process-start opt-in, shared storage key visible only in passenger HOME settings. */
+    public final Bool passengerLauncherAutoStart = new Bool(this, "passengerLauncherAutoStart", false);
     /** Legacy key retained: now hides only TIME and BLUETOOTH views while our HOME is resumed. */
     public final Bool launcherHideSystemStatusBar = new Bool(this,
             "launcherHideSystemStatusBar", false);

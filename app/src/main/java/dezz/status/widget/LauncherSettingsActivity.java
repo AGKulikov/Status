@@ -114,6 +114,12 @@ public class LauncherSettingsActivity extends SettingsLauncherProfileActivity {
         if (!isPassengerLauncherProfile())
             addButton("Выбрать домашний экран по умолчанию", view -> chooseDefaultHome());
 
+        if (isPassengerLauncherProfile()) {
+            addSwitch("Автоматически открывать лаунчер пассажира при запуске Natro",
+                    preferences.passengerLauncherAutoStart);
+            addHint("Срабатывает при следующем запуске приложения. После открытия другого "
+                    + "приложения на экране пассажира HOME не возвращается автоматически.");
+        }
         addSwitch("Полноэкранный режим", preferences.launcherImmersive);
         addSwitch("Показывать сетку в режиме компоновки", preferences.launcherShowGrid);
         addSwitch(isPassengerLauncherProfile() ? "Открывать Навигатор при возврате домой"

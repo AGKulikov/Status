@@ -56,11 +56,14 @@ public class StatusWidgetApplication extends Application {
     private boolean hudProcess;
     private boolean unlockedRuntimeInitialized;
     private boolean firstUsefulSurfaceSeen;
+    private boolean runtimeStartupAllowed;
+    private final PassengerHomeStartup passengerHomeStartup = new PassengerHomeStartup();
 
     @Override
     public void onCreate() {
         super.onCreate();
         if (!dezz.status.widget.backup.BackupMaintenance.prepareApplication(this)) return;
+        runtimeStartupAllowed = true;
         hudProcess = AppProcessPolicy.isHudProcess();
         StartupPerformanceTrace.beginProcess(AppProcessPolicy.currentProcessLabel());
         // Keep Application.onCreate minimal. Preferences, recorder recovery and vendor status-bar
@@ -71,6 +74,7 @@ public class StatusWidgetApplication extends Application {
         // The main process is the sole coordinator writer. MODE_MULTI_PROCESS is read-through
         // compatibility for :hud, not a transactional cross-process state machine.
         if (!hudProcess) StartupWorkCoordinator.clearLegacyStartupDeferrals(this);
+        main.post(() -> passengerHomeStartup.onUnlockedStart(this, hudProcess));
         if (!StartupWorkCoordinator.isUserUnlocked(this)) return;
         if (!hudProcess) {
             // Input subscription must not wait for the launcher, maps or connector stages.
@@ -82,6 +86,7 @@ public class StatusWidgetApplication extends Application {
     }
 
     public synchronized void ensureUnlockedRuntimeInitialized() {
+        if (runtimeStartupAllowed) passengerHomeStartup.onUnlockedStart(this, hudProcess);
         if (unlockedRuntimeInitialized || !firstUsefulSurfaceSeen
                 || !StartupWorkCoordinator.isUserUnlocked(this)) return;
         unlockedRuntimeInitialized = true;
@@ -115,6 +120,16 @@ public class StatusWidgetApplication extends Application {
         Context app = context.getApplicationContext();
         if (app instanceof StatusWidgetApplication) {
             ((StatusWidgetApplication) app).ensureUnlockedRuntimeInitialized();
+        }
+    }
+
+    public static void requestPassengerHomeStartup(@NonNull Context context) {
+        Context app = context.getApplicationContext();
+        if (app instanceof StatusWidgetApplication) {
+            StatusWidgetApplication application = (StatusWidgetApplication) app;
+            if (application.runtimeStartupAllowed)
+                application.main.post(() -> application.passengerHomeStartup.onUnlockedStart(
+                        application, application.hudProcess));
         }
     }
 

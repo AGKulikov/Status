@@ -2437,19 +2437,19 @@
         },
         {
           "dialogs": 1,
-          "line": 248,
+          "line": 254,
           "method": "showApplicationsDialog",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 316,
+          "line": 322,
           "method": "showMediaPlayerPicker",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 419,
+          "line": 425,
           "method": "confirmLayoutReset",
           "numeric_controls": 0
         }
@@ -2459,6 +2459,7 @@
         "HOME → наш лаунчер → оконный Навигатор",
         "· был на паузе",
         "· воспроизводил",
+        "Автоматически открывать лаунчер пассажира при запуске Natro",
         "Автоматически продолжать музыку после загрузки",
         "Всегда управлять выбранным плеером",
         "Выбрать домашний экран по умолчанию",
@@ -2505,6 +2506,7 @@
         "Системные приложения изначально скрыты, кроме «Телефона».",
         "Состав, действия, шрифты, цвета и параметры медиаплеера сохранятся.",
         "Список приложений ещё загружается",
+        "Срабатывает при следующем запуске приложения. После открытия другого",
         "Столбцы «Все приложения»",
         "Текущая цель:",
         "Цвет фона",
@@ -2515,11 +2517,12 @@
         "последний плеер ещё не определён",
         "последний:",
         "последняя активная медиасессия",
+        "приложения на экране пассажира HOME не возвращается автоматически.",
         "＋ Добавить элемент"
       ],
       "numeric_controls": 1,
       "path": "app/src/main/java/dezz/status/widget/LauncherSettingsActivity.java",
-      "sha256": "9c522fa3328041967f28e7eb828eb083ee4483bc68800171124bd3f528f44618"
+      "sha256": "f4479d66f71384e47e1421ad6366b3dbed22b22b5e210d90c0b2982d1fa172a3"
     },
     {
       "class": "dezz.status.widget.LauncherShortcutSettingsActivity",
@@ -5629,7 +5632,7 @@
       "labels": [],
       "numeric_controls": 0,
       "path": "app/src/main/java/dezz/status/widget/settings/SettingsActivity.java",
-      "sha256": "d7a78d4b4276862e5a2409f0f34eff31d215f042f748995d460668eee8b75605"
+      "sha256": "8798ce0cc7b0011c488ae2573cd4f2f083932b3b2be9263e309dc781a1f3d526"
     },
     {
       "class": "dezz.status.widget.settings.VectorIconPickerDialog",

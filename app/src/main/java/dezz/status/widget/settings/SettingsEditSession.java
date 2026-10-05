@@ -336,7 +336,8 @@ public final class SettingsEditSession {
         return result;
     }
     private static boolean previewEligible(String key){
-        return !key.startsWith("hudStock")&&!key.startsWith("hide_oem_")&&!key.startsWith("oem_");
+        return !key.equals("passengerLauncherAutoStart")
+                &&!key.startsWith("hudStock")&&!key.startsWith("hide_oem_")&&!key.startsWith("oem_");
     }
     private boolean canPreview(SharedPreferences store,String key){
         Set<String> hidden=previewSuppressed.get(store);return previewEligible(key)&&(hidden==null||!hidden.contains(key));

@@ -47,4 +47,18 @@ public class BackupDefaultsMigrationTest {
             assertEquals(restored,BackupPreferencesXml.read(main));
         }
     }
+    @Test public void passengerStartupReleasePreservesExplicitOptInAndRejectsFuture()throws Exception {
+        for(int source:new int[]{208021335,208021336,208021337,208021338,208021339}) {
+            JSONObject metadata=new JSONObject().put("sourceVersionCode",source).put("defaultsSchema",source)
+                    .put("declaredMainDefaults",BackupPreferencesXml.encode(Collections.emptyMap()));
+            File snapshot=new File(RuntimeEnvironment.getApplication().getCacheDir(),"pass-start-"+source);
+            File main=BackupFiles.child(snapshot,"de_prefs/example_preferences.xml");
+            BackupPreferencesXml.write(main,Collections.singletonMap("passengerLauncherAutoStart",true));
+            BackupDefaultsMigration.materialize(snapshot,"example",metadata,208021339);
+            assertEquals(Boolean.TRUE,BackupPreferencesXml.read(main).get("passengerLauncherAutoStart"));
+        }
+        JSONObject future=new JSONObject().put("sourceVersionCode",208021340).put("defaultsSchema",208021340)
+                .put("declaredMainDefaults",BackupPreferencesXml.encode(Collections.emptyMap()));
+        try{BackupDefaultsMigration.validate(future,208021339);fail();}catch(IOException expected){}
+    }
 }
