@@ -1,0 +1,76 @@
+name: Build Natro 3.0.6 update candidate
+on:
+  push:
+    branches: ['fix/startup-passenger-20261005']
+    paths: ['app/**', 'navigator-mod/**', 'tools/**', 'wechat-compat/**', 'settings.gradle', 'build.gradle', '.github/workflows/build-natro-3.0.6.yml']
+permissions:
+  contents: read
+concurrency:
+  group: build-natro-306-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  candidate:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    env:
+      VERSION_NAME: '3.0.6'
+      VERSION_CODE: '208021339'
+      ALLOW_UNSIGNED_RELEASE: 'true'
+      REUSE_NAVIGATOR_302: 'true'
+      HELPER_CHANGED: 'false'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Install exact Android toolchain
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+      - name: Inventory and clean release build
+        run: |
+          python3 tools/audit_settings_editors.py --check
+          python3 tools/check_backup_inventory.py
+          ./gradlew clean --no-daemon --no-configuration-cache
+          ./gradlew testGeelyDebugUnitTest assembleGeelyRelease --no-daemon --no-configuration-cache --max-workers=2
+      - name: JavaScript syntax
+        run: node --check app/src/main/assets/lan/client.js
+      - name: Compile Navigator patch for Android 9
+        run: bash tools/build_navigation_patch_dex.sh
+      - name: All tool and production replay regression tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          JSON_JAR=$(find "$HOME/.gradle/caches" -path '*/org.json/json/20240303/*/*.jar' -print -quit)
+          test -s "$JSON_JAR"
+          export JSON_JAR
+          export NATRO_ANDROID_JSON_JAR="$JSON_JAR"
+          python3 -m unittest discover -s tools/tests -q
+      - name: Stage exact candidate and signing tools
+        run: python3 tools/stage_natro_adb_candidate.py
+      - name: Upload verified unsigned candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Natro-3.0.6-offline-signing-${{ github.run_number }}
+          path: |
+            ${{ runner.temp }}/natro-3.0.6-candidate/*
+            !${{ runner.temp }}/natro-3.0.6-candidate/tools/**
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload signing tools separately
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Natro-3.0.6-signing-tools-${{ github.run_number }}
+          path: ${{ runner.temp }}/natro-3.0.6-candidate/tools/*
+          if-no-files-found: error
+          retention-days: 7
+      - name: Upload candidate and reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: natro-adb-lan-candidate-${{ github.run_number }}
+          path: |
+            app/build/outputs/apk/geely/release/*.apk
+            app/build/test-results/**
+            app/build/reports/tests/**
+          retention-days: 14
