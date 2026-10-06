@@ -11,6 +11,9 @@ import android.content.pm.PackageManager;
 import android.os.Handler;
 import android.os.Looper;
 
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 
@@ -25,6 +28,11 @@ import dezz.status.widget.diagnostics.DiagnosticJournal;
  * There is no navigation-app dependency and no polling loop.</p>
  */
 public final class HwgpsIntegration {
+    private static final Executor SNAPSHOT_LANE = Executors.newSingleThreadExecutor(task -> {
+        Thread thread = new Thread(task, "natro-hwgps-snapshot");
+        thread.setDaemon(true);
+        return thread;
+    });
     private static final String JOURNAL_COMPONENT = "hwgps.dr";
     private static final int INITIAL_SNAPSHOT_MAX_ATTEMPTS = 3;
     private static final long[] INITIAL_SNAPSHOT_RETRY_DELAYS_MS = {1_500L, 3_000L, 5_000L};
@@ -75,8 +83,11 @@ public final class HwgpsIntegration {
     public static final class DrStateSubscription {
         private final Context context;
         private final Listener listener;
+        private final Executor snapshotWorker;
         private final Handler mainHandler = new Handler(Looper.getMainLooper());
-        private boolean registered;
+        private volatile boolean registered;
+        private volatile long generation;
+        private boolean snapshotInFlight;
         @NonNull private HwgpsDrStatePolicy.State state =
                 HwgpsDrStatePolicy.State.UNAVAILABLE;
         private int initialSnapshotAttempts;
@@ -114,12 +125,19 @@ public final class HwgpsIntegration {
         };
 
         public DrStateSubscription(@NonNull Context source, @NonNull Listener listener) {
+            this(source, listener, SNAPSHOT_LANE);
+        }
+
+        DrStateSubscription(Context source, Listener listener, Executor worker) {
             this.context = applicationContext(source);
             this.listener = listener;
+            this.snapshotWorker = worker;
         }
 
         public void start() {
             if (registered) return;
+            generation++;
+            snapshotInFlight = false;
             state = HwgpsDrStatePolicy.State.UNAVAILABLE;
             initialSnapshotAttempts = 0;
             initialSnapshotResponseSeen = false;
@@ -137,6 +155,8 @@ public final class HwgpsIntegration {
         }
 
         public void stop() {
+            generation++;
+            snapshotInFlight = false;
             if (registered) {
                 registered = false;
                 try { context.unregisterReceiver(receiver); }
@@ -193,14 +213,23 @@ public final class HwgpsIntegration {
         }
 
         private void requestInitialSnapshot() {
-            if (!registered || initialSnapshotResponseSeen
+            if (!registered || initialSnapshotResponseSeen || snapshotInFlight
                     || initialSnapshotAttempts >= INITIAL_SNAPSHOT_MAX_ATTEMPTS) return;
             int attempt = ++initialSnapshotAttempts;
-            requestSnapshot();
+            long owner = generation;
+            snapshotInFlight = true;
             mainHandler.removeCallbacks(initialSnapshotRetry);
-            if (initialSnapshotResponseSeen) return;
-            mainHandler.postDelayed(initialSnapshotRetry,
-                    INITIAL_SNAPSHOT_RETRY_DELAYS_MS[attempt - 1]);
+            snapshotWorker.execute(() -> {
+                if (!registered || owner != generation) return;
+                requestSnapshot();
+                mainHandler.post(() -> {
+                    if (!registered || owner != generation) return;
+                    snapshotInFlight = false;
+                    if (!initialSnapshotResponseSeen)
+                        mainHandler.postDelayed(initialSnapshotRetry,
+                                INITIAL_SNAPSHOT_RETRY_DELAYS_MS[attempt - 1]);
+                });
+            });
         }
 
     }

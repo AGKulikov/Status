@@ -1,20 +1,20 @@
-name: Build Natro 3.0.6 update candidate
+name: Build Natro 3.0.7 update candidate
 on:
   push:
-    branches: ['release/natro-3.0.6']
-    paths: ['app/**', 'navigator-mod/**', 'tools/**', 'wechat-compat/**', 'settings.gradle', 'build.gradle', '.github/workflows/build-natro-3.0.6.yml']
+    branches: ['fix/startup-passenger-20261005']
+    paths: ['app/**', 'navigator-mod/**', 'tools/**', 'wechat-compat/**', 'settings.gradle', 'build.gradle', '.github/workflows/build-natro-3.0.7.yml']
 permissions:
   contents: read
 concurrency:
-  group: build-natro-306-${{ github.ref }}
+  group: build-natro-307-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   candidate:
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     env:
-      VERSION_NAME: '3.0.6'
-      VERSION_CODE: '208021339'
+      VERSION_NAME: '3.0.7'
+      VERSION_CODE: '208021340'
       ALLOW_UNSIGNED_RELEASE: 'true'
       REUSE_NAVIGATOR_302: 'true'
       HELPER_CHANGED: 'false'
@@ -51,17 +51,17 @@ jobs:
       - name: Upload verified unsigned candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Natro-3.0.6-offline-signing-${{ github.run_number }}
+          name: Natro-3.0.7-offline-signing-${{ github.run_number }}
           path: |
-            ${{ runner.temp }}/natro-3.0.6-candidate/*
-            !${{ runner.temp }}/natro-3.0.6-candidate/tools/**
+            ${{ runner.temp }}/natro-3.0.7-candidate/*
+            !${{ runner.temp }}/natro-3.0.7-candidate/tools/**
           if-no-files-found: error
           retention-days: 7
       - name: Upload signing tools separately
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Natro-3.0.6-signing-tools-${{ github.run_number }}
-          path: ${{ runner.temp }}/natro-3.0.6-candidate/tools/*
+          name: Natro-3.0.7-signing-tools-${{ github.run_number }}
+          path: ${{ runner.temp }}/natro-3.0.7-candidate/tools/*
           if-no-files-found: error
           retention-days: 7
       - name: Upload candidate and reports

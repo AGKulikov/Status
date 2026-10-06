@@ -13,10 +13,13 @@ public final class ButtonRestoreGate {
         active = true; attempts++; return true;
     }
     public synchronized Next finish(boolean success) {
+        return finish(success, true);
+    }
+    public synchronized Next finish(boolean success, boolean retryable) {
         if (!active) return Next.NONE;
-        active = false; completed = success;
+        active = false; completed = success || !retryable;
         if (pendingReplacement) { pendingReplacement = false; return Next.FORCE; }
-        return !success && attempts < 3 ? Next.RETRY : Next.NONE;
+        return !success && retryable && attempts < 3 ? Next.RETRY : Next.NONE;
     }
     public synchronized int attempts() { return attempts; }
 }

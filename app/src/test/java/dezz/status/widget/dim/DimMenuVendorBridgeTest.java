@@ -78,6 +78,17 @@ public class DimMenuVendorBridgeTest {
         bridge.start();lane.next();assertTrue(bridge.isConnected());
         bridge.stop();lane.next();assertEquals(1,sessions.get(1).closes);
     }
+    @Test public void navigationRecoveryRequiresBothObservedIdleStatesAndLiveSubscription(){
+        Lane lane=new Lane();Listener listener=new Listener();List<Session> sessions=new ArrayList<>();
+        DimMenuVendorBridge bridge=new DimMenuVendorBridge(RuntimeEnvironment.getApplication(),listener,events->{Session s=new Session(events);sessions.add(s);return s;},lane);
+        bridge.start();lane.next();assertFalse(bridge.navigationIdleConfirmed());
+        Session s=sessions.get(0);s.events.state("onTabChanged",new Object[]{DimMenuPanelConfig.STOCK_NAVIGATION_TAB});idle();assertFalse(bridge.navigationIdleConfirmed());
+        s.events.state("onControlCenterStateChanged",new Object[]{0});idle();assertTrue(bridge.navigationIdleConfirmed());
+        s.events.state("onControlCenterStateChanged",new Object[]{1});idle();assertFalse(bridge.navigationIdleConfirmed());
+        s.events.state("onControlCenterStateChanged",new Object[]{0});s.events.state("onTabChanged",new Object[]{99});idle();assertFalse(bridge.navigationIdleConfirmed());
+        s.events.state("onTabChanged",new Object[]{DimMenuPanelConfig.STOCK_NAVIGATION_TAB});s.events.state("onEngineStatusChanged",new Object[]{false});idle();assertFalse(bridge.navigationIdleConfirmed());
+        bridge.stop();assertFalse(bridge.navigationIdleConfirmed());lane.next();
+    }
     public interface VendorCallback {void onTabChanged(int tab);}
     public static final class VendorMenu {
         final Set<VendorCallback> callbacks=new HashSet<>();boolean failRead;

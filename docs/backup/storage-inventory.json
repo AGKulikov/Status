@@ -456,7 +456,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/instrument/InstrumentOemController.java": {
-      "sha256": "b111689051b63a69b128ee5de857a449fcde2011f2d0d2c443073078db6f1816",
+      "sha256": "15654780e48997b2a97460cf8081f9fc31d9da1dd9a96630971992ea95afd33a",
       "access_kinds": [
         "preferences"
       ]
@@ -506,7 +506,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/media/ButtonRouteRestorer.java": {
-      "sha256": "833f12aedd944ed79e417dda65000b1b192db943b1f4f3945b4e1ced10554c16",
+      "sha256": "3f063d786485eda911e2ae9b56690c9091836f41e1d3872a3db68be81c2146b1",
       "access_kinds": [
         "preferences"
       ]
@@ -658,7 +658,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/shell/AdbTransport.java": {
-      "sha256": "7bcb7b7e69a7533e455f1ad7977502353cb117d5f45954af73e735e380086766",
+      "sha256": "554d52b34df15db402218d7c668f4459a2dbcd3aa52ebef3ee115fc4da7a44cd",
       "access_kinds": [
         "files"
       ]

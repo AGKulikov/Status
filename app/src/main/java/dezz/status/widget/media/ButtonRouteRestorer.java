@@ -46,8 +46,8 @@ final class ButtonRouteRestorer {
                         v.finishStoredRestore(requested, out, error);
                         // Restart the reader after an XSF route transaction, rejecting queued old input.
                         v.reconnectAfterUpdate("routes_finished");
-                        completed(app, error == null && out != null && out.contains("NATRO_MEDIA_ROUTE=")
-                                && !out.contains("NATRO_MEDIA_ERROR="));
+                        completed(app, ButtonRouteResult.allRestored(requested, out, error),
+                                ButtonRouteResult.retryable(out, error));
                         DiagnosticJournal.infoAsync("vehicle-buttons", "startup_routes_finished uptime_ms="
                                 + android.os.SystemClock.uptimeMillis() + ", buttons=" + requested
                                 + ", transport_ok=" + (error == null));
@@ -61,7 +61,10 @@ final class ButtonRouteRestorer {
         }, "natro-button-route-restore").start();
     }
     private static void completed(Context app, boolean success) {
-        ButtonRestoreGate.Next next = gate.finish(success);
+        completed(app, success, true);
+    }
+    private static void completed(Context app, boolean success, boolean retryable) {
+        ButtonRestoreGate.Next next = gate.finish(success, retryable);
         DiagnosticJournal.infoAsync("vehicle-buttons", "routes_restore_complete success=" + success
                 + ", attempt=" + gate.attempts() + ", next=" + next + ", physical_effect=unobserved");
         if (next == ButtonRestoreGate.Next.FORCE) retry.post(() -> restore(app, true));

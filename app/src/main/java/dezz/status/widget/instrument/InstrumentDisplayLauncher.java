@@ -149,7 +149,24 @@ public final class InstrumentDisplayLauncher {
     static void windowChanged() {
         onMain(() -> {
             if (coordinator != null) coordinator.windowChanged();
+            InstrumentOemController.panelWindowChanged();
         });
+    }
+
+    /** Repair only the verified mode reset; do not recreate a healthy Activity or wake DIM. */
+    static void restoreNavigationMode(Context app, BooleanSupplier allowed, Consumer<Boolean> done) {
+        execute(() -> {
+            if (!allowed.getAsBoolean()) { MAIN.post(() -> done.accept(false)); return; }
+            Integer before = readDimMode(app);
+            boolean accepted = false;
+            if (Integer.valueOf(1).equals(before) && allowed.getAsBoolean())
+                accepted = switchDimMode(app, DIM_NAVIGATION_MODE);
+            Integer after = readDimMode(app);
+            boolean verified = Integer.valueOf(3).equals(after);
+            trace("navigation repair before=" + before + " accepted=" + accepted
+                    + " after=" + after + " physical_effect=unobserved");
+            MAIN.post(() -> done.accept(verified));
+        }, () -> done.accept(false));
     }
 
     static void trace(String message) {

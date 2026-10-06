@@ -37,7 +37,10 @@ public final class InstrumentOemController {
     private volatile boolean forceWhiteApply = true;
     private boolean observing;
     private boolean shellBusy;
-    private long whiteGeneration;
+    private volatile long whiteGeneration;
+    private dezz.status.widget.dim.DimMenuVendorBridge priorityMonitor;
+    private boolean navigationRepairBusy;
+    private int navigationRepairAttempts;
     private int whiteAttempt;
     private int lastIgnition = -1;
     private String whiteStatus = "Не изменено";
@@ -117,10 +120,49 @@ public final class InstrumentOemController {
             context.getContentResolver().registerContentObserver(Settings.Global.getUriFor("NaviMode"),
                     false, naviObserver);
             observing = true;
+            priorityMonitor = new dezz.status.widget.dim.DimMenuVendorBridge(context,
+                    new dezz.status.widget.dim.DimMenuVendorBridge.Listener() {
+                        public void onPrevious() {}
+                        public void onNext() {}
+                        public void onConfirm() {}
+                        public void onVendorStateChanged() { scheduleWhiteBar(); }
+                    });
+            priorityMonitor.start();
         } else if (!whiteBarEnabled && observing) {
             context.getContentResolver().unregisterContentObserver(naviObserver);
             observing = false;
+            if (priorityMonitor != null) priorityMonitor.stop();
+            priorityMonitor = null;
+            navigationRepairAttempts = 0;
         }
+    }
+    static void panelWindowChanged() {
+        if (instance != null && instance.whiteBarEnabled) instance.scheduleWhiteBar();
+    }
+    private void maybeRestoreNavigation(int mode) {
+        if (mode == 3) { navigationRepairAttempts = 0; return; }
+        if (navigationRepairBusy || navigationRepairAttempts >= 3) return;
+        InstrumentPanelStore store = new InstrumentPanelStore(context);
+        int display = store.load().displayId;
+        dezz.status.widget.WidgetAccessibilityService accessibility =
+                dezz.status.widget.WidgetAccessibilityService.getInstance();
+        boolean ownForeground = accessibility != null && context.getPackageName().equals(
+                accessibility.getForegroundPackageOnDisplay(display));
+        boolean panelReady = store.isEnabled()
+                && InstrumentPanelActivity.windowState().readyFor(display);
+        boolean idle = priorityMonitor != null && priorityMonitor.navigationIdleConfirmed();
+        if (!InstrumentOemPolicy.restoreNavigation(whiteBarEnabled, mode, panelReady, ownForeground, idle)) return;
+        navigationRepairBusy = true;
+        navigationRepairAttempts++;
+        long owner = whiteGeneration;
+        DiagnosticJournal.infoAsync("instrument-oem", "navigation_repair attempt="
+                + navigationRepairAttempts + ", mode=" + mode + ", foreground=Natro, navigation_idle=true");
+        InstrumentDisplayLauncher.restoreNavigationMode(context,
+                () -> whiteBarEnabled && owner == whiteGeneration,
+                verified -> {
+                    navigationRepairBusy = false;
+                    if (verified && whiteBarEnabled) scheduleWhiteBar();
+                });
     }
     private void scheduleWhiteBar() {
         whiteGeneration++;
@@ -189,6 +231,7 @@ public final class InstrumentOemController {
                 main.removeCallbacks(applyWhiteBar); whiteScheduled = true;
                 main.post(applyWhiteBar); return;
             }
+            if (success) maybeRestoreNavigation(modes[1]);
             if (!success && whiteAttempt < 3) { whiteScheduled = true; main.postDelayed(applyWhiteBar, 100); return; }
             whiteStatus = success ? (deny ? "Запрет штатного наложения подтверждён"
                     : whiteBarEnabled ? "Ожидание режима навигации приборки" : "Штатные наложения восстановлены")

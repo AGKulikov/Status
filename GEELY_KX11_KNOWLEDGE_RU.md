@@ -1,5 +1,43 @@
 # Geely KX11 / ECARX — техническая база управления
 
+
+## 06.10.2026 — подтверждённые ошибки Natro 3.0.6 и кандидат 3.0.7
+
+Источники: debug(20261006-054503), SHA256
+`47fc8fc6afaf6878440ad32ee35f6dc5120e470f891bd00dfacc62d0f98019fd`;
+diagnostics-1791264903929.zip, SHA256
+`3bf1f876c31e2e3999d4280206cdd58b93ea0ca5c7cc1192568b0d229d9e5b1a`;
+фото IMG_8735, SHA256
+`990bfb429939eaa6330a0afc21604ece77e80ce0e690d17c42fc9dc1ed20db9f`.
+Сырые пользовательские данные в публичный Git не включены.
+
+OBSERVED: session da3-33b0, HUD/LCA inspect в 08:33:40 и 08:34:10–12 падает
+после connect до shell_result с BufferOverflowException. STATIC: adblib1.3
+AdbProtocol.generateOpen выделяет dest.length()+1, затем пишет UTF-8 байты.
+Русские сообщения HudLcaPatch воспроизводят переполнение. Причина локальная,
+не несовместимость SHA модуля; фактическая установка и изменение картинки отсутствуют.
+
+OBSERVED: свежий main_unresponsive в uptime28655; stack MAIN —
+HwgpsIntegration.DrStateSubscription.requestSnapshot → sendBroadcast → Binder.
+Восстановление спустя3356мс. Кандидат переносит этот вызов с MAIN; не делает
+новых предположений о причинах задержки системного ActivityManager.
+
+OBSERVED: hide=true, SDK/Global=1, readback=allow одновременно с ready Android
+окном display2. Это подтверждает незадействованный mode3, не пиксельное владение.
+Кандидат не расширяет deny на mode1. Ограниченный возврат mode3 допускается
+только при собственном foreground, готовом окне и наблюдённых штатных callback
+onTabChanged=STOCK_NAVIGATION_TAB(2), onControlCenterStateChanged=0. Эти значения
+взяты из существующего DimMenuPanelConfig/ConflictPolicy, новые IDs не вводятся.
+Неизвестный callback/другой foreground не даёт разрешения на возврат.
+
+STATIC: прежний ButtonRouteRestorer принимал любой NATRO_MEDIA_ROUTE за успех
+всего batch, даже если присутствовал NATRO_BUTTON_ERROR=VA. Кандидат проверяет
+каждый маршрут. Свежий журнал подтверждает обработку VA200231 и готовый reader;
+не подтверждает подавление штатного VA или успешное исполнение каждого эффекта.
+Старые iterator/InterruptedIOException не являются доказанной гонкой коллекции.
+Физические гейты VA, полосы, «машинки» и HUD/LCA остаются OPEN.
+
+
 ## 04.10.2026 — восстановление подписки DIM и граница вывода о VA
 
 SOURCE: опциональный DimMenuVendorBridge ранее выполнял reflection/Binder на MAIN,

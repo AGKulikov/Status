@@ -20,8 +20,8 @@ import dezz.status.widget.diagnostics.DiagnosticJournal;
 import dezz.status.widget.diagnostics.CausalDiagnostics;
 
 /** Optional DIM subscription. Vendor Binder calls never occupy the button/UI Looper. */
-final class DimMenuVendorBridge {
-    interface Listener {
+public final class DimMenuVendorBridge {
+    public interface Listener {
         void onPrevious();
         void onNext();
         void onConfirm();
@@ -51,6 +51,7 @@ final class DimMenuVendorBridge {
     private final Map<String,Object[]> initialStates=new LinkedHashMap<>();
     private boolean started,receiverRegistered,connected,connecting;
     private boolean engineOn=true;
+    private boolean tabObserved,controlCenterObserved;
     private int currentTab=-1,controlCenterState,retryIndex;
     private long generation;
     private Connection connection;
@@ -64,13 +65,13 @@ final class DimMenuVendorBridge {
             else if(ACTION_CONFIRM.equals(action))listener.onConfirm();
         }
     };
-    DimMenuVendorBridge(Context context,Listener listener){this(context,listener,null,VENDOR_LANE);}
+    public DimMenuVendorBridge(Context context,Listener listener){this(context,listener,null,VENDOR_LANE);}
     DimMenuVendorBridge(Context context,Listener listener,Connector connector,Executor worker){
         Context app=context.getApplicationContext();this.context=app==null?context:app;
         this.listener=listener;this.worker=worker;
         this.connector=connector==null?events->ReflectionConnection.open(this.context,events):connector;
     }
-    void start(){
+    public void start(){
         if(started)return;
         started=true;retryIndex=0;
         IntentFilter filter=new IntentFilter();filter.addAction(ACTION_SCROLL_UP);
@@ -79,7 +80,7 @@ final class DimMenuVendorBridge {
         catch(RuntimeException failure){Log.w(TAG,"Could not register steering receiver",failure);}
         connect();
     }
-    void stop(){
+    public void stop(){
         started=false;generation++;connecting=false;
         main.removeCallbacksAndMessages(this);
         if(receiverRegistered){receiverRegistered=false;try{context.unregisterReceiver(steeringReceiver);}catch(RuntimeException ignored){}}
@@ -89,6 +90,12 @@ final class DimMenuVendorBridge {
     boolean isEngineOn(){return engineOn;}
     int currentTab(){return currentTab;}
     int controlCenterState(){return controlCenterState;}
+
+    /** Unknown initial callback values never authorize reclaiming the driver display. */
+    public boolean navigationIdleConfirmed(){
+        return connected && engineOn && tabObserved && controlCenterObserved
+                && currentTab==DimMenuPanelConfig.STOCK_NAVIGATION_TAB && controlCenterState==0;
+    }
 
     private void connect(){
         if(!started||connected||connecting)return;
@@ -142,6 +149,7 @@ final class DimMenuVendorBridge {
     private void release(){
         Connection previous=connection;connection=null;connected=false;initialStates.clear();
         engineOn=true;currentTab=-1;controlCenterState=0;
+        tabObserved=false;controlCenterObserved=false;
         if(previous!=null){
             CausalDiagnostics.Span trace=CausalDiagnostics.begin("dim-release","generation="+generation,5000);
             worker.execute(trace.wrap(()->{trace.stage("unregister","shared_owner_disconnect=false");previous.close();trace.finish("released","");}));
@@ -150,8 +158,8 @@ final class DimMenuVendorBridge {
     private void post(Runnable task,long delay){main.postAtTime(task,this,SystemClock.uptimeMillis()+delay);}
     private void handleCallback(String method,Object[] args){
         if("onEngineStatusChanged".equals(method))engineOn=booleanArg(args,true);
-        else if("onTabChanged".equals(method))currentTab=intArg(args,-1);
-        else if("onControlCenterStateChanged".equals(method))controlCenterState=intArg(args,0);
+        else if("onTabChanged".equals(method)){currentTab=intArg(args,-1);tabObserved=args!=null&&args.length>0&&args[0] instanceof Number;}
+        else if("onControlCenterStateChanged".equals(method)){controlCenterState=intArg(args,-1);controlCenterObserved=args!=null&&args.length>0&&args[0] instanceof Number;}
         DiagnosticJournal.infoAsync("dim-subscription", "callback="+method+", engine_on="+engineOn+", tab="+currentTab+", center="+controlCenterState);
         listener.onVendorStateChanged();
     }

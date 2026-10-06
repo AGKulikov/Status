@@ -7,6 +7,10 @@ public final class InstrumentOemPolicy {
     public static boolean suppressWhiteBar(boolean enabled, int naviMode) {
         return enabled && naviMode == 3;
     }
+    public static boolean restoreNavigation(boolean enabled, int naviMode,
+            boolean panelReady, boolean ownForeground, boolean navigationIdle) {
+        return enabled && naviMode == 1 && panelReady && ownForeground && navigationIdle;
+    }
     public static String appOpState(String output) {
         if (output == null) return "no_output";
         java.util.regex.Matcher match = java.util.regex.Pattern.compile("(?m)^\\s*SYSTEM_ALERT_WINDOW:\\s*(allow|deny|ignore|default|foreground|errored)(?:;|\\s|$)").matcher(output);

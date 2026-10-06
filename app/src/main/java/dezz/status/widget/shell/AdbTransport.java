@@ -204,24 +204,13 @@ public class AdbTransport implements ShellTransport {
 
     @Override
     public String exec(String command) throws Exception {
-        AdbStream stream = connection.open("shell:" + command);
         // adblib's AdbStream.read() returns one payload at a time (max 4 KiB). For small
         // outputs like `appops set ...` one read is enough, but anything larger gets
         // truncated. Loop until the remote closes the stream (read() returns null) and
         // concatenate so the public exec() contract — "the trimmed command output" —
         // actually holds.
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        while (true) {
-            byte[] chunk;
-            try {
-                chunk = stream.read();
-            } catch (java.io.IOException eof) {
-                // adblib throws "Stream closed" for the normal terminal EOF case.
-                break;
-            }
-            if (chunk == null || chunk.length == 0) break;
-            buffer.write(chunk);
-        }
+        execRaw(command, chunk -> buffer.write(chunk, 0, chunk.length));
         return new String(buffer.toByteArray(), StandardCharsets.UTF_8).trim();
     }
 
@@ -234,13 +223,29 @@ public class AdbTransport implements ShellTransport {
 
     /** Bounded consumers own buffering and cancellation; a missing exit marker is not success. */
     public void execRaw(String command, Consumer<byte[]> consumer) throws Exception {
-        readService("shell:" + command, consumer);
+        byte[] script = AdbShellCommand.encode(command);
+        // adblib 1.3 generateOpen allocates String.length()+1 bytes, not UTF-8 length.
+        // Keeping OPEN ASCII and short also avoids the daemon's OPEN payload limit.
+        AdbStream stream = connection.open(AdbShellCommand.SERVICE);
+        try {
+            AdbShellCommand.send(script, connection.getMaxData(), stream::write);
+            drain(stream, consumer);
+        } finally {
+            try { stream.close(); } catch (Exception ignored) {}
+        }
     }
 
     /** ADB host services such as root: are protocol requests, not shell commands. */
     public void readService(String service, Consumer<byte[]> consumer) throws Exception {
         AdbStream stream = connection.open(service);
         try {
+            drain(stream, consumer);
+        } finally {
+            try { stream.close(); } catch (Exception ignored) {}
+        }
+    }
+
+    private static void drain(AdbStream stream, Consumer<byte[]> consumer) throws Exception {
             while (true) {
                 byte[] chunk;
                 try { chunk = stream.read(); }
@@ -248,9 +253,6 @@ public class AdbTransport implements ShellTransport {
                 if (chunk == null) break;
                 if (chunk.length > 0) consumer.accept(chunk);
             }
-        } finally {
-            try { stream.close(); } catch (Exception ignored) {}
-        }
     }
 
     // ── Key pair management ───────────────────────────────────────────

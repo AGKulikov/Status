@@ -44,6 +44,7 @@ public class ColdStartReplay {
  static class White {
   Context context=new Context();Object preferences=new Object();Handler main=new Handler();boolean whiteBarEnabled=true,whiteOwned,whiteScheduled,shellBusy,forceWhiteApply=true,observing;
   Boolean lastWhiteDeny;long whiteGeneration;int whiteAttempt;String whiteStatus;Result whitePending;
+  void maybeRestoreNavigation(int mode) {}
   final Runnable applyWhiteBar=this::applyWhiteBarNow;
   final Runnable verifyWhiteBar=()->{if(whiteBarEnabled&&!shellBusy&&!whiteScheduled){whiteAttempt=0;applyWhiteBarNow();}};
   SCHEDULE
