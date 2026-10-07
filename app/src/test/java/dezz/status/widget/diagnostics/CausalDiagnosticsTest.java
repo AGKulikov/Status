@@ -37,7 +37,15 @@ public class CausalDiagnosticsTest {
         SystemClock.setCurrentTimeMillis(System.currentTimeMillis()+1000); // Wall changes must not be used by the deadline.
         org.robolectric.shadows.ShadowSystemClock.advanceBy(java.time.Duration.ofMillis(600));
         CausalDiagnostics.poll();CausalDiagnostics.poll();assertTrue(DiagnosticJournal.awaitPendingWrites());
-        String text=DiagnosticJournal.tailText(1000);assertEquals(1,count(text,"stage=operation_overdue"));assertTrue(text.contains("last_stage=sdk_read_started"));
+        // Incident snapshots repeat the last observed text in STATES and RECENT. Count
+        // original causal records for this exact span, not copies inside an incident.
+        List<DiagnosticJournal.Entry> overdue = new ArrayList<>();
+        for (DiagnosticJournal.Entry entry : DiagnosticJournal.read()) {
+            if ("causal".equals(entry.component) && entry.message.contains(", trace="+span.id+",")
+                    && entry.message.contains("stage=operation_overdue,")) overdue.add(entry);
+        }
+        assertEquals(1, overdue.size());
+        assertTrue(overdue.get(0).message.contains("last_stage=sdk_read_started"));
         span.finish("late_success","effect=unobserved");assertFalse(CausalDiagnostics.snapshot().contains("PENDING trace="+span.id));
     }
     @Test public void repeatInitializeDoesNotDiscardAnAcceptedQueue() {
