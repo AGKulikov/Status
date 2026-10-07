@@ -6,6 +6,16 @@ import static org.junit.Assert.assertEquals;
 import org.junit.Test;
 
 public final class PackageReplaceBleRecoveryGateTest {
+    @Test public void replacementIsDetectedBeforeTheBroadcastButNotOnOrdinaryBoot() {
+        org.junit.Assert.assertTrue(PackageReplaceBleRecoveryGate.recentReplacement(
+                100L, 100_000L, 100_001L));
+        org.junit.Assert.assertFalse(PackageReplaceBleRecoveryGate.recentReplacement(
+                100_000L, 100_000L, 100_001L));
+        org.junit.Assert.assertFalse(PackageReplaceBleRecoveryGate.recentReplacement(
+                100L, 100_000L, 160_001L));
+        org.junit.Assert.assertFalse(PackageReplaceBleRecoveryGate.recentReplacement(
+                100L, 100_000L, 99_999L));
+    }
     @Test public void recentSameBootReplacementGetsOnlyTheRemainingQuietWindow() {
         long marked = 100_000L;
         assertEquals(PackageReplaceBleRecoveryGate.QUIET_MS,

@@ -1,5 +1,26 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 07.10.2026 — повтор полосы 3.0.8 и кандидат 3.0.9
+
+В новом журнале 19:27:49 process_killed com.ecarx.dimmenu, затем NaviMode3→1;
+Natro подтвердил AppOp allow при включённом скрытии. Причина process_killed
+не собрана; близость VA не доказывает причинность. Существующий recovery требует
+владельца display2 из Accessibility, но API28 путь Natro публикует только display0.
+Кандидат читает `am stack list` вне MAIN, принимает только точный видимый
+InstrumentPanelActivity на целевом display и отклоняет чужой/неизвестный/смешанный
+ответ. Формат сверён с AOSP android-9.0.0_r1 ActivityManager.StackInfo.toString.
+Независимые DIM navigation-tab/control-center gates сохранены; отсутствие
+callbacks не превращается в разрешение записи. Их состояние теперь логируется.
+Это SOURCE-коррекция проверки владельца, не аппаратная приёмка полосы.
+Коды режима/SDK setters, AppOp и firmware patch allowlist не менялись.
+
+В bundled ecarx-adaptapi.jar registerDimMenuInteractionCallback вызывает
+DIMProtocolManager.registerCallback и отбрасывает boolean-результат. Само
+возвращение public void и getNaviMode не доказывают живую callback-подписку.
+Причина отсутствия callback в полевом журнале остаётся открытой; приватные поля
+SDK и недоказанные команды для её восстановления не используются.
+
+
 
 ## 06.10.2026 — подтверждённые ошибки Natro 3.0.6 и кандидат 3.0.7
 

@@ -89,8 +89,12 @@ public final class AdbConsoleSession implements AutoCloseable {
         if (transport == null) throw new IOException("Сначала выполните Connect");
         stage = "root_identity_before_request";
         AdbShellResult.Result before = command("id -u");
-        if (!before.success() || before.truncated || !before.output.trim().matches("[0-9]+"))
+        if (!before.success() || before.truncated || !before.output.trim().matches("[0-9]+")) {
+            stage += before.exitCode == null ? "_missing_exit"
+                    : !before.success() ? "_command_failed"
+                    : before.truncated ? "_truncated" : "_invalid_uid";
             throw new IOException("Не удалось проверить UID перед запросом root");
+        }
         if (root == before.output.trim().equals("0")) {
             stage = "root_identity_confirmed";
             endpoint += " · UID=" + before.output.trim();

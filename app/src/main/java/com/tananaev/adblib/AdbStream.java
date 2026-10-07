@@ -116,19 +116,20 @@ public class AdbStream implements Closeable {
      */
     void notifyClose(boolean closedByPeer) {
         /* We don't call close() because it sends another CLOSE */
-        if (closedByPeer && !readQueue.isEmpty()) {
-            /* The remote peer closed the stream but we haven't finished reading the remaining data */
-            pendingClose = true;
-        } else {
-            isClosed = true;
+        synchronized (readQueue) {
+            // read() may already have polled the final payload. Closing outside this
+            // monitor discarded that payload between poll() and the isClosed check.
+            if (closedByPeer && !readQueue.isEmpty()) {
+                pendingClose = true;
+            } else {
+                isClosed = true;
+            }
+            readQueue.notifyAll();
         }
 
         /* Unwait readers and writers */
         synchronized (this) {
             notifyAll();
-        }
-        synchronized (readQueue) {
-            readQueue.notifyAll();
         }
     }
 

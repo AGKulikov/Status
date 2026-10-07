@@ -52,10 +52,16 @@ final class MediaResumeCommand {
     static final class DispatchTrace {
         @NonNull final Result result;
         @NonNull final String detail;
+        final boolean unreadySession;
 
         private DispatchTrace(@NonNull Result result, @NonNull String detail) {
+            this(result, detail, false);
+        }
+
+        private DispatchTrace(@NonNull Result result, @NonNull String detail, boolean unreadySession) {
             this.result = result;
             this.detail = detail;
+            this.unreadySession = unreadySession;
         }
     }
 
@@ -174,9 +180,10 @@ final class MediaResumeCommand {
                                     + ", actions=" + actions);
                 }
                 controller.getTransportControls().play();
-                return trace(Result.SESSION_COMMAND,
+                return new DispatchTrace(Result.SESSION_COMMAND,
                         "route=exact_session_only, playbackState=" + playbackState
-                                + ", actions=" + actions);
+                                + ", actions=" + actions,
+                        state == null || playbackState == PlaybackState.STATE_NONE);
             }
             return trace(Result.NO_TARGET,
                     "route=exact_session_only, activeSessions=" + controllers.size());

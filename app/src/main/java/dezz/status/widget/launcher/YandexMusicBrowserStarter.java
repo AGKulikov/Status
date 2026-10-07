@@ -171,15 +171,22 @@ final class YandexMusicBrowserStarter {
                             () -> MediaResumeCommand.playExactSessionOnly(context, SERVICE.getPackageName()));
             if (trace == null) { finish("play_cancelled", "plan_or_manual_change"); return; }
             boolean retryBind = trace.result == MediaResumeCommand.Result.NO_TARGET;
+            boolean warmupOnly = trace.result == MediaResumeCommand.Result.SESSION_COMMAND
+                    && trace.unreadySession;
             finish(event, trace.result + ":" + trace.detail);
-            if (retryBind && retry < 2 && permit.getAsBoolean()) {
+            YandexBrowserRetryPolicy.Retry next = YandexBrowserRetryPolicy.next(
+                    retryBind, warmupOnly, retry, permit.getAsBoolean());
+            if (next != YandexBrowserRetryPolicy.Retry.NONE) {
                 // No PLAY was delivered and the failed browser is disconnected. Retry only
                 // this exact service, with the original plan/manual-generation permit.
                 current = this;
                 WORKER.postDelayed(() -> {
                     if (current != this) return;
                     if (!permit.getAsBoolean()) { current = null; return; }
-                    current = new Connection(context, true, permit, retry + 1);
+                    // STATE_NONE accepted a PLAY but never became usable in the field log.
+                    // Rebind may wake its service; it must not issue that PLAY a second time.
+                    current = new Connection(context, next == YandexBrowserRetryPolicy.Retry.PLAY,
+                            permit, retry + 1);
                     current.start();
                 }, retry == 0 ? 1_000L : 3_000L);
                 journal("bind_retry_scheduled", "attempt=" + (retry + 1));

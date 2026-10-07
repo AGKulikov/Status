@@ -435,3 +435,15 @@ BackupDefaultsMigration явно разрешает рассмотренные33
 формате/defaults3.0.7. При переносе сохраняются effective defaults и explicit keys;
 будущие/неизвестные схемы отвергаются. Fingerprints пересмотрены для этих шести
 владельцев; статический inventory не подтверждает аппаратное восстановление.
+
+## Review 3.0.9 / 07.10.2026
+
+PackageReplaceBleRecoveryGate использует прежние DE namespace и markElapsed.
+Ранняя проверка PackageInfo не вводит ключей; duplicate broadcast не продлевает
+процессный барьер. Метка остаётся монотонным временным состоянием, прежний отказ
+при reboot/stale сохранён. InstrumentOemController добавляет read-only task probe
+и RAM-флаги, прежние hide_oem_white_bar/oem_white_bar_owned и адаптеры сохранены.
+BackupDefaultsMigration принимает рассмотренные335…341→342 при прежних defaults
+и формате; новые/будущие схемы запрещены. Пользовательские иконки/каталоги не
+меняются: renderer только читает их в фоне. Пересмотрены fingerprints именно
+этих трёх storage owners; это не доказательство полного runtime restore.

@@ -4552,7 +4552,7 @@ public class WidgetService extends Service {
         boolean presented = presentedInStatusRow || presentedInPopup;
         if (presented) {
             DiagnosticJournal.info("phone-notification",
-                    "delivery shown key=" + phoneNotificationDeliveryKey(delivery)
+                    "delivery submitted key=" + phoneNotificationDeliveryKey(delivery)
                             + " status=" + presentedInStatusRow
                             + " popup=" + presentedInPopup);
         }
@@ -6107,8 +6107,7 @@ public class WidgetService extends Service {
                     .put("updated_at", now)
                     .put("expires_at", expiresAt);
             boolean useIconLayout = presentation.iconCached
-                    && !presentation.appIdentifier.isEmpty()
-                    && PhoneAppIconStore.get(this).hasIcon(presentation.appIdentifier);
+                    && !presentation.appIdentifier.isEmpty();
             String shownOverlay = useIconLayout
                     ? PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID
                     : PhoneNotificationAutomation.OVERLAY_ID;

@@ -41,6 +41,8 @@ public final class InstrumentOemController {
     private dezz.status.widget.dim.DimMenuVendorBridge priorityMonitor;
     private boolean navigationRepairBusy;
     private int navigationRepairAttempts;
+    private String lastRepairGate = "";
+    private boolean displayOwnerProbeBusy;
     private int whiteAttempt;
     private int lastIgnition = -1;
     private String whiteStatus = "Не изменено";
@@ -140,17 +142,42 @@ public final class InstrumentOemController {
         if (instance != null && instance.whiteBarEnabled) instance.scheduleWhiteBar();
     }
     private void maybeRestoreNavigation(int mode) {
+        maybeRestoreNavigation(mode, false);
+    }
+    private void maybeRestoreNavigation(int mode, boolean stackOwnerConfirmed) {
         if (mode == 3) { navigationRepairAttempts = 0; return; }
         if (navigationRepairBusy || navigationRepairAttempts >= 3) return;
         InstrumentPanelStore store = new InstrumentPanelStore(context);
         int display = store.load().displayId;
         dezz.status.widget.WidgetAccessibilityService accessibility =
                 dezz.status.widget.WidgetAccessibilityService.getInstance();
-        boolean ownForeground = accessibility != null && context.getPackageName().equals(
-                accessibility.getForegroundPackageOnDisplay(display));
+        boolean ownForeground = stackOwnerConfirmed || (accessibility != null && context.getPackageName().equals(
+                accessibility.getForegroundPackageOnDisplay(display)));
         boolean panelReady = store.isEnabled()
                 && InstrumentPanelActivity.windowState().readyFor(display);
         boolean idle = priorityMonitor != null && priorityMonitor.navigationIdleConfirmed();
+        if (whiteBarEnabled && mode == 1 && panelReady && idle && !ownForeground
+                && android.os.Build.VERSION.SDK_INT < 30 && !displayOwnerProbeBusy) {
+            // API 28 accessibility does not identify secondary-display owners. Read the
+            // actual task snapshot off MAIN instead; keep the independent OEM priority gate.
+            displayOwnerProbeBusy = true;
+            long generation = whiteGeneration;
+            PrivilegedShell.get(context).runCommand("am stack list", (output, error) -> {
+                displayOwnerProbeBusy = false;
+                boolean own = error == null && InstrumentDisplayOwner.owns(output, display, context.getPackageName());
+                DiagnosticJournal.infoAsync("instrument-oem", "display_owner_probe own=" + own
+                        + ", display=" + display + ", failed=" + (error != null));
+                if (own && generation == whiteGeneration) maybeRestoreNavigation(mode, true);
+            });
+        }
+        String gate = "mode=" + mode + ", panel_ready=" + panelReady
+                + ", accessibility_available=" + (accessibility != null)
+                + ", own_foreground=" + ownForeground + ", navigation_idle=" + idle
+                + ", sdk=" + android.os.Build.VERSION.SDK_INT;
+        if (!gate.equals(lastRepairGate)) {
+            lastRepairGate = gate;
+            DiagnosticJournal.infoAsync("instrument-oem", "navigation_repair_gate " + gate);
+        }
         if (!InstrumentOemPolicy.restoreNavigation(whiteBarEnabled, mode, panelReady, ownForeground, idle)) return;
         navigationRepairBusy = true;
         navigationRepairAttempts++;

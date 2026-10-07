@@ -1,20 +1,20 @@
-name: Build Natro 3.0.8 update candidate
+name: Build Natro 3.0.9 update candidate
 on:
   push:
     branches: ['fix/log-errors-20261007']
-    paths: ['app/**', 'navigator-mod/**', 'tools/**', 'wechat-compat/**', 'settings.gradle', 'build.gradle', '.github/workflows/build-natro-3.0.8.yml']
+    paths: ['app/**', 'navigator-mod/**', 'tools/**', 'wechat-compat/**', 'settings.gradle', 'build.gradle', '.github/workflows/build-natro-3.0.9.yml']
 permissions:
   contents: read
 concurrency:
-  group: build-natro-308-${{ github.ref }}
+  group: build-natro-309-${{ github.ref }}
   cancel-in-progress: true
 jobs:
   candidate:
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     env:
-      VERSION_NAME: '3.0.8'
-      VERSION_CODE: '208021341'
+      VERSION_NAME: '3.0.9'
+      VERSION_CODE: '208021342'
       ALLOW_UNSIGNED_RELEASE: 'true'
       REUSE_NAVIGATOR_302: 'true'
       HELPER_CHANGED: 'false'
@@ -51,17 +51,17 @@ jobs:
       - name: Upload verified unsigned candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Natro-3.0.8-offline-signing-${{ github.run_number }}
+          name: Natro-3.0.9-offline-signing-${{ github.run_number }}
           path: |
-            ${{ runner.temp }}/natro-3.0.8-candidate/*
-            !${{ runner.temp }}/natro-3.0.8-candidate/tools/**
+            ${{ runner.temp }}/natro-3.0.9-candidate/*
+            !${{ runner.temp }}/natro-3.0.9-candidate/tools/**
           if-no-files-found: error
           retention-days: 7
       - name: Upload signing tools separately
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Natro-3.0.8-signing-tools-${{ github.run_number }}
-          path: ${{ runner.temp }}/natro-3.0.8-candidate/tools/*
+          name: Natro-3.0.9-signing-tools-${{ github.run_number }}
+          path: ${{ runner.temp }}/natro-3.0.9-candidate/tools/*
           if-no-files-found: error
           retention-days: 7
       - name: Upload candidate and reports

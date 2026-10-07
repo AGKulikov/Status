@@ -113,6 +113,7 @@ public final class PopupOverlayController {
     private int styledBackground;
     private int styledCornerRadius = -1;
     @Nullable private PhoneNotificationCardView phoneNotificationCard;
+    @Nullable private android.view.ViewTreeObserver.OnPreDrawListener phoneDrawObserver;
     private List<PopupItemConfig> currentItems = Collections.emptyList();
     /** Actual auto-placement resolved during the last render, used by the direct grid editor. */
     private final Map<String, int[]> renderedPlacements = new HashMap<>();
@@ -540,6 +541,29 @@ public final class PopupOverlayController {
         phoneNotificationCard.setPresentation(layout, model);
         lastPhoneNotificationSignature = presentationSignature;
         setOverlayVisible(true);
+        dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("phone-notification-render",
+                "stage=attach overlay=" + overlayId + ", accepted=" + rootAdded
+                        + ", width=" + params.width + ", height=" + params.height);
+        if (rootAdded) {
+            final android.view.View rendered = root;
+            final long signature = presentationSignature;
+            if (phoneDrawObserver != null)
+                rendered.getViewTreeObserver().removeOnPreDrawListener(phoneDrawObserver);
+            phoneDrawObserver = new android.view.ViewTreeObserver.OnPreDrawListener() {
+                        @Override public boolean onPreDraw() {
+                            if (rendered.getViewTreeObserver().isAlive())
+                                rendered.getViewTreeObserver().removeOnPreDrawListener(this);
+                            if (phoneDrawObserver == this) phoneDrawObserver = null;
+                            if (root == rendered && signature == lastPhoneNotificationSignature)
+                                dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync(
+                                        "phone-notification-render", "stage=pre_draw overlay="
+                                                + overlayId + ", shown=" + rendered.isShown()
+                                                + ", physical_pixels=unobserved");
+                            return true;
+                        }
+                    };
+            rendered.getViewTreeObserver().addOnPreDrawListener(phoneDrawObserver);
+        }
     }
 
     private long phoneNotificationSignature(@NonNull PhoneNotificationLayoutConfig layout,
@@ -548,10 +572,8 @@ public final class PopupOverlayController {
         value = mix(value, model.title);
         value = mix(value, model.message);
         value = mix(value, model.appIconIdentifier);
-        if (model.appIconIdentifier != null
-                && PhoneAppIconStore.get(context).hasIcon(model.appIconIdentifier)) {
-            value = (value ^ 1L) * 0x100000001b3L;
-        }
+        // The card loads its image asynchronously. Never acquire the file-store monitor here:
+        // ANCS can hold it while persisting/migrating its catalog on a slow head unit.
         try {
             return mix(value, layout.toJson().toString());
         } catch (JSONException ignored) {

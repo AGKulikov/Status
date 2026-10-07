@@ -61,6 +61,15 @@ public final class PhoneNotificationCardView extends FrameLayout {
 
     private PhoneNotificationLayoutConfig config;
     private Model model = Model.preview();
+    private volatile long iconRequest;
+    private static final java.util.concurrent.Executor ICON_READER =
+            new java.util.concurrent.ThreadPoolExecutor(1, 1, 0L,
+                    java.util.concurrent.TimeUnit.MILLISECONDS,
+                    new java.util.concurrent.ArrayBlockingQueue<>(32), runnable -> {
+                        Thread thread = new Thread(runnable, "phone-card-icon");
+                        thread.setDaemon(true);
+                        return thread;
+                    }, new java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy());
     private final TextView avatar;
     private final AppleContinuousIconView badge;
     private final OverflowTextView title;
@@ -648,6 +657,7 @@ public final class PhoneNotificationCardView extends FrameLayout {
 
     @Nullable
     private Drawable phoneAppIcon(@Nullable String raw) {
+        final long request = ++iconRequest;
         if (raw == null || raw.trim().isEmpty()) return null;
         if (PhoneNotificationAutomation.LOW_BATTERY_ICON_ID.equals(raw.trim())) {
             int iconSize = config == null ? 72
@@ -656,8 +666,25 @@ public final class PhoneNotificationCardView extends FrameLayout {
         }
         String identifier = raw.startsWith("phone-app:")
                 ? raw.substring("phone-app:".length()).trim() : raw.trim();
-        return identifier.isEmpty() ? null
-                : PhoneAppIconStore.get(getContext()).drawable(identifier);
+        if (identifier.isEmpty()) return null;
+        // Catalog migration, file reads and decoding must never hold up showing the text.
+        // A late result belongs only to this presentation, never the next notification.
+        Context app = getContext().getApplicationContext();
+        java.lang.ref.WeakReference<PhoneNotificationCardView> reference =
+                new java.lang.ref.WeakReference<>(this);
+        ICON_READER.execute(() -> {
+            PhoneNotificationCardView current = reference.get();
+            if (current == null || current.iconRequest != request) return;
+            Drawable drawable = PhoneAppIconStore.get(app).drawable(identifier);
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
+                PhoneNotificationCardView target = reference.get();
+                if (target != null && target.iconRequest == request && drawable != null) {
+                    target.badge.setSourceDrawable(drawable);
+                    target.invalidate();
+                }
+            });
+        });
+        return null;
     }
 
     @NonNull

@@ -21,13 +21,18 @@ public final class PackageReplaceBleRecoveryGate {
     private static final String PREFS = "phone_package_replace_recovery";
     private static final String KEY_MARK_ELAPSED = "markElapsed";
     private static volatile long inProcessMarkElapsed = Long.MIN_VALUE;
+    private static boolean packageChecked;
 
     private PackageReplaceBleRecoveryGate() {
     }
 
     /** Called directly at the {@code MY_PACKAGE_REPLACED} receiver boundary. */
-    public static void mark(@NonNull Context context) {
+    public static synchronized void mark(@NonNull Context context) {
         long now = SystemClock.elapsedRealtime();
+        // The replacement broadcast can arrive after the new process already started.
+        // Do not extend the early startup barrier with a delayed duplicate broadcast.
+        if (inProcessMarkElapsed != Long.MIN_VALUE && now >= inProcessMarkElapsed
+                && now - inProcessMarkElapsed <= MAX_VALID_MARK_AGE_MS) return;
         inProcessMarkElapsed = now;
         state(context).edit().putLong(KEY_MARK_ELAPSED, now).apply();
         PhoneConnectionJournal.append("controller",
@@ -35,11 +40,29 @@ public final class PackageReplaceBleRecoveryGate {
     }
 
     /** Returns only a bounded same-kernel delay; stale marks can never freeze startup. */
-    public static long remainingQuietMillis(@NonNull Context context) {
+    public static synchronized long remainingQuietMillis(@NonNull Context context) {
+        if (!packageChecked) {
+            packageChecked = true;
+            try {
+                android.content.pm.PackageInfo info = context.getPackageManager()
+                        .getPackageInfo(context.getPackageName(), 0);
+                if (recentReplacement(info.firstInstallTime, info.lastUpdateTime,
+                        System.currentTimeMillis())) mark(context);
+            } catch (android.content.pm.PackageManager.NameNotFoundException
+                     | RuntimeException failure) {
+                PhoneConnectionJournal.append("controller", "package replacement probe failed: "
+                        + failure.getClass().getSimpleName());
+            }
+        }
         long now = SystemClock.elapsedRealtime();
         long persisted = state(context).getLong(KEY_MARK_ELAPSED, Long.MIN_VALUE);
         return Math.max(remainingQuietMillis(persisted, now),
                 remainingQuietMillis(inProcessMarkElapsed, now));
+    }
+
+    static boolean recentReplacement(long firstInstall, long updated, long now) {
+        return updated > firstInstall && updated > 0L && now >= updated
+                && now - updated <= MAX_VALID_MARK_AGE_MS;
     }
 
     static long remainingQuietMillis(long markedAtElapsed, long nowElapsed) {
