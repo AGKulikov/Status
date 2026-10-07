@@ -102,6 +102,7 @@ public final class AndroidCentralRoute {
         public final AuthorizationStep authorizationStep;
         public final int authorizationRetries;
         public final int invalidHandleRediscoveries;
+        public final int serviceChangedRetries;
         public final String detail;
 
         private State(BleRouteEpoch epoch, String selectedSystemBondAddress,
@@ -113,7 +114,7 @@ public final class AndroidCentralRoute {
             this(epoch, selectedSystemBondAddress, helperInstallationId, acquisitionMode,
                     phase, expected, activeOwnerId, nextOwnerId, consecutiveFailures,
                     sameOwnerReassertions, ancsAvailable, false, ownerOperationCursor,
-                    AuthorizationStep.NONE, 0, 0, detail);
+                    AuthorizationStep.NONE, 0, 0, 0, detail);
         }
 
         private State(BleRouteEpoch epoch, String selectedSystemBondAddress,
@@ -123,7 +124,7 @@ public final class AndroidCentralRoute {
                       boolean ancsAvailable, boolean serviceChangedArmed,
                       long ownerOperationCursor,
                       AuthorizationStep authorizationStep, int authorizationRetries,
-                      int invalidHandleRediscoveries, String detail) {
+                      int invalidHandleRediscoveries, int serviceChangedRetries, String detail) {
             this.epoch = epoch;
             this.selectedSystemBondAddress = selectedSystemBondAddress;
             this.helperInstallationId = helperInstallationId;
@@ -140,6 +141,7 @@ public final class AndroidCentralRoute {
             this.authorizationStep = authorizationStep;
             this.authorizationRetries = authorizationRetries;
             this.invalidHandleRediscoveries = invalidHandleRediscoveries;
+            this.serviceChangedRetries = serviceChangedRetries;
             this.detail = detail == null ? "" : detail;
         }
 
@@ -161,7 +163,7 @@ public final class AndroidCentralRoute {
                 state.activeOwnerId, nextOwnerId, state.consecutiveFailures,
                 state.sameOwnerReassertions, state.ancsAvailable, state.serviceChangedArmed,
                 expectedOperationId, state.authorizationStep, state.authorizationRetries,
-                state.invalidHandleRediscoveries, state.detail);
+                state.invalidHandleRediscoveries, state.serviceChangedRetries, state.detail);
     }
 
     public static BleRouteTransition<State> start(IphoneTransportStartRequest request) {
@@ -415,16 +417,17 @@ public final class AndroidCentralRoute {
         if (result != GattResultV2.SUCCESS) {
             // A completed transient CCCD failure does not invalidate this connected owner.
             // In the Oct 7 trace we destroyed the first successful link at status=14.
-            if (result == GattResultV2.TRANSIENT_FAILURE && state.authorizationRetries < 2) {
+            if (result == GattResultV2.TRANSIENT_FAILURE && state.serviceChangedRetries < 2) {
                 BleRouteToken timer = nextOperation(token);
                 if (timer == null) return counterExhausted(state, token, "operation");
                 State waiting = copyPolicy(state, Phase.WAIT_SERVICE_CHANGED_RETRY, timer,
                         token.ownerId, state.nextOwnerId, state.consecutiveFailures,
-                        AuthorizationStep.SERVICE_CHANGED_CCCD, state.authorizationRetries + 1,
+                        AuthorizationStep.SERVICE_CHANGED_CCCD, state.authorizationRetries,
                         state.invalidHandleRediscoveries, "Service Changed transient failure; retain connected owner");
+                waiting = withServiceChangedRetries(waiting, state.serviceChangedRetries + 1);
                 return BleRouteTransition.accepted(waiting,
                         op(BleRouteEffect.Type.CANCEL_DEADLINE, token, "CCCD callback completed"),
-                        BleRouteEffect.deadline(timer, state.authorizationRetries == 0 ? 1_000L : 3_000L));
+                        BleRouteEffect.deadline(timer, state.serviceChangedRetries == 0 ? 1_000L : 3_000L));
             }
             return gattFailure(state, token, result,
                     AuthorizationStep.SERVICE_CHANGED_CCCD);
@@ -1320,7 +1323,8 @@ public final class AndroidCentralRoute {
                 activeOwnerId, nextOwnerId, failures, state.sameOwnerReassertions,
                 state.ancsAvailable, state.serviceChangedArmed, cursor,
                 state.authorizationStep,
-                state.authorizationRetries, state.invalidHandleRediscoveries, detail);
+                state.authorizationRetries, state.invalidHandleRediscoveries,
+                activeOwnerId == state.activeOwnerId ? state.serviceChangedRetries : 0, detail);
     }
 
     private static State copyPolicy(State state, Phase phase, BleRouteToken expected,
@@ -1338,7 +1342,8 @@ public final class AndroidCentralRoute {
                 activeOwnerId, nextOwnerId, failures, state.sameOwnerReassertions,
                 state.ancsAvailable, state.serviceChangedArmed, cursor,
                 authorizationStep, authorizationRetries,
-                invalidHandleRediscoveries, detail);
+                invalidHandleRediscoveries,
+                activeOwnerId == state.activeOwnerId ? state.serviceChangedRetries : 0, detail);
     }
 
     private static State copyWithReassertions(State state, Phase phase,
@@ -1355,7 +1360,8 @@ public final class AndroidCentralRoute {
                         : activeOwnerId == state.activeOwnerId
                             ? state.ownerOperationCursor : 0L,
                 state.authorizationStep, state.authorizationRetries,
-                state.invalidHandleRediscoveries, detail);
+                state.invalidHandleRediscoveries,
+                activeOwnerId == state.activeOwnerId ? state.serviceChangedRetries : 0, detail);
     }
 
     private static State withHelperInstallationId(State state, String helperInstallationId) {
@@ -1365,7 +1371,7 @@ public final class AndroidCentralRoute {
                 state.nextOwnerId, state.consecutiveFailures, state.sameOwnerReassertions,
                 state.ancsAvailable, state.serviceChangedArmed,
                 state.ownerOperationCursor, state.authorizationStep,
-                state.authorizationRetries, state.invalidHandleRediscoveries, state.detail);
+                state.authorizationRetries, state.invalidHandleRediscoveries, state.serviceChangedRetries, state.detail);
     }
 
     private static State withGattInventory(State state, boolean ancsAvailable,
@@ -1376,11 +1382,20 @@ public final class AndroidCentralRoute {
                 state.sameOwnerReassertions, ancsAvailable, serviceChangedArmed,
                 state.ownerOperationCursor,
                 state.authorizationStep, state.authorizationRetries,
-                state.invalidHandleRediscoveries, state.detail);
+                state.invalidHandleRediscoveries, state.serviceChangedRetries, state.detail);
     }
 
     private static State withServiceChangedArmed(State state, boolean armed) {
         return withGattInventory(state, state.ancsAvailable, armed);
+    }
+
+    private static State withServiceChangedRetries(State state, int retries) {
+        return new State(state.epoch, state.selectedSystemBondAddress,
+                state.helperInstallationId, state.acquisitionMode, state.phase, state.expected,
+                state.activeOwnerId, state.nextOwnerId, state.consecutiveFailures,
+                state.sameOwnerReassertions, state.ancsAvailable, state.serviceChangedArmed,
+                state.ownerOperationCursor, state.authorizationStep, state.authorizationRetries,
+                state.invalidHandleRediscoveries, retries, state.detail);
     }
 
     private static boolean ownsGatt(Phase phase) {

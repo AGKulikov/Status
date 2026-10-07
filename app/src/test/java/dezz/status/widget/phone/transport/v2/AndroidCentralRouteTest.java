@@ -21,6 +21,20 @@ public final class AndroidCentralRouteTest {
                         true, true, true, true, true)).state;
     }
 
+    @Test public void transientServiceChangedRetriesDoNotConsumeAuthorizationRecovery() {
+        AndroidCentralRoute.State state = serviceChangedPending();
+        for (int i = 0; i < 2; i++) {
+            state = AndroidCentralRoute.serviceChangedSubscribed(state, state.expected, GattResultV2.TRANSIENT_FAILURE).state;
+            state = AndroidCentralRoute.deadline(state, state.expected).state;
+        }
+        state = AndroidCentralRoute.serviceChangedSubscribed(state, state.expected, GattResultV2.AUTHENTICATION_REQUIRED).state;
+        assertEquals(AndroidCentralRoute.Phase.WAIT_AUTHORIZATION, state.phase);
+        state = AndroidCentralRoute.authorizationChanged(state, state.expected).state;
+        assertEquals(AndroidCentralRoute.Phase.SUBSCRIBING_SERVICE_CHANGED, state.phase);
+        assertEquals(2, state.serviceChangedRetries);
+        assertEquals(1, state.authorizationRetries);
+    }
+
     @Test public void completedTransientServiceChangedFailureRetainsOwnerAndRetriesTwice() {
         AndroidCentralRoute.State state = serviceChangedPending();
         long owner = state.activeOwnerId;
