@@ -2905,6 +2905,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
             case WAIT_SYSTEM_CONNECTION: return IphoneTransportLifecycle.CONNECTING;
             case DISCOVERING:
             case SUBSCRIBING_SERVICE_CHANGED:
+            case WAIT_SERVICE_CHANGED_RETRY:
             case VERIFYING_PEER:
             case WAIT_ANCS: return IphoneTransportLifecycle.AUTHENTICATING;
             case NEEDS_FRESH_LINK: return IphoneTransportLifecycle.FAILED;

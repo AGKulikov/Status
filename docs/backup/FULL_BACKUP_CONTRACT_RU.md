@@ -421,3 +421,17 @@ hide_oem_white_bar/oem_white_bar_owned и сохранённые disable_default
 Новые очереди, поколения, наблюдённый DIM priority и счётчики существуют только
 в RAM и не являются переносимыми настройками. Fingerprints обновлены после этой
 проверки, не в качестве доказательства runtime backup/restore.
+
+## Review 3.0.8 / 07.10.2026
+
+AdbTransport сохраняет прежние adb_key/adb_key.pub и адаптеры; исходник AdbCrypto
+теперь включён из прежней зависимости1.3 и пишет ровно переданные файлы, новых
+roots/ключей нет. HudLcaPatchActivity сохраняет прежний last-report.txt, добавляет
+этап диагностики. AndroidCentralTransportV2 меняет только lifecycle mapping.
+HudRuntimeStatusStore пишет прежний DE hud-runtime-status-v1.txt одним асинхронным
+писателем, с заменой ожидающего snapshot. Это прежняя исключённая runtime-диагностика,
+не активируемая после restore; пользовательских данных в очереди нет.
+BackupDefaultsMigration явно разрешает рассмотренные335…340→341 при неизменном
+формате/defaults3.0.7. При переносе сохраняются effective defaults и explicit keys;
+будущие/неизвестные схемы отвергаются. Fingerprints пересмотрены для этих шести
+владельцев; статический inventory не подтверждает аппаратное восстановление.

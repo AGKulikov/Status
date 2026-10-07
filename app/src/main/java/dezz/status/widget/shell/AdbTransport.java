@@ -210,7 +210,7 @@ public class AdbTransport implements ShellTransport {
         // concatenate so the public exec() contract — "the trimmed command output" —
         // actually holds.
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-        execRaw(command, chunk -> buffer.write(chunk, 0, chunk.length));
+        execRaw(command, chunk -> buffer.write(chunk, 0, chunk.length), 15_000L);
         return new String(buffer.toByteArray(), StandardCharsets.UTF_8).trim();
     }
 
@@ -223,25 +223,46 @@ public class AdbTransport implements ShellTransport {
 
     /** Bounded consumers own buffering and cancellation; a missing exit marker is not success. */
     public void execRaw(String command, Consumer<byte[]> consumer) throws Exception {
+        execRaw(command, consumer, 60_000L);
+    }
+
+    /** Zero permits a deliberately long-lived bridge; OPEN is always bounded separately. */
+    public void execRaw(String command, Consumer<byte[]> consumer, long timeoutMs) throws Exception {
         byte[] script = AdbShellCommand.encode(command);
         // adblib 1.3 generateOpen allocates String.length()+1 bytes, not UTF-8 length.
         // Keeping OPEN ASCII and short also avoids the daemon's OPEN payload limit.
-        AdbStream stream = connection.open(AdbShellCommand.SERVICE);
+        try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, timeoutMs, "shell")) {
+        AdbStream stream = openBounded(AdbShellCommand.SERVICE);
         try {
             AdbShellCommand.send(script, connection.getMaxData(), stream::write);
             drain(stream, consumer);
         } finally {
             try { stream.close(); } catch (Exception ignored) {}
         }
+        }
+    }
+
+    private AdbStream openBounded(String service) throws Exception {
+        try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 10_000L, "open")) {
+            return connection.open(service);
+        }
+    }
+
+    public String execLongRunning(String command) throws Exception {
+        ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+        execRaw(command, chunk -> buffer.write(chunk, 0, chunk.length), 0);
+        return new String(buffer.toByteArray(), StandardCharsets.UTF_8).trim();
     }
 
     /** ADB host services such as root: are protocol requests, not shell commands. */
     public void readService(String service, Consumer<byte[]> consumer) throws Exception {
-        AdbStream stream = connection.open(service);
+        try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 10_000L, "service")) {
+        AdbStream stream = openBounded(service);
         try {
             drain(stream, consumer);
         } finally {
             try { stream.close(); } catch (Exception ignored) {}
+        }
         }
     }
 

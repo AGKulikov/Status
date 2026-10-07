@@ -100,11 +100,17 @@ final class YandexMusicBrowserStarter {
         private boolean connected;
         private boolean playRequested;
         private BooleanSupplier permit;
+        private final int retry;
 
         Connection(@NonNull Context context, boolean playRequested, BooleanSupplier permit) {
+            this(context, playRequested, permit, 0);
+        }
+
+        Connection(Context context, boolean playRequested, BooleanSupplier permit, int retry) {
             this.context = context;
             this.playRequested = playRequested;
             this.permit = permit;
+            this.retry = retry;
         }
 
         void request(boolean requestPlay, BooleanSupplier permit) {
@@ -164,7 +170,20 @@ final class YandexMusicBrowserStarter {
                     MediaAutoResumeController.guardedBrowserDispatch(context, permit,
                             () -> MediaResumeCommand.playExactSessionOnly(context, SERVICE.getPackageName()));
             if (trace == null) { finish("play_cancelled", "plan_or_manual_change"); return; }
+            boolean retryBind = trace.result == MediaResumeCommand.Result.NO_TARGET;
             finish(event, trace.result + ":" + trace.detail);
+            if (retryBind && retry < 2 && permit.getAsBoolean()) {
+                // No PLAY was delivered and the failed browser is disconnected. Retry only
+                // this exact service, with the original plan/manual-generation permit.
+                current = this;
+                WORKER.postDelayed(() -> {
+                    if (current != this) return;
+                    if (!permit.getAsBoolean()) { current = null; return; }
+                    current = new Connection(context, true, permit, retry + 1);
+                    current.start();
+                }, retry == 0 ? 1_000L : 3_000L);
+                journal("bind_retry_scheduled", "attempt=" + (retry + 1));
+            }
         }
 
         private void dispatchBrowserTokenAndFinish(@NonNull String event) {

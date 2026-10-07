@@ -53,6 +53,7 @@ public final class AndroidCentralRoute {
         CONNECTING,
         DISCOVERING,
         SUBSCRIBING_SERVICE_CHANGED,
+        WAIT_SERVICE_CHANGED_RETRY,
         VERIFYING_PEER,
         SUBSCRIBING_ROUTE_CONTROL,
         SUBSCRIBING_TELEMETRY,
@@ -412,6 +413,19 @@ public final class AndroidCentralRoute {
             return BleRouteTransition.ignored(state);
         }
         if (result != GattResultV2.SUCCESS) {
+            // A completed transient CCCD failure does not invalidate this connected owner.
+            // In the Oct 7 trace we destroyed the first successful link at status=14.
+            if (result == GattResultV2.TRANSIENT_FAILURE && state.authorizationRetries < 2) {
+                BleRouteToken timer = nextOperation(token);
+                if (timer == null) return counterExhausted(state, token, "operation");
+                State waiting = copyPolicy(state, Phase.WAIT_SERVICE_CHANGED_RETRY, timer,
+                        token.ownerId, state.nextOwnerId, state.consecutiveFailures,
+                        AuthorizationStep.SERVICE_CHANGED_CCCD, state.authorizationRetries + 1,
+                        state.invalidHandleRediscoveries, "Service Changed transient failure; retain connected owner");
+                return BleRouteTransition.accepted(waiting,
+                        op(BleRouteEffect.Type.CANCEL_DEADLINE, token, "CCCD callback completed"),
+                        BleRouteEffect.deadline(timer, state.authorizationRetries == 0 ? 1_000L : 3_000L));
+            }
             return gattFailure(state, token, result,
                     AuthorizationStep.SERVICE_CHANGED_CCCD);
         }
@@ -652,6 +666,16 @@ public final class AndroidCentralRoute {
     public static BleRouteTransition<State> deadline(State state, BleRouteToken token) {
         if (state.expected == null || !state.expected.equals(token)) {
             return BleRouteTransition.ignored(state);
+        }
+        if (state.phase == Phase.WAIT_SERVICE_CHANGED_RETRY) {
+            BleRouteToken operation = nextOperation(token);
+            if (operation == null) return counterExhausted(state, token, "operation");
+            State retrying = copyPolicy(state, Phase.SUBSCRIBING_SERVICE_CHANGED, operation,
+                    token.ownerId, state.nextOwnerId, state.consecutiveFailures,
+                    AuthorizationStep.SERVICE_CHANGED_CCCD, state.authorizationRetries,
+                    state.invalidHandleRediscoveries, "retry completed Service Changed CCCD on same owner");
+            return step(retrying, token, operation, BleRouteEffect.Type.SUBSCRIBE_GATT_SERVICE_CHANGED,
+                    CCCD_TIMEOUT_MS, "bounded same-owner Service Changed retry");
         }
         if (state.phase == Phase.WAIT_ANCS_RETRY) {
             boolean notification = state.authorizationStep
@@ -1362,6 +1386,7 @@ public final class AndroidCentralRoute {
     private static boolean ownsGatt(Phase phase) {
         return phase == Phase.CONNECTING || phase == Phase.DISCOVERING
                 || phase == Phase.SUBSCRIBING_SERVICE_CHANGED
+                || phase == Phase.WAIT_SERVICE_CHANGED_RETRY
                 || phase == Phase.VERIFYING_PEER
                 || phase == Phase.SUBSCRIBING_ROUTE_CONTROL
                 || phase == Phase.SUBSCRIBING_TELEMETRY

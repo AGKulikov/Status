@@ -20,12 +20,15 @@ public final class AdbConsoleSession implements AutoCloseable {
     private final AtomicReference<Socket> socket = new AtomicReference<>();
     private volatile AdbTransport transport;
     private volatile String endpoint = "Disconnected", stopReason = "Отменено";
+    private volatile String stage = "idle";
     private volatile boolean closed;
     private int preferredPort = 5555;
     public AdbConsoleSession(Context context) { this.context = context.getApplicationContext(); }
     public String endpoint() { return endpoint; }
     public boolean connected() { return transport != null; }
     public boolean busy() { return busy.get(); }
+    public String stage() { return stage; }
+    public void stage(String value) { stage = value; }
     public synchronized boolean submit(Operation operation, Listener listener) {
         if (closed || !busy.compareAndSet(false, true)) return false;
         cancelled.set(false); stopReason = "Отменено";
@@ -84,8 +87,18 @@ public final class AdbConsoleSession implements AutoCloseable {
     public String daemonRoot(boolean root) throws Exception {
         checkCancelled();
         if (transport == null) throw new IOException("Сначала выполните Connect");
+        stage = "root_identity_before_request";
+        AdbShellResult.Result before = command("id -u");
+        if (!before.success() || before.truncated || !before.output.trim().matches("[0-9]+"))
+            throw new IOException("Не удалось проверить UID перед запросом root");
+        if (root == before.output.trim().equals("0")) {
+            stage = "root_identity_confirmed";
+            endpoint += " · UID=" + before.output.trim();
+            return "ADB: требуемый UID уже подтверждён; перезапуск adbd не нужен";
+        }
         java.io.ByteArrayOutputStream reply = new java.io.ByteArrayOutputStream();
         String requestFailure = "";
+        stage = "root_service_request";
         try { transport.readService(root ? "root:" : "unroot:", chunk -> {
             int count = Math.min(chunk.length, 8192 - reply.size());
             if (count > 0) reply.write(chunk, 0, count);
@@ -100,7 +113,9 @@ public final class AdbConsoleSession implements AutoCloseable {
             checkCancelled();
             if (attempt > 0) Thread.sleep(500);
             try {
+                stage = "root_reconnect";
                 connect();
+                stage = "root_identity_after_restart";
                 AdbShellResult.Result identity = command("id -u");
                 if (!identity.success()) throw new IOException(identity.describe());
                 String uid = identity.output.trim();
@@ -109,6 +124,7 @@ public final class AdbConsoleSession implements AutoCloseable {
                         + (root ? ". adbd не получил root. Прошивка может запрещать adb root; su 0 проверяется отдельно."
                                 : ". adbd остался root; unroot не подтверждён."));
                 endpoint += root ? " · root (UID=0)" : " · shell (UID=" + uid + ")";
+                stage = "root_identity_confirmed";
                 return message + "\n" + (root ? "ADB root подтверждён: UID=0" : "ADB shell подтверждён: UID=" + uid);
             } catch (IllegalStateException rejected) { throw rejected; }
             catch (Exception error) { last = error; }

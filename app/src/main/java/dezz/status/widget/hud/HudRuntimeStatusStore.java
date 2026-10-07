@@ -16,11 +16,23 @@ import java.nio.charset.StandardCharsets;
 final class HudRuntimeStatusStore {
     private static final String FILE_NAME = "hud-runtime-status-v1.txt";
     private static final int MAX_BYTES = 2_048;
+    private static final LatestStatusWriter WRITER = new LatestStatusWriter(
+            java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                Thread thread = new Thread(r, "natro-hud-status-writer");
+                thread.setDaemon(true);
+                return thread;
+            }));
 
     private HudRuntimeStatusStore() {}
 
     static void write(@NonNull Context context, @NonNull String raw) {
         String value = bounded(raw);
+        Context app = context.getApplicationContext();
+        Context exact = app == null ? context : app;
+        WRITER.submit(() -> writeOnWorker(exact, value));
+    }
+
+    private static void writeOnWorker(Context context, String value) {
         AtomicFile file = new AtomicFile(statusFile(context));
         FileOutputStream output = null;
         try {
@@ -28,7 +40,9 @@ final class HudRuntimeStatusStore {
             output.write(value.getBytes(StandardCharsets.UTF_8));
             output.flush();
             file.finishWrite(output);
-        } catch (Exception ignored) {
+        } catch (Exception failure) {
+            dezz.status.widget.diagnostics.DiagnosticJournal.warn("hud-status",
+                    "write_failed=" + failure.getClass().getSimpleName());
             if (output != null) {
                 try { file.failWrite(output); }
                 catch (RuntimeException ignoredAgain) {}

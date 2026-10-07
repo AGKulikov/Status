@@ -14,6 +14,12 @@ public final class AdbSessionReplay {
             session.daemonRoot(false);check(AdbTransport.services.get(1).equals("unroot:"),"real unroot service");
             check(session.endpoint().contains("UID=2000"),"unroot confirmed by shell UID");
         }
+        AdbTransport.reset();AdbTransport.root=true;
+        try(AdbConsoleSession session=new AdbConsoleSession(new Context())) {
+            session.connect();session.daemonRoot(true);
+            check(AdbTransport.services.isEmpty(),"already-root must not restart adbd");
+            check(session.endpoint().contains("UID=0"),"preflight records actual UID");
+        }
         AdbTransport.reset();AdbTransport.dropRootReply=true;
         try(AdbConsoleSession session=new AdbConsoleSession(new Context())) {
             session.connect();session.daemonRoot(true);

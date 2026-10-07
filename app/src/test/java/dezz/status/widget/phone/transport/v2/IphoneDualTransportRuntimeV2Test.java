@@ -30,6 +30,28 @@ import org.junit.Test;
 public final class IphoneDualTransportRuntimeV2Test {
     private static final long PROCESS = 0x1234L;
 
+    @Test public void timedOutRestorationUsesFreshAdapterForNextSwitchEpoch() {
+        Fixture fixture = new Fixture(false, "");
+        fixture.factory.dropNextRestorationTerminal = true;
+        fixture.startProduction();
+        FakeTransport first = fixture.factory.created.get(0);
+        assertTrue(first.preparedRestoration);
+        fixture.scheduler.advanceBy(101L);
+        assertEquals(FAILED, fixture.listener.lastDual.switchPhase);
+        fixture.runtime.requestSameModeRecovery();
+        fixture.scheduler.drain();
+        assertEquals(2, fixture.factory.created.size());
+        assertEquals(1, first.closeCount);
+        FakeTransport second = fixture.factory.created.get(1);
+        assertTrue(second.preparedRestoration);
+        assertFalse(first.restorationOwner.equals(second.restorationOwner));
+        assertEquals(0, second.startCount);
+        fixture.scheduler.advanceBy(10L);
+        assertEquals(ACTIVE, fixture.listener.lastDual.switchPhase);
+        assertEquals(3, fixture.factory.created.size());
+        assertEquals(1, fixture.factory.created.get(2).startCount);
+    }
+
     @Test public void selectedBluetoothAddressUsesAndroidUppercaseCanonicalForm() {
         IphoneDualTransportRuntimeV2.Config config = new IphoneDualTransportRuntimeV2.Config(
                 " aa:bb:cc:dd:ee:ff ", IphoneBleMode.ANDROID_CENTRAL,
@@ -842,6 +864,7 @@ public final class IphoneDualTransportRuntimeV2Test {
             implements IphoneDualTransportRuntimeV2.TransportFactory {
         final FakeScheduler scheduler;
         final List<FakeTransport> created = new ArrayList<>();
+        boolean dropNextRestorationTerminal;
         boolean failNextStart;
         boolean errorNextStart;
         boolean throwNextCreate;
@@ -858,6 +881,8 @@ public final class IphoneDualTransportRuntimeV2Test {
                 throw new IllegalStateException("factory probe");
             }
             FakeTransport transport = new FakeTransport(mode, scheduler);
+            transport.dropRestorationTerminal = dropNextRestorationTerminal;
+            dropNextRestorationTerminal = false;
             transport.failOnStart = failNextStart;
             transport.errorOnStart = errorNextStart;
             transport.throwOnStart = throwNextStart;
@@ -876,6 +901,7 @@ public final class IphoneDualTransportRuntimeV2Test {
         final FakeScheduler scheduler;
         IphoneTransportSessionListenerV2 listener;
         IphoneTransportStartRequest startRequest;
+        boolean dropRestorationTerminal;
         Owner restorationOwner;
         RestorationDrainCompletion restorationCompletion;
         boolean preparedRestoration;
@@ -954,6 +980,10 @@ public final class IphoneDualTransportRuntimeV2Test {
         }
         @Override public void freezeIngress(Owner source, FreezeCompletion completion) {
             freezeCount++;
+            if (preparedRestoration && !source.equals(restorationOwner)) {
+                scheduler.execute(() -> completion.onFrozen(source, FreezeResult.FAILED));
+                return;
+            }
             FreezeResult result = freezeResultOverride != null
                     ? freezeResultOverride : remoteControl && ownerCount > 0
                     ? FreezeResult.FROZEN_WITH_REMOTE_CONTROL
@@ -971,6 +1001,7 @@ public final class IphoneDualTransportRuntimeV2Test {
         @Override public void cancelControlRetry(ControlTransmit transmit) { }
         @Override public void beginConfirmedModeSwitchStop(Owner source) {
             stopCount++;
+            if (preparedRestoration && dropRestorationTerminal) return;
             ownerCount = 0;
             scheduler.execute(() -> {
                 terminalDelivered = true;

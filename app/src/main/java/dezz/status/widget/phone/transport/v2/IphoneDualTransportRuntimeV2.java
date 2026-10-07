@@ -441,6 +441,14 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
     @Override public void freezeSourceIngress(Owner source) {
         assertOnSerializedExecutor();
         Slot exact = findSlot(source);
+        if (exact != null && exact.restorationOnly && !source.equals(exact.routeOwner)) {
+            // retryFailed advances the switch epoch but keeps the source generation. A drain
+            // adapter is bound to the entire Owner, unlike a live route. Reusing it makes its
+            // exact-owner freeze/terminal callbacks fail forever. Reacquire the process-wide
+            // zero-owner reservation through a new restoration adapter; never assume zero.
+            closeSlot();
+            exact = null;
+        }
         if (exact != null) {
             freezePreparedSlot(exact, source);
             return;

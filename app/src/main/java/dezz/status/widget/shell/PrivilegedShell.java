@@ -364,6 +364,8 @@ public class PrivilegedShell {
                         // Zero is an infinite Socket read timeout. The bridge itself has bounded
                         // accept/frame timeouts, so this cannot leave an orphaned remote process.
                         output = ((TelnetTransport) transport).exec(command, 0);
+                    } else if (transport instanceof AdbTransport) {
+                        output = ((AdbTransport) transport).execLongRunning(command);
                     } else {
                         output = transport.exec(command);
                     }

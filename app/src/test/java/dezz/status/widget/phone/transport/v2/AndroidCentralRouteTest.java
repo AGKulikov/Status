@@ -12,6 +12,56 @@ import org.junit.Test;
 import java.util.UUID;
 
 public final class AndroidCentralRouteTest {
+    private static AndroidCentralRoute.State serviceChangedPending() {
+        AndroidCentralRoute.State state = startSelected(new BleRouteEpoch(71L, 1L));
+        state = AndroidCentralRoute.startupQuietElapsed(state, state.expected, true).state;
+        state = AndroidCentralRoute.connected(state, state.expected, true).state;
+        return AndroidCentralRoute.servicesDiscovered(state, state.expected,
+                new IphoneGattInventoryV2(true, true, true, true, true,
+                        true, true, true, true, true)).state;
+    }
+
+    @Test public void completedTransientServiceChangedFailureRetainsOwnerAndRetriesTwice() {
+        AndroidCentralRoute.State state = serviceChangedPending();
+        long owner = state.activeOwnerId;
+        for (int attempt = 0; attempt < 2; attempt++) {
+            BleRouteToken old = state.expected;
+            BleRouteTransition<AndroidCentralRoute.State> failed =
+                    AndroidCentralRoute.serviceChangedSubscribed(state, old, GattResultV2.TRANSIENT_FAILURE);
+            assertEquals(AndroidCentralRoute.Phase.WAIT_SERVICE_CHANGED_RETRY, failed.state.phase);
+            assertEquals(owner, failed.state.activeOwnerId);
+            assertFalse(hasEffect(failed, BleRouteEffect.Type.CLOSE_GATT));
+            assertEquals(failed.state, AndroidCentralRoute.serviceChangedSubscribed(
+                    failed.state, old, GattResultV2.SUCCESS).state);
+            BleRouteTransition<AndroidCentralRoute.State> retry = AndroidCentralRoute.deadline(
+                    failed.state, failed.state.expected);
+            assertTrue(hasEffect(retry, BleRouteEffect.Type.SUBSCRIBE_GATT_SERVICE_CHANGED));
+            assertEquals(owner, retry.state.activeOwnerId);
+            state = retry.state;
+        }
+        BleRouteTransition<AndroidCentralRoute.State> exhausted =
+                AndroidCentralRoute.serviceChangedSubscribed(state, state.expected, GattResultV2.TRANSIENT_FAILURE);
+        assertEquals(AndroidCentralRoute.Phase.RETRY_DRAINING, exhausted.state.phase);
+        assertTrue(hasEffect(exhausted, BleRouteEffect.Type.CLOSE_GATT));
+    }
+
+    @Test public void successfulSameOwnerServiceChangedRetryStillRequiresPeerProof() {
+        AndroidCentralRoute.State state = serviceChangedPending();
+        long owner = state.activeOwnerId;
+        state = AndroidCentralRoute.serviceChangedSubscribed(state, state.expected, GattResultV2.TRANSIENT_FAILURE).state;
+        state = AndroidCentralRoute.deadline(state, state.expected).state;
+        state = AndroidCentralRoute.serviceChangedSubscribed(state, state.expected, GattResultV2.SUCCESS).state;
+        assertEquals(AndroidCentralRoute.Phase.VERIFYING_PEER, state.phase);
+        assertEquals(owner, state.activeOwnerId);
+    }
+
+    @Test public void disconnectDuringServiceChangedRetryCannotLeaveAnOwnedGattBehind() {
+        AndroidCentralRoute.State state = serviceChangedPending();
+        state = AndroidCentralRoute.serviceChangedSubscribed(state, state.expected, GattResultV2.TRANSIENT_FAILURE).state;
+        BleRouteTransition<AndroidCentralRoute.State> stopped = AndroidCentralRoute.stop(state, state.epoch, "stop");
+        assertTrue(hasEffect(stopped, BleRouteEffect.Type.CLOSE_GATT));
+    }
+
     @Test public void unprovenOwnerEntersCooldownAndPresenceCannotBypassIt() {
         AndroidCentralRoute.State state = startEnrolled(new BleRouteEpoch(42L, 3L));
         state = AndroidCentralRoute.startupQuietElapsed(state, state.expected, true).state;

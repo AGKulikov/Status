@@ -215,6 +215,12 @@
         "preferences"
       ]
     },
+    "app/src/main/java/com/tananaev/adblib/AdbCrypto.java": {
+      "sha256": "a2898221ccd47d68812754338f22b8d6cec92aa28f6f97d17df6c0bc80562159",
+      "access_kinds": [
+        "files"
+      ]
+    },
     "app/src/main/java/dezz/status/widget/AppRuntimeBootstrap.java": {
       "sha256": "dff92a0c81eb18974ea08205fc4e59b484306375c48e4ed152428729a1de32b7",
       "access_kinds": [
@@ -229,7 +235,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/HudLcaPatchActivity.java": {
-      "sha256": "7fb62141a532e86428a49954abed8e3a56e5cd843ac036472655b7a7f233ee48",
+      "sha256": "a46b3f66a9dcbba2691adad86675d8f90c3c1ce2c731cade5c0ab97581d18e19",
       "access_kinds": [
         "files"
       ]
@@ -334,7 +340,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "45a7df45fc2c81c4e8e017af66e79384886fdd07660f79bed29f2367d48aa33a",
+      "sha256": "6fa1c4f1bdb6b66aeb651de118451c271430b73e6f54216ba92b66d41173d385",
       "access_kinds": [
         "files"
       ]
@@ -450,7 +456,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/hud/HudRuntimeStatusStore.java": {
-      "sha256": "e75d642d89650a402d8b908bda063fd02deb07ad1a8d6842ac006a965a21c4f4",
+      "sha256": "1a038c8baff250dc23189cb4314c98c523ada1226352184e3786c577e584f3ca",
       "access_kinds": [
         "files"
       ]
@@ -597,7 +603,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2.java": {
-      "sha256": "3fa1847a2ed5818b2a7fa8a0eb4a4a6832d80e1e5445f236879da456d0bc8803",
+      "sha256": "64ac7a1eb01a1ce132241fdf554695343176aa99e159deed36d6723f05e56654",
       "access_kinds": [
         "keystore"
       ]
@@ -658,7 +664,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/shell/AdbTransport.java": {
-      "sha256": "554d52b34df15db402218d7c668f4459a2dbcd3aa52ebef3ee115fc4da7a44cd",
+      "sha256": "97ed262a5e2aafe642f30c189dba6e7de5dc478d7fc45e739a6f79ef46e6dc3d",
       "access_kinds": [
         "files"
       ]
