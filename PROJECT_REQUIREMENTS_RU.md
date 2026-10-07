@@ -30,7 +30,21 @@
   root probe пишет структурированную причину отказа без raw shell/секретов.
   DNS/HWGPS и медленный фоновый checkpoint не объявлять исправленными без причины.
 
-Статус: IN PROGRESS. Нового APK и успешного CI ещё нет. Сырые журналы приватны.
+Статус: SOURCE/TEST/RELEASE. Кандидат собран и подписан; аппаратная приёмка OPEN.
+Build source `bb319d9d54fa76880c66642745d0bb80989adef9`, tree
+`b5ed6b5d5290a7b9670499be3e009b4779014fcb`;
+[CI37655464584](https://github.com/AGKulikov/Status/actions/runs/37655464584) SUCCESS.
+2114 Android-тестов /418 suites, 223 tool tests,108 Java policy cases PASS;
+failures/errors/skips=0. Подписанный APK29489688 байт, SHA-256
+`3f345055562e8914cea9afe708f537559d45a338dec274aa1f413de986c2e28e`.
+Прежний сертификат, v2/v3/API28, zipalign16KiB, install-over metadata относительно
+3.0.8 и неизменность1516 payload entries проверены; APK сохранён для выдачи.
+Navigator/Helper не обновляются; точный Navigator classes19.dex совпал.
+Проверки SprutHub со своей иконкой, применения скрытия машинки, ANCS после
+обновления без reboot/radio toggle, белой полосы и реального звука требуют KX11.
+Отсутствие живых DIM callbacks по-прежнему может блокировать восстановление:
+сохранён обязательный gate штатного приоритета, физическое устранение не заявлено.
+Сырые журналы приватны. Отчёт: docs/3.0.9-release-report.json.
 
 
 ## 07.10.2026 — исправить ошибки журналов и выпустить 3.0.8
