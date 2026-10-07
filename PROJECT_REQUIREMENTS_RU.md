@@ -36,6 +36,23 @@ ANCS без ручного radio toggle при холодном старте и 
 
 
 
+## Выпуск 3.0.8 — проверенный установочный APK
+
+Build source `dcf11ff566568f344263d4ea542e18edddfda4e6`, tree
+`c76cf66c62d677af650136b0993349367dbdb66b`;
+[CI37647508642](https://github.com/AGKulikov/Status/actions/runs/37647508642) SUCCESS.
+2104 Android-теста /413 suites, 223 tool tests и108 Java policy cases PASS,
+без failures/errors/skips. Все82 целевых локальных JVM-теста прошли.
+APK Natro-3.0.8-signed.apk:29485592 байта, SHA-256
+`fbc89886af5ded74ff908825b3b93c50abc7f52b700feb0e2dd4c0439b187e2e`.
+Прежний сертификат, v2/v3/API28, zipalign16KiB, install-over metadata относительно
+подписанной3.0.7 и неизменность1516 payload entries после подписи проверены.
+APK сохранён для выдачи пользователю. Navigator/Helper не обновляются; точный
+classes19.dex совместимой пары3.0.2 совпал. Физическая установка/приёмка KX11
+не выполнялась: машинка, ANCS без radio toggle и фактический звук остаются
+отдельными проверками. Полный отчёт: docs/3.0.8-release-report.json.
+
+
 ## 06.10.2026 — новая сборка по полному разбору логов (3.0.7)
 
 Прямой запрос: «Готовь новую сборку, с учетом ошибок которые ты нашел»;
