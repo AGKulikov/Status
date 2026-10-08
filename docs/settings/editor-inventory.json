@@ -1003,55 +1003,55 @@
         },
         {
           "dialogs": 1,
-          "line": 473,
+          "line": 475,
           "method": "editMapSurface",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1005,
+          "line": 1009,
           "method": "editHudRoadEvents",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1091,
+          "line": 1095,
           "method": "editNavigatorIntegration",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1673,
+          "line": 1692,
           "method": "editHorizontalGroup",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 1910,
+          "line": 1931,
           "method": "editBackdrop",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2098,
+          "line": 2121,
           "method": "editGlobalOptions",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2207,
+          "line": 2230,
           "method": "editStockHudControls",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2352,
+          "line": 2375,
           "method": "confirmReset",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2403,
+          "line": 2426,
           "method": "deleteSelected",
           "numeric_controls": 0
         }
@@ -1194,6 +1194,7 @@
         "Мигание",
         "Мигать при превышении",
         "На HUD может быть только одна независимая карта",
+        "На время индикатора громкости — 2 секунды после последнего",
         "Навигатор 30.3",
         "Навигатора — это исключает вторую стрелку и прыжки. Здесь меняется только",
         "Название",
@@ -1362,6 +1363,7 @@
         "Скругление окна",
         "Скругление плашки",
         "Скрывать без активного маршрута",
+        "Скрывать при изменении громкости",
         "Скрывать при отсутствии значения",
         "Скрыть уровень топлива выше порогов",
         "Слева",
@@ -1472,6 +1474,7 @@
         "значение располагает слой выше внутри совместимой группы.",
         "и пересечения 20 км/ч. Не чаще 5 записей в минуту, с circuit breaker.",
         "и прозрачность наследуются от штатного блока Навигатора.",
+        "изменения. В редакторе элемент остаётся видимым.",
         "индивидуальные настройки. Размеры текста при растяжении ряда не меняются.",
         "кадр/с",
         "карты меняются элементами выше.",
@@ -1504,7 +1507,7 @@
       ],
       "numeric_controls": 1,
       "path": "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java",
-      "sha256": "a46a76f3339ebee81b5d0af98c3e8834669112b40265c65f15e09b86eca3c0b6"
+      "sha256": "26a207613c3971ee0f82738af97af96a77545019caff12183a6e531580aa8e7a"
     },
     {
       "class": "dezz.status.widget.InformationPanelSettingsActivity",

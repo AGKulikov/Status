@@ -436,7 +436,6 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                         item.height = height.intValue();
                         item.alignment = String.valueOf(alignment.getSelectedItem());
                         item.enabled = itemEnabled.isChecked();
-                        saveVolumeHide(item, hideDuringVolume);
                         item.wrapText = wrap.isChecked();
                         String resourceId = value(resource);
                         if (resourceId.isEmpty()) {
@@ -450,6 +449,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                                     SourceBinding.PRESENTATION_AUTO, item.unit);
                         }
                         item.options = parsedOptions;
+                        saveVolumeHide(item, hideDuringVolume);
                         item.normalize(config.gridColumns, config.gridRows);
                         if (fuelDraft != null) config.fuelSettings = fuelDraft;
                         canvas.updateConfig(config);

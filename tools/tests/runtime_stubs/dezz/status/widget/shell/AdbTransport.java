@@ -14,8 +14,11 @@ public class AdbTransport {
     public static AdbTransport connect(Context c,String host,int port,Consumer<Socket> sink) { sink.accept(new Socket());return new AdbTransport(); }
     public void execRaw(String wrapped,Consumer<byte[]> output) {
         commands.add(wrapped);
-        String marker = wrapped.substring(wrapped.indexOf("NATRO_EXIT_"));marker=marker.substring(0,marker.indexOf(':'));
-        output.accept(((root?"0":"2000")+"\n\n"+marker+":0\n").getBytes(StandardCharsets.UTF_8));
+        java.util.regex.Matcher match = java.util.regex.Pattern.compile("NATRO_EXIT_[0-9a-f]{32}").matcher(wrapped);
+        if (!match.find()) throw new IllegalArgumentException("Missing shell framing nonce");
+        String marker = match.group();
+        output.accept(("device:/ $ " + wrapped.replace("\n", "\\n") + "\r\n\r\n"
+                + marker + "_BEGIN\r\n" + (root?"0":"2000") + "\r\n" + marker+":0\r\n").getBytes(StandardCharsets.UTF_8));
     }
     public void readService(String service,Consumer<byte[]> output) throws IOException {
         services.add(service);

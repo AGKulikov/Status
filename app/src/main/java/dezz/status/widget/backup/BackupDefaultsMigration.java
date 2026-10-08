@@ -4,7 +4,7 @@ import java.io.*;
 import java.util.*;
 import org.json.JSONObject;
 
-/** Explicit 3.0.2…3.0.9 -> 3.0.10 compatibility; unknown future schemas remain rejected. */
+/** Explicit 3.0.2…3.0.9 -> 3.1.0 compatibility; unknown future schemas remain rejected. */
 final class BackupDefaultsMigration {
     private BackupDefaultsMigration(){}
     static void validate(JSONObject metadata,int target)throws Exception{

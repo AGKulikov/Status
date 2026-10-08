@@ -298,7 +298,8 @@ public final class HudRuntimeData {
         boolean hasMedia = false;
         boolean hasTimeline = false;
         for (HudElementConfig item : config.elements) {
-            if (item.enabled && isMediaElement(item.type)) {
+            if (item.enabled && (isMediaElement(item.type)
+                    || item.options.optBoolean("hideDuringVolume", false))) {
                 hasMedia = true;
                 hasTimeline |= item.type == HudElementType.MEDIA_TIMER;
             }

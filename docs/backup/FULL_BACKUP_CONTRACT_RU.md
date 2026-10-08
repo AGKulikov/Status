@@ -1,6 +1,6 @@
 # Полная личная копия Natro: контракт реализации
 
-## Review 3.0.10 / 08.10.2026
+## Review 3.1.0 / 08.10.2026
 
 HudPanelSettingsActivity сохраняет boolean options.hideDuringVolume в существующем
 документе каждого HUD-элемента; отсутствующее значение=false. JSON/copy/import

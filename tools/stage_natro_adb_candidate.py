@@ -8,6 +8,7 @@ import shutil
 import subprocess
 import xml.etree.ElementTree as ET
 import zipfile
+from check_release_version import validate_release_version
 
 def sha256(path):
     digest = hashlib.sha256()
@@ -18,6 +19,7 @@ def sha256(path):
 
 def main():
     version = os.environ["VERSION_NAME"]
+    validate_release_version(version)
     code = int(os.environ["VERSION_CODE"])
     out = Path(os.environ["RUNNER_TEMP"]) / ("natro-" + version + "-candidate")
     out.mkdir(exist_ok=False)

@@ -9,7 +9,7 @@ UID/PTY/root/remount отказа. Нельзя ослаблять UID/exit/allo
 07:35:51–07:36:24:30 delivery submitted, без attach/pre_draw для этой серии.
 07:34:12 другой показ через phone_notifications_icon имел attach/pre_draw;
 поэтому общий запрет WindowManager/сломанная любая иконка не установлен.
-Кандидат3.0.10 обновляет выбранное окно после полей вне общего debounce;
+Кандидат3.1.0 обновляет выбранное окно после полей вне общего debounce;
 проверка SprutHub на машине остаётся обязательной. ANCS по поручению не меняется.
 Повтор полосы в сохранённом текущем хвосте не установлен: mode3/readback deny.
 Старые Bluetooth133, media timeout и Binder registerListener stall относятся3.0.8.
