@@ -21,6 +21,7 @@ public final class AdbConsoleSession implements AutoCloseable {
     private volatile AdbTransport transport;
     private volatile String endpoint = "Disconnected", stopReason = "Отменено";
     private volatile String stage = "idle";
+    private volatile String rootProbeSummary = "not sampled";
     private volatile boolean closed;
     private int preferredPort = 5555;
     public AdbConsoleSession(Context context) { this.context = context.getApplicationContext(); }
@@ -28,6 +29,7 @@ public final class AdbConsoleSession implements AutoCloseable {
     public boolean connected() { return transport != null; }
     public boolean busy() { return busy.get(); }
     public String stage() { return stage; }
+    public String rootProbeSummary() { return rootProbeSummary; }
     public void stage(String value) { stage = value; }
     public synchronized boolean submit(Operation operation, Listener listener) {
         if (closed || !busy.compareAndSet(false, true)) return false;
@@ -88,11 +90,11 @@ public final class AdbConsoleSession implements AutoCloseable {
         checkCancelled();
         if (transport == null) throw new IOException("Сначала выполните Connect");
         stage = "root_identity_before_request";
+        rootProbeSummary = "pending";
         AdbShellResult.Result before = command("id -u");
-        dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("adb-root-probe",
-                "phase=before, exit=" + before.exitCode + ", truncated=" + before.truncated
+        rootProbeSummary = "phase=before, exit=" + before.exitCode + ", truncated=" + before.truncated
                         + ", output_chars=" + before.output.length()
-                        + ", numeric=" + before.output.trim().matches("[0-9]+"));
+                        + ", numeric=" + before.output.trim().matches("[0-9]+");
         if (!before.success() || before.truncated || !before.output.trim().matches("[0-9]+")) {
             stage += before.exitCode == null ? "_missing_exit"
                     : !before.success() ? "_command_failed"

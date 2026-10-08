@@ -56,7 +56,8 @@ public final class HudLcaPatchActivity extends SettingsActivity {
         boolean accepted=session.submit(operation,error->{
             String resultRecord = "stage=completed operation="+name
                     +", result="+(error==null?"success":"failed")+", reason="+(error==null?"none":error.getClass().getSimpleName())
-                    +", operation_stage="+session.stage().replace('_',' ')+", cause="+(error==null||error.getCause()==null?"none":error.getCause().getClass().getSimpleName());
+                    +", operation_stage="+session.stage().replace('_',' ')+", root_probe="+session.rootProbeSummary()
+                    +", cause="+(error==null||error.getCause()==null?"none":error.getCause().getClass().getSimpleName());
             dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("hud-lca",resultRecord);
             if(error!=null)dezz.status.widget.diagnostics.DiagnosticJournal.operationFailure("hud-lca",resultRecord);
             runOnUiThread(()->{
