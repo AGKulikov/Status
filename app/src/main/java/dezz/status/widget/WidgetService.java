@@ -6123,6 +6123,9 @@ public class WidgetService extends Service {
                     shownOverlay, overlay);
             onAutomationStateChanged(AutomationContract.SCOPE_OVERLAY,
                     shownOverlay);
+            // Do not defer a complete transient presentation behind unrelated connector
+            // lifecycle/credential refresh work. Renderer still enforces user conditions.
+            if (popupOverlay != null) popupOverlay.refreshPhonePresentation();
             activePhonePopupNotification = presentation;
             if (phoneNotificationOverlayPaused) {
                 pausedPhonePopupRemainingMs = seconds * 1_000L;

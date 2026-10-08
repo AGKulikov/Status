@@ -278,6 +278,11 @@ public final class DiagnosticJournal {
         }
     }
 
+    /** Preserve a bounded operation failure beyond the high-frequency progress tail. */
+    public static void operationFailure(String component, String message) {
+        recordIncident(component, message);
+    }
+
     public static String queueState() {
         return WRITES.state() + ", invalidated_writes=" + invalidatedWrites.get() + ", disk_failures=" + diskFailures.get()
                 + ", last_disk_failure=" + lastDiskFailure + ", last_persisted_elapsed_ms=" + lastPersistedElapsed;

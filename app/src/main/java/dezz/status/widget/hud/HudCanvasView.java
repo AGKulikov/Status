@@ -361,6 +361,7 @@ public final class HudCanvasView extends View {
 
     private boolean shouldDraw(HudElementConfig item) {
         if (!item.enabled) return false;
+        if (!HudTransientVisibility.visible(item, config, editor, data.volumeVisible())) return false;
         LauncherMediaController.Snapshot playback = data.media();
         if (!HudMediaVisibility.visible(item.type, editor,
                 playback != null && playback.available, playback != null && playback.playing,

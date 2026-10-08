@@ -1,5 +1,18 @@
 # Полная личная копия Natro: контракт реализации
 
+## Review 3.0.10 / 08.10.2026
+
+HudPanelSettingsActivity сохраняет boolean options.hideDuringVolume в существующем
+документе каждого HUD-элемента; отсутствующее значение=false. JSON/copy/import
+сохраняют options целиком. Новых namespaces и файлов нет. HudCanvasView только
+читает эту настройку; состояние громкости остаётся временным и не экспортируется.
+HudLcaPatchActivity сохраняет прежний last-report.txt; DiagnosticJournal удерживает
+короткий структурированный отказ в прежнем incidents.log, без shell output/секретов.
+DiagnosticBundle меняет только подпись возраста исторического action-tail.
+BackupDefaultsMigration принимает335…342→343, сохраняет прежние defaults и запрет
+неизвестных/будущих схем. Пересмотрены эти шесть владельцев; остальные fingerprints
+не меняются. ANCS и Helper заморожены. Runtime/KX11 backup-приёмка отдельно.
+
 ## Ревизия 05.10 — HOME пассажира и главное меню
 
 Preferences добавляет boolean passengerLauncherAutoStart в прежний основной DE

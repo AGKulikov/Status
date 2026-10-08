@@ -235,13 +235,13 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/HudLcaPatchActivity.java": {
-      "sha256": "a46b3f66a9dcbba2691adad86675d8f90c3c1ce2c731cade5c0ab97581d18e19",
+      "sha256": "6b42d4ac3cec1d51d217d4d9d64d8bcc89941b349356af51a81e89d63b098a33",
       "access_kinds": [
         "files"
       ]
     },
     "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java": {
-      "sha256": "a46a76f3339ebee81b5d0af98c3e8834669112b40265c65f15e09b86eca3c0b6",
+      "sha256": "ebfe2b3b61adc52cc4c36d92cedea92f21ad1b0b0fb8f7503caf2009a7632705",
       "access_kinds": [
         "external_resource"
       ]
@@ -340,7 +340,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "d3005d5cb64bf1292f289d2649ffec4c9ceb2fa0f9d802bd0610250e821703f2",
+      "sha256": "9bb1fa141184e28916a1eeaa5ebef84a757b9d1f59177d871f4ddc03881f14b9",
       "access_kinds": [
         "files"
       ]
@@ -426,7 +426,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/DiagnosticBundle.java": {
-      "sha256": "190d9842ed71119c347ca677a800d2470f9e10c4a2faa069665be9dae2933e01",
+      "sha256": "1b652119cec519b5ddbb325a912e4955e7a07c8b80cd61fb7a87f47a4008bb6c",
       "access_kinds": [
         "files"
       ]
@@ -438,7 +438,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/DiagnosticJournal.java": {
-      "sha256": "6fda54db954b5d533be2ed25e60ce929f0775441061be9034443b0de4110f1e6",
+      "sha256": "871f1914ec92ce1f968b7db395eacf64ce971697ee1ef3a4586a1fbf492e90c3",
       "access_kinds": [
         "files"
       ]
@@ -450,7 +450,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/hud/HudCanvasView.java": {
-      "sha256": "16ddf0c78550851b0067d2292f1eac3486d99cd18a3243e9a1694ff961a59038",
+      "sha256": "206aceb3bef188c159b14ba420b630117eccdbf317f1f88056f0c22110d5f44b",
       "access_kinds": [
         "external_resource"
       ]

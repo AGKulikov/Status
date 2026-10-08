@@ -31,6 +31,7 @@ import dezz.status.widget.navigation.MapStartupDiagnostics;
 final class HudCompositeView extends FrameLayout
         implements TextureView.SurfaceTextureListener {
     @NonNull private HudPanelConfig config;
+    private final HudRuntimeData runtimeData;
     private final boolean localHudViewport;
     @NonNull private final TextureView mapTexture;
     @NonNull private final HudCanvasView canvas;
@@ -52,6 +53,7 @@ final class HudCompositeView extends FrameLayout
                      boolean localHudViewport) {
         super(context);
         this.config = config;
+        this.runtimeData = data;
         this.localHudViewport = localHudViewport;
         setBackgroundColor(Color.TRANSPARENT);
         setClipChildren(true);
@@ -85,6 +87,7 @@ final class HudCompositeView extends FrameLayout
 
     void invalidateHud() {
         canvas.invalidate();
+        invalidate();
     }
 
     boolean hasUsableWindow() {
@@ -93,6 +96,8 @@ final class HudCompositeView extends FrameLayout
 
     @Override protected boolean drawChild(Canvas target, View child, long drawingTime) {
         if (child != mapTexture || activeMap == null) return super.drawChild(target, child, drawingTime);
+        if (!HudTransientVisibility.visible(activeMap, config, false, runtimeData.volumeVisible()))
+            return false;
         edgeBounds.set(child.getLeft(), child.getTop(), child.getRight(), child.getBottom());
         int save = mapEdgeFade.begin(target, edgeBounds,
                 activeMap.options.optBoolean("edgeBlurEnabled", false),

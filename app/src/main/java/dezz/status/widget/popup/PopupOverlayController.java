@@ -113,6 +113,7 @@ public final class PopupOverlayController {
     private int styledBackground;
     private int styledCornerRadius = -1;
     @Nullable private PhoneNotificationCardView phoneNotificationCard;
+    @Nullable private String lastPhoneSuppression;
     @Nullable private android.view.ViewTreeObserver.OnPreDrawListener phoneDrawObserver;
     private List<PopupItemConfig> currentItems = Collections.emptyList();
     /** Actual auto-placement resolved during the last render, used by the direct grid editor. */
@@ -245,6 +246,22 @@ public final class PopupOverlayController {
             main.removeCallbacks(stateRefresh);
             main.postDelayed(stateRefresh, STATE_REFRESH_DEBOUNCE_MS);
         }
+    }
+
+    public void refreshPhonePresentation() {
+        if (!PhoneNotificationAutomation.isNotificationOverlayId(overlayId)) return;
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            main.post(this::refreshPhonePresentation);
+            return;
+        }
+        PopupOverlayConfig config = currentConfig;
+        dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("phone-notification-render",
+                "stage=request overlay=" + overlayId + ", configured=" + (config != null)
+                        + ", enabled=" + (config != null && config.enabled)
+                        + ", preview_suppressed=" + editorPreviewSuppressed
+                        + ", touch_busy=" + touchInProgress + ", destroyed=" + destroyed);
+        main.removeCallbacks(stateRefresh);
+        stateRefresh.run();
     }
 
     public void destroy() {
@@ -514,6 +531,12 @@ public final class PopupOverlayController {
         boolean visible = overlayVisible && (editorPreview
                 || hasApplication || hasTopic || hasMessage);
         if (!visible) {
+            String suppression = "stage=suppressed overlay=" + overlayId + ", overlay_visible=" + overlayVisible
+                            + ", app_available=" + hasApplication + ", topic_available=" + hasTopic
+                            + ", message_available=" + hasMessage;
+            if (!suppression.equals(lastPhoneSuppression))
+                dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("phone-notification-render", suppression);
+            lastPhoneSuppression = suppression;
             if (rootAdded && holdLastGenerationDuringEmptyTransition()) return;
             setOverlayVisible(false);
             return;

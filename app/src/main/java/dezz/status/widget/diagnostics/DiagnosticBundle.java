@@ -65,7 +65,7 @@ public final class DiagnosticBundle {
                     + "Shell/API acknowledgement does not prove physical effect; old/missing samples are unknown.\n");
             add(zip, channels, "observations.txt", DiagnosticJournal.isEnabled() ? CausalDiagnostics.snapshot() : "debug_disabled\n");
             add(zip, channels, "phone.txt", PhoneConnectionJournal.tailText(1600));
-            add(zip, channels, "actions-tail.txt", "Limit: last 64000 characters; latest session only\n" + ActionRecorder.latestTimeline(64000));
+            add(zip, channels, "actions-tail.txt", "Limit: last 64000 characters; latest RECORDED action session, possibly historical; not necessarily current process. Check timestamps.\n" + ActionRecorder.latestTimeline(64000));
             manifest.put("channels", channels);
             put(zip, "manifest.json", manifest.toString(2).getBytes(StandardCharsets.UTF_8));
             return target;

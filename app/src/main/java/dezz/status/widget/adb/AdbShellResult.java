@@ -21,7 +21,8 @@ public final class AdbShellResult {
     public static String quote(String text) { return "'" + text.replace("'", "'\"'\"'") + "'"; }
     public String wrap(String command) {
         // Inner sh prevents exit, trailing comments, and compound commands from eating framing.
-        return "sh -c " + quote(command) + "; printf '\\n" + token + ":%s\\n' \"$?\"";
+        return "sh -c " + quote("printf '\\n" + token + "_BEGIN\\n'; sh -c "
+                + quote(command)) + "; printf '\\n" + token + ":%s\\n' \"$?\"";
     }
     public void accept(byte[] chunk) {
         int keep = Math.min(chunk.length, OUTPUT_LIMIT - head.size());
@@ -39,6 +40,11 @@ public final class AdbShellResult {
         Matcher marker = Pattern.compile("\\r?\\n" + token + ":([0-9]{1,3})\\r?\\n?$").matcher(end);
         Integer code = marker.find() ? Integer.valueOf(marker.group(1)) : null;
         String output = new String(head.toByteArray(), StandardCharsets.UTF_8);
+        // A legacy shell may echo its input or print a prompt before executing it. Only
+        // the complete, per-command boundary separates that preamble from actual stdout.
+        Matcher begin = Pattern.compile("\\r?\\n" + Pattern.quote(token)
+                + "_BEGIN\\r?\\n").matcher(output);
+        if (begin.find()) output = output.substring(begin.end());
         if (total <= OUTPUT_LIMIT) output = output.replaceFirst("\\r?\\n" + token + ":[0-9]{1,3}\\r?\\n?$", "");
         else output += "\n… Вывод ограничен 128 КиБ; команда дочитана до завершения.";
         return new Result(output, code, total > OUTPUT_LIMIT);

@@ -54,9 +54,11 @@ public final class HudLcaPatchActivity extends SettingsActivity {
         CharSequence previous=status.getText();status.setText(name+"…\nОперация выполняется один раз; ожидание — до 60 секунд.");setOperationBusy(true);
         dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("hud-lca","stage=submitted operation="+name);
         boolean accepted=session.submit(operation,error->{
-            dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("hud-lca","stage=completed operation="+name
+            String resultRecord = "stage=completed operation="+name
                     +", result="+(error==null?"success":"failed")+", reason="+(error==null?"none":error.getClass().getSimpleName())
-                    +", operation_stage="+session.stage()+", cause="+(error==null||error.getCause()==null?"none":error.getCause().getClass().getSimpleName()));
+                    +", operation_stage="+session.stage().replace('_',' ')+", cause="+(error==null||error.getCause()==null?"none":error.getCause().getClass().getSimpleName());
+            dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("hud-lca",resultRecord);
+            if(error!=null)dezz.status.widget.diagnostics.DiagnosticJournal.operationFailure("hud-lca",resultRecord);
             runOnUiThread(()->{
             if(isDestroyed()||isFinishing())return;
             if(error!=null){moduleVerified=false;status.setText(failureMessage(name,error));}else if(completed!=null)status.setText(completed);

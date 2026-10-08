@@ -368,6 +368,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         form.addView(label("Выравнивание"), marginTop(10));
         form.addView(alignment);
         Switch itemEnabled = switchView("Показывать элемент", item.enabled);
+        Switch hideDuringVolume = volumeHideSwitch(form, item);
         Switch wrap = switchView("Переносить длинный текст", item.wrapText);
         form.addView(itemEnabled, marginTop(8));
         form.addView(wrap, marginTop(4));
@@ -435,6 +436,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                         item.height = height.intValue();
                         item.alignment = String.valueOf(alignment.getSelectedItem());
                         item.enabled = itemEnabled.isChecked();
+                        saveVolumeHide(item, hideDuringVolume);
                         item.wrapText = wrap.isChecked();
                         String resourceId = value(resource);
                         if (resourceId.isEmpty()) {
@@ -492,6 +494,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         SliderField height = slider(form, "Высота", item.height,
                 1, Math.max(1, config.gridRows), 1, " яч.");
         Switch elementEnabled = switchView("Показывать область карты", item.enabled);
+        Switch hideDuringVolume = volumeHideSwitch(form, item);
         Switch rendererEnabled = switchView("Рендерить независимую карту HUD", profile.enabled);
         form.addView(elementEnabled, marginTop(8));
         form.addView(rendererEnabled, marginTop(4));
@@ -845,6 +848,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                         item.width = width.intValue();
                         item.height = height.intValue();
                         item.enabled = elementEnabled.isChecked();
+                        saveVolumeHide(item, hideDuringVolume);
                         item.options.put("renderer", HudElementConfig.DIRECT_MAP_RENDERER);
                         item.options.put("cornerRadiusPx", radius.intValue());
                         item.options.put("opacityPercent", opacity.intValue());
@@ -1263,6 +1267,21 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
             if (value.type == HudElementType.NAV_MAP) return value;
         }
         return null;
+    }
+
+    private Switch volumeHideSwitch(LinearLayout form, HudElementConfig item) {
+        Switch control = switchView("Скрывать при изменении громкости",
+                item.options.optBoolean("hideDuringVolume", false));
+        form.addView(control, marginTop(8));
+        form.addView(text("На время индикатора громкости — 2 секунды после последнего "
+                + "изменения. В редакторе элемент остаётся видимым.",
+                12, 0xFF95A0AF), marginTop(4));
+        return control;
+    }
+
+    private static void saveVolumeHide(HudElementConfig item, Switch control) {
+        try { item.options.put("hideDuringVolume", control.isChecked()); }
+        catch (org.json.JSONException impossible) { throw new IllegalStateException(impossible); }
     }
 
     private void addVisualElementOptions(@NonNull LinearLayout form,
@@ -1723,6 +1742,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         form.addView(label("Выравнивание элементов по вертикали"), marginTop(10));
         form.addView(vertical);
         Switch itemEnabled = switchView("Показывать группу", group.enabled);
+        Switch hideDuringVolume = volumeHideSwitch(form, group);
         form.addView(itemEnabled, marginTop(8));
 
         form.addView(section("Элементы слева направо"), marginTop(16));
@@ -1769,6 +1789,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                         group.width = width.intValue();
                         group.height = height.intValue();
                         group.enabled = itemEnabled.isChecked();
+                        saveVolumeHide(group, hideDuringVolume);
                         HudHorizontalGroup.setMemberIds(group, memberIds);
                         putHudGroupOption(group, "gapPx", gap.intValue());
                         putHudGroupOption(group, "paddingLeftPx", paddingLeft.intValue());
@@ -1937,6 +1958,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         SliderField borderWidth = slider(form, "Толщина рамки",
                 item.borderWidthPx, 0, 20, 1, " px");
         Switch itemEnabled = switchView("Показывать подложку", item.enabled);
+        Switch hideDuringVolume = volumeHideSwitch(form, item);
         form.addView(itemEnabled, marginTop(8));
         form.addView(text("Подложка всегда рисуется ниже всех HUD-виджетов. "
                 + "Тень на HUD отключена и в настройках отсутствует.",
@@ -1963,6 +1985,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                     item.borderOpacityPercent = borderOpacity.intValue();
                     item.borderWidthPx = borderWidth.intValue();
                     item.enabled = itemEnabled.isChecked();
+                    saveVolumeHide(item, hideDuringVolume);
                     item.normalize(config.gridColumns, config.gridRows);
                     canvas.updateConfig(config);
                     updateSelection(item);

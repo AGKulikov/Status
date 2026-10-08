@@ -4,6 +4,20 @@ import org.junit.Test;
 import java.nio.charset.StandardCharsets;
 import static org.junit.Assert.*;
 public final class AdbShellResultTest {
+    @Test public void shellEchoAndPromptAreOutsideCommandPayload() {
+        AdbShellResult capture = new AdbShellResult("TOKEN");
+        String wire = "device:/ $ exec sh -c 'printf \\\\nTOKEN_BEGIN\\\\n; id -u'\r\n"
+                + "\r\nTOKEN_BEGIN\r\n0\r\nTOKEN:0\r\n";
+        for (byte b : wire.getBytes(StandardCharsets.UTF_8)) capture.accept(new byte[]{b});
+        assertEquals("0", capture.finish().output);
+        assertTrue(capture.finish().success());
+    }
+
+    @Test public void beginBoundaryNeverSubstitutesForExitProof() {
+        AdbShellResult capture = new AdbShellResult("TOKEN");
+        capture.accept("\nTOKEN_BEGIN\n0\n".getBytes(StandardCharsets.UTF_8));
+        assertFalse(capture.finish().success());
+    }
     @Test public void fragmentedUtf8AndExitCode() {
         AdbShellResult capture = new AdbShellResult("TOKEN");
         for (byte value : "Привет, 🌍\nвторая строка\nTOKEN:7\n".getBytes(StandardCharsets.UTF_8)) capture.accept(new byte[]{value});

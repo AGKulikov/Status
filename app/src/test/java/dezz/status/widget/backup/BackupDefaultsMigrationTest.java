@@ -13,6 +13,16 @@ import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=28,application=Application.class)
 public class BackupDefaultsMigrationTest {
+    @Test public void hudVolumeReleaseAcceptsThrough309ButRejectsFuture() throws Exception {
+        for (int source = 208021335; source <= 208021343; source++) {
+            JSONObject metadata = new JSONObject().put("sourceVersionCode", source).put("defaultsSchema", source)
+                    .put("declaredMainDefaults", BackupPreferencesXml.encode(Collections.emptyMap()));
+            BackupDefaultsMigration.validate(metadata, 208021343);
+        }
+        JSONObject future = new JSONObject().put("sourceVersionCode", 208021344).put("defaultsSchema", 208021344)
+                .put("declaredMainDefaults", BackupPreferencesXml.encode(Collections.emptyMap()));
+        try { BackupDefaultsMigration.validate(future, 208021343); fail(); } catch (IOException expected) { }
+    }
     @Test public void followupReleaseAcceptsReviewedVersionsAndPreservesExplicitDefaults() throws Exception {
         for (int source = 208021335; source <= 208021342; source++) {
             JSONObject metadata = new JSONObject().put("sourceVersionCode", source).put("defaultsSchema", source)

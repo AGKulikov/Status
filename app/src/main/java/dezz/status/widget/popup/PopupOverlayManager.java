@@ -118,6 +118,16 @@ public final class PopupOverlayManager {
         }
     }
 
+    /** Notification fields and both window states have been committed as one presentation. */
+    public synchronized void refreshPhonePresentation() {
+        if (destroyed) return;
+        for (String id : new String[]{PhoneNotificationAutomation.OVERLAY_ID,
+                PhoneNotificationAutomation.OVERLAY_WITH_ICON_ID}) {
+            PopupOverlayController controller = controllers.get(id);
+            if (controller != null) controller.refreshPhonePresentation();
+        }
+    }
+
     private void rebuildStateOwners(Set<String> configuredIds, List<PopupItemConfig> items) {
         stateOwners.clear();
         for (PopupItemConfig item : items) {
