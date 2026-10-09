@@ -8,7 +8,10 @@ import shutil
 import subprocess
 import xml.etree.ElementTree as ET
 import zipfile
-from check_release_version import validate_release_version
+if __package__:
+    from .check_release_version import validate_release_version
+else:
+    from check_release_version import validate_release_version
 
 def sha256(path):
     digest = hashlib.sha256()

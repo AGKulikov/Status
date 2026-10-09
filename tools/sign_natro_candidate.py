@@ -7,7 +7,10 @@ from pathlib import Path
 import re
 import subprocess
 import zipfile
-from check_release_version import validate_release_version
+if __package__:
+    from .check_release_version import validate_release_version
+else:
+    from check_release_version import validate_release_version
 
 CERT = "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75"
 PACKAGE = "ru.natro.statuswidget"

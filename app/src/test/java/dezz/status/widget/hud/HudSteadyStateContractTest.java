@@ -66,7 +66,8 @@ public final class HudSteadyStateContractTest {
         assertTrue(telemetryCallbacks.contains("if (!sameTelemetryContent(previous, value)) notifyChanged()"));
         assertTrue(source.contains("Process.THREAD_PRIORITY_BACKGROUND"));
         assertTrue(source.contains("reconcileMediaController()"));
-        assertTrue(source.contains("item.enabled && isMediaElement(item.type)"));
+        assertTrue(source.contains("item.enabled && (isMediaElement(item.type)"));
+        assertTrue(source.contains("|| item.options.optBoolean(\"hideDuringVolume\", false)"));
         assertTrue(source.contains("mediaSnapshotChanged(previous, next, mediaTimelineVisible)"));
         assertTrue(source.contains("includeTimeline && before.positionMs != after.positionMs"));
         assertTrue(source.contains("if (!navigationDataNeeded) return"));
