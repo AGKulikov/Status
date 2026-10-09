@@ -4,13 +4,13 @@ import java.io.*;
 import java.util.*;
 import org.json.JSONObject;
 
-/** Explicit 3.0.2…3.0.9 -> 3.1.0 compatibility; unknown future schemas remain rejected. */
+/** Explicit 3.0.2…3.1.0 -> 3.1.1 compatibility; unknown future schemas remain rejected. */
 final class BackupDefaultsMigration {
     private BackupDefaultsMigration(){}
     static void validate(JSONObject metadata,int target)throws Exception{
         int source=metadata.getInt("sourceVersionCode"),schema=metadata.getInt("defaultsSchema");
-        if(source!=schema||source>target||(source!=target&&source!=208021335&&source!=208021336&&source!=208021337&&source!=208021338&&source!=208021339&&source!=208021340&&source!=208021341&&source!=208021342)
-                ||(source!=target&&target!=208021336&&target!=208021337&&target!=208021338&&target!=208021339&&target!=208021340&&target!=208021341&&target!=208021342&&target!=208021343))
+        if(source!=schema||source>target||(source!=target&&source!=208021335&&source!=208021336&&source!=208021337&&source!=208021338&&source!=208021339&&source!=208021340&&source!=208021341&&source!=208021342&&source!=208021343)
+                ||(source!=target&&target!=208021336&&target!=208021337&&target!=208021338&&target!=208021339&&target!=208021340&&target!=208021341&&target!=208021342&&target!=208021343&&target!=208021344))
             throw new IOException("Для этой версии копии ещё нет миграции; рабочие данные не изменены");
         BackupPreferencesXml.decode(metadata.getJSONArray("declaredMainDefaults"));
     }

@@ -235,7 +235,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/HudLcaPatchActivity.java": {
-      "sha256": "e07bea000c1d2ef7db0948ea91ac44bff88eb6ed20268839537437cb69e33cfc",
+      "sha256": "b01c5d20c019e4ea21f3114d182aa086a0c6a588c8f6b91e2579b9d757993f51",
       "access_kinds": [
         "files"
       ]
@@ -340,7 +340,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "d8f7edc0ba010718df377407413e9f2fbd44d6f919859b1b6b1f596f6d457724",
+      "sha256": "5bd09c172ca7c66f187f945934b42b39b70fb4a316bf6b5d868ce6fca29d966e",
       "access_kinds": [
         "files"
       ]
@@ -426,7 +426,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/DiagnosticBundle.java": {
-      "sha256": "1b652119cec519b5ddbb325a912e4955e7a07c8b80cd61fb7a87f47a4008bb6c",
+      "sha256": "51033b860722671e3fb04b94a4ebbdde3c003e2e04073feccc85550e1700fc95",
       "access_kinds": [
         "files"
       ]
@@ -438,7 +438,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/DiagnosticJournal.java": {
-      "sha256": "871f1914ec92ce1f968b7db395eacf64ce971697ee1ef3a4586a1fbf492e90c3",
+      "sha256": "dec4d2709854420fafb480fd9cb6751ad63b260b4e48e4a2f31cdb4d5d7e02c5",
       "access_kinds": [
         "files"
       ]
@@ -603,7 +603,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2.java": {
-      "sha256": "64ac7a1eb01a1ce132241fdf554695343176aa99e159deed36d6723f05e56654",
+      "sha256": "d7c89b662d90639d290c3e08bdece3992c30de914625b221ac71141d697999c9",
       "access_kinds": [
         "keystore"
       ]

@@ -41,6 +41,7 @@ class AncsEmptyOwnerStopTest(unittest.TestCase):
   Object mode(){return null;}void cancelAllTimers(){}void dispatchMain(Runnable r){r.run();}
   void retainOrReleaseProcessDrain(){processGateDrainRetained=true;}
   void retireRegisteredGattOwner(GattOwner o){throw new AssertionError("Stop must not force-release a live owner");}
+  void traceLifecycle(String event,String detail){}
   METHODS
  }
  static void check(boolean v){if(!v)throw new AssertionError();}

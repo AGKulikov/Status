@@ -29,6 +29,32 @@ final class EcarxInstrumentTsrAccess implements InstrumentTsrAccess,
     private Result pending;
     private long generation;
     private int attempts;
+    private long requestStartedElapsed;
+    private String trigger = "initialize";
+    private int readbackAttempt;
+    private long lastWriteElapsed = -30_000L;
+    private final Runnable monitor = this::monitorHiddenSetting;
+
+    private void monitorHiddenSetting() {
+        if (closed || !Boolean.TRUE.equals(hidden)) return;
+        if (manager == null) { scheduleMonitor(30_000); return; }
+        Integer current = read(true);
+        if (current == null) { scheduleMonitor(30_000); return; }
+        if (current == 0) { scheduleMonitor(5_000); return; }
+        long sinceWrite = android.os.SystemClock.elapsedRealtime() - lastWriteElapsed;
+        if (sinceWrite < 30_000) { scheduleMonitor(30_000 - sinceWrite); return; }
+        attempts = 0;
+        readbackAttempt = 0;
+        requestStartedElapsed = android.os.SystemClock.elapsedRealtime();
+        trigger = "setting_drift";
+        trace("drift_detected", "actual=1, wanted=0");
+        apply(++generation);
+    }
+
+    private void scheduleMonitor(long delay) {
+        worker.removeCallbacks(monitor);
+        if (!closed && Boolean.TRUE.equals(hidden)) worker.postDelayed(monitor, delay);
+    }
 
     EcarxInstrumentTsrAccess(Context context) {
         this.context = context.getApplicationContext();
@@ -47,62 +73,101 @@ final class EcarxInstrumentTsrAccess implements InstrumentTsrAccess,
             if (closed) { main.post(() -> result.complete(false, "Соединение закрыто")); return; }
             if (pending != null) finish(false, "Заменено новой настройкой");
             hidden = value;
+            worker.removeCallbacks(monitor);
             pending = result;
             attempts = 0;
+            readbackAttempt = 0;
             long owner = ++generation;
+            requestStartedElapsed = android.os.SystemClock.elapsedRealtime();
+            trigger = "set_hidden"; trace("requested", "");
             apply(owner);
         });
     }
 
     @Override public void refresh() {
-        worker.post(() -> { if (!closed && hidden != null) { attempts = 0; apply(++generation); } });
+        worker.post(() -> { if (!closed && hidden != null) { attempts = 0;
+            worker.removeCallbacks(monitor); readbackAttempt = 0;
+            requestStartedElapsed = android.os.SystemClock.elapsedRealtime(); trigger = "refresh";
+            generation++; trace("requested", ""); apply(generation); } });
     }
 
     private void apply(long owner) {
-        if (closed || owner != generation || hidden == null) return;
+        if (closed || owner != generation || hidden == null) { trace("apply_ignored", "callback_generation="+owner); return; }
         if (manager == null) {
+            trace("waiting_for_service", "next_attempt="+(attempts+1));
             if (++attempts <= 10) worker.postDelayed(() -> apply(owner), 500);
             else finish(false, "Нет подключения к штатной настройке TSR");
             return;
         }
         try {
             int wanted = hidden ? 0 : 1;
+            trace("read_before", "wanted="+wanted);
             Integer before = read();
             if (before == null) { finish(false, "TSR: штатное чтение недоступно"); return; }
             if (before == wanted) { finish(true, "TSR=" + wanted + " (подтверждено чтением)"); return; }
+            trace("sdk_write_started", "wanted="+wanted+", before="+before);
+            lastWriteElapsed = android.os.SystemClock.elapsedRealtime();
             ApiResult accepted = manager.CB_ASY_TSR(wanted);
+            trace("sdk_write_returned", "wanted="+wanted+", accepted="+accepted+", effect=unobserved");
             DiagnosticJournal.infoAsync("instrument-oem", "CB_ASY_TSR=" + wanted
                     + ", result=" + accepted + ", sdk=" + manager.getClass().getClassLoader());
             if (accepted != ApiResult.SUCCEED) {
                 finish(false, "TSR: штатная команда отклонена (" + accepted + ")");
                 return;
             }
+            trace("readback_scheduled", "delay_ms=300");
             worker.postDelayed(() -> verify(owner, wanted), 300);
         } catch (Throwable failure) { finish(false, "TSR: " + failure.getClass().getSimpleName()); }
     }
 
     private void verify(long owner, int wanted) {
-        if (closed || owner != generation) return;
+        if (closed || owner != generation) { trace("readback_ignored", "callback_generation="+owner); return; }
+        trace("readback_started", "wanted="+wanted);
         Integer value = read();
+        // A successful SDK return can precede the actual property update during cold boot.
+        // Re-read only; never repeat the write merely because its first readback is late.
+        if ((value == null || value != wanted) && ++readbackAttempt < 3) {
+            trace("readback_pending", "attempt="+readbackAttempt+", wanted="+wanted);
+            worker.postDelayed(() -> verify(owner, wanted), 1_000);
+            return;
+        }
         finish(value != null && value == wanted,
                 "TSR=" + (value == null ? "недоступно" : value) + ", ожидается " + wanted);
     }
 
     private Integer read() {
+        return read(false);
+    }
+
+    private Integer read(boolean quiet) {
         try {
             Object property = manager.getPA_Asy_TSR();
-            if (property == null) return null;
+            if (property == null) { trace("read_unavailable", "property=null"); return null; }
             Object data = property.getClass().getMethod("getData").invoke(property);
             Object availability = property.getClass().getMethod("getAvailability").invoke(property);
             int support = availability instanceof Number ? ((Number) availability).intValue() : -1;
             int raw = data instanceof Number ? ((Number) data).intValue() : -1;
+            if (!quiet || raw != 0 || (support != 1 && support != 2))
+                trace("read_returned", "availability="+support+", raw="+raw);
             return (support == 1 || support == 2) && (raw == 0 || raw == 1) ? raw : null;
-        } catch (Throwable unavailable) { return null; }
+        } catch (Throwable unavailable) { trace("read_failed", "error="+unavailable.getClass().getSimpleName()
+                +", cause="+(unavailable.getCause()==null?"none":unavailable.getCause().getClass().getSimpleName())); return null; }
+    }
+
+    private void trace(String stage, String detail) {
+        DiagnosticJournal.infoAsync("instrument-tsr", "stage="+stage+", generation="+generation
+                +", trigger="+trigger+", elapsed_ms="+(requestStartedElapsed==0?-1:
+                Math.max(0,android.os.SystemClock.elapsedRealtime()-requestStartedElapsed))
+                +", hidden="+hidden+", service_ready="+(manager!=null)+", closed="+closed
+                +", attempts="+attempts+", "+detail);
     }
 
     private void finish(boolean success, String detail) {
         Result result = pending;
+        trace("completed", "success="+success+", callback_pending="+(result!=null)+", detail="+detail+", physical_effect=unobserved");
+        if (!success) DiagnosticJournal.operationFailure("instrument-tsr", "generation="+generation+", trigger="+trigger+", detail="+detail);
         pending = null;
+        scheduleMonitor(success ? 5_000 : 30_000);
         DiagnosticJournal.infoAsync("instrument-oem", "tsr success=" + success + ", " + detail);
         if (result != null) main.post(() -> result.complete(success, detail));
     }
@@ -114,12 +179,16 @@ final class EcarxInstrumentTsrAccess implements InstrumentTsrAccess,
                 Object service = root.getCarManager(ECarXCar.PA_SERVICE);
                 manager = service instanceof ECarXCarSetManager
                         ? ((ECarXCarSetManager) service).getECarXCarActivesafetyManager() : null;
-                if (hidden != null) { attempts = 0; apply(++generation); }
-            } catch (Throwable unavailable) { manager = null; }
+                trace("service_connected", "");
+                if (hidden != null) { worker.removeCallbacks(monitor); attempts = 0; readbackAttempt = 0;
+                    requestStartedElapsed=android.os.SystemClock.elapsedRealtime();
+                    trigger="service_connected"; apply(++generation); }
+            } catch (Throwable unavailable) { manager = null; trace("service_failed", "error="+unavailable.getClass().getSimpleName()); }
         });
     }
     @Override public void onECarXCarServiceDeath() {
         worker.post(() -> {
+            trace("service_died", "");
             manager = null;
             generation++;
             // Do not leave the settings switch waiting forever if the service dies mid-write.

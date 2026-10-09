@@ -534,14 +534,63 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
         }
     };
     private boolean launcherFirstDrawCompleted;
+    private boolean automaticNavigatorHomeFocused;
+    private long automaticNavigatorStartedAt = -1L, automaticNavigatorDispatchedAt = -1L;
+    private int automaticNavigatorAttempts;
+    private final Runnable automaticNavigatorCheck = this::checkAutomaticNavigatorLaunch;
+
+    public void cancelAutomaticNavigatorRecovery() {
+        automaticNavigatorStartedAt = -1L;
+        navigationUiHandler.removeCallbacks(automaticNavigatorCheck);
+    }
+
+    private void dispatchAutomaticNavigator() {
+        automaticNavigatorAttempts++;
+        automaticNavigatorDispatchedAt = android.os.SystemClock.elapsedRealtime();
+        boolean accepted = YandexWindowLauncher.launch(this, YandexWindowLauncher.Product.NAVIGATOR, false);
+        DiagnosticJournal.infoAsync("launcher-navigation", "stage=automatic_dispatch, attempt="
+                +automaticNavigatorAttempts+", accepted="+accepted+", window_confirmed=false");
+        navigationUiHandler.removeCallbacks(automaticNavigatorCheck);
+        navigationUiHandler.postDelayed(automaticNavigatorCheck, 1_000);
+    }
+
+    private void checkAutomaticNavigatorLaunch() {
+        long now = android.os.SystemClock.elapsedRealtime();
+        if (automaticNavigatorStartedAt < 0 || !activityStarted || isFinishing() || isDestroyed()
+                || !preferences.launcherHomeOpensWindowedNavigator.get()
+                || now - automaticNavigatorStartedAt > 40_000) {
+            cancelAutomaticNavigatorRecovery(); return;
+        }
+        WidgetService service = WidgetService.getInstance();
+        if (service != null) {
+            if (service.navigatorWasPresentSince(automaticNavigatorStartedAt)) {
+                traceAutomaticNavigator("window_observed");
+                cancelAutomaticNavigatorRecovery(); return;
+            }
+            if (service.shouldRetryAutomaticNavigator(automaticNavigatorStartedAt,
+                    automaticNavigatorDispatchedAt, automaticNavigatorAttempts, automaticNavigatorHomeFocused)) {
+                traceAutomaticNavigator("retry_confirmed_absence");
+                dispatchAutomaticNavigator(); return;
+            }
+            service.refreshAutomaticNavigatorEvidence();
+        }
+        navigationUiHandler.postDelayed(automaticNavigatorCheck, 1_000);
+    }
     private final Runnable panelInitializationStep = this::continuePanelInitialization;
     private final Runnable automaticNavigatorLaunch = () -> {
         if (!pendingAutomaticNavigatorLaunch || !activityStarted || !launcherBootstrapReady
-                || !launcherFirstDrawCompleted || isFinishing() || isDestroyed()) return;
+                || !launcherFirstDrawCompleted || isFinishing() || isDestroyed()) {
+            traceAutomaticNavigator("dispatch_deferred"); return;
+        }
         pendingAutomaticNavigatorLaunch = false;
         DiagnosticJournal.info("launcher-navigation",
                 "launching windowed Navigator over HOME");
-        launchYandex(YandexWindowLauncher.Product.NAVIGATOR, false);
+        if (isPassengerLauncherProfile()) launchYandex(YandexWindowLauncher.Product.NAVIGATOR, false);
+        else {
+            automaticNavigatorStartedAt = android.os.SystemClock.elapsedRealtime();
+            automaticNavigatorAttempts = 0;
+            dispatchAutomaticNavigator();
+        }
     };
     private final Runnable deferredLauncherRuntimeStart = new Runnable() {
         @Override public void run() {
@@ -786,6 +835,8 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
     }
 
     public void onStop() {
+        cancelAutomaticNavigatorRecovery();
+        if (pendingAutomaticNavigatorLaunch) traceAutomaticNavigator("home_stopped_pending");
         activityStarted = false;
         // If HOME lost foreground before its first traversal (or between onDraw and its posted
         // handoff), leave only a delayed AlarmManager owner. This does no controller/vendor work
@@ -1043,8 +1094,20 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
     private void scheduleAutomaticNavigatorLaunch() {
         navigationUiHandler.removeCallbacks(automaticNavigatorLaunch);
         if (!pendingAutomaticNavigatorLaunch || !launcherBootstrapReady
-                || !launcherFirstDrawCompleted || !activityStarted) return;
+                || !launcherFirstDrawCompleted || !activityStarted) {
+            if (pendingAutomaticNavigatorLaunch) traceAutomaticNavigator("waiting_for_home");
+            return;
+        }
+        traceAutomaticNavigator("queued");
         navigationUiHandler.post(automaticNavigatorLaunch);
+    }
+
+    private void traceAutomaticNavigator(String stage) {
+        DiagnosticJournal.infoAsync("launcher-navigation", "stage="+stage
+                +", pending="+pendingAutomaticNavigatorLaunch+", started="+activityStarted
+                +", bootstrap="+launcherBootstrapReady+", first_draw="+launcherFirstDrawCompleted
+                +", finishing="+isFinishing()+", destroyed="+isDestroyed()
+                +", passenger="+isPassengerLauncherProfile());
     }
 
     private void scheduleVisibleIntegrationHostHandoff() {
@@ -1085,6 +1148,8 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
     }
 
     public void onDestroy() {
+        cancelAutomaticNavigatorRecovery();
+        if (pendingAutomaticNavigatorLaunch) traceAutomaticNavigator("home_destroyed_pending");
         if(disposed)return;
         disposed=true;
         if(homeDraft!=null&&!isChangingConfigurations())homeDraft.cancel(this);
@@ -1169,6 +1234,7 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
     }
 
     public void onWindowFocusChanged(boolean hasFocus) {
+        automaticNavigatorHomeFocused = hasFocus;
         // Focus is the reliable close signal for the ECARX freeform task: HOME may be RESUMED
         // underneath Navigator, but it regains window focus only after that window is gone.
         if (!isPassengerLauncherProfile()) StatusBarSurfaceContext.setLauncherHomeForeground(hasFocus);
@@ -5345,6 +5411,7 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
     }
 
     private void launchYandex(YandexWindowLauncher.Product product, boolean full) {
+        cancelAutomaticNavigatorRecovery();
         if (isPassengerLauncherProfile()) {
             String pkg = product == YandexWindowLauncher.Product.MAPS
                     ? "ru.yandex.yandexmaps" : "ru.yandex.yandexnavi";

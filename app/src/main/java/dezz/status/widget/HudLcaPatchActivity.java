@@ -14,6 +14,9 @@ public final class HudLcaPatchActivity extends SettingsActivity {
     private final List<Button> operationButtons=new ArrayList<>();
     private final List<Button> patchButtons=new ArrayList<>();
     private boolean moduleVerified;
+    private static final java.util.concurrent.atomic.AtomicLong OPERATION_SEQUENCE = new java.util.concurrent.atomic.AtomicLong();
+    private volatile String operationId = "none", shellDiagnostics = "shell_stage=unobserved";
+    private long submittedAt;
     @Override protected void onCreate(Bundle state){super.onCreate(state);session=new AdbConsoleSession(this);setTitle("HUD/LCA");
         ScrollView scroll=new ScrollView(this);LinearLayout page=new LinearLayout(this);page.setOrientation(LinearLayout.VERTICAL);page.setPadding(24,20,24,24);scroll.addView(page);
         TextView title=new TextView(this);title.setText("Системный патч HUD/LCA");title.setTextSize(26);page.addView(title);
@@ -31,9 +34,14 @@ public final class HudLcaPatchActivity extends SettingsActivity {
         s.stage("connect");s.connect();dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("hud-lca","stage=connected operation="+(mode==null?"inspect":mode.name()));
         if(mode!=null){s.daemonRoot(true);dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("hud-lca","stage=root_identity_confirmed");}
         s.stage(mode==null?"inspect_shell":"install_shell");
-        AdbShellResult.Result result=s.command(mode==null?HudLcaPatch.inspect():HudLcaPatch.install(mode));
+        HudLcaDiagnostics trace=new HudLcaDiagnostics(event->dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync(
+                "hud-lca","operation_id="+operationId+", elapsed_ms="+(android.os.SystemClock.elapsedRealtime()-submittedAt)+", "+event));
+        AdbShellResult.Result result;
+        try { result=s.command(mode==null?HudLcaPatch.inspect():HudLcaPatch.install(mode),trace::accept); }
+        finally { shellDiagnostics=trace.summary(); }
         dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("hud-lca","stage=shell_result operation="+(mode==null?"inspect":mode.name())
-                +", exit="+result.exitCode+", truncated="+result.truncated+", inspected_mode="+HudLcaPatch.inspectedMode(result.output));
+                +", operation_id="+operationId+", exit="+result.exitCode+", truncated="+result.truncated
+                +", inspected_mode="+HudLcaPatch.inspectedMode(result.output)+", "+shellDiagnostics);
         if(!result.success()||result.truncated)throw new IOException(result.describe());
         if(mode==null&&HudLcaPatch.inspectedMode(result.output)==null)throw new IOException("Нет подтверждения полной проверки модуля\n"+result.describe());
         if(mode!=null&&!result.output.contains("NATRO_HUD_PATCH_VERIFIED_"+mode.name()))throw new IOException("Нет подтверждения финального чтения");
@@ -52,11 +60,14 @@ public final class HudLcaPatchActivity extends SettingsActivity {
     private void submit(String name,AdbConsoleSession.Operation operation,String completed){
         if(session.busy()){Toast.makeText(this,"Дождитесь завершения текущей операции",Toast.LENGTH_SHORT).show();return;}
         CharSequence previous=status.getText();status.setText(name+"…\nОперация выполняется один раз; ожидание — до 60 секунд.");setOperationBusy(true);
-        dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("hud-lca","stage=submitted operation="+name);
+        operationId="lca-"+OPERATION_SEQUENCE.incrementAndGet();
+        submittedAt=android.os.SystemClock.elapsedRealtime();shellDiagnostics="shell_stage=unobserved";
+        dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("hud-lca","stage=submitted operation="+name+", operation_id="+operationId);
         boolean accepted=session.submit(operation,error->{
             String resultRecord = "stage=completed operation="+name
                     +", result="+(error==null?"success":"failed")+", reason="+(error==null?"none":error.getClass().getSimpleName())
                     +", operation_stage="+session.stage().replace('_',' ')+", root_probe="+session.rootProbeSummary()
+                    +", operation_id="+operationId+", elapsed_ms="+(android.os.SystemClock.elapsedRealtime()-submittedAt)+", "+shellDiagnostics
                     +", cause="+(error==null||error.getCause()==null?"none":error.getCause().getClass().getSimpleName());
             dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("hud-lca",resultRecord);
             if(error!=null)dezz.status.widget.diagnostics.DiagnosticJournal.operationFailure("hud-lca",resultRecord);

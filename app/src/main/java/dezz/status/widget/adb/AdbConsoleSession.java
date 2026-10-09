@@ -75,10 +75,17 @@ public final class AdbConsoleSession implements AutoCloseable {
         if (cancelled.get()) try { next.close(); } catch (IOException ignored) {}
     }
     public AdbShellResult.Result command(String command) throws Exception {
+        return command(command, null);
+    }
+    /** Optional read-only observer sees chunks before a timeout can discard partial output. */
+    public AdbShellResult.Result command(String command, java.util.function.Consumer<byte[]> observer) throws Exception {
         checkCancelled();
         if (transport == null) throw new IOException("no devices/emulators found — выполните Connect");
         AdbShellResult capture = new AdbShellResult();
-        try { transport.execRaw(capture.wrap(command), chunk -> { capture.accept(chunk); }); }
+        try { transport.execRaw(capture.wrap(command), chunk -> {
+            capture.accept(chunk);
+            if (observer != null) observer.accept(chunk);
+        }); }
         catch (Exception error) { disconnect(); throw error; }
         checkCancelled();
         AdbShellResult.Result result = capture.finish();

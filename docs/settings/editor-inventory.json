@@ -2133,97 +2133,97 @@
         },
         {
           "dialogs": 0,
-          "line": 599,
+          "line": 648,
           "method": "onCreate",
           "numeric_controls": 0
         },
         {
           "dialogs": 8,
-          "line": 2025,
+          "line": 2091,
           "method": "showLauncherWidgetEditor",
           "numeric_controls": 0
         },
         {
           "dialogs": 2,
-          "line": 2348,
+          "line": 2414,
           "method": "showLauncherBackdropEditor",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2457,
+          "line": 2523,
           "method": "createLauncherHorizontalGroup",
           "numeric_controls": 0
         },
         {
           "dialogs": 5,
-          "line": 2528,
+          "line": 2594,
           "method": "showLauncherHorizontalGroupEditor",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2656,
+          "line": 2722,
           "method": "chooseLauncherHorizontalGroupMembers",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2717,
+          "line": 2783,
           "method": "showLauncherWidgetCatalog",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2839,
+          "line": 2905,
           "method": "showRemovedLauncherWidgets",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2870,
+          "line": 2936,
           "method": "showFavoriteAppWidgetCatalog",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2903,
+          "line": 2969,
           "method": "showSimpleWidgetCatalog",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2939,
+          "line": 3005,
           "method": "showMediaWidgetCatalog",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 2970,
+          "line": 3036,
           "method": "showNavigationWidgetCatalog",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 3002,
+          "line": 3068,
           "method": "showClimateWidgetCatalog",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 3095,
+          "line": 3161,
           "method": "chooseLauncherWidgetApp",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 4080,
+          "line": 4146,
           "method": "onStopTrackingTouch",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 5360,
+          "line": 5427,
           "method": "showAllApps",
           "numeric_controls": 0
         }
@@ -2421,7 +2421,7 @@
       ],
       "numeric_controls": 2,
       "path": "app/src/main/java/dezz/status/widget/LauncherHomeSurface.java",
-      "sha256": "f4613d84327513ec1cf94c354edc8e1b105f42e8e7566c4e9f54c59b80560fc1"
+      "sha256": "e7cbfadcddeb862a03db2939ed82975eb674cff6d9f81228d5d9804dac64df8a"
     },
     {
       "class": "dezz.status.widget.LauncherSettingsActivity",

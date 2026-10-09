@@ -41,7 +41,7 @@ public final class DiagnosticBundle {
                     .put("interpretation", "last observed state has explicit ages; external process cause and physical effect may remain unknown");
             JSONArray channels = new JSONArray();
             File diagnosticDirectory = new File(context.getFilesDir(), "diagnostics");
-            for (String name : new String[]{"journal.log", "journal-hud.log", "incidents.log", "incidents-hud.log", "crash.log", "crash-hud.log"}) {
+            for (String name : new String[]{"journal.log", "journal-hud.log", "incidents.log", "incidents-hud.log", "crash.log", "crash-hud.log", "operations.log", "operations-hud.log"}) {
                 JSONObject entry = new JSONObject().put("name", name);
                 File source = new File(diagnosticDirectory, name);
                 if (!source.isFile()) entry.put("state", "missing; never written, cleared, or process not started");
@@ -60,6 +60,7 @@ public final class DiagnosticBundle {
                     + "journal*.log: wall_ms, elapsed_ms, level, component, message separated by TAB; escaped \\n inside messages.\n"
                     + "Correlate process session + trace/root/parent; do not compare uptime across reboots.\n"
                     + "incidents*.log retain state/thread snapshots separately from routine rotation.\n"
+                    + "operations*.log retain bounded startup, HUD/LCA, TSR, Navigator and ANCS lifecycle evidence; debug must be enabled.\n"
                     + "manifest.json lists permissions, writer losses, limits, missing channels and SHA-256.\n"
                     + "Snapshots are not atomic between processes; absent events are not proof of no event.\n"
                     + "Shell/API acknowledgement does not prove physical effect; old/missing samples are unknown.\n");

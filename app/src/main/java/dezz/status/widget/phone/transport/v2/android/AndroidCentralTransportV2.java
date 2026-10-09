@@ -233,6 +233,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         SelectedBondIdentityResolverV2.Candidate bondAttribution;
         BluetoothGatt gatt;
         long connectGattStartedAtMillis;
+        long disconnectRequestedAtMillis;
         boolean callbackObserved;
         /** A positive Android clientIf proves that close() can unregister this exact owner. */
         boolean registrationProven;
@@ -1221,6 +1222,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     }
 
     private void closeGattOwner(BleRouteToken token, String reason) {
+        traceLifecycle("close_requested", "requested_owner="+token.ownerId+", same_owner="+(owner!=null&&owner.ownerToken.sameOwner(token)));
         if (owner == null) {
             dispatchMain(this::maybeCompleteTeardown);
             return;
@@ -1260,17 +1262,35 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     private void retireRegisteredGattOwner(GattOwner exact) {
         if (owner != exact) return;
         if (exact.connected && exact.gatt != null && adapter != null && adapter.isEnabled()) {
+            // A lost disconnect callback must not strand a registration-proven wrapper forever.
+            // Keep the exact process lease until close returns and the native settle completes.
+            if (exact.disconnectRequestedAtMillis != 0L) return;
             try {
+                traceLifecycle("disconnect_call", "");
+                exact.disconnectRequestedAtMillis=SystemClock.elapsedRealtime();
+                main.postDelayed(() -> closeAfterDisconnectTimeout(exact), 1_000L);
                 exact.gatt.disconnect();
+                traceLifecycle("disconnect_returned", "callback_confirmed=false");
                 return;
             } catch (RuntimeException ignored) {
+                traceLifecycle("disconnect_exception", "error="+ignored.getClass().getSimpleName());
                 // Close the now-invalid Java wrapper below.
             }
         }
         finishGattClose();
     }
 
+    private void closeAfterDisconnectTimeout(GattOwner exact) {
+        if (owner != exact || !exact.closing || !exact.registrationProven
+                || exact.quarantinedBeforeRegistration
+                || !ProcessGattRegistrationGateV2.owns(exact)) return;
+        traceLifecycle("disconnect_callback_timeout", "registration_proven=true");
+        exact.retirementSettleRequested = true;
+        finishGattClose();
+    }
+
     private void finishGattClose() {
+        traceLifecycle("gatt_close_started", "");
         GattOwner closing = owner;
         if (closing == null) {
             dispatchMain(this::maybeCompleteTeardown);
@@ -1283,8 +1303,15 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         maybeRefreshGattCache(closing);
         try {
             if (closing.gatt != null) closing.gatt.close();
+            traceLifecycle("gatt_close_returned", "closed_owner="+closing.ownerToken.ownerId+", native_release=unobserved");
         } catch (RuntimeException ignored) {
-            // The Java owner is terminal; switch coordinator still performs an owner-count gate.
+            traceLifecycle("gatt_close_exception", "closed_owner="+closing.ownerToken.ownerId+", error="+ignored.getClass().getSimpleName());
+            // An exception is not evidence that the registration was released. Preserve the
+            // exact owner/lease; a later callback or radio reset can still complete its teardown.
+            owner = closing;
+            reportError(IphoneTransportErrorV2.Kind.TEARDOWN,
+                    "GATT close failed; exact registration retained", false);
+            return;
         }
         ProcessGattRegistrationGateV2.cancelWaiter(closing);
         boolean settle = closing.retirementSettleRequested && !radioResetProven
@@ -1377,6 +1404,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     }
 
     private void discoverServices(BleRouteToken token) {
+        traceLifecycle("discovery_requested", "requested_owner="+token.ownerId+", operation="+token.operationId);
         if (!readyForGattOperation(token) || pendingGatt != null) {
             postServices(token, null);
             return;
@@ -1400,7 +1428,9 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
         boolean started;
         try {
             started = owner.gatt.discoverServices();
+            traceLifecycle("discovery_returned", "accepted="+started+", callback_confirmed=false");
         } catch (RuntimeException error) {
+            traceLifecycle("discovery_exception", "error="+error.getClass().getSimpleName());
             started = false;
         }
         if (!started) {
@@ -1569,6 +1599,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                             + ", plannedMs=" + boundedDelay
                             + ", actualMs=" + Math.max(0L, firedAt - armedAt)
                             + ", latenessMs=" + Math.max(0L, firedAt - deadlineAt));
+            traceLifecycle("route_deadline", "armed_phase="+armedPhase+", planned_ms="+boundedDelay+", actual_ms="+Math.max(0L,firedAt-armedAt));
             switch (current.phase) {
                 case STARTUP_QUIET:
                     apply(AndroidCentralRoute.startupQuietElapsed(
@@ -2730,6 +2761,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     }
 
     private void maybeCompleteTeardown() {
+        traceLifecycle("teardown_check", "");
         boolean ownsDrain = ProcessGattRegistrationGateV2.ownsDrainReservation(
                 processGateDrainWaiter);
         if (processGateDrainRetained) return;
@@ -2932,6 +2964,32 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 mode(), state.epoch, kind, detail, retryable));
     }
 
+    /** Passive snapshot only: no Binder calls, retries, gate acquisition or peer content. */
+    private void traceLifecycle(String event, String detail) {
+        if (!dezz.status.widget.diagnostics.DiagnosticJournal.isEnabled()) return;
+        GattOwner exact=owner;
+        PendingGattOperation pending=pendingGatt;
+        AndroidCentralRoute.State current=state;
+        long now=SystemClock.elapsedRealtime();
+        dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("ancs-lifecycle",
+                "event="+event+", epoch="+(current==null?"none":current.epoch)
+                +", phase="+(current==null?"none":current.phase)
+                +", expected="+(current==null?"none":current.expected)
+                +", owner="+(exact==null?0:exact.ownerToken.ownerId)
+                +", registered="+(exact!=null&&exact.registrationProven)
+                +", connected="+(exact!=null&&exact.connected)
+                +", closing="+(exact!=null&&exact.closing)
+                +", waiting_gate="+(exact!=null&&exact.waitingForProcessGate)
+                +", quarantined="+(exact!=null&&exact.quarantinedBeforeRegistration)
+                +", disconnect_wait_ms="+(exact==null||exact.disconnectRequestedAtMillis==0?-1:
+                Math.max(0,now-exact.disconnectRequestedAtMillis))
+                +", pending="+(pending==null?"none":pending.type)
+                +", pending_age_ms="+(pending==null?-1:Math.max(0,now-pending.startedElapsedMs))
+                +", scan="+scanRunning+", frozen="+ingressFrozen
+                +", drain_retained="+processGateDrainRetained
+                +", deferred_stop="+(deferredStopTerminalEpoch!=null)+", "+detail);
+    }
+
     private void reportPlatformDiagnostic(BleRouteToken token, String detail) {
         if (listener == null || state == null || !currentEpoch(token)) return;
         String bounded = detail == null ? "" : detail.trim();
@@ -3131,6 +3189,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     };
 
     private void handleConnectionState(BluetoothGatt callbackGatt, int status, int newState) {
+        traceLifecycle("connection_callback", "status="+status+", new_state="+newState+", exact_wrapper="+(owner!=null&&owner.gatt==callbackGatt));
         if (owner == null || owner.gatt != callbackGatt) return;
         GattOwner exact = owner;
         long elapsed = exact.connectGattStartedAtMillis <= 0L ? 0L
@@ -3197,6 +3256,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
     }
 
     private void handleServicesDiscovered(BluetoothGatt callbackGatt, int status) {
+        traceLifecycle("discovery_callback", "status="+status+", exact_wrapper="+(owner!=null&&owner.gatt==callbackGatt));
         if (ingressFrozen) return;
         PendingGattOperation pending = pendingGatt;
         if (owner == null || owner.gatt != callbackGatt || pending == null

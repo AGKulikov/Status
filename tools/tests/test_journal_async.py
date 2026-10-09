@@ -95,6 +95,26 @@ STUBS = {
           DiagnosticJournal.recordCrash(Thread.currentThread(),new RuntimeException("crash-marker"));
           check(exported().contains("crash-marker"));
         }
+        static void operationHistorySurvivesNoiseAndRespectsClear()throws Exception{
+          DiagnosticJournal.initialize(context,true);
+          DiagnosticJournal.info("hud-lca","stage=module_context operation_id=lca-7 password=hidden-test");
+          check(DiagnosticJournal.awaitPendingWrites());
+          for(int batch=0;batch<30;batch++){
+            for(int i=0;i<20;i++)DiagnosticJournal.info("noise","routine-"+"small ".repeat(650));
+            check(DiagnosticJournal.awaitPendingWrites());
+          }
+          Path directory=context.getFilesDir().toPath().resolve("diagnostics");
+          String normal=Files.readString(directory.resolve("journal.log"));
+          Path pinned=directory.resolve("operations.log");
+          String focused=Files.readString(pinned);
+          check(!normal.contains("operation_id=lca-7"));check(focused.contains("operation_id=lca-7"));
+          check(!focused.contains("hidden-test"));check(!focused.contains("routine-"));
+          DiagnosticJournal.setEnabled(context,false);
+          DiagnosticJournal.info("hud-lca","disabled-operation");
+          check(DiagnosticJournal.awaitPendingWrites());
+          check(!Files.readString(pinned).contains("disabled-operation"));
+          DiagnosticJournal.clear();check(!Files.exists(pinned));
+        }
         public static void main(String[] a)throws Exception{
           context=new android.content.Context(new File(a[1]));
           JournalReplay.class.getDeclaredMethod(a[0]).invoke(null);
@@ -142,7 +162,7 @@ class JournalAsyncTest(unittest.TestCase):
 
 for case in ("normalProducersNeverWaitForDisk", "queueIsBoundedAndReportsLoss",
              "clearAndDisableFenceQueuedWrites", "orderAndPrivacySurviveAsyncExport",
-             "crashStillPersistsWhenDebugDisabled"):
+             "crashStillPersistsWhenDebugDisabled", "operationHistorySurvivesNoiseAndRespectsClear"):
     setattr(JournalAsyncTest, "test_" + case, lambda self, name=case: self.replay(name))
 
 

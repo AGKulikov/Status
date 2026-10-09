@@ -17,6 +17,7 @@ import dezz.status.widget.StatusBarSurfaceContext;
 
 /** Starts the special floating-window entry points used by the head-unit Yandex builds. */
 public final class YandexWindowLauncher {
+    private static final java.util.concurrent.atomic.AtomicLong LAUNCH_SEQUENCE = new java.util.concurrent.atomic.AtomicLong();
     public enum Product { MAPS, NAVIGATOR }
     public static final String EXTRA_STAGED_PRODUCT =
             "dezz.status.widget.extra.YANDEX_STAGED_PRODUCT";
@@ -167,10 +168,24 @@ public final class YandexWindowLauncher {
     }
 
     private static boolean start(@NonNull Context context, @NonNull Intent intent) {
+        long attempt = LAUNCH_SEQUENCE.incrementAndGet();
+        long started = android.os.SystemClock.elapsedRealtime();
+        ComponentName component = intent.getComponent();
+        String target = component == null ? "package_resolution" : component.flattenToShortString();
+        String detail = "attempt="+attempt+", target="+target
+                +", requested_window="+intent.getBooleanExtra("ddnavwin",false)
+                +", forced_full="+intent.getBooleanExtra("ddnavforcewinfull",false);
+        dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("navigator-launch", "stage=dispatch, "+detail);
         try {
             context.startActivity(intent);
+            dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("navigator-launch",
+                    "stage=handoff, "+detail+", elapsed_ms="+(android.os.SystemClock.elapsedRealtime()-started)
+                    +", window_confirmed=false");
             return true;
         } catch (RuntimeException ignored) {
+            dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("navigator-launch",
+                    "stage=rejected, "+detail+", elapsed_ms="+(android.os.SystemClock.elapsedRealtime()-started)
+                    +", error="+ignored.getClass().getSimpleName());
             return false;
         }
     }

@@ -827,6 +827,20 @@ public class WidgetService extends Service {
     @NonNull private NavigatorWindowSourcePolicy.VendorDecision ecarxNavigatorWindowDecision =
             NavigatorWindowSourcePolicy.VendorDecision.NONE;
     private long ecarxNavigatorWindowDecisionAtElapsed = -1L;
+    private NavigatorWindowFramePolicy.State navigatorLaunchObservedState = NavigatorWindowFramePolicy.State.UNKNOWN;
+    private long navigatorLaunchObservedAt = -1L, navigatorLaunchLastPresentAt = -1L;
+
+    boolean shouldRetryAutomaticNavigator(long started, long dispatched, int attempts, boolean focused) {
+        return NavigatorAutoLaunchPolicy.retry(SystemClock.elapsedRealtime(), started, dispatched,
+                attempts, focused, navigatorLaunchObservedState == NavigatorWindowFramePolicy.State.ABSENT,
+                navigatorLaunchObservedAt, navigatorLaunchLastPresentAt);
+    }
+
+    boolean navigatorWasPresentSince(long started) { return navigatorLaunchLastPresentAt >= started; }
+
+    void refreshAutomaticNavigatorEvidence() {
+        if (ecarxNavigatorWindowObserver != null) ecarxNavigatorWindowObserver.refresh("home-auto-launch-check");
+    }
     private final Runnable ecarxNavigatorWindowLeaseExpiry =
             this::expireEcarxNavigatorWindowLease;
     private boolean ecarxNavigatorOptimisticConfirmationPending;
@@ -7129,6 +7143,11 @@ public class WidgetService extends Service {
     private void onEcarxNavigatorWindowStateChanged(
             @NonNull NavigatorWindowFramePolicy.Result result) {
         if (destroyed) return;
+        navigatorLaunchObservedState = result.state;
+        navigatorLaunchObservedAt = SystemClock.elapsedRealtime();
+        if (result.state == NavigatorWindowFramePolicy.State.WINDOWED
+                || result.state == NavigatorWindowFramePolicy.State.FULLSCREEN)
+            navigatorLaunchLastPresentAt = navigatorLaunchObservedAt;
         NavigatorWindowSourcePolicy.VendorDecision decision =
                 NavigatorWindowSourcePolicy.decisionFor(
                         result, ecarxNavigatorOptimisticConfirmationPending,

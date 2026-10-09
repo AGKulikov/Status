@@ -14,28 +14,35 @@ public final class HudLcaPatch {
         Mode(String label,String sha256,String hex){this.label=label;this.sha256=sha256;this.hex=hex;}
     }
     private HudLcaPatch(){}
-    private static String find() {return "set -e\nf='/vendor/lib64/"+MODULE+"'\n[ -f \"$f\" ] || f='/system/vendor/lib64/"+MODULE+"'\n"
+    private static String step(String name) {
+        return "natro_step="+name+"\nprintf 'NATRO_HUD_DIAG stage=%s\\n' \"$natro_step\"\n";
+    }
+    private static String trace() {
+        return "natro_step=start\nnatro_exit() { printf 'NATRO_HUD_DIAG exit=%s stage=%s\\n' \"$1\" \"$natro_step\"; }\n"
+                + "trap 'natro_rc=$?; natro_exit \"$natro_rc\"; exit \"$natro_rc\"' EXIT\n";
+    }
+    private static String find() {return trace()+"set -e\n"+step("locate_module")+"f='/vendor/lib64/"+MODULE+"'\n[ -f \"$f\" ] || f='/system/vendor/lib64/"+MODULE+"'\n"
             +"[ -f \"$f\" ] || { echo 'Модуль не найден в /vendor/lib64 и /system/vendor/lib64; запись запрещена'; exit 45; }\n"
             +"[ ! -L \"$f\" ] || { echo 'Модуль является символической ссылкой; запись запрещена'; exit 46; }\n"
             +"[ -r \"$f\" ] || { echo 'Нет права чтения модуля; совместимость не проверена'; exit 47; }\n";}
     private static String platform(){return
-            "sdk=$(getprop ro.build.version.sdk)\nabi=$(getprop ro.product.cpu.abi)\n"
+            step("platform")+"sdk=$(getprop ro.build.version.sdk)\nabi=$(getprop ro.product.cpu.abi)\nprintf 'NATRO_HUD_DIAG platform=%s:%s\\n' \"$sdk\" \"$abi\"\n"
             +"[ \"$sdk\" = 28 ] && [ \"$abi\" = arm64-v8a ] || { printf 'Неподдерживаемая платформа: SDK=%s ABI=%s; запись запрещена\\n' \"$sdk\" \"$abi\"; exit 41; }\n";}
     private static String hash(String file){return "sha256sum \""+file+"\" | cut -d ' ' -f1";}
     private static String block(String file,Mode mode) {
         StringBuilder octal=new StringBuilder();for(int i=0;i<mode.hex.length();i+=2)octal.append(String.format(java.util.Locale.ROOT,"\\%03o",Integer.parseInt(mode.hex.substring(i,i+2),16)));
-        return "printf '"+octal+"' | dd of=\""+file+"\" bs=1 seek=124248 conv=notrunc 2>/dev/null\n";
+        return step(mode==Mode.ORIGINAL?"prepare_original_block":"prepare_target_block")+"printf '"+octal+"' | dd of=\""+file+"\" bs=1 seek=124248 conv=notrunc 2>/dev/null\n";
     }
     private static String known() {
         StringBuilder script=new StringBuilder(
-                "for tool in wc sha256sum od tr cut; do command -v \"$tool\" >/dev/null 2>&1 || { printf 'Нет утилиты проверки: %s; запись запрещена\\n' \"$tool\"; exit 48; }; done\n"
-                +"size=$(wc -c < \"$f\") || { echo 'Не удалось прочитать размер модуля'; exit 48; }\n"
+                step("verification_tools")+"for tool in wc sha256sum od tr cut; do command -v \"$tool\" >/dev/null 2>&1 || { printf 'Нет утилиты проверки: %s; запись запрещена\\n' \"$tool\"; exit 48; }; done\n"
+                +step("module_size")+"size=$(wc -c < \"$f\") || { echo 'Не удалось прочитать размер модуля'; exit 48; }\n"
                 +"[ \"$size\" -eq 268424 ] || { printf 'Неизвестный размер модуля: %s байт, ожидается 268424; запись запрещена\\n' \"$size\"; exit 49; }\n"
-                +"h=$(sha256sum \"$f\") || { echo 'Не удалось вычислить SHA-256 модуля'; exit 48; }\nh=${h%% *}\n"
-                +"raw_block=$(od -An -tx1 -j 124248 -N 32 \"$f\") || { echo 'Не удалось прочитать контрольный блок модуля'; exit 48; }\n"
+                +step("module_hash")+"h=$(sha256sum \"$f\") || { echo 'Не удалось вычислить SHA-256 модуля'; exit 48; }\nh=${h%% *}\n"
+                +step("module_block")+"raw_block=$(od -An -tx1 -j 124248 -N 32 \"$f\") || { echo 'Не удалось прочитать контрольный блок модуля'; exit 48; }\n"
                 +"b=$(printf '%s' \"$raw_block\" | tr -d ' \\r\\n')\ncase \"$h:$b\" in\n");
         for(Mode mode:Mode.values())script.append(mode.sha256).append(':').append(mode.hex).append(") mode='").append(mode.name()).append("';;\n");
-        return script+"*) printf 'Неизвестная версия: запись запрещена\\nSHA-256: %s\\n' \"$h\"; exit 40;;\nesac\n";
+        return script+"*) printf 'Неизвестная версия: запись запрещена\\nSHA-256: %s\\n' \"$h\"; exit 40;;\nesac\nprintf 'NATRO_HUD_DIAG mode=%s size=%s\\n' \"$mode\" \"$size\"\n";
     }
     public static String inspect(){return find()+platform()+known()+"printf 'Файл: %s\\nРежим: %s\\nSHA-256: %s\\n' \"$f\" \"$mode\" \"$h\"\nls -lZ \"$f\"\nif [ -f '"+BACKUP+"/journal' ]; then echo 'Есть незавершённый журнал; проверьте результат или восстановите оригинал'; cat '"+BACKUP+"/journal'; fi\nprintf 'NATRO_HUD_INSPECT_VERIFIED_%s\\n' \"$mode\"\n";}
     public static Mode inspectedMode(String output){
@@ -50,20 +57,20 @@ public final class HudLcaPatch {
     public static String install(Mode target) {
         if(target==null)throw new IllegalArgumentException("Mode required");
         String directory=BACKUP;
-        return find()+platform()+"[ \"$(id -u)\" = 0 ] || { echo 'Запись требует подтверждённого root'; exit 50; }\n"+known()
-            +"[ \"$(stat -c '%u:%g:%a' \"$f\")\" = '0:0:644' ]\ncontext=$(ls -lZ \"$f\" | tr ' ' '\\n' | sed -n '/^u:object_r:[a-zA-Z0-9_]*:s0$/p')\n[ -n \"$context\" ]\n"
-            +"d='"+directory+"'\n[ ! -L \"$d\" ]\nmkdir -p \"$d\"\nchmod 0700 \"$d\"\n"
-            +"[ ! -L \"$d/operation-lock\" ]\nif [ -d \"$d/operation-lock\" ]; then\n  p=$(cat \"$d/operation-lock/pid\" 2>/dev/null || true)\n  case \"$p\" in ''|*[!0-9]*) echo 'Неизвестный владелец блокировки'; exit 42;; esac\n  if kill -0 \"$p\" 2>/dev/null; then echo 'Операция ещё выполняется'; exit 42; fi\n  rm \"$d/operation-lock/pid\"\n  rmdir \"$d/operation-lock\"\nfi\nmkdir \"$d/operation-lock\"\nprintf '%s\\n' \"$$\" > \"$d/operation-lock/pid\"\ntrap 'rm -f \"$d/operation-lock/pid\"; rmdir \"$d/operation-lock\" 2>/dev/null || true' EXIT\n"
-            +"[ ! -L \"$d/original.so\" ]\ncp \"$f\" \"$d/original-new.so\"\n"+block("$d/original-new.so",Mode.ORIGINAL)
-            +"[ \"$("+hash("$d/original-new.so")+")\" = '"+Mode.ORIGINAL.sha256+"' ]\n"
-            +"if [ -f \"$d/original.so\" ]; then [ \"$("+hash("$d/original.so")+")\" = '"+Mode.ORIGINAL.sha256+"' ]; else mv \"$d/original-new.so\" \"$d/original.so\"; fi\nchmod 0600 \"$d/original.so\"\nsync\n"
-            +"cp \"$d/original.so\" \"$d/target.so\"\n"+block("$d/target.so",target)
-            +"[ \"$("+hash("$d/target.so")+")\" = '"+target.sha256+"' ]\n"
-            +"printf '%s\\n%s\\n%s\\n' \"$f\" \"$h\" '"+target.sha256+"' > \"$d/journal-new\"\nmv \"$d/journal-new\" \"$d/journal\"\nsync\n"
-            +"case \"$f\" in /vendor/*) mount -o remount,rw /vendor;; /system/vendor/*) mount -o remount,rw /system;; *) exit 43;; esac\n"
-            +"[ ! -L \"$f.hudlab-original.bak\" ]\nif [ -e \"$f.hudlab-original.bak\" ]; then [ \"$("+hash("$f.hudlab-original.bak")+")\" = '"+Mode.ORIGINAL.sha256+"' ]; else cp \"$d/original.so\" \"$f.hudlab-original.bak\"; chown 0:0 \"$f.hudlab-original.bak\"; chmod 0644 \"$f.hudlab-original.bak\"; chcon \"$context\" \"$f.hudlab-original.bak\"; fi\n"
-            +"[ ! -L \"$f.natro-new\" ]\ncp \"$d/target.so\" \"$f.natro-new\"\nchown 0:0 \"$f.natro-new\"\nchmod 0644 \"$f.natro-new\"\nchcon \"$context\" \"$f.natro-new\"\n[ \"$("+hash("$f.natro-new")+")\" = '"+target.sha256+"' ]\nsync\nmv -f \"$f.natro-new\" \"$f\"\nsync\n"
-            +"if [ \"$("+hash("$f")+")\" != '"+target.sha256+"' ] || [ \"$(stat -c '%u:%g:%a' \"$f\")\" != '0:0:644' ] || ! ls -lZ \"$f\" | grep -F \"$context\"; then\n"
-            +"  [ \"$("+hash("$d/original.so")+")\" = '"+Mode.ORIGINAL.sha256+"' ]\n  cp \"$d/original.so\" \"$f.natro-new\"\n  chown 0:0 \"$f.natro-new\"\n  chmod 0644 \"$f.natro-new\"\n  chcon \"$context\" \"$f.natro-new\"\n  sync\n  mv -f \"$f.natro-new\" \"$f\"\n  sync\n  [ \"$("+hash("$f")+")\" = '"+Mode.ORIGINAL.sha256+"' ]\n  [ \"$(stat -c '%u:%g:%a' \"$f\")\" = '0:0:644' ]\n  ls -lZ \"$f\" | grep -F \"$context\"\n  mv \"$d/journal\" \"$d/last-rolled-back\"\n  sync\n  echo 'Проверка патча не пройдена; оригинал восстановлен'\n  exit 44\nfi\nmv \"$d/journal\" \"$d/last-completed\"\nsync\necho 'NATRO_HUD_PATCH_VERIFIED_"+target.name()+"'\n";
+        return find()+platform()+step("root_identity")+"[ \"$(id -u)\" = 0 ] || { echo 'Запись требует подтверждённого root'; exit 50; }\n"+known()
+            +step("module_metadata")+"metadata=$(stat -c '%u:%g:%a' \"$f\")\nprintf 'NATRO_HUD_DIAG metadata=%s\\n' \"$metadata\"\n[ \"$metadata\" = '0:0:644' ]\n"+step("module_context")+"context=$(ls -lZ \"$f\" | tr ' ' '\\n' | sed -n '/^u:object_r:[a-zA-Z0-9_]*:s0$/p')\nprintf 'NATRO_HUD_DIAG context=%s\\n' \"$context\"\n[ -n \"$context\" ]\n"
+            +step("backup_directory")+"d='"+directory+"'\n[ ! -L \"$d\" ]\nmkdir -p \"$d\"\nchmod 0700 \"$d\"\n"
+            +step("operation_lock")+"[ ! -L \"$d/operation-lock\" ]\nif [ -d \"$d/operation-lock\" ]; then\n  p=$(cat \"$d/operation-lock/pid\" 2>/dev/null || true)\n  case \"$p\" in ''|*[!0-9]*) echo 'Неизвестный владелец блокировки'; exit 42;; esac\n  if kill -0 \"$p\" 2>/dev/null; then echo 'Операция ещё выполняется'; exit 42; fi\n  rm \"$d/operation-lock/pid\"\n  rmdir \"$d/operation-lock\"\nfi\nmkdir \"$d/operation-lock\"\nprintf '%s\\n' \"$$\" > \"$d/operation-lock/pid\"\ntrap 'natro_rc=$?; natro_exit \"$natro_rc\"; rm -f \"$d/operation-lock/pid\"; rmdir \"$d/operation-lock\" 2>/dev/null || true; exit \"$natro_rc\"' EXIT\n"
+            +step("backup_copy")+"[ ! -L \"$d/original.so\" ]\ncp \"$f\" \"$d/original-new.so\"\n"+block("$d/original-new.so",Mode.ORIGINAL)
+            +step("backup_hash")+"[ \"$("+hash("$d/original-new.so")+")\" = '"+Mode.ORIGINAL.sha256+"' ]\n"
+            +step("backup_existing_verify")+"if [ -f \"$d/original.so\" ]; then [ \"$("+hash("$d/original.so")+")\" = '"+Mode.ORIGINAL.sha256+"' ]; else mv \"$d/original-new.so\" \"$d/original.so\"; fi\nchmod 0600 \"$d/original.so\"\nsync\n"
+            +step("target_copy")+"cp \"$d/original.so\" \"$d/target.so\"\n"+block("$d/target.so",target)
+            +step("target_hash")+"[ \"$("+hash("$d/target.so")+")\" = '"+target.sha256+"' ]\n"
+            +step("journal_persist")+"printf '%s\\n%s\\n%s\\n' \"$f\" \"$h\" '"+target.sha256+"' > \"$d/journal-new\"\nmv \"$d/journal-new\" \"$d/journal\"\nsync\n"
+            +step("remount_rw")+"case \"$f\" in /vendor/*) mount -o remount,rw /vendor;; /system/vendor/*) mount -o remount,rw /system;; *) exit 43;; esac\n"
+            +step("vendor_backup")+"[ ! -L \"$f.hudlab-original.bak\" ]\nif [ -e \"$f.hudlab-original.bak\" ]; then [ \"$("+hash("$f.hudlab-original.bak")+")\" = '"+Mode.ORIGINAL.sha256+"' ]; else cp \"$d/original.so\" \"$f.hudlab-original.bak\"; chown 0:0 \"$f.hudlab-original.bak\"; chmod 0644 \"$f.hudlab-original.bak\"; chcon \"$context\" \"$f.hudlab-original.bak\"; fi\n"
+            +step("target_install")+"[ ! -L \"$f.natro-new\" ]\ncp \"$d/target.so\" \"$f.natro-new\"\nchown 0:0 \"$f.natro-new\"\nchmod 0644 \"$f.natro-new\"\nchcon \"$context\" \"$f.natro-new\"\n[ \"$("+hash("$f.natro-new")+")\" = '"+target.sha256+"' ]\nsync\nmv -f \"$f.natro-new\" \"$f\"\nsync\n"
+            +step("installed_readback")+"if [ \"$("+hash("$f")+")\" != '"+target.sha256+"' ] || [ \"$(stat -c '%u:%g:%a' \"$f\")\" != '0:0:644' ] || ! ls -lZ \"$f\" | grep -F \"$context\"; then\n"
+            +step("rollback")+"  [ \"$("+hash("$d/original.so")+")\" = '"+Mode.ORIGINAL.sha256+"' ]\n  cp \"$d/original.so\" \"$f.natro-new\"\n  chown 0:0 \"$f.natro-new\"\n  chmod 0644 \"$f.natro-new\"\n  chcon \"$context\" \"$f.natro-new\"\n  sync\n  mv -f \"$f.natro-new\" \"$f\"\n  sync\n  [ \"$("+hash("$f")+")\" = '"+Mode.ORIGINAL.sha256+"' ]\n  [ \"$(stat -c '%u:%g:%a' \"$f\")\" = '0:0:644' ]\n  ls -lZ \"$f\" | grep -F \"$context\"\n  mv \"$d/journal\" \"$d/last-rolled-back\"\n  sync\n  echo 'Проверка патча не пройдена; оригинал восстановлен'\n  exit 44\nfi\nmv \"$d/journal\" \"$d/last-completed\"\nsync\necho 'NATRO_HUD_PATCH_VERIFIED_"+target.name()+"'\n"+step("completed");
     }
 }

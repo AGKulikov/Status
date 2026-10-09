@@ -85,6 +85,8 @@ public final class DiagnosticJournal {
     private static final int KEEP_TAIL_BYTES = 900_000;
     private static final long INCIDENT_ROTATE_BYTES = 256_000L;
     private static final int INCIDENT_KEEP_BYTES = 180_000;
+    private static final long OPERATIONS_ROTATE_BYTES = 768_000L;
+    private static final int OPERATIONS_KEEP_BYTES = 512_000;
     private static final int MAX_MESSAGE_CHARS = 16_000;
     private static final Pattern SECRET_ASSIGNMENT = Pattern.compile(
             "(?i)(token|password|passwd|secret|authorization|bearer|key)"
@@ -366,8 +368,8 @@ public final class DiagnosticJournal {
             }
             if (file != null) {
                 String[] names = dezz.status.widget.AppProcessPolicy.isHudProcess()
-                        ? new String[]{"incidents-hud.log", "crash-hud.log"}
-                        : new String[]{"incidents.log", "crash.log", "journal-hud.log", "incidents-hud.log", "crash-hud.log"};
+                        ? new String[]{"incidents-hud.log", "crash-hud.log", "operations-hud.log"}
+                        : new String[]{"incidents.log", "crash.log", "journal-hud.log", "incidents-hud.log", "crash-hud.log", "operations.log", "operations-hud.log"};
                 for (String name : names) { File old = new File(file.getParentFile(), name);
                     if (old.exists() && !old.delete()) { diskFailures.incrementAndGet(); lastDiskFailure="clear_failed"; }
                 }
@@ -435,6 +437,20 @@ public final class DiagnosticJournal {
         if (file == null) { diskFailures.incrementAndGet(); lastDiskFailure="destination_unavailable"; return; }
         rotateLocked(file);
         writeLine(file, level, component, rawMessage, timestamp, uptimeMs);
+        if (retainsOperation(component)) {
+            File operations = new File(file.getParentFile(), processFile("operations"));
+            rotateLocked(operations, OPERATIONS_ROTATE_BYTES, OPERATIONS_KEEP_BYTES);
+            writeLine(operations, level, component, rawMessage, timestamp, uptimeMs);
+        }
+    }
+
+    /** Low-rate lifecycle evidence survives routine polling and remains opt-in. */
+    private static boolean retainsOperation(String component) {
+        return "hud-lca".equals(component) || "instrument-tsr".equals(component)
+                || "launcher-navigation".equals(component) || "navigator-launch".equals(component)
+                || "navigator-window".equals(component)
+                || "ancs-lifecycle".equals(component) || "runtime".equals(component)
+                || "startup".equals(component);
     }
 
     private static void writeLine(File file, Level level, String component, String rawMessage, long timestamp, long uptimeMs) {
