@@ -2421,7 +2421,7 @@
       ],
       "numeric_controls": 2,
       "path": "app/src/main/java/dezz/status/widget/LauncherHomeSurface.java",
-      "sha256": "e7cbfadcddeb862a03db2939ed82975eb674cff6d9f81228d5d9804dac64df8a"
+      "sha256": "8f84a23e0858f7383f6ab165c18c08682e63b8dcb824e03b83a56358f23a281b"
     },
     {
       "class": "dezz.status.widget.LauncherSettingsActivity",

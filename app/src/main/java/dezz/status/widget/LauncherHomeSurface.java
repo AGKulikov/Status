@@ -558,7 +558,7 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
         long now = android.os.SystemClock.elapsedRealtime();
         if (automaticNavigatorStartedAt < 0 || !activityStarted || isFinishing() || isDestroyed()
                 || !preferences.launcherHomeOpensWindowedNavigator.get()
-                || now - automaticNavigatorStartedAt > 40_000) {
+                || now - automaticNavigatorStartedAt > 60_000) {
             cancelAutomaticNavigatorRecovery(); return;
         }
         WidgetService service = WidgetService.getInstance();

@@ -71,15 +71,15 @@ class RecoveryReplay(unittest.TestCase):
         path='dezz/status/widget/'
         self.execute({path+'NavigatorAutoLaunchPolicy.java':(ROOT/'app/src/main/java'/path/'NavigatorAutoLaunchPolicy.java').read_text(),path+'LaunchReplay.java':'''package dezz.status.widget;
         public class LaunchReplay {static void check(boolean b){if(!b)throw new AssertionError();}public static void main(String[] a){
-        check(NavigatorAutoLaunchPolicy.retry(16000,0,0,1,true,true,15900,-1));
-        check(!NavigatorAutoLaunchPolicy.retry(14000,0,0,1,true,true,13900,-1));
-        check(!NavigatorAutoLaunchPolicy.retry(16000,0,0,2,true,true,15900,-1));
-        check(!NavigatorAutoLaunchPolicy.retry(16000,0,0,1,false,true,15900,-1));
-        check(!NavigatorAutoLaunchPolicy.retry(16000,0,0,1,true,false,15900,-1));
-        check(!NavigatorAutoLaunchPolicy.retry(16000,0,0,1,true,true,10000,-1));
-        check(!NavigatorAutoLaunchPolicy.retry(16000,0,0,1,true,true,15900,10));
-        check(!NavigatorAutoLaunchPolicy.retry(41000,0,0,1,true,true,40900,-1));
-        check(!NavigatorAutoLaunchPolicy.retry(16000,-1,0,1,true,true,15900,-1));
+        check(NavigatorAutoLaunchPolicy.retry(31000,0,0,1,true,true,30900,-1));
+        check(!NavigatorAutoLaunchPolicy.retry(23000,0,0,1,true,true,22900,-1));
+        check(!NavigatorAutoLaunchPolicy.retry(31000,0,0,2,true,true,30900,-1));
+        check(!NavigatorAutoLaunchPolicy.retry(31000,0,0,1,false,true,30900,-1));
+        check(!NavigatorAutoLaunchPolicy.retry(31000,0,0,1,true,false,30900,-1));
+        check(!NavigatorAutoLaunchPolicy.retry(31000,0,0,1,true,true,10000,-1));
+        check(!NavigatorAutoLaunchPolicy.retry(31000,0,0,1,true,true,30900,10));
+        check(!NavigatorAutoLaunchPolicy.retry(61000,0,0,1,true,true,60900,-1));
+        check(!NavigatorAutoLaunchPolicy.retry(31000,-1,0,1,true,true,30900,-1));
         }}'''},'dezz.status.widget.LaunchReplay')
 
     def test_gatt_disconnect_callback_loss_preserves_exact_owner_and_settle(self):
