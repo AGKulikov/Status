@@ -351,7 +351,7 @@ public final class AutomationStateStore {
         checkLength(patch, "icon_tint", 64);
         checkLength(patch, "icon_background_color", 64);
         checkLength(patch, "icon_outline_color", 64);
-        checkLength(patch, "icon", 64);
+        checkIconLength(patch);
         checkLength(patch, "request_id", 128);
         checkLength(patch, "source", 64);
     }
@@ -361,6 +361,16 @@ public final class AutomationStateStore {
                 && String.valueOf(patch.opt(field)).length() > max) {
             throw new IllegalArgumentException(field + " is too long");
         }
+    }
+
+    private static void checkIconLength(JSONObject patch) {
+        String icon = patch.optString("icon", "");
+        // ANCS app IDs are bounded at 512, independently of short built-in icon names.
+        // Web Push bundle IDs commonly exceed 54 characters; the phone-app: prefix must
+        // not cause rejection of the entire notification field update.
+        boolean phoneApp = icon.startsWith("phone-app:")
+                && icon.substring(10).matches("[A-Za-z0-9._-]{1,512}");
+        checkLength(patch, "icon", phoneApp ? 522 : 64);
     }
 
     private static String key(String scope, String id) {

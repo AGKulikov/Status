@@ -328,7 +328,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/automation/AutomationStateStore.java": {
-      "sha256": "ebe9646c3e9291ad6665109b2f80c94dab2734604afec314fdfadfdb1c2aff9b",
+      "sha256": "e7de52c099414068546a1c820f45806b6cd1b28f82a251ec2b38b5a74b43610a",
       "access_kinds": [
         "preferences"
       ]

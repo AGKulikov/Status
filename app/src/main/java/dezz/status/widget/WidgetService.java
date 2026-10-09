@@ -6071,6 +6071,10 @@ public class WidgetService extends Service {
             }
         } catch (JSONException | RuntimeException failure) {
             Log.e(TAG, "Could not publish phone notification fields", failure);
+            DiagnosticJournal.operationFailure("phone-notification-render",
+                    "stage=field_publish_failed, icon_cached="+presentation.iconCached
+                            +", app_id_chars="+presentation.appIdentifier.length()
+                            +", error="+failure.getClass().getSimpleName());
         }
     }
 
