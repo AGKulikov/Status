@@ -54,6 +54,7 @@ public final class DimMenuVendorBridge {
     private boolean tabObserved,controlCenterObserved;
     private int currentTab=-1,controlCenterState,retryIndex;
     private long generation;
+    private long tabObservedAt=-1,controlCenterObservedAt=-1;
     private Connection connection;
 
     private final BroadcastReceiver steeringReceiver=new BroadcastReceiver(){
@@ -95,6 +96,24 @@ public final class DimMenuVendorBridge {
     public boolean navigationIdleConfirmed(){
         return connected && engineOn && tabObserved && controlCenterObserved
                 && currentTab==DimMenuPanelConfig.STOCK_NAVIGATION_TAB && controlCenterState==0;
+    }
+
+    /** A mode reset invalidates callback evidence even when the cached SDK getter still works. */
+    public void navigationModeLost(){
+        if(!started)return;
+        generation++;connecting=false;main.removeCallbacksAndMessages(this);release();
+        DiagnosticJournal.infoAsync("dim-subscription","navigation_mode_lost; callback_evidence_invalidated=true");
+        listener.onVendorStateChanged();
+        connect();
+    }
+
+    public String navigationEvidence(){
+        long now=SystemClock.uptimeMillis();
+        return "connected="+connected+", generation="+generation+", engine_on="+engineOn
+                +", tab="+currentTab+", tab_observed="+tabObserved
+                +", tab_age_ms="+(tabObservedAt<0?-1:now-tabObservedAt)
+                +", center="+controlCenterState+", center_observed="+controlCenterObserved
+                +", center_age_ms="+(controlCenterObservedAt<0?-1:now-controlCenterObservedAt);
     }
 
     private void connect(){
@@ -150,6 +169,7 @@ public final class DimMenuVendorBridge {
         Connection previous=connection;connection=null;connected=false;initialStates.clear();
         engineOn=true;currentTab=-1;controlCenterState=0;
         tabObserved=false;controlCenterObserved=false;
+        tabObservedAt=-1;controlCenterObservedAt=-1;
         if(previous!=null){
             CausalDiagnostics.Span trace=CausalDiagnostics.begin("dim-release","generation="+generation,5000);
             worker.execute(trace.wrap(()->{trace.stage("unregister","shared_owner_disconnect=false");previous.close();trace.finish("released","");}));
@@ -158,9 +178,9 @@ public final class DimMenuVendorBridge {
     private void post(Runnable task,long delay){main.postAtTime(task,this,SystemClock.uptimeMillis()+delay);}
     private void handleCallback(String method,Object[] args){
         if("onEngineStatusChanged".equals(method))engineOn=booleanArg(args,true);
-        else if("onTabChanged".equals(method)){currentTab=intArg(args,-1);tabObserved=args!=null&&args.length>0&&args[0] instanceof Number;}
-        else if("onControlCenterStateChanged".equals(method)){controlCenterState=intArg(args,-1);controlCenterObserved=args!=null&&args.length>0&&args[0] instanceof Number;}
-        DiagnosticJournal.infoAsync("dim-subscription", "callback="+method+", engine_on="+engineOn+", tab="+currentTab+", center="+controlCenterState);
+        else if("onTabChanged".equals(method)){currentTab=intArg(args,-1);tabObserved=args!=null&&args.length>0&&args[0] instanceof Number;tabObservedAt=SystemClock.uptimeMillis();}
+        else if("onControlCenterStateChanged".equals(method)){controlCenterState=intArg(args,-1);controlCenterObserved=args!=null&&args.length>0&&args[0] instanceof Number;controlCenterObservedAt=SystemClock.uptimeMillis();}
+        DiagnosticJournal.infoAsync("dim-subscription", "callback="+method+", "+navigationEvidence());
         listener.onVendorStateChanged();
     }
     private static int intArg(Object[] args,int fallback){return args!=null&&args.length>0&&args[0] instanceof Number?((Number)args[0]).intValue():fallback;}

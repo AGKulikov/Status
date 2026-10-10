@@ -774,6 +774,18 @@ public final class IphoneDualTransportRuntimeV2Test {
         }
     }
 
+    @Test public void restorationReportsOwnerEvidenceAndBothTimerStages(){
+        Fixture fixture = new Fixture(false, "");
+        fixture.start(IphoneBleMode.ANDROID_CENTRAL);
+        assertTrue(fixture.listener.platformDiagnostics.stream().anyMatch(s -> s.startsWith("switch_timer_armed kind=stop")));
+        assertTrue(fixture.listener.platformDiagnostics.stream().anyMatch(s -> s.startsWith("local_owners_checked count=0")));
+        assertTrue(fixture.listener.platformDiagnostics.stream().anyMatch(s -> s.startsWith("local_owners_applied outcome=APPLIED")));
+        assertTrue(fixture.listener.platformDiagnostics.stream().anyMatch(s -> s.startsWith("switch_timer_armed kind=drain")));
+        fixture.scheduler.advanceBy(10L);
+        assertTrue(fixture.listener.platformDiagnostics.stream().anyMatch(s -> s.startsWith("switch_timer_fired kind=drain")));
+        assertEquals(ACTIVE, fixture.listener.lastDual.switchPhase);
+    }
+
     private static final class FakeScheduler
             implements IphoneDualTransportRuntimeV2.SerializedScheduler {
         private static final class Timer implements IphoneDualTransportRuntimeV2.Cancellable {
@@ -1054,6 +1066,7 @@ public final class IphoneDualTransportRuntimeV2Test {
         IphoneBleMode lastPlatformDiagnosticMode;
         BleRouteEpoch lastPlatformDiagnosticEpoch;
         String lastPlatformDiagnostic = "";
+        final List<String> platformDiagnostics = new ArrayList<>();
         String learnedHelperId = "";
         final List<String> events = new ArrayList<>();
         @Override public void onDualTransportStatus(IphoneDualTransportStatusV2 status) {
@@ -1066,6 +1079,7 @@ public final class IphoneDualTransportRuntimeV2Test {
             lastPlatformDiagnosticMode = mode;
             lastPlatformDiagnosticEpoch = epoch;
             lastPlatformDiagnostic = detail;
+            platformDiagnostics.add(detail);
         }
         @Override public void onTelemetry(IphoneTelemetryV2 telemetry) { }
         @Override public void onNotificationEvent(IphoneNotificationEventV2 event) { }

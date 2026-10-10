@@ -1,5 +1,13 @@
 # Полная личная копия Natro: контракт реализации
 
+### Дополнение Review 3.1.3 / 10.10.2026 17:08 МСК
+
+InstrumentOemController меняет только RAM lifecycle подписки и условие read-only
+task probe. Имена hide_oem_white_bar/oem_white_bar_owned, DE namespace, defaults,
+адаптеры и RuntimePreferenceWriter сохранены; новых данных нет. Пересмотрен один
+fingerprint. ANCS WAL сохраняет тот же snapshot и обязательный commit/readback;
+диагностика не экспортирует его содержимое и не изменяет формат/restore policy.
+
 ### Review 3.1.3 / 10.10.2026
 
 BackupDefaultsMigration: явное335…345→346; defaults, документы и неизвестные

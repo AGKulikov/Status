@@ -560,7 +560,13 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
         assertOnSerializedExecutor();
         Slot exact = findSlot(source);
         int count = exact == null ? 1 : exact.transport.appOwnedOwnerCount(source);
-        enqueue(() -> coordinator.onLocalOwnerCount(source, count, now()));
+        runtimeDiagnostic(source, "local_owners_checked count=" + count
+                + ", slot_present=" + (exact != null));
+        enqueue(() -> {
+            Outcome outcome = coordinator.onLocalOwnerCount(source, count, now());
+            runtimeDiagnostic(source, "local_owners_applied outcome=" + outcome);
+            publishDualStatus("local owner evidence: " + outcome);
+        });
     }
 
     @Override public void cancelStopTimeout(Owner source) {
@@ -1039,9 +1045,21 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
         cancelTimer(timers, owner);
         Cancellable task = scheduler.scheduleAt(deadline, () -> enqueue(() -> {
             Cancellable current = timers.remove(owner);
+            runtimeDiagnostic(owner, "switch_timer_fired kind="
+                    + (timers == stopTimers ? "stop" : "drain")
+                    + ", lateness_ms=" + Math.max(0L, now() - deadline)
+                    + ", registered=" + (current != null));
             if (current != null && coordinator != null) action.run();
         }));
         timers.put(owner, task);
+        runtimeDiagnostic(owner, "switch_timer_armed kind="
+                + (timers == stopTimers ? "stop" : "drain")
+                + ", delay_ms=" + Math.max(0L, deadline - now()));
+    }
+
+    private void runtimeDiagnostic(Owner owner, String detail) {
+        if (listener != null) listener.onPlatformDiagnostic(mode(owner.role()), routeEpoch(owner),
+                detail + ", switch_phase=" + (coordinator == null ? "unavailable" : coordinator.state().phase()));
     }
 
     private static void cancelTimer(Map<Owner, Cancellable> timers, Owner owner) {

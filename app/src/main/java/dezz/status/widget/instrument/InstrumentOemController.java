@@ -156,7 +156,7 @@ public final class InstrumentOemController {
         boolean panelReady = store.isEnabled()
                 && InstrumentPanelActivity.windowState().readyFor(display);
         boolean idle = priorityMonitor != null && priorityMonitor.navigationIdleConfirmed();
-        if (whiteBarEnabled && mode == 1 && panelReady && idle && !ownForeground
+        if (whiteBarEnabled && mode == 1 && panelReady && !ownForeground
                 && android.os.Build.VERSION.SDK_INT < 30 && !displayOwnerProbeBusy) {
             // API 28 accessibility does not identify secondary-display owners. Read the
             // actual task snapshot off MAIN instead; keep the independent OEM priority gate.
@@ -176,7 +176,8 @@ public final class InstrumentOemController {
                 + ", sdk=" + android.os.Build.VERSION.SDK_INT;
         if (!gate.equals(lastRepairGate)) {
             lastRepairGate = gate;
-            DiagnosticJournal.infoAsync("instrument-oem", "navigation_repair_gate " + gate);
+            DiagnosticJournal.infoAsync("instrument-oem", "navigation_repair_gate " + gate
+                    + ", evidence=" + (priorityMonitor == null ? "unavailable" : priorityMonitor.navigationEvidence()));
         }
         if (!InstrumentOemPolicy.restoreNavigation(whiteBarEnabled, mode, panelReady, ownForeground, idle)) return;
         navigationRepairBusy = true;
@@ -248,7 +249,15 @@ public final class InstrumentOemController {
                 CausalDiagnostics.capture("white_bar_mode_left_navigation",false);
             forceWhiteApply = !success;
             if (success) {
+                boolean navigationLost = whiteBarEnabled && Boolean.TRUE.equals(lastWhiteDeny)
+                        && modes[1] == 1 && !deny;
                 lastWhiteDeny = deny;
+                if (navigationLost && priorityMonitor != null) {
+                    // One refresh per confirmed 3 -> 1 transition, not every five-second poll.
+                    // This never bypasses foreground, menu or control-center priority checks.
+                    lastRepairGate = "";
+                    priorityMonitor.navigationModeLost();
+                }
                 if (whiteOwned != deny) {
                     whiteOwned = deny;
                     dezz.status.widget.media.RuntimePreferenceWriter.put(preferences, "oem_white_bar_owned", deny);

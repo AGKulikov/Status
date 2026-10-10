@@ -42,6 +42,8 @@ public class ColdStartReplay {
   static void complete(){Command q=pending.remove();String c=q.command.get();executed.add(c);if(c.startsWith("appops set"))op=c.contains("WINDOW deny")?"deny":"allow";String result="SYSTEM_ALERT_WINDOW: "+op;new Handler().post(()->q.callback.accept(result,null));}
  }
  static class White {
+  static class Monitor {int refreshes;void navigationModeLost(){refreshes++;}}
+  Monitor priorityMonitor=new Monitor();String lastRepairGate="";
   Context context=new Context();Object preferences=new Object();Handler main=new Handler();boolean whiteBarEnabled=true,whiteOwned,whiteScheduled,shellBusy,forceWhiteApply=true,observing;
   Boolean lastWhiteDeny;long whiteGeneration;int whiteAttempt;String whiteStatus;Result whitePending;
   void maybeRestoreNavigation(int mode) {}
@@ -71,7 +73,10 @@ public class ColdStartReplay {
    White w=new White();Settings.Global.mode=1;InstrumentDisplayLauncher.actual=3;w.scheduleWhiteBar();advance(1500);PrivilegedShell.complete();advance(now);
    check(op.equals("deny"),"stale global mode must not undo native mode3");
    Settings.Global.mode=3;InstrumentDisplayLauncher.actual=1;w.scheduleWhiteBar();advance(now+1500);PrivilegedShell.complete();advance(now);
-   check(op.equals("allow"),"real native exit must restore overlays");break;
+   check(op.equals("allow"),"real native exit must restore overlays");
+   check(w.priorityMonitor.refreshes==1,"one subscription refresh on confirmed mode3 to mode1");
+   advance(now+5000);PrivilegedShell.complete();advance(now);
+   check(w.priorityMonitor.refreshes==1,"unchanged mode1 must not repeatedly register callbacks");break;
   }
   case "external_appop_reset":{
    White w=new White();w.scheduleWhiteBar();advance(1500);PrivilegedShell.complete();advance(now);check(op.equals("deny"),"initial state");
@@ -81,7 +86,8 @@ public class ColdStartReplay {
   }
   case "off_while_queued":{
    White w=new White();w.scheduleWhiteBar();advance(1500);w.whiteBarEnabled=false;w.scheduleWhiteBar();PrivilegedShell.complete();advance(now);
-   check(op.equals("allow"),"OFF supersedes queued ON");break;
+   check(op.equals("allow"),"OFF supersedes queued ON");
+   check(w.priorityMonitor.refreshes==0,"disabled setting cannot refresh subscription");break;
   }
   case "expired_selector":{
    Context c=new Context();DriveSelectorController.request(c,1);android.os.SystemClock.now=7510;now=7510;

@@ -4,6 +4,7 @@ package dezz.status.widget.phone.transport.v2.android;
 import java.util.Objects;
 
 import dezz.status.widget.Preferences;
+import dezz.status.widget.diagnostics.CausalDiagnostics;
 import dezz.status.widget.phone.transport.v2.IphoneDualTransportStateStoreV2;
 import dezz.status.widget.phone.transport.v2.IphoneLeEnrollmentRecordV2;
 
@@ -25,12 +26,22 @@ public final class AndroidIphoneBleStateStoreV2 implements IphoneDualTransportSt
 
     /** Must complete before the coordinator executes the effect covered by this snapshot. */
     @Override public void persistSwitchSnapshot(String encodedSnapshot) {
-        if (!preferences.commitPhoneBleV2SwitchSnapshot(
-                Objects.requireNonNull(encodedSnapshot, "encodedSnapshot"))) {
-            throw new IllegalStateException("ANCS v2 switch snapshot was not durable");
-        }
-        if (!encodedSnapshot.equals(preferences.phoneBleV2SwitchSnapshot())) {
-            throw new IllegalStateException("ANCS v2 switch snapshot durability mismatch");
+        Objects.requireNonNull(encodedSnapshot, "encodedSnapshot");
+        CausalDiagnostics.Span trace = CausalDiagnostics.begin("ancs-wal",
+                "snapshot_content=not_logged; effects_wait_for_durability=true", 3000);
+        try {
+            trace.stage("commit_started", "");
+            if (!preferences.commitPhoneBleV2SwitchSnapshot(encodedSnapshot)) {
+                throw new IllegalStateException("ANCS v2 switch snapshot was not durable");
+            }
+            trace.stage("commit_returned", "");
+            if (!encodedSnapshot.equals(preferences.phoneBleV2SwitchSnapshot())) {
+                throw new IllegalStateException("ANCS v2 switch snapshot durability mismatch");
+            }
+            trace.finish("readback_matched", "");
+        } catch (RuntimeException failure) {
+            trace.fail("persist", failure);
+            throw failure;
         }
     }
 

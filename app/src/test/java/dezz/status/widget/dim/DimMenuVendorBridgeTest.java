@@ -89,6 +89,28 @@ public class DimMenuVendorBridgeTest {
         s.events.state("onTabChanged",new Object[]{DimMenuPanelConfig.STOCK_NAVIGATION_TAB});s.events.state("onEngineStatusChanged",new Object[]{false});idle();assertFalse(bridge.navigationIdleConfirmed());
         bridge.stop();assertFalse(bridge.navigationIdleConfirmed());lane.next();
     }
+    @Test public void navigationModeLossReplacesSubscriptionAndRejectsOldIdleEvidence(){
+        Lane lane=new Lane();Listener listener=new Listener();List<Session> sessions=new ArrayList<>();
+        DimMenuVendorBridge bridge=new DimMenuVendorBridge(RuntimeEnvironment.getApplication(),listener,events->{Session s=new Session(events);sessions.add(s);return s;},lane);
+        bridge.start();lane.next();Session old=sessions.get(0);
+        old.events.state("onTabChanged",new Object[]{2});
+        old.events.state("onControlCenterStateChanged",new Object[]{0});idle();
+        assertTrue(bridge.navigationIdleConfirmed());
+        bridge.navigationModeLost();assertFalse(bridge.navigationIdleConfirmed());
+        assertTrue(bridge.navigationEvidence().contains("center_observed=false"));
+        lane.next();assertEquals(1,old.closes);lane.next();
+        old.events.state("onTabChanged",new Object[]{2});
+        old.events.state("onControlCenterStateChanged",new Object[]{0});idle();
+        assertFalse(bridge.navigationIdleConfirmed());
+        Session fresh=sessions.get(1);
+        fresh.events.state("onTabChanged",new Object[]{5});idle();
+        assertFalse("Menu closed is not proof of navigation/control-center state",bridge.navigationIdleConfirmed());
+        fresh.events.state("onTabChanged",new Object[]{2});idle();
+        assertFalse(bridge.navigationIdleConfirmed());
+        fresh.events.state("onControlCenterStateChanged",new Object[]{0});idle();
+        assertTrue(bridge.navigationIdleConfirmed());
+        bridge.stop();lane.next();bridge.navigationModeLost();assertTrue(lane.tasks.isEmpty());
+    }
     public interface VendorCallback {void onTabChanged(int tab);}
     public static final class VendorMenu {
         final Set<VendorCallback> callbacks=new HashSet<>();boolean failRead;

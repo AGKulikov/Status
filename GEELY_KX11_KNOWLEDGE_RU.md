@@ -9,6 +9,24 @@ readback PASS; следующий1791638539760 содержит новый kerne
 Новые vehicle IDs/setters не добавлялись; обязательность reboot сохраняется.
 
 
+## 10.10.2026 17:08 МСК — повтор mode3→1 после перезапуска DIM
+
+Архив1791639765764,3.1.2,eb7-37d6: killed891.489с/start892.095с
+com.ecarx.dimmenu; SDK/Global1 и AppOp allow892.898с, панель display2 готова.
+Первый callback tab5 на20.051с, center0 не является наблюдением: соответствующего
+callback не было. Причина завершения процесса неизвестна. Bundled AdaptAPI:
+MENU_TAB_MENU_CLOSE=5, NAVIGATION=2, CENTER_STATE_EXIT=0; закрытое меню не
+подменяет независимое подтверждение control center. SHA SDK остаётся
+33d0c62851e834dbf443f969627973dbc6e00eec3dd1e8fb6fc9dfe5af78e886.
+
+SOURCE: при подтверждённом3→1 обновляется только собственная подписка по прежнему
+пути unregister/register/notifyIHUReady; последнее — существующее уведомление
+готовности, НЕ read-only getter. Общий root не отключается/не пересоздаётся.
+Один refresh на переход, не на каждый polling tick. Старые callbacks отбрасываются,
+приоритетные gates не ослабляются. Read-only owner probe теперь независим от idle.
+Это исправление восстановления подписки, не доказанное скрытие физической полосы.
+Если свежие tab2/center0 не придут, запись режима остаётся запрещена.
+
 ## 10.10.2026 — DIM ownership и отказ подготовки HUD/LCA
 
 Архив1791631703384/3.1.1: inspect GUIDE,268424bytes; root/metadata0:0:644/
