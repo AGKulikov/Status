@@ -9,6 +9,11 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class HudDimRegressionTest(unittest.TestCase):
+    def test_failed_command_report_is_saved_before_failure_is_presented(self):
+        source=(ROOT/'app/src/main/java/dezz/status/widget/HudLcaPatchActivity.java').read_text().split('private void execute(',1)[1]
+        self.assertLess(source.index('BackupFiles.atomicWrite(record'),source.index('if(!result.success()||result.truncated)'))
+        self.assertIn('report_persist_failed',source)
+
     def test_block_is_exact_without_notrunc_and_failures_preserve_input(self):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)

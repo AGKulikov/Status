@@ -42,11 +42,20 @@ public final class HudLcaPatchActivity extends SettingsActivity {
         dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("hud-lca","stage=shell_result operation="+(mode==null?"inspect":mode.name())
                 +", operation_id="+operationId+", exit="+result.exitCode+", truncated="+result.truncated
                 +", inspected_mode="+HudLcaPatch.inspectedMode(result.output)+", "+shellDiagnostics);
+        // Keep failed command output too; otherwise last-report still describes an older success.
+        IOException reportFailure=null;
+        try {
+            File record=new File(getFilesDir(),"hud-lca-patch/last-report.txt");
+            dezz.status.widget.backup.BackupFiles.atomicWrite(record,result.output.getBytes(StandardCharsets.UTF_8));
+        } catch(IOException failure) {
+            reportFailure=failure;
+            dezz.status.widget.diagnostics.DiagnosticJournal.operationFailure("hud-lca",
+                    "stage=report_persist_failed, operation_id="+operationId+", error="+failure.getClass().getSimpleName());
+        }
         if(!result.success()||result.truncated)throw new IOException(result.describe());
         if(mode==null&&HudLcaPatch.inspectedMode(result.output)==null)throw new IOException("Нет подтверждения полной проверки модуля\n"+result.describe());
         if(mode!=null&&!result.output.contains("NATRO_HUD_PATCH_VERIFIED_"+mode.name()))throw new IOException("Нет подтверждения финального чтения");
-        s.stage("persist_report");File record=new File(getFilesDir(),"hud-lca-patch/last-report.txt");
-        dezz.status.widget.backup.BackupFiles.atomicWrite(record,result.output.getBytes(StandardCharsets.UTF_8));
+        if(reportFailure!=null)throw new IOException("Результат shell получен, но локальный отчёт не сохранён",reportFailure);
         runOnUiThread(()->{if(!isDestroyed()&&!isFinishing()){moduleVerified=true;status.setText(result.output+(mode==null?"\nПроверка файла завершена. Root и remount для записи этой проверкой не подтверждены.":"\nФайл проверен. Перезагрузка — отдельной кнопкой."));}});
     },null);}
     private void setOperationBusy(boolean busy){for(Button button:operationButtons)button.setEnabled(!busy&&(!patchButtons.contains(button)||moduleVerified));}
