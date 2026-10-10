@@ -1,5 +1,24 @@
 # Единый реестр требований Natro
 
+## Выпуск 3.1.2 / 10.10.2026 — SOURCE/TEST/APK, FIELD OPEN
+
+Подписанный APK3.1.2/208021345: build source
+bbc9ff083c36f188ed1dd1902823f852c7b4e91f, tree493745604724d89d7f1be244dcb8052668ef2d3f.
+CI38053346501 SUCCESS:2124 Android tests/421 suites,235 tool tests и108 Java
+policy/source cases PASS, без ошибок/пропусков. Сверены XML, DEX-маркеры DIM/
+block diagnostics/failed report, прежний сертификат, v2/v3/API28, zipalign16KiB,
+install-over metadata3.1.1 и неизменность1516 payload entries при подписи.
+APK29514264bytes, SHA25655f0d543976b52ac8544ffa53dca26d59fb81ce3e96111d0346f29f35ff28703.
+Файл сохранён для выдачи; отчёт docs/3.1.2-release-report.json.
+Navigator DEX совпал с проверенной парой3.0.2; Helper не менялся.
+
+Устранено повторное создание DIM root в трёх production-путях; подготовка
+HUD/LCA переписана без conv=notrunc с прежними строгими guards. Это не аппаратная
+приёмка скрытия: исходный модуль уже GUIDE, причина отсутствия физического
+эффекта не доказана. FIELD по обоим симптомам OPEN. CI38049267499 имеет один
+старый source-contract failure; промежуточный38053208426 не использован для
+выпуска после добавления сохранения failed shell report. SDK/ключи/журналы приватны.
+
 ## 10.10.2026 — исправить HUD/LCA и receiver exhaustion, кандидат 3.1.2
 
 Пользователь повторно сообщил «машинка не работает», приложил архив1791631703384
