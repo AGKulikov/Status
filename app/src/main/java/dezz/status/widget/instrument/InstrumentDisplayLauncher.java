@@ -339,9 +339,7 @@ public final class InstrumentDisplayLauncher {
     }
 
     private static Object dimMenu(Context app) throws Exception {
-        Class<?> type = Class.forName("com.ecarx.xui.adaptapi.diminteraction.DimInteraction");
-        Object interaction = type.getMethod("create", Context.class).invoke(null, app);
-        return interaction == null ? null : type.getMethod("getDimMenuInteraction").invoke(interaction);
+        return dezz.status.widget.dim.DimInteractionAccess.menu(app);
     }
 
     private static boolean switchDimMode(Context app, int mode) {

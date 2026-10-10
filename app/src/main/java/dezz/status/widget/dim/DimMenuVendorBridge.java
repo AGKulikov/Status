@@ -171,10 +171,7 @@ public final class DimMenuVendorBridge {
         private Object menu,callback;
         private Method unregister,read;
         static Connection open(Context context,Events events)throws Exception{
-            Class<?> type=Class.forName("com.ecarx.xui.adaptapi.diminteraction.DimInteraction");
-            Object interaction=type.getMethod("create",Context.class).invoke(null,context);
-            if(interaction==null)throw new IllegalStateException("DIM interaction missing");
-            Object menu=type.getMethod("getDimMenuInteraction").invoke(interaction);
+            Object menu=DimInteractionAccess.menu(context);
             if(menu==null)throw new IllegalStateException("DIM menu missing");
             Class<?> callbackClass=Class.forName("com.ecarx.xui.adaptapi.diminteraction.IDimMenuInteraction$IDimMenuInteractionCallback");
             return open(menu,callbackClass,events);

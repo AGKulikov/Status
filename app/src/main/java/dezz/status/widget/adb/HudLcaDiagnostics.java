@@ -10,13 +10,15 @@ public final class HudLcaDiagnostics {
     private static final String STAGES = "(?:start|locate_module|platform|verification_tools|module_size|module_hash|module_block"
             + "|root_identity|module_metadata|module_context|backup_directory|operation_lock|backup_copy|prepare_original_block"
             + "|backup_hash|backup_existing_verify|target_copy|prepare_target_block|target_hash|journal_persist|remount_rw"
-            + "|vendor_backup|target_install|installed_readback|rollback|completed)";
+            + "|vendor_backup|target_install|installed_readback|rollback|completed"
+            + "|block_prefix|block_bytes|block_suffix|block_size|block_commit)";
     private static final Pattern RECORD = Pattern.compile(
             "(?:stage="+STAGES+"|exit=[0-9]{1,3} stage="+STAGES
             + "|metadata=[0-9]{1,10}:[0-9]{1,10}:[0-7]{3,4}"
             + "|context=u:object_r:[a-zA-Z0-9_]{1,64}:s0"
             + "|platform=[0-9]{1,3}:[a-zA-Z0-9_-]{1,24}"
-            + "|mode=(?:ORIGINAL|SIMPLE|GUIDE|AR) size=[0-9]{1,10})");
+            + "|mode=(?:ORIGINAL|SIMPLE|GUIDE|AR) size=[0-9]{1,10}"
+            + "|block_error=(?:permission|no_space|read_only|missing_tool|unsupported|io|other) rc=[0-9]{1,3})");
     private final Consumer<String> sink;
     private final StringBuilder line = new StringBuilder();
     private boolean discard;

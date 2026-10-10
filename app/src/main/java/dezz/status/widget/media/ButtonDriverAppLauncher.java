@@ -97,9 +97,7 @@ final class ButtonDriverAppLauncher {
                 }));
     }
     private Object menu() throws Exception {
-        Class<?> type = Class.forName("com.ecarx.xui.adaptapi.diminteraction.DimInteraction");
-        Object dim = type.getMethod("create", Context.class).invoke(null, context);
-        return dim == null ? null : type.getMethod("getDimMenuInteraction").invoke(dim);
+        return dezz.status.widget.dim.DimInteractionAccess.menu(context);
     }
     private int readMode() {
         try { Object menu = menu(); return ((Number) menu.getClass().getMethod("getNaviMode").invoke(menu)).intValue(); }

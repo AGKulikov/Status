@@ -43,6 +43,15 @@ public class HudTraceReplay {
   brokenSink.accept("NATRO_HUD_DIAG stage=module_context\n".getBytes(StandardCharsets.UTF_8));
   check(brokenSink.summary().contains("diagnostic_sink_failures=1"));
   check(brokenSink.summary().contains("shell_stage=module_context"));
+  List<String> blockEvents=new ArrayList<>();
+  HudLcaDiagnostics blockTrace=new HudLcaDiagnostics(blockEvents::add);
+  blockTrace.accept(("NATRO_HUD_DIAG stage=block_suffix\n"
+    +"NATRO_HUD_DIAG block_error=no_space rc=7\n"
+    +"dd: private path or secret must not be exported\n"
+    +"NATRO_HUD_DIAG block_error=secret rc=7\n"
+    +"NATRO_HUD_DIAG exit=7 stage=block_suffix\n").getBytes(StandardCharsets.UTF_8));
+  check(blockEvents.size()==3);check(blockEvents.get(1).equals("block_error=no_space rc=7"));
+  check(!blockEvents.toString().contains("secret"));
  }
 }''')
         sources = [ROOT/'app/src/main/java/dezz/status/widget/adb'/name

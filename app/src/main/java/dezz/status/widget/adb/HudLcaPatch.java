@@ -31,7 +31,29 @@ public final class HudLcaPatch {
     private static String hash(String file){return "sha256sum \""+file+"\" | cut -d ' ' -f1";}
     private static String block(String file,Mode mode) {
         StringBuilder octal=new StringBuilder();for(int i=0;i<mode.hex.length();i+=2)octal.append(String.format(java.util.Locale.ROOT,"\\%03o",Integer.parseInt(mode.hex.substring(i,i+2),16)));
-        return step(mode==Mode.ORIGINAL?"prepare_original_block":"prepare_target_block")+"printf '"+octal+"' | dd of=\""+file+"\" bs=1 seek=124248 conv=notrunc 2>/dev/null\n";
+        // Compose a private candidate instead of depending on vendor dd's conv=notrunc.
+        // 15531 * 8 = 124248; 15535 * 8 = 124280. The reviewed 32 bytes are unchanged.
+        return step(mode==Mode.ORIGINAL?"prepare_original_block":"prepare_target_block")
+            +"[ -f \""+file+"\" ] && [ ! -L \""+file+"\" ]\n"
+            +"natro_part=$(mktemp \"$d/block.XXXXXX\")\n"
+            +step("block_prefix")+checkedBlockCommand("dd if=\""+file+"\" bs=8 count=15531 > \"$natro_part\"")
+            +step("block_bytes")+checkedBlockCommand("printf '"+octal+"' >> \"$natro_part\"")
+            +step("block_suffix")+checkedBlockCommand("dd if=\""+file+"\" bs=8 skip=15535 >> \"$natro_part\"")
+            +step("block_size")+"[ \"$(wc -c < \"$natro_part\")\" -eq 268424 ]\n"
+            +step("block_commit")+"mv \"$natro_part\" \""+file+"\"\n";
+    }
+    private static String checkedBlockCommand(String command) {
+        // Raw stderr belongs only to the private operation report, never the diagnostic export.
+        return "if natro_error=$({ "+command+"; } 2>&1); then :; else\n"
+            +"  natro_rc=$?\n  natro_reason=other\n  case \"$natro_error\" in\n"
+            +"    *'Permission denied'*) natro_reason=permission;;\n"
+            +"    *'No space left'*) natro_reason=no_space;;\n"
+            +"    *'Read-only file system'*) natro_reason=read_only;;\n"
+            +"    *'not found'*) natro_reason=missing_tool;;\n"
+            +"    *'Invalid argument'*|*'invalid option'*|*'unknown '*|*'bad '*) natro_reason=unsupported;;\n"
+            +"    *'Input/output error'*) natro_reason=io;;\n  esac\n"
+            +"  printf 'NATRO_HUD_DIAG block_error=%s rc=%s\\n' \"$natro_reason\" \"$natro_rc\"\n"
+            +"  printf '%.2048s\\n' \"$natro_error\"\n  exit \"$natro_rc\"\nfi\n";
     }
     private static String known() {
         StringBuilder script=new StringBuilder(

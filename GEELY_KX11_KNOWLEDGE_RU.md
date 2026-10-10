@@ -1,5 +1,25 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 10.10.2026 — DIM ownership и отказ подготовки HUD/LCA
+
+Архив1791631703384/3.1.1: inspect GUIDE,268424bytes; root/metadata0:0:644/
+context vendor_file прошли. Apply завершён exit1 на prepare_original_block,
+до remount/target_install. Причина stderr не сохранена старой командой.
+Кандидат3.1.2 собирает частный файл prefix+32bytes+suffix без conv=notrunc,
+с прежними offsets/allowlist SHA, размером, backup/rollback и отдельным reboot.
+Неизвестная прошивка по-прежнему запрещена; аппаратный результат OPEN.
+
+Локальный javap bundled ecarx-adaptapi.jar (SHA-256
+33d0c62851e834dbf443f969627973dbc6e00eec3dd1e8fb6fc9dfe5af78e886): DimInteraction.create возвращает
+NEW DIMInteractionImpl; его конструктор создаёт NEW DimMenuInteraction;
+последний регистрирует mReceiver на MASTER_CLEAR_NOTIFICATION. getDimMenuInteraction
+возвращает поле, disconnect DIMInteractionImpl пуст. Следовательно нельзя
+создавать AdaptAPI root при каждом5с readNaviMode. Все три Natro DIM factory
+пути сведены к process owner с application context; callback unregister
+не отключает общий owner, ошибки чтения не создают новый. Это подтверждённый
+источник утечки по коду SDK, но состав всех1000 полевых receivers не снят.
+Числовые vehicle IDs/режимы и право перехвата экрана не меняются.
+
 ## 09.10.2026 — ограниченное восстановление TSR и отрицательная приёмка HUD
 
 Архивы1791550067441/1791553360565: OEM TSR0 был подтверждён, пользователь затем
