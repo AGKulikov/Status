@@ -31,6 +31,12 @@ metadata/context прошли, install остановился exit1 на prepare
 16тысяч конкурентных обращений к общему owner, transient menu failure/cooldown.
 Android CI/APK и KX11 ещё OPEN. Сырые пользовательские журналы и SDK не публикуются.
 
+Первый CI38049267499 скомпилировал production/test Java:2124 tests,1 failure.
+DimMenuIntegrationContractTest искал строку getDimMenuInteraction в прежнем
+владельце. Контракт перенесён на полную цепочку bridge→shared owner→SDK;
+добавлены проверки единого synchronized owner и запрета create в bridge.
+Поведенческие тесты не отключены. Требуется повтор полного CI перед выпуском.
+
 ## Выпуск 3.1.1 / 09.10.2026 — SOURCE/TEST/RELEASE, аппаратные gates OPEN
 
 Подписанный Natro3.1.1 /208021344 собран из опубликованного source

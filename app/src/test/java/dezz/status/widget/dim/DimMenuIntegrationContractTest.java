@@ -27,7 +27,13 @@ public final class DimMenuIntegrationContractTest {
         assertTrue(vendor.contains("ECARX_KEY_DIMSCROLLUP_EVENT"));
         assertTrue(vendor.contains("ECARX_KEY_DIMSCROLLDOWN_EVENT"));
         assertTrue(vendor.contains("ECARX_KEY_DIMCONFIRM_EVENT"));
-        assertTrue(vendor.contains("getDimMenuInteraction"));
+        String owner = read(root.resolve("app/src/main/java/dezz/status/widget/dim/"
+                + "DimInteractionAccess.java"));
+        assertTrue(vendor.contains("DimInteractionAccess.menu(context)"));
+        assertTrue(owner.contains("getDimMenuInteraction"));
+        assertTrue(owner.contains("static synchronized Object menu"));
+        assertTrue(owner.contains("if (interaction == null)"));
+        assertFalse(vendor.contains("getMethod(\"create\""));
         assertTrue(vendor.contains("RETRY_DELAYS_MS"));
         assertTrue(window.contains("createDisplayContext(display)"));
         assertTrue(window.contains("FLAG_NOT_TOUCHABLE"));
