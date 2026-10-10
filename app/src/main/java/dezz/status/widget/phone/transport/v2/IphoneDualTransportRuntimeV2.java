@@ -1058,8 +1058,9 @@ public final class IphoneDualTransportRuntimeV2 implements AutoCloseable, Effect
     }
 
     private void runtimeDiagnostic(Owner owner, String detail) {
-        if (listener != null) listener.onPlatformDiagnostic(mode(owner.role()), routeEpoch(owner),
-                detail + ", switch_phase=" + (coordinator == null ? "unavailable" : coordinator.state().phase()));
+        // Effects run inside the coordinator's non-reentrant commit batch. Even state()
+        // is forbidden there; diagnostics must not call back into the coordinator.
+        if (listener != null) listener.onPlatformDiagnostic(mode(owner.role()), routeEpoch(owner), detail);
     }
 
     private static void cancelTimer(Map<Owner, Cancellable> timers, Owner owner) {
