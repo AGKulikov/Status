@@ -238,7 +238,7 @@ public final class MediaAutoResumeController {
                         + ", route=inline, elapsed=" + enteredAt);
         try {
             captureBootHistorySnapshot(exactApp, action);
-            if (MediaAutoResumeLifecyclePolicy.isUsableBoundary(action)) {
+            if (playerBoundaryReady(exactApp, action)) {
                 scheduleAfterBoot(exactApp);
             }
         } catch (RuntimeException failure) {
@@ -258,7 +258,7 @@ public final class MediaAutoResumeController {
             state = state(app);
         }
         String captureAction = state.getString(KEY_CAPTURE_ACTION, "");
-        if (!MediaAutoResumeLifecyclePolicy.isUsableBoundary(captureAction)) {
+        if (!playerBoundaryReady(app, captureAction)) {
             PhoneConnectionJournal.append("media-auto-resume",
                     "trace event=plan_deferred, reason=player_boot_gate, token="
                             + captureToken + ", action=" + captureAction
@@ -403,7 +403,8 @@ public final class MediaAutoResumeController {
         MediaResumeCommand.DispatchTrace trace = MediaResumeCommand.playWithTrace(
                 app, target, yandexBootRecovery,
                 requestYandexBrowserBootstrap, yandexColdStartRouteRequested,
-                yandexSessionPlayAttempted);
+                YandexColdSessionPolicy.unreadyPlayReserved(
+                        yandexSessionPlayAttempted, yandexBrowserBootstrapRequested));
         long dispatchFinishedAt = SystemClock.elapsedRealtime();
         long firstCommandAt = state.getLong(KEY_FIRST_COMMAND_ELAPSED, Long.MIN_VALUE);
         SharedPreferences.Editor commandTiming = state.edit()
@@ -720,6 +721,18 @@ public final class MediaAutoResumeController {
 
     private static int clamp(int value, int minimum, int maximum) {
         return Math.max(minimum, Math.min(maximum, value));
+    }
+
+    private static boolean playerBoundaryReady(Context app, String action) {
+        boolean unlocked = false;
+        try {
+            android.os.UserManager users = app.getSystemService(android.os.UserManager.class);
+            unlocked = users != null && users.isUserUnlocked();
+        } catch (RuntimeException ignored) { }
+        boolean ready = MediaAutoResumeLifecyclePolicy.isUsableBoundary(action, unlocked);
+        PhoneConnectionJournal.append("media-auto-resume", "trace event=player_boundary"
+                + ", action=" + action + ", userUnlocked=" + unlocked + ", ready=" + ready);
+        return ready;
     }
 
     private static int maxAttempts(@NonNull String target) {

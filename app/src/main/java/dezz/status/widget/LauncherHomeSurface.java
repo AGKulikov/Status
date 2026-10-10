@@ -545,6 +545,7 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
     }
 
     private void dispatchAutomaticNavigator() {
+        dezz.status.widget.diagnostics.SystemProcessDiagnostics.observeLaunch(this);
         automaticNavigatorAttempts++;
         automaticNavigatorDispatchedAt = android.os.SystemClock.elapsedRealtime();
         boolean accepted = YandexWindowLauncher.launch(this, YandexWindowLauncher.Product.NAVIGATOR, false);
@@ -559,6 +560,7 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
         if (automaticNavigatorStartedAt < 0 || !activityStarted || isFinishing() || isDestroyed()
                 || !preferences.launcherHomeOpensWindowedNavigator.get()
                 || now - automaticNavigatorStartedAt > 60_000) {
+            traceAutomaticNavigator("observation_stopped");
             cancelAutomaticNavigatorRecovery(); return;
         }
         WidgetService service = WidgetService.getInstance();

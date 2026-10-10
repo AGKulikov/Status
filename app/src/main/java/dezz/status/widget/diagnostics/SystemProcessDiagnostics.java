@@ -16,6 +16,7 @@ public final class SystemProcessDiagnostics {
     private static volatile long rateDropped;
     private SystemProcessDiagnostics(){}
     public static void initialize(Context owner){context=owner.getApplicationContext();}
+    public static void observeLaunch(Context owner){initialize(owner);poll();}
     static void disabled(){generation++;Process process=reader;if(process!=null)process.destroy();state="debug_disabled";}
     static void poll(){
         Context owner=context;long now=SystemClock.uptimeMillis();
@@ -31,8 +32,9 @@ public final class SystemProcessDiagnostics {
     private static void read(long expected){
         Process process=null;long rateAt=0;int count=0;
         try{
-            double started=System.currentTimeMillis()/1000d;
-            process=new ProcessBuilder("logcat","-b","main","-b","system","-v","epoch","-T","1","ActivityManager:I","*:S").redirectErrorStream(true).start();
+            // Startup may precede diagnostics initialization. Read a bounded current-boot tail.
+            double started=(System.currentTimeMillis()-Math.min(SystemClock.elapsedRealtime(),120_000L))/1000d;
+            process=new ProcessBuilder("logcat","-b","main","-b","system","-v","epoch","-T","200","ActivityManager:I","*:S").redirectErrorStream(true).start();
             reader=process;
             if(expected!=generation||!DiagnosticJournal.isEnabled())return;
             state="listening";

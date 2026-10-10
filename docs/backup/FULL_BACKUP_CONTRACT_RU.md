@@ -1,5 +1,16 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review 3.1.3 / 10.10.2026
+
+BackupDefaultsMigration: явное335…345→346; defaults, документы и неизвестные
+ключи прежние. MediaAutoResumeController сохраняет те же DE keys, target/token/
+manual guard; меняются только ранний unlock gate и RAM-порядок dispatch.
+AndroidCentralTransportV2 добавляет capability flags в прежнюю диагностику,
+enrollment/SecretStore/файлы неизменны. Иконка хранит только последний Drawable
+в карточке, не создаёт persistent cache. Пересмотрены три storage fingerprints;
+это не сертификация аппаратной полноты backup/restore.
+
+
 ### Review 3.1.2 / 10.10.2026
 
 BackupDefaultsMigration: явный переход335…344→345 без новых defaults или схемы

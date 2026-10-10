@@ -32,6 +32,11 @@ final class MediaAutoResumeLifecyclePolicy {
                 || ACTION_USER_UNLOCKED.equals(action);
     }
 
+    static boolean isUsableBoundary(String action, boolean userUnlocked) {
+        return isUsableBoundary(action)
+                || (ACTION_LOCKED_BOOT_COMPLETED.equals(action) && userUnlocked);
+    }
+
     /**
      * ECARX can publish BOOT and QUICKBOOT repeatedly during one startup. Treat a continuous burst
      * as one lifecycle even after the media plan has already consumed its token; otherwise every

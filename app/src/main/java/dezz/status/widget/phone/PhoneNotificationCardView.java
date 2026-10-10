@@ -62,6 +62,8 @@ public final class PhoneNotificationCardView extends FrameLayout {
     private PhoneNotificationLayoutConfig config;
     private Model model = Model.preview();
     private volatile long iconRequest;
+    private String displayedIconIdentifier = "";
+    private Drawable displayedAppIcon;
     private static final java.util.concurrent.Executor ICON_READER =
             new java.util.concurrent.ThreadPoolExecutor(1, 1, 0L,
                     java.util.concurrent.TimeUnit.MILLISECONDS,
@@ -141,8 +143,6 @@ public final class PhoneNotificationCardView extends FrameLayout {
         badge.setContinuousCornerRadiusPx(value.iconCornerRadiusPx);
         badge.setPreserveAspectRatio(value.iconPreserveAspectRatio);
         Drawable icon = phoneAppIcon(model.appIconIdentifier);
-        if (icon == null) icon = PhoneNotificationPreviewIconFactory.create(
-                getContext(), Math.max(24, value.badge.columnSpan * 24));
         badge.setSourceDrawable(icon);
         title.setText(model.title);
         time.setText("сейчас");
@@ -658,15 +658,26 @@ public final class PhoneNotificationCardView extends FrameLayout {
     @Nullable
     private Drawable phoneAppIcon(@Nullable String raw) {
         final long request = ++iconRequest;
-        if (raw == null || raw.trim().isEmpty()) return null;
+        if (raw == null || raw.trim().isEmpty()) {
+            displayedIconIdentifier = "";
+            displayedAppIcon = null;
+            return fallbackIcon();
+        }
         if (PhoneNotificationAutomation.LOW_BATTERY_ICON_ID.equals(raw.trim())) {
+            displayedIconIdentifier = "";
+            displayedAppIcon = null;
             int iconSize = config == null ? 72
                     : Math.max(24, config.badge.columnSpan * 24);
             return PhoneNotificationLowBatteryIconFactory.create(getContext(), iconSize);
         }
         String identifier = raw.startsWith("phone-app:")
                 ? raw.substring("phone-app:".length()).trim() : raw.trim();
-        if (identifier.isEmpty()) return null;
+        if (identifier.isEmpty()) return fallbackIcon();
+        if (!identifier.equals(displayedIconIdentifier)) {
+            displayedIconIdentifier = identifier;
+            displayedAppIcon = null;
+        }
+        final long started = android.os.SystemClock.elapsedRealtime();
         // Catalog migration, file reads and decoding must never hold up showing the text.
         // A late result belongs only to this presentation, never the next notification.
         Context app = getContext().getApplicationContext();
@@ -675,16 +686,34 @@ public final class PhoneNotificationCardView extends FrameLayout {
         ICON_READER.execute(() -> {
             PhoneNotificationCardView current = reference.get();
             if (current == null || current.iconRequest != request) return;
-            Drawable drawable = PhoneAppIconStore.get(app).drawable(identifier);
+            Drawable loaded;
+            try { loaded = PhoneAppIconStore.get(app).drawable(identifier); }
+            catch (RuntimeException failure) {
+                loaded = null;
+                dezz.status.widget.diagnostics.DiagnosticJournal.warn("phone-notification-icon",
+                        "stage=load_failed, error=" + failure.getClass().getSimpleName());
+            }
+            final Drawable drawable = loaded;
             new android.os.Handler(android.os.Looper.getMainLooper()).post(() -> {
                 PhoneNotificationCardView target = reference.get();
-                if (target != null && target.iconRequest == request && drawable != null) {
-                    target.badge.setSourceDrawable(drawable);
+                if (target != null && target.iconRequest == request) {
+                    target.displayedAppIcon = drawable;
+                    target.badge.setSourceDrawable(drawable == null ? target.fallbackIcon() : drawable);
                     target.invalidate();
+                    dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync(
+                            "phone-notification-icon", "stage=resolved, found=" + (drawable != null)
+                            + ", elapsed_ms=" + (android.os.SystemClock.elapsedRealtime() - started));
                 }
             });
         });
-        return null;
+        // Preserve this app's decoded image on refresh. For a new app reserve an empty slot:
+        // absence is known only after the worker returns, not while its read is pending.
+        return displayedAppIcon;
+    }
+
+    private Drawable fallbackIcon() {
+        return PhoneNotificationPreviewIconFactory.create(getContext(),
+                config == null ? 72 : Math.max(24, config.badge.columnSpan * 24));
     }
 
     @NonNull

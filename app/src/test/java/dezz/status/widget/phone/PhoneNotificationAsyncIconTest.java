@@ -34,10 +34,17 @@ public class PhoneNotificationAsyncIconTest {
                     new PhoneNotificationCardView.Model("Test app", "Title", "Message", "phone-app:test.app"));
             assertTrue("Showing text must not wait for the catalog writer",
                     TimeUnit.NANOSECONDS.toMillis(System.nanoTime()-start) < 1000);
+            java.lang.reflect.Field badgeField = PhoneNotificationCardView.class.getDeclaredField("badge");
+            badgeField.setAccessible(true);
+            Object badge = badgeField.get(view);
+            java.lang.reflect.Field source = badge.getClass().getDeclaredField("sourceDrawable");
+            source.setAccessible(true);
+            assertNull("Pending custom icon must never flash the default icon", source.get(badge));
             // Replacing the card while the first image is blocked must also return immediately.
             view.setPresentation(PhoneNotificationLayoutConfig.carPlay(
                     PhoneNotificationAutomation.OVERLAY_ID),
                     new PhoneNotificationCardView.Model("Next app", "Next title", "Next message", null));
+            assertNotNull("No icon reference still receives the normal preview/fallback", source.get(badge));
         } finally { release.countDown(); writer.join(2000); }
     }
 }

@@ -3,7 +3,7 @@ package dezz.status.widget.diagnostics;
 import java.util.regex.*;
 /** Extracts only allowlisted process lifecycle facts, never raw Intent/reason/exception text. */
 final class SystemProcessEvent {
-    private static final String NAME="(?:ru\\.natro\\.statuswidget|com\\.ecarx\\.(?:dimmenu|hud)|ecarx\\.xsf\\.[a-zA-Z0-9_.]+)(?::[a-zA-Z0-9_.]+)?";
+    private static final String NAME="(?:ru\\.natro\\.statuswidget|ru\\.yandex\\.(?:yandexnavi|music)|com\\.ecarx\\.(?:dimmenu|hud)|ecarx\\.xsf\\.[a-zA-Z0-9_.]+)(?::[a-zA-Z0-9_.]+)?";
     private static final Pattern START=Pattern.compile("\\bStart proc (\\d+):("+NAME+")(?:/|\\s)");
     private static final Pattern DIED=Pattern.compile("\\bProcess ("+NAME+") \\(pid (\\d+)\\) has died");
     private static final Pattern KILL=Pattern.compile("\\bKilling (\\d+):("+NAME+")(?:/|\\s)");

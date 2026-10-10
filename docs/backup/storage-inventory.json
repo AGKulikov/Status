@@ -340,7 +340,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "dc34214d2206f024e2dcc9ee56460471db1acacc2e982f7c273a43243a218f79",
+      "sha256": "35799b4c42452c0bc9ddc76b2da0587517665d15bdc3635d43c042e2d0673bd3",
       "access_kinds": [
         "files"
       ]
@@ -474,7 +474,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/launcher/MediaAutoResumeController.java": {
-      "sha256": "ba0ee08020646060eb8deaf09b717aa9ece8cd941f0a678a5cc6570be8ec6b71",
+      "sha256": "a2cf6fd7b279ac87a014abc43eac5ed37cb7ba54f8f625606e0e27cd7f1cd5a5",
       "access_kinds": [
         "preferences"
       ]
@@ -603,7 +603,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/phone/transport/v2/android/AndroidCentralTransportV2.java": {
-      "sha256": "d7c89b662d90639d290c3e08bdece3992c30de914625b221ac71141d697999c9",
+      "sha256": "b0b590788ce92618a23a1aa18dcf2e9ae23f7430f45e8cdb1fd81458ce6114c3",
       "access_kinds": [
         "keystore"
       ]

@@ -7,6 +7,14 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 public final class MediaAutoResumeLifecyclePolicyTest {
+    @Test public void delayedLockedBootBroadcastUsesObservedUnlock() {
+        assertTrue(MediaAutoResumeLifecyclePolicy.isUsableBoundary(
+                MediaAutoResumeLifecyclePolicy.ACTION_LOCKED_BOOT_COMPLETED, true));
+        assertFalse(MediaAutoResumeLifecyclePolicy.isUsableBoundary(
+                MediaAutoResumeLifecyclePolicy.ACTION_LOCKED_BOOT_COMPLETED, false));
+        assertFalse(MediaAutoResumeLifecyclePolicy.isUsableBoundary("unrelated", true));
+    }
+
     @Test public void coldBootSequencePreservesOriginalDelayAnchor() {
         assertTrue(MediaAutoResumeLifecyclePolicy.shouldCoalesce(
                 MediaAutoResumeLifecyclePolicy.ACTION_LOCKED_BOOT_COMPLETED,

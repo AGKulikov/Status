@@ -39,6 +39,17 @@ public final class IphoneGattInventoryV2 {
         return completeHelperV2() && completeAncs();
     }
 
+    /** Only known capability flags; no addresses, identifiers or notification payloads. */
+    public String diagnosticCapabilities() {
+        return "helper:" + helperV2Service + "/proof_read:" + peerProofReadable
+                + "/telemetry_notify:" + telemetryNotifiable
+                + "/control_write:" + routeControlWritable
+                + "/control_indicate:" + routeControlIndicatable
+                + "/ancs:" + ancsService + "/notification_notify:" + notificationSourceNotifiable
+                + "/control_point_write:" + controlPointWritable
+                + "/data_notify:" + dataSourceNotifiable;
+    }
+
     public boolean completeHelperV2() {
         return helperV2Service && peerProofReadable
                 && routeControlWritable && routeControlIndicatable;

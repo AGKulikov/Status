@@ -1366,6 +1366,7 @@ public final class AndroidCentralTransportV2 implements IphoneSwitchTransportV2 
                 "service_inventory status=" + status
                         + ", helperComplete=" + helperComplete
                         + ", ancsComplete=" + ancsComplete
+                        + ", capabilities=" + (inventory == null ? "unavailable" : inventory.diagnosticCapabilities())
                         + ", serviceChanged="
                         + (inventory != null && inventory.serviceChangedIndicatable)
                         + ", cacheCount=" + cacheSensitiveFailures

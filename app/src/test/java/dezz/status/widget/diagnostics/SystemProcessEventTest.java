@@ -3,6 +3,13 @@ package dezz.status.widget.diagnostics;
 import org.junit.Test;
 import static org.junit.Assert.*;
 public class SystemProcessEventTest {
+    @Test public void navigationAndMusicStartWithoutPrivateArguments() {
+        assertEquals("event=process_start, package=ru.yandex.yandexnavi, pid=71",
+                SystemProcessEvent.parse("Start proc 71:ru.yandex.yandexnavi/u0a1 for activity secret=secret"));
+        assertEquals("event=process_died, package=ru.yandex.music:player, pid=72",
+                SystemProcessEvent.parse("Process ru.yandex.music:player (pid 72) has died: private"));
+        assertNull(SystemProcessEvent.parse("Start proc 71:ru.yandex.music.fake/u0a1"));
+    }
     @Test public void lifecycleFactsExcludeIntentExtrasAndKillReason() {
         assertEquals("event=process_start, package=ecarx.xsf.inputservice, pid=789",SystemProcessEvent.parse("ActivityManager: Start proc 789:ecarx.xsf.inputservice/u0a5 for service extras secret=value"));
         assertEquals("event=process_died, package=com.ecarx.dimmenu, pid=123",SystemProcessEvent.parse("Process com.ecarx.dimmenu (pid 123) has died: foreground TOP"));
