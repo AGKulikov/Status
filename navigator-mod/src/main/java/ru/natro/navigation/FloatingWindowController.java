@@ -1510,6 +1510,14 @@ final class FloatingWindowController {
             modeButton.setClickable(true);
             modeButton.setFocusable(true);
             modeButton.setWillNotDraw(false);
+            modeButton.setOnLongClickListener(view -> {
+                try {
+                    RouteHistoryDiagnostics.show(activity);
+                } catch (Throwable failure) {
+                    reportCallbackFailure("routeHistoryDiagnostics", failure);
+                }
+                return true;
+            });
             modeButton.setOnClickListener(view -> {
                 try {
                     restartInMode(!floating, null);
