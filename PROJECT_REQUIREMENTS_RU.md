@@ -1,5 +1,22 @@
 # Единый реестр требований Natro
 
+## Выпуск3.1.4 — SOURCE/TEST/APK; FIELD OPEN
+
+Собрана и подписана пара из28bc0998d665846b501dd9f5672e3e5189c943e6,
+tree b604333452a1c64723f3c837db7dac69d5e4bb0f. CI38419616861 SUCCESS:
+2131 Android tests/422 suites,243 tool tests и108 Java policy cases PASS;
+0 failures/errors/skips. XML проверены независимо. В подписанном Natro проверены
+DEX-маркеры сборщика, общей папки, API, исправленный TOP regex; старого regex нет.
+
+Natro3.1.4/208021347 SHA256 c6789cfc63621a98057a6e75843db897df7777693905fac5a34248086d1d81d8.
+Navigator SHA256 a2246263b1749c2511f8d361f9b68e0581e4a81fd29c9bb308db34ce57e470f0.
+Прежний общий сертификат, один подписант, v2/v3/API28, zipalign16KiB и metadata
+установки Natro поверх3.1.3 проверены. У Navigator заменён толькоclasses19.dex:
+сохранена диагностика истории от11.10;17226 остальных payload entries неизменны.
+Helper не менялся; новые функции обмена доступны в Safari. Отчёты и порядок
+установки: docs/releases/3.1.4/. Физическая установка/работа KX11 и Safari OPEN.
+Наличие дампа не означает, что получатель крыльев DIM уже найден или изменён.
+
 ## Кандидат3.1.4 /208021347 —13.10.2026
 
 Source77afa41e26a2cc53df4190017a825e418ba4d668 /tree5da10306f1dd1908ff923309d85c1f1ff60133cc:
