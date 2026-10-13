@@ -303,11 +303,14 @@ public class LauncherSettingsActivity extends SettingsLauncherProfileActivity {
         }
         updateApplicationCount(count);
         new dezz.status.widget.settings.SettingsDialogBuilder(this)
+                .plainContent()
                 .setTitle("Приложения в общем меню")
                 .setMessage("Системные приложения изначально скрыты, кроме «Телефона». "
-                        + "Изменения сразу действуют и на HOME, и на панели водителя.")
+                        + "Нажмите «В общий черновик», затем «Сохранить» на экране настроек. "
+                        + "Закрытие этого окна без подтверждения отменяет выбор.")
                 .setView(scroll)
-                .setPositiveButton("Готово", null)
+                .setPositiveButton("В общий черновик", null)
+                .setNegativeButton("Отмена", null)
                 .show();
     }
 

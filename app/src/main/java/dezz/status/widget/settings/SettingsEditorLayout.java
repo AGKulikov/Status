@@ -22,6 +22,12 @@ public final class SettingsEditorLayout extends LinearLayout {
     private final LinearLayout form;
     private final String owner;
     private final LinearLayout navigation;
+    private final LinearLayout split;
+    private final ScrollView rail;
+    private final HorizontalScrollView tabs;
+    private final View previewPane;
+    private final Button previewButton;
+    private boolean compact;
     private final Map<SettingsSection, Button> buttons = new EnumMap<>(SettingsSection.class);
     private final List<FieldGroup> groups = new ArrayList<>();
     private final Map<SettingsSection, Integer> positions = new EnumMap<>(SettingsSection.class);
@@ -41,7 +47,7 @@ public final class SettingsEditorLayout extends LinearLayout {
         super(context); this.scroll = scroll; this.form = form; this.owner = owner;
         setOrientation(VERTICAL); setTag(FORM_TAG);
         setBackgroundColor(color(R.color.settings_background));
-        LinearLayout split = new LinearLayout(context); split.setOrientation(HORIZONTAL);
+        split = new LinearLayout(context); split.setOrientation(HORIZONTAL);
         View preview = null;
         for (int i = form.getChildCount() - 1; i >= 0; i--) {
             View child = form.getChildAt(i);
@@ -53,9 +59,19 @@ public final class SettingsEditorLayout extends LinearLayout {
         try { selected = SettingsSection.valueOf(SettingsAppearance.preferences(context)
                 .getString("editor." + owner + ".section", "MAIN")); }
         catch (IllegalArgumentException ignored) { selected = SettingsSection.MAIN; }
-        ScrollView rail = new ScrollView(context); rail.setFillViewport(false);
+        rail = new ScrollView(context); rail.setFillViewport(false);
         navigation = new LinearLayout(context); navigation.setOrientation(VERTICAL);
         navigation.setPadding(dp(8), dp(8), dp(8), dp(8)); rail.addView(navigation);
+        tabs = new HorizontalScrollView(context); tabs.setVisibility(GONE);
+        addView(tabs, new LayoutParams(-1, -2));
+        previewPane = preview;
+        previewButton = new Button(context); previewButton.setAllCaps(false);
+        previewButton.setText("Открыть предпросмотр"); previewButton.setVisibility(GONE);
+        previewButton.setOnClickListener(v -> {
+            if (previewPane instanceof SettingsPreviewView) previewPane.performClick();
+            else if (previewPane != null) new SettingsPreviewView(context, previewPane).performClick();
+        });
+        addView(previewButton, new LayoutParams(-1, -2));
         split.addView(rail, new LayoutParams(dp(258), ViewGroup.LayoutParams.MATCH_PARENT));
         split.addView(scroll, new LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1));
         if (preview != null) split.addView(preview, new LayoutParams(dp(280), ViewGroup.LayoutParams.MATCH_PARENT));
@@ -77,6 +93,31 @@ public final class SettingsEditorLayout extends LinearLayout {
         });
         post(() -> scroll.scrollTo(0, SettingsAppearance.preferences(context)
                 .getInt("editor." + owner + "." + selected.name(), 0)));
+    }
+
+    @Override protected void onMeasure(int widthSpec, int heightSpec) {
+        int width = MeasureSpec.getSize(widthSpec);
+        // Use the actual editor width: a dialog or outer split may be far narrower
+        // than the display. Preserve at least 480dp for the controls themselves.
+        boolean next = MeasureSpec.getMode(widthSpec) != MeasureSpec.UNSPECIFIED
+                && width < dp(258 + 480 + (previewPane == null ? 0 : 280));
+        if (compact != next) {
+            compact = next;
+            ((ViewGroup) navigation.getParent()).removeView(navigation);
+            navigation.setOrientation(compact ? HORIZONTAL : VERTICAL);
+            for (Button button : buttons.values()) {
+                LayoutParams params = new LayoutParams(compact ? -2 : -1, -2);
+                params.rightMargin = compact ? dp(6) : 0;
+                params.bottomMargin = compact ? 0 : dp(6);
+                button.setLayoutParams(params);
+            }
+            if (compact) tabs.addView(navigation); else rail.addView(navigation);
+            tabs.setVisibility(compact ? VISIBLE : GONE);
+            rail.setVisibility(compact ? GONE : VISIBLE);
+            if (previewPane != null) previewPane.setVisibility(compact ? GONE : VISIBLE);
+            previewButton.setVisibility(compact && previewPane != null ? VISIBLE : GONE);
+        }
+        super.onMeasure(widthSpec, heightSpec);
     }
 
     /** The fixed Back button must reserve space above the rail as well as the form. */

@@ -10,6 +10,9 @@ import androidx.appcompat.app.AlertDialog;
 public final class SettingsDialogBuilder extends AlertDialog.Builder {
     private CharSequence title = "";
     private View content;
+    private boolean editorSections = true;
+    /** Lists are one form, not a set of automatically inferred editor sections. */
+    public SettingsDialogBuilder plainContent() { editorSections = false; return this; }
     private static final java.util.Map<DialogInterface,SettingsEditSession.Savepoint> checkpoints=new java.util.WeakHashMap<>();
     public SettingsDialogBuilder(Context context) { super(context); }
     private View preview(){
@@ -41,7 +44,7 @@ public final class SettingsDialogBuilder extends AlertDialog.Builder {
                     &&((android.widget.LinearLayout)content).getChildCount()>=4){
                 android.widget.ScrollView scroll=new android.widget.ScrollView(getContext());scroll.addView(content);content=scroll;
             }
-            View preview=preview();
+            View preview=editorSections?preview():null;
             if(preview!=null&&(content instanceof android.widget.ScrollView||content instanceof androidx.core.widget.NestedScrollView)){
                 android.view.ViewGroup scroller=(android.view.ViewGroup)content;
                 if(scroller.getChildCount()==1&&scroller.getChildAt(0) instanceof android.widget.LinearLayout){
@@ -49,15 +52,24 @@ public final class SettingsDialogBuilder extends AlertDialog.Builder {
                     if(form.getChildCount()>=4)form.addView(new SettingsPreviewView(getContext(),preview));
                 }
             }
-            View wrapped = SettingsEditorLayout.wrap(getContext(), content,
-                    getContext().getClass().getName() + ":" + title);
-            if (wrapped == content) SettingsEditorLayout.install(content, getContext().getClass().getName() + ":" + title);
-            if (wrapped instanceof SettingsEditorLayout) {
-                float density = getContext().getResources().getDisplayMetrics().density;
-                int height = getContext().getResources().getDisplayMetrics().heightPixels;
-                wrapped.setMinimumHeight(Math.max(Math.round(250 * density), height - Math.round(190 * density)));
-            }
-            super.setView(wrapped);
+            View wrapped = editorSections ? SettingsEditorLayout.wrap(getContext(), content,
+                    getContext().getClass().getName() + ":" + title) : content;
+            if (editorSections && wrapped == content) SettingsEditorLayout.install(content, getContext().getClass().getName() + ":" + title);
+            // Reserve room for the title, explanation and confirmation buttons. A minimum
+            // form height can push the only accepting button below the visible dialog.
+            android.widget.FrameLayout bounded = new android.widget.FrameLayout(getContext()) {
+                @Override protected void onMeasure(int width, int height) {
+                    int screen = getResources().getDisplayMetrics().heightPixels;
+                    int reserve = Math.round(240 * getResources().getDisplayMetrics().density);
+                    int cap = Math.max(screen / 4, screen - reserve);
+                    if (View.MeasureSpec.getMode(height) != View.MeasureSpec.UNSPECIFIED)
+                        cap = Math.min(cap, View.MeasureSpec.getSize(height));
+                    super.onMeasure(width, View.MeasureSpec.makeMeasureSpec(cap, View.MeasureSpec.AT_MOST));
+                }
+            };
+            bounded.addView(wrapped, new android.widget.FrameLayout.LayoutParams(-1,
+                    wrapped instanceof SettingsEditorLayout ? -1 : -2));
+            super.setView(bounded);
         }
         AlertDialog dialog = SettingsWindowOwner.attach(getContext(),super.create());
         SettingsEditSession session=SettingsEditSession.find(getContext());
