@@ -1,0 +1,216 @@
+{
+  "reference_sha256": "04f1ab0f659e147b715de6cbdbdd4edcaf738621b8eb78246df1637a88c0d832",
+  "sections": [
+    {
+      "section": ".startup",
+      "va": "0x1000000",
+      "size": 298,
+      "sha256": "1694cf049e2b067c509ea98818f5745ce5c369403fa42d8ade67627a34077736",
+      "A": {
+        "file_offset": "0x60000",
+        "bytes_compared": 298,
+        "different_bytes": 0
+      },
+      "B": {
+        "file_offset": "0x1a0000",
+        "bytes_compared": 298,
+        "different_bytes": 0
+      }
+    },
+    {
+      "section": ".core_exceptions_table",
+      "va": "0x1001000",
+      "size": 244,
+      "sha256": "76a2181e1afcd6ce7cda2f137c4705cdd0aaa4e59519e4219f3e13d3489e2ad4",
+      "A": {
+        "file_offset": "0x61000",
+        "bytes_compared": 244,
+        "different_bytes": 0
+      },
+      "B": {
+        "file_offset": "0x1a1000",
+        "bytes_compared": 244,
+        "different_bytes": 0
+      }
+    },
+    {
+      "section": ".text",
+      "va": "0x1002c40",
+      "size": 127840,
+      "sha256": "81fe40403860d3ea9593a313701a6e3d36cc4910ba3b0e6846c185804eff5513",
+      "A": {
+        "file_offset": "0x62c40",
+        "bytes_compared": 127840,
+        "different_bytes": 0
+      },
+      "B": {
+        "file_offset": "0x1a2c40",
+        "bytes_compared": 127840,
+        "different_bytes": 234
+      }
+    },
+    {
+      "section": ".rodata",
+      "va": "0x1021fb0",
+      "size": 50631,
+      "sha256": "6fbc8acaf655ba667934f8829b5b570fb3bc23901fa99470fd3e8c38e58a612d",
+      "A": {
+        "file_offset": "0x81fb0",
+        "bytes_compared": 50631,
+        "different_bytes": 0
+      },
+      "B": {
+        "file_offset": "0x1c1fb0",
+        "bytes_compared": 50631,
+        "different_bytes": 7
+      }
+    }
+  ],
+  "functions": [
+    {
+      "name": "receive_command",
+      "va": "0x10052e8",
+      "size": 42,
+      "B_different_bytes": 0
+    },
+    {
+      "name": "spi_task_fn",
+      "va": "0x1005314",
+      "size": 254,
+      "B_different_bytes": 0
+    },
+    {
+      "name": "process_command",
+      "va": "0x100b338",
+      "size": 928,
+      "B_different_bytes": 2
+    }
+  ],
+  "dispatch": [
+    {
+      "first_byte": "0x81",
+      "target_va": "0x100b41a"
+    },
+    {
+      "first_byte": "0x82",
+      "target_va": "0x100b40e"
+    },
+    {
+      "first_byte": "0x83",
+      "target_va": "0x100b45c"
+    },
+    {
+      "first_byte": "0x84",
+      "target_va": "0x100b468"
+    },
+    {
+      "first_byte": "0x85",
+      "target_va": "0x100b6bc"
+    },
+    {
+      "first_byte": "0x86",
+      "target_va": "0x100b474"
+    },
+    {
+      "first_byte": "0x87",
+      "target_va": "0x100b47e"
+    },
+    {
+      "first_byte": "0x88",
+      "target_va": "0x100b4a2"
+    },
+    {
+      "first_byte": "0x89",
+      "target_va": "0x100b4c6"
+    },
+    {
+      "first_byte": "0x8a",
+      "target_va": "0x100b4d0"
+    },
+    {
+      "first_byte": "0x8b",
+      "target_va": "0x100b6bc"
+    },
+    {
+      "first_byte": "0x8c",
+      "target_va": "0x100b6bc"
+    },
+    {
+      "first_byte": "0x8d",
+      "target_va": "0x100b6bc"
+    },
+    {
+      "first_byte": "0x8e",
+      "target_va": "0x100b6bc"
+    },
+    {
+      "first_byte": "0x8f",
+      "target_va": "0x100b6bc"
+    },
+    {
+      "first_byte": "0x90",
+      "target_va": "0x100b6bc"
+    },
+    {
+      "first_byte": "0x91",
+      "target_va": "0x100b6bc"
+    },
+    {
+      "first_byte": "0x92",
+      "target_va": "0x100b6bc"
+    },
+    {
+      "first_byte": "0x93",
+      "target_va": "0x100b6bc"
+    },
+    {
+      "first_byte": "0x94",
+      "target_va": "0x100b6bc"
+    },
+    {
+      "first_byte": "0x95",
+      "target_va": "0x100b43e"
+    },
+    {
+      "first_byte": "0x96",
+      "target_va": "0x100b4f2"
+    },
+    {
+      "first_byte": "0x97",
+      "target_va": "0x100b580"
+    },
+    {
+      "first_byte": "0x98",
+      "target_va": "0x100b61a"
+    },
+    {
+      "first_byte": "0x99",
+      "target_va": "0x100b6bc"
+    },
+    {
+      "first_byte": "0x9a",
+      "target_va": "0x100b6bc"
+    },
+    {
+      "first_byte": "0x9b",
+      "target_va": "0x100b6bc"
+    },
+    {
+      "first_byte": "0x9c",
+      "target_va": "0x100b5c4"
+    },
+    {
+      "first_byte": "0x9d",
+      "target_va": "0x100b6bc"
+    },
+    {
+      "first_byte": "0x9e",
+      "target_va": "0x100b6a2"
+    },
+    {
+      "first_byte": "0x9f",
+      "target_va": "0x100b6b0"
+    }
+  ],
+  "decoder_commit": "bfdc928f65b486b5cc3bb5f586f04a39b9d07fa9"
+}
