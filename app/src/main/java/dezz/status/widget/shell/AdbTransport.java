@@ -248,6 +248,19 @@ public class AdbTransport implements ShellTransport {
         }
     }
 
+    /** Exact existing QNX endpoint, GET-only protocol; shares cancellation with the ADB socket. */
+    public void collectQnx(dezz.status.widget.diagnostics.QnxFileReader.Receiver receiver) throws Exception {
+        try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 25_000L, "qnx-read")) {
+            AdbStream stream = openBounded("shell:toybox nc -w 30 198.18.34.2 8000");
+            try {
+                new dezz.status.widget.diagnostics.QnxFileReader(new dezz.status.widget.diagnostics.QnxFileReader.Wire() {
+                    public byte[] read() throws Exception { return stream.read(); }
+                    public void write(byte[] bytes) throws Exception { stream.write(bytes); }
+                }).collect(receiver);
+            } finally { try { stream.close(); } catch (Exception ignored) {} }
+        }
+    }
+
     public String execLongRunning(String command) throws Exception {
         ByteArrayOutputStream buffer = new ByteArrayOutputStream();
         execRaw(command, chunk -> buffer.write(chunk, 0, chunk.length), 0);

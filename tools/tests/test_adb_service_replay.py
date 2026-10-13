@@ -13,7 +13,7 @@ class AdbServiceReplay(unittest.TestCase):
         source = ROOT / "app/src/main/java/dezz/status/widget"
         files = list((ROOT / "tools/tests/runtime_stubs").rglob("*.java"))
         files += [source / (name + ".java") for name in (
-            "adb/AdbConsoleSession", "adb/AdbShellResult", "servicemode/ServiceModeJournal",
+            "adb/AdbConsoleSession", "adb/AdbShellResult", "diagnostics/QnxFileReader", "servicemode/ServiceModeJournal",
             "servicemode/AppsToHideStorage", "servicemode/AlwaysIgnoreAppResolver", "servicemode/PinStorage",
             "servicemode/NatroSelfVisibility")]
         files += [ROOT / "tools/tests/java" / name for name in ("AdbSessionReplay.java", "ServiceModeRecoveryReplay.java")]

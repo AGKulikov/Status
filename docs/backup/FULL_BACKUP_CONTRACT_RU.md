@@ -1,5 +1,22 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review 13.10 — расширенный дамп и нижний градиент
+
+Кандидат3.1.5/208021348: явно допускаются335…347→348, неизвестные334/349
+отвергаются; typed defaults и пользовательские значения сохраняют прежний смысл.
+BackupDefaultsMigration пересмотрен отдельно, добавлен тест допуска схем.
+
+SystemFileDump/DiagnosticsActivity сохраняют прежний cache/exports и явную копию
+в Download/Natro; добавляются только диагностические payloads QNX и UART context.
+Новых managed roots, автоматического восстановления firmware и секретов нет.
+AdbTransport сохраняет прежние RSA файлы, новый qconn транспорт не пишет на QNX.
+Эти три storage-owner пересмотрены по указанному составу, а не ради scanner.
+bottomFadeEnabled хранится в существующем NAV_MAP.options: отсутствующее=true
+сохраняет прежнее поведение, false переносится вместе с полным JSON, copy и
+mergeUserOptions. Namespace/схема документа неизменны. Test покрывает false при
+миграции пресета и повторной сериализации. Внешний новый backup format не вводится.
+SettingsEditSession меняет подписи/компоновку footer, не commit/rollback semantics.
+
 ### Review 13.10.2026 — отдельный системный дамп
 
 SystemFileDump и DiagnosticsActivity используют только cache/exports/Natro-system-*

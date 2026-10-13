@@ -51,7 +51,7 @@ public class NavigatorWindowEditorInteractionTest {
             NavigatorWindowSettingsActivity a=c.setup().get();
             CompoundButton enabled=ReflectionHelpers.getField(a,"enabled");enabled.setChecked(false);
             assertTrue(NavigationIntegrationConfig.fromJson(disk().getString(KEY,"")).mainFloatingWindow.enabled);
-            SettingsScreensInteractionTest.find(a.getWindow().getDecorView(),"Применить").performClick();
+            SettingsScreensInteractionTest.find(a.getWindow().getDecorView(),"Сохранить").performClick();
             c.pause().stop();
             NavigationIntegrationConfig saved=NavigationIntegrationConfig.fromJson(disk().getString(KEY,""));
             assertFalse(saved.mainFloatingWindow.enabled);assertFalse(saved.hudMap.enabled);
@@ -65,7 +65,7 @@ public class NavigatorWindowEditorInteractionTest {
     @Test public void unchangedApplyPreservesAbsentDefault(){
         try(ActivityController<NavigatorWindowSettingsActivity> c=Robolectric.buildActivity(NavigatorWindowSettingsActivity.class)){
             NavigatorWindowSettingsActivity a=c.setup().get();
-            SettingsScreensInteractionTest.find(a.getWindow().getDecorView(),"Применить").performClick();
+            SettingsScreensInteractionTest.find(a.getWindow().getDecorView(),"Сохранить").performClick();
             c.pause().stop();assertFalse(disk().contains(KEY));
         }
     }
@@ -75,7 +75,7 @@ public class NavigatorWindowEditorInteractionTest {
             try(ActivityController<NavigatorWindowSettingsActivity> c=Robolectric.buildActivity(NavigatorWindowSettingsActivity.class)){
                 NavigatorWindowSettingsActivity a=c.setup().get();
                 assertNull(ReflectionHelpers.getField(a,"enabled"));
-                SettingsScreensInteractionTest.find(a.getWindow().getDecorView(),"Применить").performClick();
+                SettingsScreensInteractionTest.find(a.getWindow().getDecorView(),"Сохранить").performClick();
                 c.pause().stop();assertEquals(raw,disk().getString(KEY,""));
             }
         }

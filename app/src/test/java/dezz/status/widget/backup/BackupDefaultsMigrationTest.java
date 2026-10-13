@@ -13,6 +13,18 @@ import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=28,application=Application.class)
 public class BackupDefaultsMigrationTest {
+    @Test public void qnxReleaseAcceptsReviewedSchemasOnly() throws Exception {
+        for(int source=208021335;source<=208021348;source++) {
+            JSONObject metadata=new JSONObject().put("sourceVersionCode",source).put("defaultsSchema",source)
+                    .put("declaredMainDefaults",BackupPreferencesXml.encode(Collections.emptyMap()));
+            BackupDefaultsMigration.validate(metadata,208021348);
+        }
+        for(int invalid:new int[]{208021334,208021349}) {
+            JSONObject metadata=new JSONObject().put("sourceVersionCode",invalid).put("defaultsSchema",invalid)
+                    .put("declaredMainDefaults",BackupPreferencesXml.encode(Collections.emptyMap()));
+            try {BackupDefaultsMigration.validate(metadata,208021348);fail();}catch(IOException expected){}
+        }
+    }
     @Test public void systemDumpReleasePreservesDefaultsAndRejectsFuture() throws Exception {
         for(int source=208021335;source<=208021347;source++) {
             JSONObject metadata=new JSONObject().put("sourceVersionCode",source).put("defaultsSchema",source)

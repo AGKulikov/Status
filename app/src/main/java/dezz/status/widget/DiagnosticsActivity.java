@@ -546,9 +546,10 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
 
     private void confirmSystemDump() {
         new AlertDialog.Builder(this).setTitle("Снять системный дамп?")
-                .setMessage("Только чтение 9 файлов DIM/UART, включая dim_dtc.ko. До 8 МиБ на файл, "
+                .setMessage("Только чтение 9 файлов Android DIM/UART и 6 файлов QNX, плюс привязка ttyHS2. До 8 МиБ на файл, "
                         + "64 МиБ суммарно и 60 секунд. Нужен доступ к встроенному ADB; доступный su 0 "
-                        + "проверяется без перезапуска adbd. Прошивка и настройки не изменяются. "
+                        + "проверяется без перезапуска adbd. QNX читается прежним способом через ADB и qconn; "
+                        + "если сервис недоступен, службы и firewall не меняются. Прошивка и настройки не изменяются. "
                         + "Отсутствующие или недоступные файлы будут отмечены. Архив содержит закрытые "
                         + "системные файлы — передавайте его лично, не публикуйте. Хранятся два последних ZIP "
                         + "во временной памяти приложения. При закрытии экрана сбор отменяется.")
@@ -576,7 +577,7 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
             result.set(dezz.status.widget.diagnostics.SystemFileDump.collect(
                     new File(getCacheDir(), "exports"), adb::command, text -> runOnUiThread(() -> {
                         if (!isDestroyed() && systemDumpSession == session) systemDumpState.setText(text);
-                    }), BuildConfig.VERSION_NAME));
+                    }), BuildConfig.VERSION_NAME, adb::collectQnx));
         }, error -> {
             session.close();
             dezz.status.widget.diagnostics.SystemFileDump.RUNNING.set(false);

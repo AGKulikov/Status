@@ -15,6 +15,7 @@ import java.util.zip.ZipOutputStream;
 public final class SystemFileDump {
     public interface Shell { AdbShellResult.Result command(String command) throws Exception; }
     public interface Progress { void update(String text); }
+    public interface Qnx { void collect(QnxFileReader.Receiver receiver) throws Exception; }
     public static final AtomicBoolean RUNNING = new AtomicBoolean();
     static final int CHUNK = 32768, MAX_FILE = 8 * 1024 * 1024, MAX_TOTAL = 64 * 1024 * 1024;
     private static final String[] PATHS = {
@@ -42,7 +43,7 @@ public final class SystemFileDump {
     public static final class Report {
         public final File file;
         public final int collected, requested;
-        Report(File file, int collected) { this.file=file; this.collected=collected; requested=PATHS.length; }
+        Report(File file, int collected, int requested) { this.file=file; this.collected=collected; this.requested=requested; }
     }
     static String output(AdbShellResult.Result result) throws IOException {
         if (!result.success() || result.truncated) throw new IOException("shell_incomplete");
@@ -92,6 +93,9 @@ public final class SystemFileDump {
     }
     /** Caller supplies a private ADB session with its existing 60-second deadline. */
     public static Report collect(File directory, Shell shell, Progress progress, String version) throws Exception {
+        return collect(directory,shell,progress,version,null);
+    }
+    public static Report collect(File directory, Shell shell, Progress progress, String version, Qnx qnx) throws Exception {
         if(!directory.isDirectory() && !directory.mkdirs()) throw new IOException("export_directory_unavailable");
         File partial=File.createTempFile("Natro-system-", ".part", directory);
         File target=new File(directory,partial.getName().replace(".part", ".zip"));
@@ -157,12 +161,46 @@ public final class SystemFileDump {
                     manifest.append(path).append('\t').append(status).append('\t')
                         .append(bytes==null ? 0 : size).append('\t').append(bytes==null ? "-" : sha).append('\n');
                 }
+                if(qnx!=null) {
+                    // Pseudo-files are not firmware payloads; collect only exact bounded UART evidence.
+                    String uart="readlink -f /sys/class/tty/ttyHS2/device; "
+                            + "for p in /sys/class/tty/ttyHS2/device/uevent /sys/class/tty/ttyHS2/device/of_node/name "
+                            + "/sys/class/tty/ttyHS2/device/of_node/compatible; do echo \"$p\"; "
+                            + "if [ -r \"$p\" ]; then head -c 4096 \"$p\"; else echo unavailable; fi; echo; done; "
+                            + "dmesg | grep -i -E 'ttyHS|geni.*serial|890000' | head -c 24000";
+                    try {
+                        AdbShellResult.Result r=shell.command(privileged(uart,su));
+                        String context="exit="+r.exitCode+" truncated="+r.truncated+"\n"+r.output;
+                        put(zip,"uart-context.txt",context.getBytes(StandardCharsets.UTF_8));
+                    } catch(Exception unavailable) {
+                        put(zip,"uart-context.txt","read_or_transport_failed\n".getBytes(StandardCharsets.UTF_8));
+                    }
+                    final int[] qcount={0}, qtotal={total};
+                    final java.util.Set<String> qnxAttempted=new java.util.HashSet<>();
+                    try {
+                        progress.update("Чтение QNX через ADB/qconn…");
+                        qnx.collect((path,status,bytes)-> {
+                            qnxAttempted.add(path);
+                            if(bytes!=null && qtotal[0]+bytes.length>MAX_TOTAL) { bytes=null;status="size_limit"; }
+                            String sha="-";
+                            if(bytes!=null) {sha=digest(bytes);put(zip,"qnx/files"+path,bytes);qcount[0]++;qtotal[0]+=bytes.length;}
+                            manifest.append("qnx:").append(path).append('\t').append(status).append('\t')
+                                    .append(bytes==null?0:bytes.length).append('\t').append(sha).append('\n');
+                        });
+                    } catch(Exception unavailable) {
+                        // No reconnect, service start, firewall changes or alternative dialect guessing.
+                    }
+                    for(String path:QnxFileReader.TARGETS) if(!qnxAttempted.contains(path))
+                        manifest.append("qnx:").append(path).append("\tunavailable_or_not_attempted\t0\t-\n");
+                    count+=qcount[0];
+                }
                 put(zip,"manifest.tsv",manifest.toString().getBytes(StandardCharsets.UTF_8));
                 put(zip,"README.txt",("Natro system evidence\nversion="+version+"\naccess="+access
-                    +"\ncollected="+count+"/"+PATHS.length+"\nwall_ms="+System.currentTimeMillis()
+                    +"\ncollected="+count+"/"+(PATHS.length+(qnx==null?0:QnxFileReader.TARGETS.length))+"\nwall_ms="+System.currentTimeMillis()
                     +"\nLimits: 8 MiB/file, 64 MiB total, ADB session 60 seconds.\n"
                     +"Explicit allowlist only; not a complete firmware backup. Missing and inaccessible may be indistinguishable.\n"
                     +"Files are verified against remote SHA-256 before/after transfer, but not an atomic system snapshot.\n"
+                    +"QNX exception: descriptor stat and two equal reads; SHA-256 computed locally, not remote authenticated hash.\n"
                     +"Read-only; no daemon restart, remount, reboot, vehicle commands or private /data.\n"
                     +"Contains proprietary firmware; share privately, do not publish.\n").getBytes(StandardCharsets.UTF_8));
             }
@@ -172,7 +210,7 @@ public final class SystemFileDump {
             File[] old=archives(directory);
             int retained=0;
             for(File previous:old) if(!previous.equals(target) && retained++>=1) previous.delete();
-            return new Report(target,count);
+            return new Report(target,count,PATHS.length+(qnx==null?0:QnxFileReader.TARGETS.length));
         } finally { if(!published) partial.delete(); }
     }
 }

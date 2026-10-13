@@ -45,6 +45,12 @@ public class AllAppsThemeRegressionTest {
                 ReflectionHelpers.callInstanceMethod(activity,"renderApplications",
                         ReflectionHelpers.ClassParameter.from(List.class,Collections.singletonList(app)));
                 LinearLayout rows=ReflectionHelpers.getField(activity,"applications");
+                android.view.ViewParent ancestor=rows.getParent();
+                while(ancestor!=null) {
+                    assertFalse("Catalog must not be squeezed into a section rail",ancestor instanceof SettingsEditorLayout);
+                    ancestor=ancestor.getParent();
+                }
+                assertNotNull(SettingsScreensInteractionTest.find(activity.getWindow().getDecorView(),"Сохранить"));
                 MaterialCardView card=(MaterialCardView)rows.getChildAt(0);
                 int background=card.getCardBackgroundColor().getDefaultColor();
                 assertEquals(ContextCompat.getColor(activity,R.color.settings_group_background),background);

@@ -293,14 +293,16 @@ public final class SettingsEditSession {
         content.removeView(original);
         LinearLayout column=new LinearLayout(activity);column.setOrientation(LinearLayout.VERTICAL);column.setTag("natro.settings.draft");
         column.addView(original,new LinearLayout.LayoutParams(-1,0,1));
-        LinearLayout footer=new LinearLayout(activity);footer.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout footer=new LinearLayout(activity);footer.setOrientation(LinearLayout.VERTICAL);
         int padding=Math.round(10*activity.getResources().getDisplayMetrics().density);
         footer.setPadding(padding,padding/2,padding,padding/2);
-        state=new TextView(activity);state.setTextSize(18);footer.addView(state,new LinearLayout.LayoutParams(0,-2,1));
+        state=new TextView(activity);state.setTextSize(18);footer.addView(state,new LinearLayout.LayoutParams(-1,-2));
+        LinearLayout actions=new LinearLayout(activity);actions.setGravity(Gravity.END|Gravity.CENTER_VERTICAL);
         Button cancel=new Button(activity);cancel.setAllCaps(false);cancel.setText("Отмена");cancel.setTextSize(20);
-        cancel.setOnClickListener(v->{cancel(activity);finish.run();});footer.addView(cancel);
-        Button apply=new Button(activity);apply.setAllCaps(false);apply.setText("Применить");apply.setTextSize(20);
-        apply.setOnClickListener(v->{if(apply(activity)){cancel(activity);finish.run();}});footer.addView(apply);
+        cancel.setOnClickListener(v->{cancel(activity);finish.run();});actions.addView(cancel);
+        Button apply=new Button(activity);apply.setAllCaps(false);apply.setText(parent==null?"Сохранить":"В общий черновик");apply.setTextSize(20);
+        apply.setOnClickListener(v->{if(apply(activity)){cancel(activity);finish.run();}});actions.addView(apply);
+        footer.addView(actions,new LinearLayout.LayoutParams(-1,-2));
         column.addView(footer,new LinearLayout.LayoutParams(-1,-2));content.addView(column,0,old);updateState();
     }
     /** Invalid form input must not crash pause/back or silently commit the previous value. */
@@ -393,8 +395,8 @@ public final class SettingsEditSession {
         boolean valid=flushChanges();
         if(valid&&!dirty()){cancel(activity);return false;}
         new SettingsDialogBuilder(activity).setTitle("Сохранить изменения?")
-                .setMessage("Предпросмотр ещё не записан в настройки.")
-                .setPositiveButton("Применить",(d,w)->{if(apply(activity)){cancel(activity);finish.run();}})
+                .setMessage(parent==null?"Изменения ещё не сохранены.":"Изменения будут переданы в общий черновик. После возврата нажмите «Сохранить» на основном экране.")
+                .setPositiveButton(parent==null?"Сохранить":"В общий черновик",(d,w)->{if(apply(activity)){cancel(activity);finish.run();}})
                 .setNegativeButton("Отменить изменения",(d,w)->{cancel(activity);finish.run();})
                 .setNeutralButton("Продолжить",null).show();return true;
     }
@@ -403,7 +405,7 @@ public final class SettingsEditSession {
         if(session==null){activity.finish();return;}
         if(session.apply(activity)){session.cancel(activity);activity.finish();}
     }
-    private void updateState(){if(state!=null)state.setText(dirty()?"Предпросмотр · есть изменения":"Изменений нет");}
+    private void updateState(){if(state!=null)state.setText(dirty()?(parent==null?"Есть несохранённые изменения":"Черновик · сохранение на основном экране"):"Изменений нет");}
     private static void refresh(Context activity){
         WidgetService service=WidgetService.getInstance();if(service!=null)service.applyPreferences();
         String owner=activity.getClass().getSimpleName();

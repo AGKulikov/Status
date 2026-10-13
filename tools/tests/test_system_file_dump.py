@@ -12,6 +12,14 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'app/src/main/java/dezz/status/widget'
 
 class SystemDumpTest(unittest.TestCase):
+    def test_qnx_protocol_replay(self):
+        with tempfile.TemporaryDirectory() as work:
+            compiled=subprocess.run(['java','com.sun.tools.javac.Main','-d',work,
+                str(SOURCE/'diagnostics/QnxFileReader.java'),str(ROOT/'tools/tests/java/QnxFileReaderReplay.java')],capture_output=True,text=True)
+            self.assertEqual(compiled.returncode,0,compiled.stderr)
+            run=subprocess.run(['java','-cp',work,'dezz.status.widget.diagnostics.QnxFileReaderReplay'],capture_output=True,text=True,timeout=15)
+            self.assertEqual(run.returncode,0,run.stdout+run.stderr)
+
     def test_production_owner_parser(self):
         with tempfile.TemporaryDirectory() as work:
             run=subprocess.run(['java','com.sun.tools.javac.Main','-d',work,
@@ -21,7 +29,7 @@ class SystemDumpTest(unittest.TestCase):
             self.assertEqual(run.returncode,0,run.stdout+run.stderr)
     def test_production_binary_collector(self):
         with tempfile.TemporaryDirectory() as work:
-            files = [SOURCE/'diagnostics/SystemFileDump.java', SOURCE/'adb/AdbShellResult.java',
+            files = [SOURCE/'diagnostics/SystemFileDump.java', SOURCE/'diagnostics/QnxFileReader.java', SOURCE/'adb/AdbShellResult.java',
                      ROOT/'tools/tests/java/SystemFileDumpReplay.java']
             compiled = subprocess.run(['java','com.sun.tools.javac.Main','-d',work,*map(str,files)],capture_output=True,text=True)
             self.assertEqual(compiled.returncode,0,compiled.stderr)

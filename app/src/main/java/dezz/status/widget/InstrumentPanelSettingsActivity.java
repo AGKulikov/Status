@@ -601,11 +601,16 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
 
     private final class MapEdgeControls {
         final InstrumentElementConfig element;
-        final Switch enabled;
+        final Switch enabled, bottomFade;
         final SliderField strength, size;
 
         MapEdgeControls(LinearLayout content, InstrumentElementConfig element) {
             this.element = element;
+            bottomFade = switchView("Затемнение нижнего края карты (цветная полоса)",
+                    element.options.optBoolean("bottomFadeEnabled", true));
+            content.addView(bottomFade);
+            content.addView(text("Выключите, чтобы убрать нижнюю цветную полосу Natro. "
+                    + "Общий фон и штатные «крылья» не меняются.", 14, 0xFFB8C0CC));
             enabled = switchView("Размыть края карты", element.options.optBoolean("edgeBlurEnabled", false));
             content.addView(enabled);
             strength = slider(content, "Степень размытия края",
@@ -617,6 +622,7 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         }
 
         void apply() {
+            setOption(element, "bottomFadeEnabled", bottomFade.isChecked());
             setOption(element, "edgeBlurEnabled", enabled.isChecked());
             setOption(element, "edgeBlurStrengthPercent", strength.intValue());
             setOption(element, "edgeBlurSizePx", size.intValue());

@@ -7,6 +7,9 @@ import java.util.*;
 import java.util.function.Consumer;
 /** Deterministic daemon simulation; tests the real console policy, not an actual adbd. */
 public class AdbTransport {
+    public void collectQnx(dezz.status.widget.diagnostics.QnxFileReader.Receiver receiver) throws IOException {
+        throw new IOException("QNX unavailable in daemon policy fixture");
+    }
     public static final List<String> services = new ArrayList<>(), commands = new ArrayList<>();
     public static boolean root, refuse, dropRootReply;
     public static void reset() { root=false;refuse=false;dropRootReply=false;services.clear();commands.clear(); }

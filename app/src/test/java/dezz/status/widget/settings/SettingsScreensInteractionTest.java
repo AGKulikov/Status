@@ -80,7 +80,7 @@ public class SettingsScreensInteractionTest {
             android.content.SharedPreferences disk=activity.createDeviceProtectedStorageContext().getSharedPreferences(activity.getPackageName()+"_preferences",0);
             Map<String,?> before=disk.getAll();
             snapshot(decor,type.getSimpleName()+"-"+(theme==1?"light":"dark"));
-            Button apply=find(decor,"Применить");assertNotNull("Reachable Apply",apply);assertTrue(apply.isShown());
+            Button apply=find(decor,"Сохранить");assertNotNull("Reachable Save",apply);assertTrue(apply.isShown());
             if(type==PhoneConnectorSettingsActivity.class)for(String section:new String[]{"Состав","Поведение","Дополнительно"}){
                 Button tab=find(decor,section);assertNotNull(section,tab);assertTrue(section,tab.isShown());
             }

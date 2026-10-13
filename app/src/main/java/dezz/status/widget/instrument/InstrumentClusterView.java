@@ -1159,6 +1159,8 @@ public final class InstrumentClusterView extends View implements Choreographer.F
         paint.setShader(new LinearGradient(0f, bounds.top, 0f,
                 bounds.top + vertical, edge, Color.TRANSPARENT, Shader.TileMode.CLAMP));
         canvas.drawRect(bounds.left, bounds.top, bounds.right, bounds.top + vertical, paint);
+        // Independent of the background and of the transparent edge blur.
+        if (option(element, "bottomFadeEnabled", true)) {
         int bottomColor = withAlpha(Color.parseColor(config.backgroundBottomColor),
                 Math.round(235f * element.opacityPercent / 100f));
         paint.setShader(new LinearGradient(0f, bounds.bottom, 0f,
@@ -1166,6 +1168,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                 Shader.TileMode.CLAMP));
         canvas.drawRect(bounds.left, bounds.bottom - vertical,
                 bounds.right, bounds.bottom, paint);
+        }
         paint.setShader(null);
     }
 

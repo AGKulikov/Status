@@ -234,6 +234,7 @@ public final class InstrumentPanelContractTest {
         InstrumentPanelConfig old = InstrumentPanelPreset.STEEL_VECTOR.create();
         old.presetLayoutRevision = 1;
         InstrumentElementConfig oldMap = element(old, "map");
+        oldMap.options.put("bottomFadeEnabled", false);
         oldMap.x = 13;
         oldMap.width = 22;
         element(old, "speedometer").enabled = false;
@@ -244,6 +245,9 @@ public final class InstrumentPanelContractTest {
         JSONObject raw = old.toJson().put("presetLayoutRevision", 1);
 
         InstrumentPanelConfig upgraded = InstrumentPanelConfig.fromJson(raw);
+        assertFalse(element(upgraded, "map").options.optBoolean("bottomFadeEnabled", true));
+        assertFalse(element(InstrumentPanelConfig.fromJson(upgraded.toJson()), "map")
+                .copy().options.optBoolean("bottomFadeEnabled", true));
 
         assertEquals(InstrumentPanelPreset.LAYOUT_REVISION,
                 upgraded.presetLayoutRevision);

@@ -36,6 +36,8 @@ public class AllAppsSettingsActivity extends dezz.status.widget.settings.Setting
     private interface IntSetter { void set(int value); }
 
     protected boolean passengerPanel() { return false; }
+    // A single catalog is not a multi-section form. Keep the list full width.
+    @Override protected boolean usesEditorSections() { return false; }
     private Preferences preferences;
     private LinearLayout applications;
     private TextView visibleCount;
@@ -80,6 +82,9 @@ public class AllAppsSettingsActivity extends dezz.status.widget.settings.Setting
         LinearLayout.LayoutParams hintParams = rowParams();
         hintParams.bottomMargin = dp(12);
         root.addView(hint, hintParams);
+        root.addView(text("Выберите приложения, затем нажмите кнопку внизу экрана. "
+                + "Если написано «В общий черновик», после возврата сохраните изменения "
+                + "на основном экране настроек. «Отмена» отменяет выбор.", 17, 0xFFB8C0CC), rowParams());
 
         slider(root, "Столбцы", 3, 8,
                 clamp((passengerPanel() ? preferences.passengerAllAppsColumns : preferences.launcherAllAppsColumns).get(), 3, 8), "", value -> {
