@@ -1,0 +1,46 @@
+QNX graphic path investigation, 2026-10-12
+Offline read-only. No commands executed on the vehicle.
+
+qcdisplaycfg.xml active WFD clients:
+0x78FF Screen: QDI display3 layers5/6/7 (CSD BootLogo, CSD RVC, AVM),
+QDI display2 layer8 (PSD). Historical DIM+HUD comment on layer7 is followed
+by explicit For AVM display on CSD now. This is not a confirmed DIM wing layer.
+0x7815 LA_GVM: QDI display3 layers14/15 (CSD SF/overlay), display1 layer16
+(DIM+HUD, Z6), display2 layer17 (PSD,Z7).
+0x7816 LV_GVM: display3 layer10, Z0.
+TELLTALE client0x7812 is commented out; not evidence of an active telltale layer.
+
+UDS_SOMEIP_Gateway:
+screenSsplashUtility::ssplash_start VA0x51a80 takes an image path and display
+array index. Enumerates Screen displays, loads image, sets ZORDER255,
+selects display at0x51df0, centers the window at0x51fdc–0x52018 using display
+and window sizes, posts at0x520b0, flushes at0x520e0.
+This is a static-image path; no proof it draws stock cluster wings.
+The separate DID HUD calibration handler did_hud_calibration_d90f_handle
+calls display_imageShowClose VA0x1a180, which launches /usr/bin/display_image
+with -size=456x152 -zorder=1 -display=3 and a calibration image path.
+Do not equate display_image CLI number with Android display ID or QDI ID.
+
+VsomeipTestService SHA2566df50cb8d4a3022a663c0f84fd506415c65cbe68ea9729851c5b892c90188bd8:
+main calls function VA0x3528 every500ms with fixed bytes01 01 01 01.
+Function logs sendFullMapModeReq and calls application_impl::notify;
+virtual slot0xa0 verified against libvsomeip.so.2 vtable relocation.
+service0x00e0,instance1,event0x8001. Startup references not found in inspected
+configs. One captured PCAP (Linux SLL linktype113) contains15036IPv4 UDP packets;
+39 parsed SOME/IP messages are SD serviceffff/method8100; no00e0 event found.
+This is limited capture evidence, not proof the service can never operate.
+
+Additional archive KX11-VP-Firmware-Evidence.zip inspected:
+linux-la.img and linux-lv.img have ARM64 Linux Image headers and Linux4.14.156
+version strings. LV contains gzip initramfs at file offset19406128;
+342CPIO entries. init.rc imports init.recovery.${ro.hardware}.rc and launches
+recovery,swdl_soc,swdl_gtw,mcu_log. Resources include installation/error/progress
+images. Thus this concrete LV image is a recovery/update environment, not an
+identified stock cluster graphics application. No confirmed wing asset or
+renderer obtained from these paths. Small LA built-in CPIO parsed separately;
+do not claim complete unpacking of all image content or all disk slices.
+
+Working hypothesis: current QNX material describes HU host/display transport;
+stock DIM rendering may be in another controller/image. Still unproven.
+Missing binaries in inspected archives include openwfd_server,openwfd_telltale,
+screen and libopenwfd_qnx.so despite their names in filesystem listings.

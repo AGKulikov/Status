@@ -1,5 +1,15 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 13.10.2026 — уточнение QNX DIM transport
+
+Активный LA_GVM port3→QDI1/layer16/Z6 DIM+HUD→MAX96755_QC_0_UART.
+Библиотека перечислена в QNX inventory, байтов в проверенных архивах нет.
+QUP4 passthrough0x890000 подтверждён linux.config; ttyHS2→QUP4 не доказано.
+Нельзя отождествлять Android ttyHS2, QNX ser2/ser4 и QDI display IDs.
+[Отчёт и хеши](docs/geely-kx11/research-2026-10-13-dim/QNX_PANEL_ROUTE_RU.md).
+Добавлен пропущенный QNX graphics report12октября: архивная консолидация теперь
+32 отчёта/9 архивов; ниже сохранено описание первоначальной31/8 публикации.
+
 ## Индекс исследований12–13.10.2026
 
 [Карта найденных отчётов, происхождения и актуальных уточнений](docs/geely-kx11/research-2026-10-12-13-archive/README_RU.md).
