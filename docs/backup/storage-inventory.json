@@ -425,6 +425,14 @@
         "files"
       ]
     },
+    "app/src/main/java/dezz/status/widget/DiagnosticsActivity.java": {
+      "sha256": "4a0c38f8134a7c4bfe8ed18f8584f401829110bcdbc6edc94eeb03c02dc7cd21",
+      "access_kinds": ["files"]
+    },
+    "app/src/main/java/dezz/status/widget/diagnostics/SystemFileDump.java": {
+      "sha256": "f69a7f021072045ce665d8991e8325d0787d1143183b488583043014669a0d75",
+      "access_kinds": ["files"]
+    },
     "app/src/main/java/dezz/status/widget/diagnostics/DiagnosticBundle.java": {
       "sha256": "51033b860722671e3fb04b94a4ebbdde3c003e2e04073feccc85550e1700fc95",
       "access_kinds": [
@@ -687,8 +695,12 @@
         "files"
       ]
     },
+    "app/src/main/java/dezz/status/widget/transfer/NatroSharedFolder.java": {
+      "sha256": "285dc449d11866e9da5972f8fe93951f2fd2c2fe0ee22459add2a711ebf9b97f",
+      "access_kinds": ["files"]
+    },
     "app/src/main/java/dezz/status/widget/transfer/LanTransferService.java": {
-      "sha256": "e1f31a2833cd53fb8aa8e69f611686997261ef1a74671b5931f14f03766aba6e",
+      "sha256": "557d0876e90c78645cba5b5815cccf2f83e633bffbcb28910602d7e3b8f73683",
       "access_kinds": [
         "files"
       ]

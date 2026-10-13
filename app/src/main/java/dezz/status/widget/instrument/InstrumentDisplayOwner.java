@@ -6,7 +6,8 @@ import java.util.regex.Pattern;
 /** Read-only Android 9 `am stack list` snapshot; ambiguity never grants screen ownership. */
 final class InstrumentDisplayOwner {
     private static final Pattern STACK = Pattern.compile("(?m)^Stack id=\\d+ [^\\r\\n]*\\bdisplayId=(\\d+)\\b[^\\r\\n]*$");
-    private static final Pattern TOP = Pattern.compile("\\bvisible=true\\s+topActivity=ComponentInfo\\{([^}]+)}");
+    // Android 9 uses ICU: unlike the host JVM, an unescaped closing brace is invalid.
+    private static final Pattern TOP = Pattern.compile("\\bvisible=true\\s+topActivity=ComponentInfo\\{([^}]+)\\}");
     static boolean owns(String output, int display, String packageName) {
         if (output == null || output.length() > 128 * 1024 || display < 0) return false;
         Matcher headers = STACK.matcher(output);

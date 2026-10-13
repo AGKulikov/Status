@@ -74,6 +74,12 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
     private EditText markerComment;
     private Switch rootInputEnabled;
     private boolean screenResumed;
+    private dezz.status.widget.adb.AdbConsoleSession systemDumpSession;
+    private Button systemDumpButton;
+    private Button systemDumpShare;
+    private Button systemDumpSave;
+    private TextView systemDumpState;
+    private File systemDumpFile;
     private long refreshGeneration;
     private long lifecycleGeneration;
     private List<String> lastComponentChoices = new ArrayList<>();
@@ -103,6 +109,21 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
         super.onResume();
         screenResumed = true;
         refreshAll();
+        if (systemDumpFile == null && systemDumpSession == null) {
+            final Context app = getApplicationContext();
+            try { exportWorker.execute(() -> {
+                File latest = dezz.status.widget.diagnostics.SystemFileDump.latest(new File(app.getCacheDir(), "exports"));
+                runOnUiThread(() -> {
+                    if (isDestroyed() || systemDumpSession != null || systemDumpFile != null || latest == null) return;
+                    systemDumpFile = latest;
+                    systemDumpShare.setEnabled(true);
+                    systemDumpSave.setEnabled(true);
+                    systemDumpState.setText("Доступен предыдущий дамп. Его полнота и время указаны внутри ZIP.");
+                });
+            }); } catch (java.util.concurrent.RejectedExecutionException busy) {
+                // An active export owns this bounded lane; a later resume can rediscover the ZIP.
+            }
+        }
     }
 
     @Override protected void onPause() {
@@ -114,6 +135,7 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
     }
 
     @Override protected void onDestroy() {
+        if (systemDumpSession != null) systemDumpSession.close();
         lifecycleGeneration++;
         refreshGeneration++;
         refreshWorker.shutdownNow();
@@ -186,6 +208,27 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
         legacyText.setOnClickListener(view -> exportAsync(0));
         incidentActions.addView(legacyText, weightedWithMargin(8));
         page.addView(incidentActions, topMargin(8));
+
+        LinearLayout dumpActions = row();
+        systemDumpButton = button("Дамп системных файлов");
+        systemDumpButton.setOnClickListener(view -> {
+            if (systemDumpSession != null) {
+                systemDumpSession.cancel("Сбор отменён пользователем");
+                systemDumpState.setText("Отмена… Уже проверенные файлы сохранятся в частичном ZIP.");
+            } else confirmSystemDump();
+        });
+        dumpActions.addView(systemDumpButton, weighted());
+        systemDumpShare = button("Отправить дамп ZIP");
+        systemDumpShare.setEnabled(false);
+        systemDumpShare.setOnClickListener(view -> share(systemDumpFile, "application/zip"));
+        dumpActions.addView(systemDumpShare, weightedWithMargin(8));
+        systemDumpSave = button("В Загрузки/Natro");
+        systemDumpSave.setEnabled(false);
+        systemDumpSave.setOnClickListener(view -> confirmDumpToDownloads());
+        dumpActions.addView(systemDumpSave, weightedWithMargin(8));
+        page.addView(dumpActions, topMargin(8));
+        systemDumpState = label("Отдельный сбор DIM/UART через ADB: системные файлы, не полный образ прошивки.");
+        page.addView(systemDumpState, topMargin(8));
 
         page.addView(heading("Регистратор воспроизводимых действий", 21), topMargin(28));
         page.addView(label("Сессия фиксирует порядок: обычные кнопки руля "
@@ -499,6 +542,98 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
             Toast.makeText(this, "Экспорт уже выполняется; дождитесь завершения",
                     Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void confirmSystemDump() {
+        new AlertDialog.Builder(this).setTitle("Снять системный дамп?")
+                .setMessage("Только чтение 9 файлов DIM/UART, включая dim_dtc.ko. До 8 МиБ на файл, "
+                        + "64 МиБ суммарно и 60 секунд. Нужен доступ к встроенному ADB; доступный su 0 "
+                        + "проверяется без перезапуска adbd. Прошивка и настройки не изменяются. "
+                        + "Отсутствующие или недоступные файлы будут отмечены. Архив содержит закрытые "
+                        + "системные файлы — передавайте его лично, не публикуйте. Хранятся два последних ZIP "
+                        + "во временной памяти приложения. При закрытии экрана сбор отменяется.")
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Снять дамп", (dialog, which) -> startSystemDump()).show();
+    }
+
+    private void startSystemDump() {
+        if (!dezz.status.widget.diagnostics.SystemFileDump.RUNNING.compareAndSet(false, true)) {
+            systemDumpState.setText("Другой сбор ещё выполняется. Дождитесь завершения.");
+            return;
+        }
+        final dezz.status.widget.adb.AdbConsoleSession session =
+                new dezz.status.widget.adb.AdbConsoleSession(getApplicationContext());
+        systemDumpSession = session;
+        systemDumpFile = null;
+        systemDumpShare.setEnabled(false);
+        systemDumpSave.setEnabled(false);
+        systemDumpButton.setText("Отменить сбор");
+        systemDumpState.setText("Подключение к ADB…");
+        final java.util.concurrent.atomic.AtomicReference<dezz.status.widget.diagnostics.SystemFileDump.Report> result =
+                new java.util.concurrent.atomic.AtomicReference<>();
+        session.submit(adb -> {
+            adb.connect();
+            result.set(dezz.status.widget.diagnostics.SystemFileDump.collect(
+                    new File(getCacheDir(), "exports"), adb::command, text -> runOnUiThread(() -> {
+                        if (!isDestroyed() && systemDumpSession == session) systemDumpState.setText(text);
+                    }), BuildConfig.VERSION_NAME));
+        }, error -> {
+            session.close();
+            dezz.status.widget.diagnostics.SystemFileDump.RUNNING.set(false);
+            runOnUiThread(() -> {
+                if (isDestroyed() || systemDumpSession != session) return;
+                systemDumpSession = null;
+                systemDumpButton.setText("Дамп системных файлов");
+                dezz.status.widget.diagnostics.SystemFileDump.Report report = result.get();
+                if (report == null) {
+                    systemDumpState.setText("Дамп не создан: ADB недоступен, сбор отменён или произошла ошибка хранения. "
+                            + "Проверьте подключение и авторизацию в разделе ADB. Перезапуск служб не выполнялся.");
+                } else {
+                    systemDumpFile = report.file;
+                    systemDumpShare.setEnabled(true);
+                    systemDumpSave.setEnabled(true);
+                    systemDumpState.setText((report.collected == report.requested && error == null ? "Сбор завершён. " : "Частичный дамп. ")
+                            + "Получено " + report.collected + "/" + report.requested + " файлов. "
+                            + "Причины пропусков — в manifest.tsv. Нажмите «Отправить дамп ZIP».");
+                }
+            });
+        });
+    }
+
+    private void confirmDumpToDownloads() {
+        if (systemDumpFile == null) return;
+        if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 8767);
+            systemDumpState.setText("Разрешите доступ к файлам и снова нажмите «В Загрузки/Natro».");
+            return;
+        }
+        final File source = systemDumpFile;
+        new AlertDialog.Builder(this).setTitle("Сохранить дамп для iPhone?")
+                .setMessage("Копия ZIP будет в общей папке Download/Natro. Она доступна другим приложениям "
+                        + "и сопряжённому телефону при включённом обмене. Файл не удаляется автоматически. "
+                        + "Дамп может содержать закрытые системные файлы — не публикуйте его.")
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Сохранить", (dialog, which) -> {
+                    systemDumpSave.setEnabled(false);
+                    try { exportWorker.execute(() -> {
+                        String message;
+                        try {
+                            File directory = new File(android.os.Environment.getExternalStoragePublicDirectory(
+                                    android.os.Environment.DIRECTORY_DOWNLOADS), "Natro");
+                            File saved = new dezz.status.widget.transfer.NatroSharedFolder(directory).exportDump(source);
+                            message = "Сохранено: Download/Natro/" + saved.getName()
+                                    + ". В обмене с телефоном обновите папку Natro и нажмите «Скачать».";
+                        } catch (Exception error) { message = "Не удалось сохранить в Download/Natro. Проверьте разрешение и свободное место. Приватный ZIP сохранён."; }
+                        final String result = message;
+                        runOnUiThread(() -> { if (!isDestroyed()) {
+                            systemDumpSave.setEnabled(systemDumpFile != null && systemDumpSession == null);
+                            systemDumpState.setText(result);
+                        }});
+                    }); } catch (java.util.concurrent.RejectedExecutionException busy) {
+                        systemDumpSave.setEnabled(true);
+                        systemDumpState.setText("Экспорт занят. Повторите после завершения.");
+                    }
+                }).show();
     }
 
     private void markProblem() {

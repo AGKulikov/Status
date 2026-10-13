@@ -68,6 +68,15 @@ public final class LanTransferActivity extends dezz.status.widget.settings.Setti
                     .setMessage(service == null ? "Включите сервер, чтобы увидеть папку приёма" : service.folder() + "\n\nФайлы также доступны в списке Safari. APK автоматически не устанавливаются.")
                     .setPositiveButton("Закрыть", null).show();
         }));
+        root.addView(button("Доступ к Загрузки/Natro", () -> {
+            if (checkSelfPermission(android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 8766);
+            } else new androidx.appcompat.app.AlertDialog.Builder(this).setTitle("Загрузки / Natro")
+                    .setMessage("В Safari после сопряжения доступен отдельный список файлов Download/Natro. "
+                            + "Сохраните туда файлы на магнитоле, затем нажмите «Обновить папку Natro» на iPhone. "
+                            + "Доступ только к файлам этой папки, без подкаталогов. Ничего не удаляется. До 256 МиБ на файл.")
+                    .setPositiveButton("Закрыть", null).show();
+        }));
         ScrollView scroll = new ScrollView(this); scroll.addView(root); setContentView(scroll); SettingsBackNavigation.applySafeTopInset(this, root);
         if (saved != null) text.setText(saved.getString("text", "")); addresses();
     }

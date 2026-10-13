@@ -22,6 +22,7 @@ public final class LanTransferService extends Service {
     private final Set<String> seenCommands = new HashSet<>();
     private volatile LanHttpServer server;
     private volatile LanFileStore files;
+    private NatroSharedFolder sharedFolder;
     private volatile AdbConsoleSession adb;
     private volatile LanPairing pairing;
     private volatile boolean remoteCommands;
@@ -43,6 +44,7 @@ public final class LanTransferService extends Service {
             try {
                 File root = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS); if (root == null) root = getFilesDir();
                 files = new LanFileStore(new File(root, "Natro-Incoming"));
+                sharedFolder = new NatroSharedFolder(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Natro"));
                 pairing = new LanPairing(SystemClock.elapsedRealtime()); adb = new AdbConsoleSession(this);
                 synchronized (this) { if (destroyed) { adb.close(); return; } server = new LanHttpServer(PORT, this::request); }
                 status = "Сервер включён";
@@ -132,6 +134,12 @@ public final class LanTransferService extends Service {
                     if (!get(request, output)) return;
                     JSONArray list = new JSONArray(); for (LanFileStore.Item file : files.list()) list.put(new JSONObject().put("id", file.id).put("name", file.name).put("size", file.file.length()));
                     json(output, 200, new JSONObject().put("files", list)); return;
+                case "/api/natro-files":
+                    if (!get(request, output)) return;
+                    JSONArray shared = new JSONArray();
+                    for (NatroSharedFolder.Item item : sharedFolder.list()) shared.put(new JSONObject()
+                            .put("id", item.id).put("name", item.name).put("size", item.size).put("modified", item.modified));
+                    json(output, 200, new JSONObject().put("files", shared)); return;
                 case "/api/upload":
                     if (!post(request, output)) return;
                     String name = URLDecoder.decode(request.headers.getOrDefault("x-file-name", "file"), "UTF-8");
@@ -141,6 +149,16 @@ public final class LanTransferService extends Service {
                     if (!post(request, output)) return;
                     command(request, output); return;
                 default:
+                    if (request.path.startsWith("/api/natro-file/") && request.method.equals("GET")) {
+                        // Validate and open before committing HTTP headers. Never append JSON to a partial binary response.
+                        NatroSharedFolder.Download download = sharedFolder.open(request.path.substring(16));
+                        try (NatroSharedFolder.Download owned = download) {
+                            LanHttpServer.header(output, 200, "application/octet-stream", owned.size,
+                                    "attachment; filename*=UTF-8''" + URLEncoder.encode(owned.name, "UTF-8").replace("+", "%20"));
+                            owned.writeTo(output);
+                        } catch (IOException interrupted) { /* socket closes; no false successful body */ }
+                        return;
+                    }
                     if (request.path.startsWith("/api/job/") && request.method.equals("GET")) {
                         Job job; synchronized (jobs) { job = jobs.get(request.path.substring(9)); }
                         if (job == null || !job.token.equals(request.token())) { json(output, 404, new JSONObject().put("error", "Команда не найдена; не отправляйте повторно вслепую")); return; }
