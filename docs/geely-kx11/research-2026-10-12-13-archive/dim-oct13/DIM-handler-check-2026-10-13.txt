@@ -1,0 +1,124 @@
+ПРОВЕРКА ПОЛУЧАТЕЛЯ ACTION35/36 В НАШИХ ПРИЛОЖЕНИЯХ
+13.10.2026. Только статический анализ, без запуска APK и команд автомобиля.
+
+ИТОГ
+Предположение, что action35/36 обязательно обрабатываются нашим Навигатором,
+не подтвердилось. Найден другой конкретный путь в Natro: собственный
+InstrumentDisplayLauncher переключает DIM и запускает InstrumentPanelActivity.
+Путь не требует найденного SDK-callback action35/36.
+
+ИСТОЧНИКИ И ГРАНИЦЫ ВЕРСИЙ
+Natro-3.1.3-signed.apk: package ru.natro.statuswidget, version3.1.3,
+versionCode208021346; SHA256:
+3332b6c158e2243a9ef6591d1a5bf4f38b4526aa61893c21d47a91c1fd3ae5ea
+Navigator-30.3.0-Natro-3.0.2-signed.apk: package ru.yandex.yandexnavi,
+version30.3.0, versionCode739564630; SHA256:
+958832329aa5d938d735e18b27d658c608082253a256b10937d6acc73c5c7058
+Это проверенные файлы, не доказательство их текущей установки на машине.
+Дополнительно: DimMenu из системного дампа27.07, ecarx.jar и сервис DIM
+из предыдущего этапа; первичный лог hudlab-cluster-20260730-213051.txt.
+
+1. ПОИСК САМОГО ОБРАБОТЧИКА
+Проверены все19 classes*.dex Навигатора. Не найдены строки/ссылки:
+onDoInteractionAction, INavigationInteractionCallback,
+registerNavigationInteractionCallback, EXT_KEY_DIM_DISPLAY_MODE.
+Следовательно прямую Java/DEX-реализацию указанного ECARX callback
+в этом Навигаторе мы не нашли. Это не исключает произвольный native-код,
+внешний динамически загруженный код или построение имён во время исполнения.
+
+В Natro проверены все3 DEX; целевые ссылки только в classes.dex.
+Четыре выбранных метода принадлежат встроенному SDK:
+NaviInteraction$DIMProtocolServiceCallbackImpl.onReceived,
+NaviInteraction.registerNavigationInteractionCallback,
+NaviInteraction.unregisterNavigationInteractionCallback,
+NaviInteraction.updateExtensionInfo.
+Прямых вызовов регистрации или конкретного прикладного тела
+onDoInteractionAction в DEX Natro не найдено.
+В DimMenu аналогичный поиск дал те же четыре SDK-метода.
+
+registerNavigationInteractionCallback просто присваивает mNaviCallback;
+unregister обнуляет поле. SDK вызывает action35/36 только когда поле не null.
+Наличие этих SDK-классов в APK не означает наличие работающего получателя.
+
+2. СВЕРКА С ПЕРВИЧНЫМ ЛОГОМ
+30.07,21:31:11.254: DIMPROTOCOL_HAL msg_received_cb, received[01].
+21:31:11.255..260: девять записей NaviInteraction mNaviCallback is null
+в нескольких процессах; рядом DimMenuInteraction: opcode7,data1.
+Это показывает, что такой незарегистрированный callback действительно
+встречался в наших захватах, а не только возможен по коду.
+Лог июльский: он не доказывает состояние октябрьской Natro3.1.3, и PID
+здесь не были надёжно сопоставлены всем пакетам. Не делаем такой подмены.
+
+3. ФАКТИЧЕСКИЙ ПУТЬ В NATRO3.1.3
+InstrumentPanelLaunchCoordinator использует LaunchHost.prepareDim.
+InstrumentDisplayLauncher$LaunchHost.lambda$prepareDim$3:
+0x26..0x32: switchDimMode(context,3), сохраняется boolean результата;
+0x34..0x38: SystemClock.sleep(100);
+0x3e..0x62: повторная проверка BooleanSupplier актуальности запроса;
+0x64..0x68: sendDimWake(context);
+0x6e..0x72: SystemClock.sleep(200);
+0x78..0x82: readDimMode(context);
+0xbc: InstrumentPanelLaunchCoordinator.dimPrepared(accepted,readback);
+0xc4..0xd6: возврат результата на main-поток через Consumer.
+Это задержки кода, не гарантированные интервалы UART.
+
+switchDimMode получает DimMenu через reflection и вызывает switchNaviMode.
+sendDimWake самостоятельно вызывает DIMProtocolManager.sendMessageToDIM:
+type2,len8,opcode8,API data=[1].
+То есть посылка8 не требует updateExtensionInfo Навигатора или action35/36.
+readDimMode через reflection вызывает DimMenu.getNaviMode.
+В разобранном июльском системном сервисе эта цепь читает Global.NaviMode,
+а не фактический режим DIM. Совпадение версии системного сервиса с текущей
+установкой нужно подтверждать, но именно этот сервис есть в нашем дампе.
+
+4. ПРОВЕРКА ГОТОВНОСТИ — КОНКРЕТНОЕ СЛАБОЕ МЕСТО
+dimPrepared(boolean accepted,Integer readback), offsets0x00..0x1a:
+  если readback==null: вернуть accepted;
+  иначе: вернуть readback==3.
+Следовательно:
+accepted=false,readback=3 -> true;
+accepted=true,readback=null -> true;
+accepted=true,readback=1 -> false.
+Проверка подтверждает программное состояние/возврат API, не получение
+разрешающего RX7 приборки. Это потенциальный ложноположительный результат
+подготовки; причинность конкретного белого экрана или «крыльев» не доказана.
+
+При false координатор идёт в retry("dim-not-ready"). При true дополнительно
+проверяет доступность дисплея и WindowState.readyFor(displayId).
+Если окно готово, reloadPanel; иначе launch.
+Нельзя утверждать, что приложение вообще не проверяет окно: такая проверка есть.
+
+5. ДО КАКОГО ВЫХОДА ДОШЛИ
+LaunchHost.lambda$startPanel$7:
+создаёт Intent на InstrumentPanelActivity;
+добавляет instrument_launch_token;
+ActivityOptions.setLaunchDisplayId(selectedDisplayId);
+Bundle android.activity.windowingMode=5,
+android.activity.SplitScreenShownPosition=0;
+Context.startActivity(intent,bundle).
+После принятия запуска координатор переходит в фазу WINDOW,
+ставит deadline now+15000ms и вызывает checkWindow.
+Это собственная панель Natro, а не доказанный вызов обработчика в Яндекс Навигаторе.
+
+Дополнительный путь ButtonDriverAppLauncher.mode также вызывает
+switchNaviMode, планирует через100ms отправку type2,len8,opcode8,[1],
+затем через200ms продолжает сценарий. Он отдельно сохранён в дизассемблировании.
+Нельзя заранее считать все сообщения8 ответом на callback навигации.
+
+6. ЧТО ЭТО МЕНЯЕТ В ПРЕЖНЕЙ КАРТЕ
+Штатная ветвь SDK RX7 -> action35/36 существует, но её прикладной получатель
+не найден в проверенных наших APK. Это не незамкнутая обязательная часть
+пуска Natro: найден собственный альтернативный путь до запуска панели.
+Новый путь объясняет, почему TX8 может идти раньше RX7. Августовская запись
+имела именно такой порядок, однако этот факт не идентифицирует старого
+отправителя как октябрьский InstrumentDisplayLauncher3.1.3.
+
+По «крыльям» остаётся другая граница: аппаратный получатель UART и renderer
+приборки. Найденный код Natro не доказывает независимое управление их геометрией.
+Изменений Natro/Навигатора/прошивки на этом этапе не делалось.
+
+ВОСПРОИЗВОДИМОСТЬ
+trace_nav_handler.py: поиск exact-строк во всех DEX, дизассемблирование
+методов с целевыми ссылками; JSON содержит хеши каждого DEX.
+trace_custom_dim.py: полные выбранные классы launcher/coordinator и их ссылки.
+Основные доказательства: dim_evidence/nav_handler/*.json и *.txt.

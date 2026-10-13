@@ -1,0 +1,300 @@
+{
+  "scope": "Разбор кастомного update и DIM за12–13.10.2026; отчёты, не полные первичные дампы",
+  "archives": [
+    {
+      "name": "Natro-update-analysis-2026-10-12.zip",
+      "sha256": "b301411cb65deea0e8aaf9ccc40dc2fa6ddfbdc63d08195794c0a18eae92acdb",
+      "entries": 25214
+    },
+    {
+      "name": "Natro-DIM-log-comparison-2026-10-12.zip",
+      "sha256": "a78e72659cb422c5ddd98ca630aa11470632ba7afcb9854659c91f52a29a4e73",
+      "entries": 8
+    },
+    {
+      "name": "Natro-DIM-UART-parameters.zip",
+      "sha256": "2513e30a6bf0bb741a5feec74af19df2f10811b971e7673921fc13174df1e5dc",
+      "entries": 13
+    },
+    {
+      "name": "Natro-DIM-protocol-analysis-2026-10-12.zip",
+      "sha256": "240809c861cd7566e787b6232e3ff6ccd2217d7d6db8523fb0ddb0336171ffba",
+      "entries": 6
+    },
+    {
+      "name": "Natro-DIM-white-bar-resource-trace.zip",
+      "sha256": "dafc20d063e8f9e9521a18e41c1277395e03ac389049aa1ae31b6e4566b69034",
+      "entries": 8
+    },
+    {
+      "name": "Natro-DIM-receiver-collection.zip",
+      "sha256": "e94fcb36e9827f5b3185f28da094678ca85e5784cdd941b7d2f9c7c9a7939fbe",
+      "entries": 3
+    },
+    {
+      "name": "Natro-DIM-file-analysis-2026-10-12.zip",
+      "sha256": "cb1235fcd27541950cb1b0860fcc75acbe6789e5962ab2f9b8e0300cccf811f2",
+      "entries": 7
+    },
+    {
+      "name": "Natro-DIM-followup-2026-10-13.zip",
+      "sha256": "92b4e57e372db0d95fdebc5e3a2b46d4293d9a196b80da63dc8c8505de25780f",
+      "entries": 77
+    }
+  ],
+  "reports": [
+    {
+      "archive": "Natro-update-analysis-2026-10-12.zip",
+      "member": "recovered/VIRBOX_FINDINGS.txt",
+      "source_sha256": "c3b114774667caa7651c21fc94a959358785fb7c70d99a24a7462d5b5be36ab2",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/update/VIRBOX_FINDINGS.txt",
+      "published_sha256": "f19da1bb5617ce6f0b8d8bf5b67f806226c77f48f6135ef8f8cc16276bf8a59f",
+      "redacted_lines": [
+        48
+      ]
+    },
+    {
+      "archive": "Natro-update-analysis-2026-10-12.zip",
+      "member": "recovered/full_audit/SETTINGS_CATALOGUE_RU.txt",
+      "source_sha256": "b5efcb963f89406c3f3cb4630c417539603f735b3340a008e01aa8f4bc3a6676",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/update/full_audit/SETTINGS_CATALOGUE_RU.txt",
+      "published_sha256": "b5efcb963f89406c3f3cb4630c417539603f735b3340a008e01aa8f4bc3a6676",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-update-analysis-2026-10-12.zip",
+      "member": "recovered/full_audit/README.txt",
+      "source_sha256": "f242f0e27b4ef296ac56f701228fc1369f774151c71707bec96822d733af7f73",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/update/full_audit/README.txt",
+      "published_sha256": "f242f0e27b4ef296ac56f701228fc1369f774151c71707bec96822d733af7f73",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-update-analysis-2026-10-12.zip",
+      "member": "recovered/full_audit/XCSettings2/UI_FUNCTIONS_RU.txt",
+      "source_sha256": "e1366870aa29009e4122f925fdcb18ed9407aa219d37a15e889310fe2ba46dd0",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/update/full_audit/XCSettings2/UI_FUNCTIONS_RU.txt",
+      "published_sha256": "e1366870aa29009e4122f925fdcb18ed9407aa219d37a15e889310fe2ba46dd0",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-update-analysis-2026-10-12.zip",
+      "member": "recovered/full_audit/GMCSoft/RUNNERS_RU.txt",
+      "source_sha256": "6fca0b0e1f000e7a22b36b65832018c429b856ddcadf08d86365e98a6b5da122",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/update/full_audit/GMCSoft/RUNNERS_RU.txt",
+      "published_sha256": "6fca0b0e1f000e7a22b36b65832018c429b856ddcadf08d86365e98a6b5da122",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-update-analysis-2026-10-12.zip",
+      "member": "recovered/README.txt",
+      "source_sha256": "7f23e1d577f952a5906344fcd833702af6203096d728baf3fd6fea4334c8ea40",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/update/README.txt",
+      "published_sha256": "8a42ff6e140e390f1993bd2155603432f6c1aede7b3b1882eafa8821ad37ba3c",
+      "redacted_lines": [
+        157
+      ]
+    },
+    {
+      "archive": "Natro-update-analysis-2026-10-12.zip",
+      "member": "recovered/deep_audit/COVERAGE_AND_NEXT_RU.txt",
+      "source_sha256": "e93eb25729f76d321974333ce8aa5fab6c4f6f11e0f964afd7adc0e692055eea",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/update/deep_audit/COVERAGE_AND_NEXT_RU.txt",
+      "published_sha256": "e93eb25729f76d321974333ce8aa5fab6c4f6f11e0f964afd7adc0e692055eea",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-update-analysis-2026-10-12.zip",
+      "member": "recovered/deep_audit/README.txt",
+      "source_sha256": "b8e72429ce14b8be484858fea9b49cb15d2e42ac048b818eadb08b512beb2b0c",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/update/deep_audit/README.txt",
+      "published_sha256": "b8e72429ce14b8be484858fea9b49cb15d2e42ac048b818eadb08b512beb2b0c",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-update-analysis-2026-10-12.zip",
+      "member": "recovered/deep_audit/SETTINGS_RESOLVED_INDEX_RU.txt",
+      "source_sha256": "7b24f1989f343ee08276af6e72d8796b292f4c9922160e07d7c6076abf828f7a",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/update/deep_audit/SETTINGS_RESOLVED_INDEX_RU.txt",
+      "published_sha256": "7b24f1989f343ee08276af6e72d8796b292f4c9922160e07d7c6076abf828f7a",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-update-analysis-2026-10-12.zip",
+      "member": "recovered/deep_audit/audio_seat_climate/README_RU.txt",
+      "source_sha256": "46a561b0d825282cb00dda27307c55e038532b68f9c6a1672f76cda0179714e9",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/update/deep_audit/audio_seat_climate/README_RU.txt",
+      "published_sha256": "46a561b0d825282cb00dda27307c55e038532b68f9c6a1672f76cda0179714e9",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-update-analysis-2026-10-12.zip",
+      "member": "recovered/deep_audit/climate_reset/README_RU.txt",
+      "source_sha256": "f71af11f300053ebe0579ffcfc7ecb5745c5401cbd6188b17b5e296c7080e5e5",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/update/deep_audit/climate_reset/README_RU.txt",
+      "published_sha256": "f71af11f300053ebe0579ffcfc7ecb5745c5401cbd6188b17b5e296c7080e5e5",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-update-analysis-2026-10-12.zip",
+      "member": "recovered/deep_audit/parameters/KANZI_PROTOCOL_RU.txt",
+      "source_sha256": "c6549a5e2c56a16050c985777d2fcc35aa4d82587f365e5f9f3e1c20567f6feb",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/update/deep_audit/parameters/KANZI_PROTOCOL_RU.txt",
+      "published_sha256": "c6549a5e2c56a16050c985777d2fcc35aa4d82587f365e5f9f3e1c20567f6feb",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-update-analysis-2026-10-12.zip",
+      "member": "recovered/deep_audit/parameters/README_RU.txt",
+      "source_sha256": "e3c3ada4af7b961955a31808e46eb507d6b2ec3666851e333cf97c6804c3c107",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/update/deep_audit/parameters/README_RU.txt",
+      "published_sha256": "e3c3ada4af7b961955a31808e46eb507d6b2ec3666851e333cf97c6804c3c107",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-update-analysis-2026-10-12.zip",
+      "member": "recovered/deep_audit/parameters/UI_PARAMETERS_RU.txt",
+      "source_sha256": "01d7860b2c4ebdd611615cbbad78dc04677c616884d82708b91e40c84365dd93",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/update/deep_audit/parameters/UI_PARAMETERS_RU.txt",
+      "published_sha256": "01d7860b2c4ebdd611615cbbad78dc04677c616884d82708b91e40c84365dd93",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-update-analysis-2026-10-12.zip",
+      "member": "recovered/deep_audit/runtime_comparison/README_RU.txt",
+      "source_sha256": "80f828c3070417175266683ab9c420dbdb7bbfd917c3eaf4bf9707b71c02eb87",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/update/deep_audit/runtime_comparison/README_RU.txt",
+      "published_sha256": "80f828c3070417175266683ab9c420dbdb7bbfd917c3eaf4bf9707b71c02eb87",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-update-analysis-2026-10-12.zip",
+      "member": "recovered/deep_audit/settings_versions/README_RU.txt",
+      "source_sha256": "dbe9dd00b8f680e4885622b32c07c2ef013515fa288aee697e5da788401ff97a",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/update/deep_audit/settings_versions/README_RU.txt",
+      "published_sha256": "dbe9dd00b8f680e4885622b32c07c2ef013515fa288aee697e5da788401ff97a",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-update-analysis-2026-10-12.zip",
+      "member": "recovered/deep_audit/system_handlers/README_RU.txt",
+      "source_sha256": "bb9d03f60cea22ffd4224a4a23cc6d3a7a1eff2f1210692be8a20b2b27045aa1",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/update/deep_audit/system_handlers/README_RU.txt",
+      "published_sha256": "bb9d03f60cea22ffd4224a4a23cc6d3a7a1eff2f1210692be8a20b2b27045aa1",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-update-analysis-2026-10-12.zip",
+      "member": "recovered/deep_audit/voice_commands/README_RU.txt",
+      "source_sha256": "54b4680f87c23213c931ffc9f9a9abca1ead6b36ba9299aa7f11497aa4366807",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/update/deep_audit/voice_commands/README_RU.txt",
+      "published_sha256": "54b4680f87c23213c931ffc9f9a9abca1ead6b36ba9299aa7f11497aa4366807",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-DIM-log-comparison-2026-10-12.zip",
+      "member": "RESULTS.txt",
+      "source_sha256": "3b54b2855dc54fdbe887615a919a87817773143815e59a80fe4febca36a8c81e",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/dim-oct12/Natro-DIM-log-comparison-2026-10-12.txt",
+      "published_sha256": "3b54b2855dc54fdbe887615a919a87817773143815e59a80fe4febca36a8c81e",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-DIM-UART-parameters.zip",
+      "member": "uart/RESULTS.txt",
+      "source_sha256": "143ebc891c4585a8d1a7a6284de5e06a1ae4a3247320f6002e91a4084c8a1297",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/dim-oct12/Natro-DIM-UART-parameters.txt",
+      "published_sha256": "143ebc891c4585a8d1a7a6284de5e06a1ae4a3247320f6002e91a4084c8a1297",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-DIM-protocol-analysis-2026-10-12.zip",
+      "member": "DIM-PROTOCOL-RESULTS.txt",
+      "source_sha256": "02a793cb11b7cdffa4a6c8ce0f66d230c706665285a66be45b882ab83e2785ad",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/dim-oct12/Natro-DIM-protocol-analysis-2026-10-12.txt",
+      "published_sha256": "02a793cb11b7cdffa4a6c8ce0f66d230c706665285a66be45b882ab83e2785ad",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-DIM-white-bar-resource-trace.zip",
+      "member": "findings.txt",
+      "source_sha256": "8f11557bc953ee099a94d103d5fd0fb4ac11830d0930f06595c0b2dd5681f292",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/dim-oct12/Natro-DIM-white-bar-resource-trace.txt",
+      "published_sha256": "8f11557bc953ee099a94d103d5fd0fb4ac11830d0930f06595c0b2dd5681f292",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-DIM-receiver-collection.zip",
+      "member": "Natro-DIM-receiver/README.txt",
+      "source_sha256": "13767d006ccdd26482468fdb1cafce1bc1674cede5485a5c44adee83930d70a7",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/dim-oct12/Natro-DIM-receiver-collection.txt",
+      "published_sha256": "13767d006ccdd26482468fdb1cafce1bc1674cede5485a5c44adee83930d70a7",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-DIM-file-analysis-2026-10-12.zip",
+      "member": "file-analysis.txt",
+      "source_sha256": "146a4b9aee01ba924fc7c5b2bba5f60042dce7cd79d14b162f9799f95207e6ff",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/dim-oct12/Natro-DIM-file-analysis-2026-10-12.txt",
+      "published_sha256": "146a4b9aee01ba924fc7c5b2bba5f60042dce7cd79d14b162f9799f95207e6ff",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-DIM-followup-2026-10-13.zip",
+      "member": "DIM-complete-chains-2026-10-13.txt",
+      "source_sha256": "3f0cabc5a8e89555e9a7c574aa59f8504d958f141275f732dc85621db5a53c5b",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/dim-oct13/DIM-complete-chains-2026-10-13.txt",
+      "published_sha256": "3f0cabc5a8e89555e9a7c574aa59f8504d958f141275f732dc85621db5a53c5b",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-DIM-followup-2026-10-13.zip",
+      "member": "DIM-findings-2026-10-13.txt",
+      "source_sha256": "6f561ea8045bd467bc1a16143a7008bde248be1623c56af963af30e7f22d0b95",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/dim-oct13/DIM-findings-2026-10-13.txt",
+      "published_sha256": "6f561ea8045bd467bc1a16143a7008bde248be1623c56af963af30e7f22d0b95",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-DIM-followup-2026-10-13.zip",
+      "member": "DIM-handler-check-2026-10-13.txt",
+      "source_sha256": "c3a1929a0e437681f298ebf329f87b08afeb6d454e3c0c5b4f3f8d083d283a51",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/dim-oct13/DIM-handler-check-2026-10-13.txt",
+      "published_sha256": "c3a1929a0e437681f298ebf329f87b08afeb6d454e3c0c5b4f3f8d083d283a51",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-DIM-followup-2026-10-13.zip",
+      "member": "DIM-missing-driver-2026-10-13.txt",
+      "source_sha256": "d0a2c132e44d10e39a3b42dd8294fd5b9a5bc6092e4193e700a3d61fa588a59f",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/dim-oct13/DIM-missing-driver-2026-10-13.txt",
+      "published_sha256": "d0a2c132e44d10e39a3b42dd8294fd5b9a5bc6092e4193e700a3d61fa588a59f",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-DIM-followup-2026-10-13.zip",
+      "member": "DIM-receiver-dispatch-2026-10-13.txt",
+      "source_sha256": "be13903a441dfb863e6575ac47a36014842918e89b1ee51004160057ff575fb6",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/dim-oct13/DIM-receiver-dispatch-2026-10-13.txt",
+      "published_sha256": "be13903a441dfb863e6575ac47a36014842918e89b1ee51004160057ff575fb6",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-DIM-followup-2026-10-13.zip",
+      "member": "DIM-receiver-search-2026-10-13.txt",
+      "source_sha256": "425ef272338be894db511a6433e50243bafbefe812ffbd9caf4c21d79c183b5d",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/dim-oct13/DIM-receiver-search-2026-10-13.txt",
+      "published_sha256": "425ef272338be894db511a6433e50243bafbefe812ffbd9caf4c21d79c183b5d",
+      "redacted_lines": []
+    },
+    {
+      "archive": "Natro-DIM-followup-2026-10-13.zip",
+      "member": "DIM-wings-parameters-2026-10-13.txt",
+      "source_sha256": "20f82018a2b20d030c575df21fa3436158fe7d57d92bb35749ff884b8752eb37",
+      "published_path": "docs/geely-kx11/research-2026-10-12-13-archive/dim-oct13/DIM-wings-parameters-2026-10-13.txt",
+      "published_sha256": "20f82018a2b20d030c575df21fa3436158fe7d57d92bb35749ff884b8752eb37",
+      "redacted_lines": []
+    }
+  ],
+  "excluded": "Бинарники, ключи упаковки, сырые журналы, массовые листинги байткода и сторонние инструменты не перенесены; ссылки на них внутри отчётов относятся к исходным архивам."
+}

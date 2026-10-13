@@ -1,0 +1,298 @@
+GMCSoft / GPSProvider: снятие упаковки, восстановление VM и пути HUD
+Дата: 2026-10-12. Только анализ пользовательского update.zip.
+
+ВАЖНОЕ НОВОЕ: восстановлены все 34 найденных VM-метода. В CheckPingService
+подтверждены опасные ветки удаления /system/framework и выполнения команд
+через su. Условия и ограничения вывода — раздел 8. Код не запускался.
+
+1. Подтверждённый результат
+
+GMCSoft:
+  DEX 039, 4 544 932 байта, 4 983 class_defs, 25 694 string_ids,
+  29 405 method_ids (это записи методов, включая ссылки, не число реализаций).
+  SHA256 ffdfbf85611167c19495982066b26bd4338f347555e7a8a94bb92ff937437d2b
+  Длина, встроенная SHA-1 и Adler-32 проверены, совпали.
+  VM-блок: 8 176 байт, SHA256
+  57b8068b3819d9f7b3e975c6a537bc5ea93762687acffa5f522053c25e8d39e5
+
+GPSProvider:
+  DEX 039, 1 697 996 байт, 1 887 class_defs; длина/SHA-1/Adler-32 совпали.
+  SHA256 636dde926a8ecc3efca3b1a269e14dacf63a9e6578c0bdf1ac7bc8894ac29ab5
+  VM-блок: 3 324 байта, SHA256
+  47dee15b87ec9d157fe4ccf5e48ebb4de5c0766e5ea7436b6b31bce828519e59
+
+Это восстановленные оригинальные DEX-данные контейнера, не пересобранные APK.
+Проверки структурной целостности не заменяют проверку поведения на Android.
+
+Дополнительно созданы отдельные DEX для анализа с восстановленными VM-телами:
+  GMCSoft-vm-restored.dex: 4 446 084 байта, 19 методов восстановлено.
+  SHA256 14d716bf79d620f68621caa3730a2e2a9bc998a2ce21deb2de7edbc9eb834a84
+  GPSProvider-vm-restored.dex: 1 664 504 байта, 15 методов восстановлено.
+  SHA256 38ea29bb3855cccc3dd23effd17ef491b7d653d9b0aed4b3d8dc98c3a024e7a0
+Это уже новые файлы, сериализованные dexlib2, а не побайтовые оригиналы.
+Число классов сохранено; длина, SHA-1 и Adler-32 проверены. Исходные DEX/APK
+не изменены. Аналитические DEX не предназначены для установки.
+
+2. Как устроен VBPD в этих двух файлах
+
+После data-секции DEX-загрузчика (data_off + data_size = 14 800) расположен
+блок с magic VBPD. Заголовок занимает 56 байт. В этих образцах:
+  +0x18: размер сжатого/зашифрованного основного DEX;
+  +0x1c: размер распакованного DEX;
+  +0x20: размер сжатого/зашифрованного VM-блока;
+  +0x24: размер распакованного VM-блока;
+  +0x28..0x37: 16 байт, каждый XOR 0x2a даёт ключ RC4;
+  +0x38: два последовательных Zstandard-фрейма под одним потоком RC4.
+Полный размер точно равен 56 + размер первого блока + размер второго блока.
+RC4 не переинициализируется между блоками.
+[Значение ключа упаковки/расшифровки исключено из публикации; исходный отчёт сохранён в архиве.]
+Это ключ упаковки приложений; он не является паролем update.zip.
+
+Адреса виртуальные, для GMCSoft assets/l5608e5c5_x64.so:
+  0x106550 — функция загрузки/разбора;
+  0x32d70 — проверка VBPD (0x44504256);
+  0x1069d2/0x1069d6 — чтение 16 байт и XOR;
+  0x15ef70 — константа 16 * 0x2a;
+  0x10a460 — RC4 KSA; 0x10a5b0 — RC4 PRGA;
+  0x11a970 — вызванная функция распаковки, результат независимо распакован
+  установленной библиотекой Zstandard.
+Переходы разобраны как данные: скрипт virbox_static.py распознаёт ограниченные
+шаблоны нейтральных инструкций/возвратов. Это не эмулятор Android и не запуск ELF.
+Его trace-файлы показывают один линейный путь и условные рёбра, а не полный CFG.
+
+3. Декодирование строк
+
+Функция m5608e5c5.F5608e5c5_11 соответствует native vm_str (0x10c590).
+Формат: два символа префикса, затем HEX; ключ — второй символ префикса.
+plain[i] = ((HEX_byte[i] - i) & 0xff) XOR ord(prefix[1]).
+В x64 чтение ключа видно у 0x6a430, байтовый цикл — у 0xacd30.
+Пример E.40505A4A756355544D585356 -> navi_package.
+Второе приложение использует m2ded8cef.F2ded8cef_11 с тем же форматом.
+
+GMCSoft-readable: 3 258 Java-файлов, 12 079 константных вызовов заменено,
+7 860 уникальных строк. GPSProvider-readable: 1 036 Java-файлов, 2 081 вызов,
+1 557 уникальных строк. Ошибок декодирования этих вызовов нет.
+Оригинальный результат JADX сохранён отдельно в *-unpacked, без замен строк.
+
+После восстановления VM актуальные читаемые каталоги — *-vm-readable:
+  GMCSoft: 3 257 Java-файлов, 12 106 замен, 7 872 уникальные строки;
+  GPSProvider: 1 037 Java-файлов, 2 101 замена, 1 560 уникальных строк.
+Ошибок декодирования константных строк нет. Различие числа Java-файлов
+связано с реконструкцией/встраиванием классов JADX; число DEX-классов неизменно.
+
+4. Реально найденные отправители GMCSoft
+
+Музыка на приборку:
+  a/j2/b.java: MediaCenterAPI.init -> registerMusic(packageName, MusicClient),
+  сохраняется токен e.
+  a/z9/d.java, b(context, model): при dashboard_music_active_key и отсутствии
+  штатного radio_is_playing/media_is_playing сохраняет обложку в DCIM, затем:
+    requestPlay(token)
+    updateCurrentSourceType(token, 6)
+    updateMusicPlaybackState(token, new a.z9.b(model, imageName))
+  a/z9/b.java: title, artist/album, status и file:///storage/emulated/0/DCIM/...
+  Это путь MediaCenter SDK; конкретная низкоуровневая команда DIM не видна.
+
+HUD-навигация:
+  a/ea/a.java j -> a/j1/n.java run, ветка default.
+  Условие: dashboard_navigation_hud_active_key.
+  Action: HUD_NAVI_BROADCAST_SEND.
+  Extras и реальные перегрузки putExtra по DEX:
+    ICON                Integer, передан как Serializable
+    NEXT_ROAD_NAME      String
+    CUR_ROAD_NAME       String
+    SEG_REMAIN_DIS      Integer, Serializable
+    ROUTE_REMAIN_DIS    Integer, Serializable
+    ROUTE_ALL_DIS       Integer, Serializable; тот же model.d, что REMAIN_DIS
+    ROUTE_REMAIN_TIME   Integer, Serializable
+    AR_VARIANT          int из Global hud_ar_variant, default 0
+    NON_AR_VARIANT      int из Global hud_non_ar_variant, default 0
+  addFlags(32), Context.sendBroadcast(intent).
+  Очистка: a/j1/i.java, HUD_NAVI_CLEAR_SEND, setFlags(32).
+
+HUD-музыка:
+  a/z9/d.java b -> a/j1/p.java run, ветка default.
+  Условие show_music_on_hud_display == 1; отправка пропускается при активном
+  флаге навигации a.da.a.b.
+  Action HUD_MUSIC_BROADCAST_SEND.
+  music.title и music.subtitle — String; music.image — Bitmap/Parcelable.
+  setFlags(32), Context.sendBroadcast(intent).
+  Очистка: a/v9/b.java, HUD_MUSIC_BROADCAST_CLEAR.
+
+Навигационные данные для другой принимающей части:
+  a/ea/a.java h отправляет GMC_NAVI_BROADCAST_SEND с ICON, названиями дорог,
+  расстояниями и временем; m отправляет GMC_NAVI_PROVINCE_CITY_BROADCAST_SEND.
+  a/da/c.java и a/da/d.java разбирают RemoteViews уведомлений Яндекс Карт /
+  Навигатора через a/fa/a.java и строят a.ca.a. В Java этих парсеров есть
+  артефакты декомпиляции; исходные DEX-инструкции сохранены для проверки.
+  Путь остановки: a/ea/a.java k -> a/j1/k.java ->
+  NaviInteraction.updateNavigationInfo с navigationStatus=0 и turnId=115.
+
+Важная граница: найденные broadcast actions — Android API уровня приложения,
+НЕ сырые CAN/QNX/DIM-пакеты и НЕ подтверждённая команда открытия «крыльев».
+Не приводится инструкция отправлять их на автомобиле.
+
+Восстановленный вход в цепочку (NaviService, VM 18/19):
+  Оба callback сначала проверяют локальную авторизацию через a.f2.b.
+  onNotificationPosted получает packageName и Notification; перебирает
+  зарегистрированные парсеры, выбирая первый по совпадению пакета.
+  В onCreate зарегистрированы Яндекс Навигатор (a.da.d), Яндекс Карты
+  (a.da.c) и Навител (a.da.b). Перечисление других приложений в a.ca.b
+  само по себе не означает наличие их парсеров уведомлений.
+  После вызова подходящего парсера удаляет message 0 и ставит новый через
+  60 000 мс. Сам парсер может не распознать данные — таймер ставится всё равно,
+  если он вернулся без исключения. Затем вызываются музыкальный разбор b()
+  и запоминание последнего плеера a().
+  Таймер a.ga.d вызывает a.ea.a.k/l/m: сбрасывает состояние навигации,
+  планирует остановку приборной навигации (если настройка включена),
+  планирует HUD_NAVI_CLEAR_SEND, отправляет сообщения о городе/регионе.
+  onNotificationRemoved для известного пакета с подходящим парсером вызывает
+  a.ba.a.c -> те же k/l/m, после чего вызывает музыкальную очистку c(package).
+  Удаление уведомления НЕ отменяет уже поставленный минутный message 0.
+  Это не подтверждение низкоуровневой команды DIM, а логика Android-отправителя.
+
+5. Что проверено по принимающей стороне
+
+В открытом статически прочитанном коде четырёх APK принимающий обработчик
+HUD_NAVI_BROADCAST_SEND / HUD_MUSIC_BROADCAST_SEND не найден.
+В двух DEX XCSettings2 и двух DEX CarService нет даже открытых литералов этих
+actions: точные результаты в GMCSoft_target_paths_verified.json.
+Это ограниченный отрицательный результат, а не доказательство отсутствия:
+получатель может быть в другом системном APK/JAR, динамической регистрации
+или нативном коде. Проверены также восстановленные 34 VM-метода и новые
+раскрытые строки; нового HUD-получателя они не дали. Называть компонент нельзя.
+
+GPSProvider после распаковки содержит USBGpsProviderService / USBGpsManager
+в org.broeuschmeul.android.gps.usb.provider.driver, управление USB/GPS и путь
+setTestProviderLocation. Все 15 VM-методов восстановлены. Скрытый onReceive
+в USBGpsProviderService обрабатывает запуск/остановку GPS, запись трека и
+настройку SiRF. Обработчика указанных HUD actions в прочитанном коде не найдено.
+
+XCSettings2 сохраняет ранее найденный путь CustomVehicle, функция 260:
+display_on_dashboard = no/normal и notifyChange по
+content://ecarx.settings/map/display_on_dashboard.
+Он сам по себе не подтверждает назначение для «крыльев».
+CarService: get/set property вызывают ICarImpl.assertPermission, а тот в этой
+реконструкции проверяет checkCallingOrSelfPermission и бросает SecurityException.
+Нет оснований объявлять все проверки доступа удалёнными по наличию APK в апдейте.
+
+6. VM-формат, восстановление и ограничения
+
+В GMCSoft найдено 19 явных вызовов VM, IDs 1..19:
+  GmcAppApplication 1..3; HomeActivity 4..8; BootReceiver 9;
+  CheckPingService и вложенные обработчики 10..17;
+  NaviService.onNotificationPosted 18, onNotificationRemoved 19.
+В GPSProvider найдено и восстановлено 15 записей. Полные карты —
+recovered/virbox/<app>/vm-restored-methods.tsv. Старая карта обёрток оставлена
+в GMCSoft_target_paths_verified.json как исходное состояние до восстановления.
+
+Формат VM-блока этих образцов: u32 числа групп (1), затем пары offset/size.
+В начале группы u32 числа методов, далее пары offset/size каждого метода.
+Смещения записей относительны к началу группы, размеры таблицы выровнены на 4.
+В записи:
+  +0x00..0x0f: индивидуальный 16-байтовый RC4-ключ, без XOR 0x2a;
+  +0x10: фактическая длина записи (может быть на 1–3 байта меньше табличной);
+  +0x14..конец: RC4 с новым состоянием для каждой записи;
+  после расшифровки +0x14: magic dvmp; +0x1c: VM ID;
+  +0x20: упакованный индекс метода (верхние 16 бит — индекс DEX);
+  +0x28: обычный Dalvik code_item, +0x38: начало его инструкций.
+Поля +0x18 и +0x24 не интерпретируются как надёжные флаги.
+Формат следует из x64 dispatcher 0x10c250; RC4 вызывается по 0x612c8/0xb064a,
+таблица обработчиков обычных Dalvik opcodes — VA 0x1ae6e0.
+Trace сохранён в analysis_evidence/virbox_vm_dispatch_trace.txt.
+
+RestoreVirboxDex.java читает code_items с исходными индексами и создаёт
+новый согласованный DEX через dexlib2. Это не простая подмена code_off.
+Независимая проверка другим парсером (Androguard) сравнила все 34 825
+определений методов: 34 восстановленных — непосредственно с расшифрованными
+записями, остальные 34 791 — с исходными DEX. Сравнивались инструкции
+с разрешёнными ссылками, регистры, входные аргументы и try/catch-области.
+Расхождений нет; вызовов VM dispatcher F*_00..09 в новых DEX не осталось.
+Сериализатор пересчитал outs_size в 129 методах GMCSoft и 4 GPSProvider;
+полный список в vm_restoration_verified.json. Отладочные данные не сравнивались.
+Это проверка реконструкции, не проверка запуска или совместимости на Android.
+
+JADX для новых DEX завершился с 38 ошибками GMCSoft и 6 GPSProvider.
+Например, HomeActivity.onCreate содержит артефакты Java-реконструкции,
+хотя его восстановленные Dalvik-инструкции прошли независимое сравнение.
+Нельзя выдавать *-vm-readable за точные исходники или собирать из них прошивку.
+Native-защита и функции декодирования строк в исходных APK не удалялись.
+Ключевые HUD-отправители и последовательность MediaCenter сверены с байткодом:
+13 методов, 1 235 строк доказательств в GMCSoft_target_bytecode.txt.
+
+7. Воспроизводимость
+
+Инструменты анализа (из корня update_analysis):
+  python3 tools/unpack_gmcsoft_vbpd.py recovered/virbox/GMCSoft/classes.dex recovered/virbox/GMCSoft
+  python3 tools/unpack_gmcsoft_vbpd.py recovered/virbox/GPSProvider/classes.dex recovered/virbox/GPSProvider
+Зависимость распаковки: Python zstandard. В скрипте есть тест RC4 и обязательные
+проверки размеров, SHA-1, Adler-32. ELF, ключевой DEX и VM-блоки сохранены.
+decode_virbox_strings.py создаёт отдельную читаемую копию, не меняя DEX/исходный Java.
+collect_gmcsoft_paths.py формирует доказательства через androguard.
+virbox_static.py использует capstone и pyelftools; ELF только читается.
+
+Восстановление VM (нужен JDK и dexlib2 из JADX 1.5.6):
+  java -cp tools/jadx/lib/jadx-1.5.6-all.jar tools/RestoreVirboxDex.java recovered/virbox/GMCSoft/GMCSoft-main.dex recovered/virbox/GMCSoft/GMCSoft-vbpd-metadata.bin recovered/virbox/GMCSoft/GMCSoft-vm-restored.dex recovered/virbox/GMCSoft/vm-restored-methods.tsv
+  Для GPSProvider заменить GMCSoft на GPSProvider во всех четырёх путях.
+  python3 tools/verify_virbox_restoration.py
+Восстановленные 34 метода и дополнительные значимые методы разобраны в
+GMCSoft_vm_restored_bytecode.txt (2 235 строк) и
+GPSProvider_vm_restored_bytecode.txt (593 строки). Java-скрипт анализа
+исполняет только собственный парсер, не код из APK или native-библиотек.
+
+8. Подтверждённый риск: опасные ветки CheckPingService
+
+Это вывод о содержимом файла, а не обвинение автора и не наблюдение работы
+на автомобиле. При наличии su/root и успешной записи в системный раздел
+следующие действия могут повредить Android и сделать устройство незагружаемым.
+
+8.1. CheckPingService$c.a(Object), VM 13, original method_id 26604.
+  Ответ содержит boolean valid (поле i) и signature.
+  Проверяется подпись строки Boolean.toString(valid) + локальный ключ устройства.
+  Если проверка вернула false: удаляется запись провайдера auth, затем
+  вызывается helper a.y2.a.a для remount /, remount /system и команды
+  "rm -rf /system/framework".
+  Если valid == false, тот же набор действий выполняется независимо от
+  результата подписи. При valid == true следующая проверка назначается
+  через час; при false — через 30 секунд.
+  В байткоде: проверка подписи 0x0032, ветка 0x0068, опасные вызовы
+  0x0098/0x009e/0x00a4; проверка valid 0x00b2, повторные вызовы
+  0x0108/0x010e/0x0114. Смещения байтовые, внутри метода.
+
+8.2. CheckPingService$d.a(Object), VM 15, original method_id 26607.
+  Проверяет подпись десятичного List.hashCode() от списка команд.
+  При false повторяет remount и удаление /system/framework
+  (ветка 0x0046, вызовы 0x005a/0x006e/0x0082).
+  При true и непустом списке запускает переданные команды; при наличии
+  file сначала сохраняет Base64-содержимое файла в DCIM. Команды перед
+  исполнением тоже декодируются из Base64. Период повторного запроса —
+  5 минут после ответа, 2 минуты в callback ошибки.
+  Это подписанный механизм удалённых команд, а не доказательство того,
+  что любой посторонний может выполнить произвольную команду.
+
+8.3. Helper a.y2.a.a(String,boolean).
+  Создаёт аргументы [su, -c, команда], вызывает ProcessBuilder.start()
+  и waitFor(); исключения перехватываются. Соответственно, это не просто
+  неиспользуемые строки: до процесса прослежены реальные вызовы.
+  Подпись проверяется через SHA256WithRSA с встроенным публичным ключом;
+  ошибка верификации/декодирования возвращает false.
+
+8.4. В этом API-клиенте a.x2.f установлен X509TrustManager a.x2.e с пустыми
+  checkServerTrusted/checkClientTrusted, а HostnameVerifier a.x2.b всегда true.
+  Все эти методы отдельно сверены по DEX. Штатные проверки сертификата
+  и имени хоста отключены; подпись прикладного ответа — отдельный механизм.
+  Адреса и Retrofit-пути прочитаны из файлов; к серверу запросы не отправлялись.
+
+Важное разграничение: обычная ошибка сети попадает в callbacks b() и
+планирует повторный запрос; в этих callbacks удаления не найдено.
+Нельзя утверждать «при любом отсутствии интернета удалится система».
+Также неизвестно, есть ли на конкретной машине нужные права и сработает ли
+remount. Совместимость и реальные условия выполнения не испытывались.
+
+Практический вывод: не устанавливать и не запускать этот пакет на автомобиле
+на основании одного лишь успешного снятия упаковки. Дальнейший анализ — офлайн.
+
+Следующие узкие задачи: найти получателя HUD actions
+в системных компонентах; проследить его реальный выход к приборке/HUD.
+Совместимость с автомобилем и эффект каких-либо команд не проверялись.
+На автомобиль ничего не устанавливалось и не отправлялось.

@@ -1,0 +1,206 @@
+DIM: ПРОДОЛЖЕНИЕ ПОЛНЫХ ЦЕПОЧЕК — 13.10.2026
+
+Область: статический анализ исходных APK/JAR/ELF из нашего системного
+дампа ecarx-hud-system-20260727-010640.zip. Это не предположения о стоке.
+Соответствие июльских файлов текущей установленной кастомной сборке
+не доказано: нельзя автоматически переносить каждый вывод на октябрь.
+Прошивка, программы и команды автомобиля не запускались; записи настроек
+ниже описывают код, а не выполненные нами действия.
+
+1. ПЕРВИЧНЫЕ ФАЙЛЫ И ПРОВЕРКА
+
+Повторно извлечены полные исходные файлы. Просканированы все методы с кодом:
+DimMenu APK: 78552; DIMProtocolService APK: 84;
+ecarx.jar: 1050; ecarx.adaptapi.jar: 18037.
+Другие 10 framework JAR также прошли поиск по целевым ссылкам.
+Дизассемблирование выбранных методов, точные смещения, SHA256 и счётчики
+сохранены в dim_evidence/complete/*.json и *.txt.
+Это полный поиск прямых ссылок по заданным шаблонам, не полный разбор
+семантики каждого метода. Reflection, native-вызовы и внешние DEX этим
+поиском не исключаются. Таблицы исключений в текстовую выборку не включены.
+
+DimMenu SHA256:
+214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820
+DIMProtocolService SHA256:
+c435f1be2402be76355172f7d50d66d1de782a792cea912851c7571a1fd4739c
+ecarx.jar SHA256:
+126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7
+ecarx.adaptapi.jar SHA256:
+87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0
+libuart.so и native DIM HAL совпали с ранее разобранными SHA256:
+2b2325798a7e29bf39dc7ed35266d0cdb2967c3f0b281ca5cf5e7bd7602a5c46
+b97a9e721ee17a7885ff3be6b5edbe52541d0e350deb803c24722f6f0990a1db
+
+2. ПРЯМОЙ ПУТЬ ОТ ANDROID-СОБЫТИЯ К UART
+
+KeyActionEnum сопоставляет action
+ecarx.intent.action.ECARX_KEY_MAPFULLSCREEN_EVENT
+с ACTION_FULL_MAP (инициализатор offsets 0x14c..0x16a).
+KeyEventReceiver.onReceive сравнивает action с таблицей и вызывает
+InteractiveClientProxy.getGlobalListener().onKeyEvent(enum).
+BaseViewModel.Companion.setViewModelCallBack при MainViewModel назначает
+его global listener и DIM callback через InteractiveClientProxy.
+
+MainViewModel.onKeyEvent(ACTION_FULL_MAP), 0x28..0x40:
+DimRepository.switchFullMode$default(null) -> switchFullMode(null).
+Метод ставит IS_USER_ACTION=true и переключает относительно
+AppModuleKt.IS_FULL_SCREEN_MODE: true -> mode1; false -> mode3.
+Второй прямой вход: NavigationViewModel.handlePressBehavior, branch1,
+передаёт Boolean в switchFullMode: true -> mode1, false -> mode3.
+Это аргумент, отражающий состояние, а не универсальное enableFullScreen.
+
+DimRepository$switchNavMode$1.invoke(I), 0x32..0x3a:
+getMenuInteraction -> IDimMenuInteraction.switchNaviMode(mode).
+DimMenuInteraction: сначала setNaviMode(mode), затем запрос:
+mode1 OFF / mode2 SIMPLIFY: type0,len8,opcode14,API [2];
+mode3 FULL / mode4 AR: type0,len8,opcode14,API [1].
+Возврат true не ожидает ответа приборки.
+
+DIMProtocolManager в ecarx.jar получает Binder через
+ServiceManager.getService("dimprotocol"). sendMessageToDIM(B B B [B)V
+на 0x68..0x6e читает ТОЛЬКО vec_data[0] и вызывает
+IDIMProtocolService.sendMessageToDIM(B B B B)V.
+Таким образом дополнительные байты переданного API-массива не доходят
+до Binder через этот менеджер. Пустой массив также не создаёт пустую
+посылку: в методе стоит безусловный доступ к элементу0.
+
+AIDL Proxy передаёт четыре byte, transaction5 (0x1a..0x3a).
+DIMProtocolServiceImpl создаёт ArrayList с одним Byte (0x5c..0x6e),
+вызывает HIDL IDIMProtocol.sendMessageToDIM(type,len,opcode,list) на0xc0.
+Возвращаемый HIDL int здесь не присваивается и не проверяется.
+HIDL Proxy: interface vendor.ecarx.xma.dimprotocol@1.0::IDIMProtocol,
+transaction1, три int8 и int8-vector.
+Далее ранее подтверждённый native HAL -> libuart.so -> write(/dev/ttydim0).
+HAL VA0x33c8..0x33fc, libuart sendMessage0x8c58, write0x7860.
+
+В захвате на линии payload8 байт, хотя Java/HIDL передаёт один элемент.
+Источник и безопасность дополнения до8 байт пока полностью не доказаны.
+Не объявляем семь нулей отдельными параметрами и не объявляем найденную
+разницу доказанной ошибкой памяти без полного анализа native-пути.
+
+3. СОХРАНЁННЫЙ РЕЖИМ — НЕ ТЕЛЕМЕТРИЯ ПРИБОРКИ
+
+setNaviMode: AIDL transaction12 -> DIMProtocolServiceImpl.setNaviMode ->
+Settings.Global.putInt("NaviMode", mode), 0x2c..0x3c.
+getNaviMode: transaction13 -> Settings.Global.getInt("NaviMode",2).
+Отдельно менеджер возвращает исходное значение1, если его вызов завершился
+обрабатываемым исключением. Поэтому значение1 может означать не только
+успешно прочитанный OFF; значение2 — в том числе отсутствие сохранённого ключа.
+В этой паре методов нет запроса фактического режима к DIM.
+Обновление сохранённого режима происходит до отправки запроса14.
+
+4. ОБРАТНЫЙ ПУТЬ: ТРАНСПОРТ И ДВА РАЗНЫХ CALLBACK-КАНАЛА
+
+HAL callback onReceived(opcode, ArrayList) ->
+DIMProtocolServiceImpl$DIMHALCallback.onReceived:
+копирует массив, затем для зарегистрированных клиентов передаёт только
+первый байт в IDIMProtocolServiceCallback.onReceived(opcode,data[0])
+(0xfc..0x100). Для opcode31 дополнительно обновляет mHUDMode.
+ACK и ERROR имеют отдельные методы; их нельзя приравнивать к смене UI.
+
+NaviInteraction$DIMProtocolServiceCallbackImpl:
+opcode7,data2 -> navigation callback action33;
+opcode7,data1 -> getNaviMode(), т.е. Settings.Global:
+  mode3 -> action35; mode4 -> action36; другие -> ни одно из этих действий.
+Полный обработчик действия в самом навигационном приложении этим этапом
+не разобран. Нельзя рисовать непрерывную доказанную цепь через этот пробел.
+
+Отдельная ветвь сообщения навигационного приложения:
+NaviInteraction.updateExtensionInfo(EXT_KEY_DIM_DISPLAY_MODE)
+значения33/34/35/36 (0x21/0x22/0x23/0x24) ->
+DIMProtocolManager.onChangeNaviMode(1/2/3/4)
+-> DIMProtocolServiceImpl.onChangeNaviMode -> INaviFunctionCallback list
+-> DimMenuInteraction$NaviFunctionCallback.onChangeNaviMode
+-> зарегистрированный IDimMenuInteractionCallback (DimRepository).
+Все четыре ветви updateExtensionInfo затем отправляют type2,len8,opcode8,[1].
+Ключи switch перепроверены через DEX get_keys(): текстовый вывод Androguard
+packed-switch-payload показывает здесь HEX без префикса, не decimal21..24.
+Сам onChangeNaviMode у сервиса рассылает callback и не записывает NaviMode.
+
+DimRepository.onChangeNaviMode:
+планирует onNavModeChanged на main-потоке; ставит currentNavMode;
+IS_FULL_SCREEN_MODE=(mode==3); очищает SP_MAP_MODE_CACHE.
+MainViewModel.onNavModeChanged -> FullMapFragment.onNavModeChanged:
+viewFullMapContainer visibility=0 при mode3, иначе8 (GONE).
+То есть AR4 не устанавливает этот конкретный флаг и не показывает этот
+контейнер: это НЕ доказательство отсутствия другого AR-отображения.
+
+Ещё одна обратная ветвь: DimMenuInteraction callback opcode7,data0
+логирует отказ fullscreen и вызывает onChangeNaviMode(1) у слушателей.
+В этой ветви не найден отдельный setNaviMode(1) в сервис.
+Следовательно UI-состояние и сохранённый Global.NaviMode — разные сущности;
+их равенство после отказа нельзя предполагать.
+
+5. ПАРАЛЛЕЛЬНЫЙ ИСТОЧНИК CALLBACK: НАБЛЮДАТЕЛИ НАСТРОЕК
+
+Это не просто неиспользуемый метод с названием test:
+DIMProtocolServiceImpl.<init> прямо вызывает testRegisterObServer, offset0x56.
+Он регистрирует Settings.System ContentObserver для шести ключей:
+switchTab -> callback opcode4;
+fullMap -> callback opcode7;
+dimcontrolcenter -> callback opcode16;
+dimwallpaper -> callback opcode20;
+hudmode -> callback opcode31;
+ihuready -> callback opcode11.
+SettingsObserver.onChange читает int (default0), преобразует к byte и
+вызывает тот же IDIMProtocolServiceCallback.onReceived(opcode,data).
+В самом observer нет отправки UART или вызова HIDL sendMessage.
+Однако последующий callback приложения может вызвать другие действия.
+Менять эти ключи для проверки мы НЕ пробовали.
+
+Вывод: прикладной onReceived сам по себе не подтверждает физический RX.
+Нужно отличать callback от DIMHALCallback и callback от SettingsObserver.
+Это механизм найденной версии сервиса, не доказательство, что именно он
+участвовал в конкретном опыте Natro.
+
+6. РУЧНОЙ ФЛАГ: УТОЧНЕНИЕ ПРЕЖНЕГО ВЫВОДА
+
+Во всех DEX DimMenu найдено две инструкции записи IS_USER_ACTION:
+switchFullMode -> true; setter -> переданный аргумент.
+Прямых invoke setIS_USER_ACTION нет. Прямых invoke syncNavigationMode нет.
+syncNavigationMode действительно содержит ранний выход при флагеtrue и
+иначе display_on_dashboard=="normal" -> mode3, другое -> mode1.
+Но наличие этого тела не доказывает его участие в рабочем сценарии.
+MapModeObserver в найденном обработчике только читает и логирует настройку.
+Сброс флага прямым вызовом в APK не найден; reflection/внешний код не исключены.
+Нельзя на основании одного флага объявлять причину сбоя синхронизации.
+
+7. ВЫХОД ANDROID НА ДОПОЛНИТЕЛЬНЫЙ ДИСПЛЕЙ
+
+MainViewModel.initPresentation:
+DisplayManager.getDisplays() -> displays[2] -> FullMapPresentation.
+Индекс массива2 — НЕ доказанный displayId2 и не идентификация кабеля/панели.
+Window type2038; прозрачный фон; размер:
+isLowLine=true ->1280x480, иначе1920x720.
+Проверка длины перед индексом2: length>1. При ровно двух элементах этого
+недостаточно; статически возможен выход за границу массива. В наших логах
+этот сбой не подтверждён, так что не называем его установленной неисправностью.
+FullMapPresentation создаёт FullMapLayoutBinding/FullMapFragment.
+Это контейнер Android-отображения; renderer шкал/«крыльев» здесь не локализован.
+
+8. СВЕРКА С ЛОГАМИ И ГРАНИЦА ПОЛНОТЫ
+
+Повторная независимая CRC-проверка сохранённых байтов:
+переход10.08 — 6 из6 полных кадров корректны;
+kernel13.08 — 507 полных корректны,4 неполны из511 записей.
+Переход: TX14 -> RX ACK14 -> TX8 -> RX ACK8 -> RX7 data1 -> TX ACK7.
+TX8 в этом захвате ПРЕДШЕСТВУЕТ RX7. Нельзя описывать запись как
+обязательную последовательность «RX7 вызывает TX8».
+Сохранённая последовательность транспорта не содержит достаточного
+полного журнала стеков вызовов, чтобы привязать каждый TX к единственному UI.
+
+APK и framework содержат дубли SDK-классов с различным дизассемблированием:
+из37 общих выбранных DIM-методов11 совпали буквально по инструкциям;
+остальные нельзя автоматически объявлять семантически различными:
+видны различия регистров, компиляции, const-string/jumbo и ветвлений.
+Ключевые mapping switchNaviMode, updateExtensionInfo и RX7 проверены в обеих
+копиях. Источник конкретного класса в runtime этим сравнением не установлен.
+
+Пока НЕ закрыто: обработчик action35/36 внутри навигации; точная привязка
+дисплеев к аппаратному выходу; native-дополнение payload до8 байт;
+dim_dtc.ko и конечный обработчик/renderer на стороне DIM;
+отдельные координаты, высота и независимое скрытие «крыльев».
+Полной цепочкой до физического рисунка это исследование пока не является.
+
+Воспроизведение офлайн: trace_dim.py на исходных APK/JAR;
+validate_dim_chains.py на сохранённых JSON; verify_dim.py на байтах логов.

@@ -1,0 +1,53 @@
+DIM UART: параметры и граница подтверждённой цепочки, 2026-10-12
+
+Источники: ecarx-hud-system-20260727-010640.zip (SDK, HAL, libuart);
+KX11-Bus-Capture-20260810-005510-27602-1234567;
+KX11-VP-Firmware-Locator-Evidence-20260815-191452_84144.
+
+1. switchNaviMode: локальные OFF=1/SIMPLIFY=2 дают msgType=0, len=8,
+opcode=14, API data=[2]. FULL=3/AR=4 дают те же поля и data=[1].
+Локальное Settings.Global.NaviMode не равно значению data на линии.
+
+2. Реально записанный TX при FULL:
+79 6c 00 00 0f 08 00 0e 01 00 00 00 00 00 00 00 25 52 bf ad 00 00 00 00 00 00 00 00 00 00
+Смещения: 0..1 magic; 2 поле=0 (смысл не установлен);
+3 msgType; 4 payload length+7; 5 поле=8 (смысл не установлен);
+6..7 opcode big endian; 8..15 payload; 16..19 CRC32 big endian;
+20..29 нулевое заполнение до фиксированных 30 байт.
+API содержит один элемент, но захваченный payload содержит восемь байт.
+Нули не доказаны как отдельные настраиваемые параметры.
+
+3. Второй TX: msgType=2 (NOTIFY), len=8, opcode=8, payload=01 00 00 00 00 00 00 00.
+SDK NaviInteraction.updateExtensionInfo читает EXT_KEY_DIM_DISPLAY_MODE.
+Ветви OFF/SIMPLIFY/FULL/AR вызывают onChangeNaviMode(1/2/3/4),
+но ВСЕ четыре ветви отправляют sendMessageToDIM(2,8,8,[1]).
+Следовательно этот payload не кодирует четыре режима разными значениями.
+В прежнем тестовом выключении встречался data=0: это не доказательство,
+что штатная ветвь SDK OFF отправляет 0.
+
+4. Захват: TX14; +75ms RX ACK14; +103ms TX8; +176ms RX ACK8;
++276ms RX7 msgType2 data1. Последний в Android трактуется как разрешение
+полноэкранной карты. Все шесть кадров, включая TX ACK7, прошли проверку CRC.
+Это последовательность одного захвата, а не универсальные задержки протокола.
+
+5. Транспорт: DIMProtocolService -> vendor.ecarx.xma.dimprotocol@1.0-service
+-> libuart.so -> write(/dev/ttydim0). FD процесса подтверждает путь.
+libuart sendMessage VA0x8c58, SerialPort_sendData VA0x77f8 (write0x7860),
+SerialPort_recvData VA0x78a8 (read0x78c0).
+HAL построение LinOverLVDSMsg VA0x33c8..0x33fc: поле0=0, тип из аргумента,
+длина из аргумента, поле8=8, opcode из аргумента, pointer из HIDL vector.
+Не заявляем, что HAL сам выделяет/обнуляет все восемь байт данных.
+
+6. Новая зацепка ядра: logcat-after-boot.txt строки1091..1136:
+dim_dimtty печатает кадр RX 79 6d 00 00 08 08 00 0b 01 90 d0 5e 39
+и сообщение Not Kernel Space Cared Frame Data! Invalide Data Received.
+Рядом max9675x_uart_open /dev/ttyHS2,115200 8E1 и MAX96755 dummy_uart_rx_work_func.
+Соседство не доказывает соответствие /dev/ttydim0 -> /dev/ttyHS2.
+Этот RX относится к opcode11 (готовность), не к переключению14.
+Модули .ko и файлы с max967/dimtty в именах в локально загруженных ZIP не найдены.
+Ранее проверенные linux-la/lv.img не содержали строк dim_dimtty/ttydim.
+
+7. Ограничение: конечный обработчик на стороне DIM и renderer крыльев
+не локализованы. Координаты/высота/visibility крыльев в разобранном переключении
+не найдены. Подмена FULL на OFF может менять весь режим; независимое скрытие
+крыльев этим анализом не подтверждено. Прошивки и машина не изменялись.

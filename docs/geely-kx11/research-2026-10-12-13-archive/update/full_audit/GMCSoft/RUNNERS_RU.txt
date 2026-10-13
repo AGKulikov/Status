@@ -1,0 +1,124 @@
+GMCSoft: классы автоматических действий a.q2/a.r2/a.s2/a.t2.
+Условия выполнения и повторные таймеры — в исходниках. Log tag — подсказка, не доказательство всех эффектов.
+
+La/q2/a; | 
+  Ljava/lang/ProcessBuilder;-><init>([Ljava/lang/String;)V [{"kind": "array", "allocation_offset": 138, "elements": {}}]
+  Ljava/lang/ProcessBuilder;->command([Ljava/lang/String;)Ljava/lang/ProcessBuilder; [{"kind": "unknown"}]
+  Ljava/lang/ProcessBuilder;->start()Ljava/lang/Process; []
+  Ljava/lang/ProcessBuilder;-><init>([Ljava/lang/String;)V [{"kind": "array", "allocation_offset": 138, "elements": {}}]
+  Ljava/lang/ProcessBuilder;->command([Ljava/lang/String;)Ljava/lang/ProcessBuilder; [{"kind": "unknown"}]
+  Ljava/lang/ProcessBuilder;->start()Ljava/lang/Process; []
+  Ljava/lang/ProcessBuilder;-><init>([Ljava/lang/String;)V [{"kind": "array", "allocation_offset": 138, "elements": {}}]
+  Ljava/lang/ProcessBuilder;->command([Ljava/lang/String;)Ljava/lang/ProcessBuilder; [{"kind": "unknown"}]
+  Ljava/lang/ProcessBuilder;->start()Ljava/lang/Process; []
+La/q2/b; | AlwaysOpenScreenSaverOnTwoDisplayStartRunner
+  Settings.Global always_open_screen_saved_on_two_display
+  Lcom/ecarx/xui/adaptapi/car/base/ICarFunction;->getFunctionValue(II)I [{"kind": "literal", "value": 554697216}, {"kind": "literal", "value": 4}]
+  Lcom/ecarx/xui/adaptapi/car/base/ICarFunction;->setFunctionValue(III)Z [{"kind": "unknown"}, {"kind": "unknown"}, {"kind": "literal", "value": 0}]
+La/q2/c; | ButtonsHandlerDeviceStartRunner
+  Settings.Global alice_action_type_key
+  Settings.Global handle_alice_action
+  Settings.Global handle_next_action
+  Settings.Global handle_prev_action
+  Settings.Global handle_voice_action
+  Settings.Global handle_we_chat_action
+  Settings.Global handle_we_chat_action_app
+  Settings.Global media_is_playing
+  Settings.Global radio_is_playing
+  Settings.Global we_chat_action_type_key
+  Landroid/content/Context;->startActivity(Landroid/content/Intent;)V [{"kind": "unknown"}]
+  Landroid/content/Context;->sendBroadcast(Landroid/content/Intent;)V [{"kind": "object", "class": "Landroid/content/Intent;", "allocation_offset": 238, "properties": {"action": {"kind": "literal", "value": "android.intent.action.MEDIA_BUTTON"}, "extras": [{"key": {"kind": "literal", "value": "android.intent.extra.KEY_EVENT"}, "value": {"kind": "unknown"}, "type": "Landroid/os/Parcelable;"}]}}]
+  Landroid/content/Context;->startActivity(Landroid/content/Intent;)V [{"kind": "unknown"}]
+La/q2/d; | MileageHandlerStartStopRunner
+  Settings.Global is_notify_by_low_mileage_step_key
+  Settings.Global is_notify_by_mileage_step_key
+  Settings.Global last_mileage_state_key
+  Lcom/ecarx/xui/adaptapi/car/sensor/ISensor;->getSensorLatestValue(I)F [{"kind": "literal", "value": 1050624}]
+  Lcom/ecarx/xui/adaptapi/car/sensor/ISensor;->registerListener(Lcom/ecarx/xui/adaptapi/car/sensor/ISensor$ISensorListener;I)Z [{"kind": "unknown"}, {"kind": "unknown"}]
+La/q2/e; | 
+La/q2/g; | 
+  Settings.Global enable_split_from_ui
+  Settings.Global split_screen_enable
+  Settings.Global split_screen_timeout
+La/q2/h; | 
+  Settings.Global auto_enable_bluetooth
+La/q2/i; | 
+  Settings.Global auto_enable_wifi
+La/q2/j; | 
+La/q2/k; | 
+La/q2/l; | 
+  Settings.Global wpc_charging_status_charging_notification_key
+  Settings.Global wpc_charging_status_error_notification_key
+  Settings.Global wpc_charging_status_fod_notification_key
+  Settings.Global wpc_charging_status_fully_charged_notification_key
+  Settings.Global wpc_charging_status_take_mobile_always_key
+  Settings.Global wpc_charging_status_take_mobile_key
+  Lcom/ecarx/xui/adaptapi/car/base/ICarFunction;->registerFunctionValueWatcher([ILcom/ecarx/xui/adaptapi/car/base/ICarFunction$IFunctionValueWatcher;)Z [{"kind": "array", "allocation_offset": 2, "elements": {"0": {"kind": "literal", "value": 637665536}}}, {"kind": "object", "class": "La/q2/l$b;", "allocation_offset": 18, "properties": {}}]
+  Lcom/ecarx/xui/adaptapi/car/sensor/ISensor;->registerListener(Lcom/ecarx/xui/adaptapi/car/sensor/ISensor$ISensorListener;I)Z [{"kind": "object", "class": "La/q2/l$a;", "allocation_offset": 38, "properties": {}}, {"kind": "literal", "value": 2097408}]
+La/r2/a; | GMCAccCanTsrEmsRunner
+  Settings.Global speed_compensation_store_key
+La/r2/b; | CarEngineWorkingStartStopRunner
+  Settings.Global engine_working_check_last_time
+  Settings.Global on_start_engine_last_time
+  Settings.Global on_stop_engine_last_time
+La/r2/c; | 
+  Settings.Global is_notify_by_fuel_step_key
+  Settings.Global is_notify_by_low_fuel_step_key
+  Lcom/ecarx/xui/adaptapi/car/sensor/ISensor;->unregisterListener(Lcom/ecarx/xui/adaptapi/car/sensor/ISensor$ISensorListener;)V [{"kind": "unknown"}]
+La/r2/d; | 
+  Settings.Global engine_working_check_last_time
+  Settings.Global notify_about_heat_engine_exclude_key
+  Settings.Global notify_about_heat_engine_key
+  Settings.Global on_start_engine_last_time
+  Lcom/ecarx/xui/adaptapi/car/sensor/ISensor;->getSensorLatestValue(I)F [{"kind": "unknown"}]
+  Lcom/ecarx/xui/adaptapi/car/sensor/ISensor;->registerListener(Lcom/ecarx/xui/adaptapi/car/sensor/ISensor$ISensorListener;I)Z [{"kind": "unknown"}, {"kind": "literal", "value": 1048832}]
+  Lcom/ecarx/xui/adaptapi/car/sensor/ISensor;->unregisterListener(Lcom/ecarx/xui/adaptapi/car/sensor/ISensor$ISensorListener;)V [{"kind": "unknown"}]
+La/r2/e; | 
+  Settings.Global close_windows_after_ventilation_mode
+La/r2/f; | GMCEmsDriveModeStartStopRunner
+La/r2/h; | GMCEmsDriveModeStartStopRunner
+  Settings.Global drive_mode_select_key
+  Settings.Global drive_mode_select_last_active_key
+  Lcom/ecarx/xui/adaptapi/car/base/ICarFunction;->registerFunctionValueWatcher(ILcom/ecarx/xui/adaptapi/car/base/ICarFunction$IFunctionValueWatcher;)Z [{"kind": "literal", "value": 570491136}, {"kind": "unknown"}]
+La/r2/i; | EnableSplitScreenCommand
+  Settings.Global split_screen_first_app
+  Settings.Global split_screen_second_app
+La/r2/j; | 
+  Settings.Global disable_start_stop_system_value
+  Lcom/ecarx/xui/adaptapi/car/base/ICarFunction;->registerFunctionValueWatcher(ILcom/ecarx/xui/adaptapi/car/base/ICarFunction$IFunctionValueWatcher;)Z [{"kind": "literal", "value": 570491136}, {"kind": "unknown"}]
+  Lcom/ecarx/xui/adaptapi/car/base/ICarFunction;->unregisterFunctionValueWatcher(Lcom/ecarx/xui/adaptapi/car/base/ICarFunction$IFunctionValueWatcher;)Z [{"kind": "unknown"}]
+La/r2/k; | 
+  Settings.Global enable_gPilot_hwa_key
+La/r2/l; | 
+  Settings.Global enable_intelligent_fuel_control_function_key
+La/r2/m; | 
+  Settings.Global open_shadow_on_start
+La/r2/n; | 
+  Settings.Global fix_last_temperature_driver
+  Settings.Global fix_last_temperature_passenger
+  Settings.Global save_last_temperature_state_key
+  Lcom/ecarx/xui/adaptapi/car/base/ICarFunction;->registerFunctionValueWatcher(ILcom/ecarx/xui/adaptapi/car/base/ICarFunction$IFunctionValueWatcher;)Z [{"kind": "literal", "value": 268828928}, {"kind": "unknown"}]
+  Lcom/ecarx/xui/adaptapi/car/base/ICarFunction;->unregisterFunctionValueWatcher(Lcom/ecarx/xui/adaptapi/car/base/ICarFunction$IFunctionValueWatcher;)Z [{"kind": "unknown"}]
+La/s2/a; | AutoHeatBackWinStartStopRunner
+  Settings.Global back_win_auto_heat_in_repeat_mode_key
+  Settings.Global engine_working_check_last_time
+  Settings.Global on_stop_engine_last_time_option
+La/s2/b; | 
+  Settings.Global engine_working_check_last_time
+  Settings.Global on_stop_engine_last_time_option
+La/s2/c; | AutoHeatFrontWinStartStopRunner
+  Settings.Global engine_working_check_last_time
+  Settings.Global front_win_auto_heat_in_repeat_mode_key
+  Settings.Global on_stop_engine_last_time_option
+La/s2/d; | 
+  Settings.Global engine_working_check_last_time
+  Settings.Global on_stop_engine_last_time_option
+La/s2/e; | 
+  Settings.Global engine_working_check_last_time
+  Settings.Global on_stop_engine_last_time_option
+La/t2/a; | 
+  Settings.Global engine_working_check_last_time
+  Settings.Global on_stop_engine_last_time_option_ventilation
+La/t2/b; | 
+  Settings.Global engine_working_check_last_time
+  Settings.Global on_stop_engine_last_time_option_ventilation

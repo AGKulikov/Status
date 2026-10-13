@@ -1,0 +1,904 @@
+КАТАЛОГ ПАРАМЕТРОВ XCSettings2
+Статический разбор. defaultValue — значение JSON, не текущее состояние машины.
+checkList — порядок в ресурсах; преобразование индекса виджетом может отличаться.
+Сценарии 0..7 — пробы анализа, не утверждение допустимого диапазона.
+
+TYPE=23 ID=256 | Push-уведомления / Notifications
+Обработчик: Lecarx/settings/proxy/branch/NotifyMessageProxy;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/config.json:/0", "attributes": {"viewType": 3, "functionType": 23, "functionId": 256, "currentPage": "notify", "defaultValue": 1, "stored": {"key": "key_system_notify_enable", "type": 2}}}, {"source": "assets/table/tab_search.json:/161", "attributes": {"target": "notify", "targetAction": "2", "currentPage": "search_content_sys", "functionType": 23, "functionId": 256, "searchStr": "全局推送"}}]
+
+TYPE=23 ID=77 | Объединение оповещений / Notifications / Объединение  оповещений
+Обработчик: Lecarx/settings/proxy/branch/NotifyMessageProxy;
+Support map: 0
+Варианты: []
+Параметры/источники: [{"source": "assets/config.json:/1", "attributes": {"viewType": 3, "functionType": 23, "functionId": 77, "currentPage": "notify", "defaultValue": 1, "stored": {"key": "key_system_notify_merge_group", "type": 2}}}, {"source": "assets/table/tab_search.json:/162", "attributes": {"target": "notify", "targetAction": "2", "currentPage": "search_content_sys", "functionType": 23, "functionId": 77, "searchStr": "通知消息聚合"}}, {"source": "assets/table/vehicle/system/tab_notify.json:/2", "attributes": {"viewType": 3, "functionType": 23, "functionId": 77, "currentPage": "notify"}}]
+
+TYPE=23 ID=75 | Настройки голосовых сообщений / Notifications / Настройки  голосовых сообщений
+Обработчик: Lecarx/settings/proxy/branch/NotifyMessageProxy;
+Support map: 2
+Варианты: []
+Параметры/источники: [{"source": "assets/config.json:/2", "attributes": {"viewType": 3, "functionType": 23, "functionId": 75, "currentPage": "notify", "defaultValue": 0, "stored": {"key": "key_system_notify_tts", "type": 2}}}, {"source": "assets/table/tab_search.json:/163", "attributes": {"target": "notify", "targetAction": "2", "currentPage": "search_content_sys", "functionType": 23, "functionId": 75, "searchStr": "通知消息语音播报"}}, {"source": "assets/table/vehicle/system/tab_notify.json:/0", "attributes": {"viewType": 3, "functionType": 23, "functionId": 75, "currentPage": "notify"}}]
+
+TYPE=2 ID=203 | Приветственная подсветка / 迎宾灯
+Обработчик: Lecarx/settings/proxy/branch/LightingProxy;
+Support map: 537135360
+Варианты: []
+Параметры/источники: [{"source": "assets/table/light/tab_light_lamp.json:/0", "attributes": {"viewType": 3, "functionType": 2, "functionId": 203}}, {"source": "assets/table/tab_search.json:/92", "attributes": {"target": "light", "targetAction": "3", "currentPage": "search_content_car", "functionType": 2, "functionId": 203, "searchStr": "迎宾灯"}}]
+
+TYPE=2 ID=4 | Световые сигналы приветственной подсветки / 欢迎灯语
+Обработчик: Lecarx/settings/proxy/branch/LightingProxy;
+Support map: 721617152
+Варианты: [[{"name": "Мягкий"}, {"name": "Звездный"}, {"name": "Лунный"}]]
+Параметры/источники: [{"source": "assets/table/light/tab_light_lamp.json:/1", "attributes": {"viewType": 20, "functionType": 2, "functionId": 4}}, {"source": "assets/table/tab_search.json:/93", "attributes": {"target": "light", "targetAction": "3", "currentPage": "search_content_car", "functionType": 2, "functionId": 4, "searchStr": "欢迎灯语"}}]
+
+TYPE=2 ID=1 | Функция задержки выключения света фар / 伴我回家
+Обработчик: Lecarx/settings/proxy/branch/LightingProxy;
+Support map: 537134848
+Варианты: [[{"name": "Выкл."}, {"name": "30 с"}, {"name": "60 с"}, {"name": "90 с"}]]
+Параметры/источники: [{"source": "assets/table/light/tab_light_lamp.json:/2", "attributes": {"viewType": 17, "functionType": 2, "functionId": 1}}, {"source": "assets/table/tab_search.json:/91", "attributes": {"target": "light", "targetAction": "3", "currentPage": "search_content_car", "functionType": 2, "functionId": 1, "searchStr": "伴我回家"}}]
+
+TYPE=None ID=279 | Интеллектуальные ассистенты помощи водителю
+Обработчик: None
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/0", "attributes": {"viewType": 50, "functionId": 279, "currentPage": "assist_safe"}}]
+
+TYPE=1 ID=126 | Автоматическое ограничение скорости круиз-контроля / 巡航自动限速辅助
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 2
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/1", "attributes": {"viewType": 37, "currentPage": "assist_safe", "functionType": 1, "functionId": 126}}, {"source": "assets/table/tab_search.json:/61", "attributes": {"target": "assist_safe", "targetAction": "0", "currentPage": "search_content_car", "functionType": 1, "functionId": 126, "searchStr": "巡航自动限速辅助"}}]
+
+TYPE=1 ID=127 | Ассистент смены полосы движения G-Pilot / G-Pilot变道辅助
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 671351040
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/2", "attributes": {"viewType": 37, "currentPage": "assist_safe", "functionType": 1, "functionId": 127}}, {"source": "assets/table/tab_search.json:/62", "attributes": {"target": "assist_safe", "targetAction": "0", "currentPage": "search_content_car", "functionType": 1, "functionId": 127, "searchStr": "G-Pilot变道辅助"}}]
+
+TYPE=1 ID=230 | Система LKA / 车道保持辅助
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537329920
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/3", "attributes": {"viewType": 50, "functionType": 1, "functionId": 230, "currentPage": "assist_safe"}}, {"source": "assets/table/tab_search.json:/63", "attributes": {"target": "assist_safe", "targetAction": "1", "currentPage": "search_content_car", "functionType": 1, "functionId": 230, "searchStr": "车道保持辅助"}}]
+
+TYPE=1 ID=137 | Система LDW / 车道偏离报警
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537330176
+Варианты: [[{"name": "Звук"}, {"name": "Вибрация"}]]
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/4", "attributes": {"viewType": 38, "currentPage": "assist_safe", "functionType": 1, "functionId": 137}}, {"source": "assets/table/tab_search.json:/65", "attributes": {"target": "assist_safe", "targetAction": "1", "currentPage": "search_content_car", "functionType": 1, "functionId": 137, "searchStr": "车道偏离报警"}}]
+
+TYPE=1 ID=229 | Система LDP / 车道偏离辅助
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537329920
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/5", "attributes": {"viewType": 37, "currentPage": "assist_safe", "functionType": 1, "functionId": 229}}, {"source": "assets/table/tab_search.json:/64", "attributes": {"target": "assist_safe", "targetAction": "1", "currentPage": "search_content_car", "functionType": 1, "functionId": 229, "searchStr": "车道偏离辅助"}}]
+
+TYPE=None ID=280 | Ассистент предупреждения о столкновении
+Обработчик: None
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/6", "attributes": {"viewType": 50, "functionId": 280, "currentPage": "assist_safe"}}]
+
+TYPE=1 ID=139 | Чувствительность системы FCW
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537788928
+Варианты: [[{"name": "Выкл."}, {"name": "Низк."}, {"name": "Сред."}, {"name": "Выс."}]]
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/7", "attributes": {"viewType": 58, "functionType": 1, "functionId": 139, "currentPage": "assist_safe"}}]
+
+TYPE=1 ID=239 | Персонализация предупреждений о превышении скорости / 自定义超速报警
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 671484160
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/8", "attributes": {"viewType": 39, "currentPage": "assist_safe", "functionType": 1, "functionId": 239}}, {"source": "assets/table/tab_search.json:/77", "attributes": {"target": "assist_safe", "targetAction": "4", "currentPage": "search_content_car", "functionType": 1, "functionId": 239, "searchStr": "自定义超速报警"}}]
+
+TYPE=1 ID=237 | Настройка предупреждений / 报警值设置
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 671483136
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/8/subItem/0", "attributes": {"viewType": 19, "functionType": 1, "functionId": 237}}, {"source": "assets/table/tab_search.json:/78", "attributes": {"target": "assist_safe", "targetAction": "4", "currentPage": "search_content_car", "functionType": 1, "functionId": 237, "searchStr": "报警值设置"}}]
+
+TYPE=None ID=281 | Мониторинг безопасности движения
+Обработчик: None
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/9", "attributes": {"viewType": 50, "functionId": 281, "currentPage": "assist_safe"}}]
+
+TYPE=1 ID=87 | Cистема LCA / 变道安全预警
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537331456
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/10", "attributes": {"viewType": 37, "currentPage": "assist_safe", "functionType": 1, "functionId": 87}}, {"source": "assets/table/tab_search.json:/69", "attributes": {"target": "assist_safe", "targetAction": "3", "currentPage": "search_content_car", "functionType": 1, "functionId": 87, "searchStr": "变道安全预警"}}]
+
+TYPE=1 ID=235 | Звук / 声音
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 671351296
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/10/subItem/0", "attributes": {"viewType": 15, "functionType": 1, "functionId": 235}}, {"source": "assets/table/tab_search.json:/70", "attributes": {"target": "assist_safe", "targetAction": "3", "currentPage": "search_content_car", "functionType": 1, "functionId": 235, "searchStr": "声音"}}]
+
+TYPE=1 ID=88 | Cистема DOW / 开门安全预警
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 538050816
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/11", "attributes": {"viewType": 37, "currentPage": "assist_safe", "functionType": 1, "functionId": 88}}, {"source": "assets/table/tab_search.json:/71", "attributes": {"target": "assist_safe", "targetAction": "3", "currentPage": "search_content_car", "functionType": 1, "functionId": 88, "searchStr": "开门安全预警"}}]
+
+TYPE=1 ID=89 | Cистема CMSR / 后碰撞安全预警
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537333760
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/12", "attributes": {"viewType": 37, "currentPage": "assist_safe", "functionType": 1, "functionId": 89}}, {"source": "assets/table/tab_search.json:/72", "attributes": {"target": "assist_safe", "targetAction": "3", "currentPage": "search_content_car", "functionType": 1, "functionId": 89, "searchStr": "后碰撞安全预警"}}]
+
+TYPE=1 ID=86 | Предупреждение системы RCTA / 后方横向来车预警
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537332224
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/13", "attributes": {"viewType": 37, "currentPage": "assist_safe", "functionType": 1, "functionId": 86}}, {"source": "assets/table/tab_search.json:/73", "attributes": {"target": "assist_safe", "targetAction": "3", "currentPage": "search_content_car", "functionType": 1, "functionId": 86, "searchStr": "后方横向来车预警"}}]
+
+TYPE=1 ID=176 | Уведомление системы TSI / Предупреждение о превышении скорости
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 671482368
+Варианты: [[{"name": "Выкл."}, {"name": "Мигание"}, {"name": "Звук"}]]
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/14", "attributes": {"viewType": 61, "currentPage": "assist_safe", "functionType": 1, "functionId": 176}}, {"source": "assets/table/safe/tab_assist_safe.json:/14/subItem/0", "attributes": {"viewType": 17, "functionType": 1, "functionId": 176}}]
+
+TYPE=1 ID=236 | Настройка ограничения скорости / 限速偏差设定
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 671482880
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/14/subItem/1", "attributes": {"viewType": 19, "functionType": 1, "functionId": 236}}, {"source": "assets/table/tab_search.json:/75", "attributes": {"target": "assist_safe", "targetAction": "3", "currentPage": "search_content_car", "functionType": 1, "functionId": 236, "searchStr": "限速偏差设定"}}]
+
+TYPE=1 ID=238 | Cистема TSI / 道路标志识别
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537592064
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/15", "attributes": {"viewType": 37, "currentPage": "assist_safe", "functionType": 1, "functionId": 238}}, {"source": "assets/table/tab_search.json:/76", "attributes": {"target": "assist_safe", "targetAction": "3", "currentPage": "search_content_car", "functionType": 1, "functionId": 238, "searchStr": "道路标志识别"}}]
+
+TYPE=None ID=282 | Парковка
+Обработчик: None
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/16", "attributes": {"viewType": 50, "functionId": 282, "currentPage": "assist_safe"}}]
+
+TYPE=1 ID=242 | Интеллектуальные рекомендации при парковке / 泊车方式智能推荐
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 587596032
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/17", "attributes": {"viewType": 37, "currentPage": "assist_safe", "functionType": 1, "functionId": 242}}, {"source": "assets/table/tab_search.json:/80", "attributes": {"target": "assist_safe", "targetAction": "5", "currentPage": "search_content_car", "functionType": 1, "functionId": 242, "searchStr": "泊车方式智能推荐"}}]
+
+TYPE=1 ID=142 | Система помощи при парковке (PAS) / 泊车辅助系统
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537723136
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/18", "attributes": {"viewType": 37, "currentPage": "assist_safe", "functionType": 1, "functionId": 142}}, {"source": "assets/table/tab_search.json:/81", "attributes": {"target": "assist_safe", "targetAction": "5", "currentPage": "search_content_car", "functionType": 1, "functionId": 142, "searchStr": "泊车辅助系统"}}]
+
+TYPE=1 ID=233 | Ассистент для удаленной парковки / 遥控泊车辅助
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 587596288
+Варианты: []
+Параметры/источники: [{"source": "assets/table/safe/tab_assist_safe.json:/19", "attributes": {"viewType": 37, "currentPage": "assist_safe", "functionType": 1, "functionId": 233}}, {"source": "assets/table/tab_search.json:/82", "attributes": {"target": "assist_safe", "targetAction": "5", "currentPage": "search_content_car", "functionType": 1, "functionId": 233, "searchStr": "遥控泊车辅助"}}]
+
+TYPE=5 ID=148 | Аудиосистема Bose / BOSE高级音响
+Обработчик: Lecarx/settings/proxy/custom/CustomSound;
+Support map: 4
+Варианты: []
+Параметры/источники: [{"source": "assets/table/sound/tab_sound.json:/0", "attributes": {"viewType": 10, "functionId": 148, "functionType": 5, "currentPage": "sound", "target": "high_bose"}}, {"source": "assets/table/tab_search.json:/113", "attributes": {"target": "sound", "targetAction": "0", "currentPage": "search_content_sys", "functionType": 5, "functionId": 148, "searchStr": "BOSE高级音响"}}]
+
+TYPE=5 ID=149 | Звуковые эффекты
+Обработчик: Lecarx/settings/proxy/custom/CustomSound;
+Support map: 4
+Варианты: [[{"name": "Стандарт"}, {"name": "Водитель"}], [{"name": "Стандарт", "pcode": "all"}, {"name": "驾驶座优先", "pcode": "all"}, {"name": "Приоритет для задних сидений", "pcode": "all"}]]
+Параметры/источники: [{"source": "assets/table/sound/tab_sound.json:/0/subItem/0", "attributes": {"viewType": 17, "functionType": 5, "functionId": 149, "currentPage": "sound"}}, {"source": "assets/table/sound/tab_sound.json:/1/subItem/0", "attributes": {"viewType": 27, "functionType": 5, "functionId": 149, "currentPage": "sound"}}]
+
+TYPE=1 ID=211 | Воспроизведение с технологией SoundTrue
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 771818240
+Варианты: []
+Параметры/источники: [{"source": "assets/table/sound/tab_sound.json:/0/subItem/1", "attributes": {"viewType": 3, "functionType": 1, "functionId": 211, "currentPage": "sound"}}]
+
+TYPE=5 ID=164 | Подавление шума Audio Pilot / Звукокомпенсация в зависимости от скорости движения
+Обработчик: Lecarx/settings/proxy/custom/CustomSound;
+Support map: 0
+Варианты: [[{"name": "Низк."}, {"name": "Сред."}, {"name": "Высок."}], [{"name": "Низк."}, {"name": "Сред."}, {"name": "Выс."}]]
+Параметры/источники: [{"source": "assets/table/sound/tab_sound.json:/0/subItem/2", "attributes": {"viewType": 23, "functionType": 5, "functionId": 164, "currentPage": "sound"}}, {"source": "assets/table/sound/tab_sound.json:/7/subItem/0", "attributes": {"viewType": 23, "functionType": 5, "functionId": 164, "currentPage": "sound"}}]
+
+TYPE=5 ID=301 | Звуковые эффекты
+Обработчик: Lecarx/settings/proxy/custom/CustomSound;
+Support map: 4
+Варианты: []
+Параметры/источники: [{"source": "assets/table/sound/tab_sound.json:/1", "attributes": {"viewType": 10, "functionId": 301, "functionType": 5, "target": "special_bose", "currentPage": "sound"}}]
+
+TYPE=1 ID=160 | Громкость сигналов панели приборов
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 538771712
+Варианты: [[{"name": "Низк."}, {"name": "Сред."}, {"name": "Высок."}]]
+Параметры/источники: [{"source": "assets/table/sound/tab_sound.json:/2/subItem/0", "attributes": {"viewType": 24, "functionType": 1, "functionId": 160}}]
+
+TYPE=1 ID=172 | Громкость уведомлений системы помощи при парковке (PAS) / 泊车辅助系统音量
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537723392
+Варианты: [[{"name": "Низк."}, {"name": "Сред."}, {"name": "Высок."}]]
+Параметры/источники: [{"source": "assets/table/sound/tab_sound.json:/2/subItem/1", "attributes": {"viewType": 24, "functionType": 1, "functionId": 172}}, {"source": "assets/table/tab_search.json:/124", "attributes": {"target": "sound", "targetAction": "1", "currentPage": "search_content_sys", "functionType": 1, "functionId": 172, "searchStr": "泊车辅助系统音量"}}]
+
+TYPE=5 ID=146 | Громкость мультимедийной системы / 多媒体音量
+Обработчик: Lecarx/settings/proxy/custom/CustomSound;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/sound/tab_sound.json:/2/subItem/2", "attributes": {"viewType": 21, "defaultValue": 16, "functionType": 5, "target": "volume_control", "functionId": 146}}, {"source": "assets/table/tab_search.json:/122", "attributes": {"target": "sound", "targetAction": "1", "currentPage": "search_content_sys", "functionType": 5, "functionId": 146, "searchStr": "多媒体音量"}}]
+
+TYPE=5 ID=147 | Громкость Bluetooth / 蓝牙电话音量
+Обработчик: Lecarx/settings/proxy/custom/CustomSound;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/sound/tab_sound.json:/2/subItem/3", "attributes": {"viewType": 21, "defaultValue": 10, "functionType": 5, "target": "volume_control", "functionId": 147}}, {"source": "assets/table/tab_search.json:/125", "attributes": {"target": "sound", "targetAction": "5", "currentPage": "search_content_sys", "functionType": 5, "functionId": 147, "searchStr": "蓝牙电话音量"}}]
+
+TYPE=1 ID=259 | Частоты / 低中高频
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 0
+Варианты: []
+Параметры/источники: [{"source": "assets/table/sound/tab_sound.json:/3", "attributes": {"viewType": 10, "target": "special_lmh_adjust", "functionId": 259, "functionType": 1, "currentPage": "sound"}}, {"source": "assets/table/tab_search.json:/117", "attributes": {"target": "sound", "targetAction": "3", "currentPage": "search_content_sys", "functionType": 1, "functionId": 259, "searchStr": "低中高频"}}]
+
+TYPE=1 ID=44 | Эквалайзер / 均衡器
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 0
+Варианты: []
+Параметры/источники: [{"source": "assets/table/sound/tab_sound.json:/4", "attributes": {"viewType": 10, "functionId": 44, "functionType": 1, "target": "special_equalizer", "currentPage": "sound"}}, {"source": "assets/table/tab_search.json:/118", "attributes": {"target": "sound", "targetAction": "4", "currentPage": "search_content_sys", "functionType": 1, "functionId": 44, "searchStr": "均衡器"}}]
+
+TYPE=1 ID=163 | Звук при касании экрана
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 771883264
+Варианты: []
+Параметры/источники: [{"source": "assets/table/sound/tab_sound.json:/6", "attributes": {"viewType": 10, "functionId": 163, "functionType": 1}}]
+
+TYPE=1 ID=212 | Звук при касании экрана
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 771883264
+Варианты: [[{"name": "Классика"}, {"name": "Аналоговые часы"}, {"name": "Presto - увеличение скорости воспроизведения "}]]
+Параметры/источники: [{"source": "assets/table/sound/tab_sound.json:/6/subItem/0", "attributes": {"viewType": 23, "functionType": 1, "functionId": 212}}]
+
+TYPE=5 ID=54 | Звукокомпенсация в зависимости от скорости движения / 音量随车速调节
+Обработчик: Lecarx/settings/proxy/custom/CustomSound;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/sound/tab_sound.json:/7", "attributes": {"viewType": 10, "currentPage": "sound", "defaultValue": 0, "functionType": 5, "functionId": 54}}, {"source": "assets/table/tab_search.json:/128", "attributes": {"target": "sound", "targetAction": "6", "currentPage": "search_content_sys", "functionType": 5, "functionId": 54, "searchStr": "音量随车速调节"}}]
+
+TYPE=1 ID=285 | Регул. сидений
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_car_quick.json:/0/subItem/0", "attributes": {"viewType": 15, "functionType": 1, "functionId": 285, "subItemViews": 1, "currentPage": "car_quick", "target": "seat_control"}}]
+
+TYPE=1 ID=277 | Люк и солнцезащитная шторка
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_car_quick.json:/0/subItem/1", "attributes": {"viewType": 21, "currentPage": "car_quick", "target": "window", "subItemViews": 2, "functionType": 1, "functionId": 277, "res": {"iconLeft": "ic_icon_60_skylight"}}}]
+
+TYPE=1 ID=111 | Дверь багажника / 行李箱开闭
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 553779456
+Варианты: [[{"name": "开启", "functionId": 111, "functionType": 1}, {"name": "关闭", "functionId": 111, "functionType": 1}, {"name": "暂停", "functionId": 111, "functionType": 1}]]
+Параметры/источники: [{"source": "assets/table/tab_car_quick.json:/1", "attributes": {"viewType": 48, "currentPage": "car_quick", "functionType": 1, "functionId": 111}}, {"source": "assets/table/vehicle/tab_trunk.json:/0", "attributes": {"viewType": 18, "currentPage": "trunk", "functionId": 111, "functionType": 1}}]
+
+TYPE=1 ID=305 | Стеклоочиститель
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_car_quick.json:/2/subItem/0", "attributes": {"viewType": 24, "functionType": 1, "functionId": 305, "subItemViews": 1, "currentPage": "car_quick", "target": "wiper", "res": {"iconLeft": "ic_icon_60_wiper"}}}]
+
+TYPE=1 ID=31 | Проекционный  дисплей (HUD) / HUD抬头显示 / HUD / HUD switch
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537985280
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_car_quick.json:/2/subItem/1", "attributes": {"viewType": 24, "functionType": 1, "functionId": 31, "subItemViews": 2, "target": "hud", "currentPage": "car_quick"}}, {"source": "assets/table/tab_search.json:/12", "attributes": {"target": "vehicle", "targetAction": "4", "currentPage": "search_content_car", "functionType": 1, "functionId": 31, "searchStr": "HUD抬头显示"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/3", "attributes": {"viewType": 10, "functionType": 1, "functionId": 31, "currentPage": "vehicle", "target": "hud"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/3/subItem/0", "attributes": {"viewType": 31, "functionType": 1, "functionId": 31, "currentPage": "hud"}}]
+
+TYPE=1 ID=216 | Cвязь с реж. вождения / 转向力与驾驶模式联动 / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 570688256
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_car_quick.json:/3/subItem/0", "attributes": {"viewType": 3, "functionType": 1, "subItemViews": 1, "functionId": 216, "currentPage": "car_quick"}}, {"source": "assets/table/tab_search.json:/14", "attributes": {"target": "vehicle", "targetAction": "5", "currentPage": "search_content_car", "functionType": 1, "functionId": 216, "searchStr": "转向力与驾驶模式联动"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/5/subItem/0", "attributes": {"viewType": 3, "functionType": 1, "functionId": 216}}]
+
+TYPE=1 ID=125 | Регулировка  усилия на руле / 方向盘转向力调节 / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537331712
+Варианты: [[{"name": "Легкое"}, {"name": "Стандарт"}, {"name": "Сильное"}], [{"name": "淑女"}, {"name": "标准"}, {"name": "型男"}]]
+Параметры/источники: [{"source": "assets/table/tab_car_quick.json:/3/subItem/1", "attributes": {"viewType": 17, "functionType": 1, "subItemViews": 2, "functionId": 125, "currentPage": "car_quick"}}, {"source": "assets/table/tab_search.json:/15", "attributes": {"target": "vehicle", "targetAction": "5", "currentPage": "search_content_car", "functionType": 1, "functionId": 125, "searchStr": "方向盘转向力调节"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/5/subItem/1", "attributes": {"viewType": 17, "functionType": 1, "functionId": 125}}]
+
+TYPE=2 ID=58 | Яркость подсветки панели приборов / 仪表/开关亮度调节
+Обработчик: Lecarx/settings/proxy/branch/LightingProxy;
+Support map: 687997184
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_display.json:/0/subItem/0", "attributes": {"viewType": 21, "defaultValue": 16, "target": "display_light", "functionType": 2, "functionId": 58}}, {"source": "assets/table/tab_search.json:/133", "attributes": {"target": "display", "targetAction": "0", "currentPage": "search_content_sys", "functionType": 2, "functionId": 58, "searchStr": "仪表/开关亮度调节"}}]
+
+TYPE=2 ID=402 | Яркость дисплея / 屏幕亮度
+Обработчик: Lecarx/settings/proxy/branch/LightingProxy;
+Support map: 688062976
+Варианты: [[{"name": "Авто"}, {"name": "День"}, {"name": "Ночь"}]]
+Параметры/источники: [{"source": "assets/table/tab_display.json:/0/subItem/1", "attributes": {"viewType": 24, "functionType": 2, "target": "display_light", "functionId": 402}}, {"source": "assets/table/tab_search.json:/132", "attributes": {"target": "display", "targetAction": "0", "currentPage": "search_content_sys", "functionType": 2, "functionId": 402, "searchStr": "屏幕亮度"}}]
+
+TYPE=2 ID=57 | Яркость дисплея / 中控屏亮度调节
+Обработчик: Lecarx/settings/proxy/branch/LightingProxy;
+Support map: 538247936
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_display.json:/0/subItem/2", "attributes": {"viewType": 21, "defaultValue": 16, "target": "display_light", "functionType": 2, "functionId": 57}}, {"source": "assets/table/tab_search.json:/134", "attributes": {"target": "display", "targetAction": "0", "currentPage": "search_content_sys", "functionType": 2, "functionId": 57, "searchStr": "中控屏亮度调节"}}]
+
+TYPE=2 ID=169 | Регулировка яркости экрана переднего пассажира / 副驾屏亮度调节
+Обработчик: Lecarx/settings/proxy/branch/LightingProxy;
+Support map: 538248192
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_display.json:/0/subItem/3", "attributes": {"viewType": 21, "defaultValue": 16, "target": "display_light", "functionType": 2, "functionId": 169}}, {"source": "assets/table/tab_search.json:/135", "attributes": {"target": "display", "targetAction": "0", "currentPage": "search_content_sys", "functionType": 2, "functionId": 169, "searchStr": "副驾屏亮度调节"}}]
+
+TYPE=1 ID=308 | Экран переднего пассажира / 副驾屏幕
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 539495936
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_display.json:/1", "attributes": {"viewType": 10, "currentPage": "display", "functionId": 308, "functionType": 1, "target": "special_psd_screen_switch"}}, {"source": "assets/table/tab_search.json:/136", "attributes": {"target": "display", "targetAction": "0", "currentPage": "search_content_sys", "functionType": 1, "functionId": 308, "searchStr": "副驾屏幕"}}]
+
+TYPE=2 ID=65 | Настройка день/ночь / 日夜主题
+Обработчик: Lecarx/settings/proxy/branch/LightingProxy;
+Support map: 538247424
+Варианты: [[{"name": "День"}, {"name": "Ночь"}, {"name": "Авто"}]]
+Параметры/источники: [{"source": "assets/table/tab_display.json:/2", "attributes": {"viewType": 10, "functionType": 2, "functionId": 65, "currentPage": "display", "target": "display_day_and_night"}}, {"source": "assets/table/tab_search.json:/144", "attributes": {"target": "display", "targetAction": "5", "currentPage": "search_content_sys", "functionType": 2, "functionId": 65, "searchStr": "日夜主题"}}]
+
+TYPE=1 ID=93 | 锁车自动关闭遮阳帘 / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537395456
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/6", "attributes": {"target": "vehicle", "targetAction": "2", "currentPage": "search_content_car", "functionType": 1, "functionId": 93, "searchStr": "锁车自动关闭遮阳帘"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/2/subItem/1", "attributes": {"viewType": 3, "currentPage": "key", "functionType": 1, "functionId": 93}}, {"source": "assets/table/vehicle/tab_window.json:/1", "attributes": {"viewType": 3, "currentPage": "window", "functionType": 1, "functionId": 93}}]
+
+TYPE=101 ID=177 | 方向盘自定义按键 / DVR拍照/录像 / 360全景 / 一键导航回家 / 仪表全屏地图 / 多媒体音源切换 / 多媒体节目收藏 / Steering custom
+Обработчик: Lecarx/settings/proxy/custom/CustomVehicle;
+Support map: None
+Варианты: [[{"name": "仪表全屏地图"}, {"name": "DVR拍照/录像"}, {"name": "多媒体音源切换"}, {"name": "360全景"}, {"name": "一键导航回家"}, {"name": "多媒体节目收藏"}]]
+Параметры/источники: [{"source": "assets/table/tab_search.json:/16", "attributes": {"target": "vehicle", "targetAction": "6", "currentPage": "search_content_car", "functionId": 177, "functionType": 101, "searchStr": "方向盘自定义按键"}}, {"source": "assets/table/tab_search.json:/17", "attributes": {"target": "vehicle", "targetAction": "6", "currentPage": "search_content_car", "functionId": 177, "functionType": 101, "searchStr": "DVR拍照/录像"}}, {"source": "assets/table/tab_search.json:/18", "attributes": {"target": "vehicle", "targetAction": "6", "currentPage": "search_content_car", "functionId": 177, "functionType": 101, "searchStr": "360全景"}}, {"source": "assets/table/tab_search.json:/19", "attributes": {"target": "vehicle", "targetAction": "6", "currentPage": "search_content_car", "functionId": 177, "functionType": 101, "searchStr": "一键导航回家"}}, {"source": "assets/table/tab_search.json:/20", "attributes": {"target": "vehicle", "targetAction": "6", "currentPage": "search_content_car", "functionId": 177, "functionType": 101, "searchStr": "仪表全屏地图"}}, {"source": "assets/table/tab_search.json:/21", "attributes": {"target": "vehicle", "targetAction": "6", "currentPage": "search_content_car", "functionId": 177, "functionType": 101, "searchStr": "多媒体音源切换"}}, {"source": "assets/table/tab_search.json:/22", "attributes": {"target": "vehicle", "targetAction": "6", "currentPage": "search_content_car", "functionId": 177, "functionType": 101, "searchStr": "多媒体节目收藏"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/6", "attributes": {"viewType": 10, "currentPage": "vehicle", "functionId": 177, "functionType": 101, "target": "steering_custom"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/6/subItem/0", "attributes": {"viewType": 11, "functionId": 177, "functionType": 101}}]
+
+TYPE=1 ID=128 | 安全带自动收紧 / Вкл/Выкл / Vehicle / Electronic safe
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537333504
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/23", "attributes": {"target": "vehicle", "targetAction": "7", "currentPage": "search_content_car", "functionType": 1, "functionId": 128, "searchStr": "安全带自动收紧"}}, {"source": "assets/table/vehicle/tab_car_vehicle.json:/3/subItem/0", "attributes": {"viewType": 52, "functionType": 1, "functionId": 128, "target": "electronic_safe", "currentPage": "car_vehicle_sub_1"}}, {"source": "assets/table/vehicle/tab_electronic_safe.json:/0", "attributes": {"viewType": 3, "currentPage": "electronic_safe", "functionType": 1, "functionId": 128}}, {"source": "assets/table/vehicle/tab_vehicle.json:/7", "attributes": {"viewType": 10, "functionType": 1, "functionId": 128, "target": "electronic_safe", "currentPage": "vehicle"}}]
+
+TYPE=1 ID=252 | 无钥匙进入 / Бесключевой доступ / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537920512
+Варианты: [[{"name": "Одна дверь"}, {"name": "Автомобиль"}], [{"name": "NA"}, {"name": "NA"}]]
+Параметры/источники: [{"source": "assets/table/tab_search.json:/25", "attributes": {"target": "vehicle", "targetAction": "8", "currentPage": "search_content_car", "functionType": 1, "functionId": 252, "searchStr": "无钥匙进入"}}, {"source": "assets/table/vehicle/tab_car_vehicle.json:/0/subItem/0", "attributes": {"viewType": 51, "functionType": 1, "functionId": 252, "currentPage": "car_vehicle_sub_1"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/8/subItem/0", "attributes": {"viewType": 17, "functionType": 1, "functionId": 252}}]
+
+TYPE=1 ID=114 | 钥匙解锁 / Управление с помощью ключа / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537922048
+Варианты: [[{"name": "Водитель"}, {"name": "Автомобиль"}], [{"name": "NA"}, {"name": "NA"}]]
+Параметры/источники: [{"source": "assets/table/tab_search.json:/26", "attributes": {"target": "vehicle", "targetAction": "8", "currentPage": "search_content_car", "functionType": 1, "functionId": 114, "searchStr": "钥匙解锁"}}, {"source": "assets/table/vehicle/tab_car_vehicle.json:/0/subItem/1", "attributes": {"viewType": 51, "functionType": 1, "functionId": 114, "currentPage": "car_vehicle_sub_1"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/8/subItem/1", "attributes": {"viewType": 17, "functionType": 1, "functionId": 114}}]
+
+TYPE=1 ID=105 | 自动落锁 / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 2
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/27", "attributes": {"target": "vehicle", "targetAction": "8", "currentPage": "search_content_car", "functionType": 1, "functionId": 105, "searchStr": "自动落锁"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/8/subItem/2", "attributes": {"viewType": 3, "currentPage": "key", "functionType": 1, "functionId": 105}}]
+
+TYPE=1 ID=17 | 靠近解锁/远离上锁 / Автоматическое отпирание дверей при приближении к автомобилю / Автоматическое запирание дверей при отдалении от автомобиля / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 738263296
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/28", "attributes": {"target": "vehicle", "targetAction": "8", "currentPage": "search_content_car", "functionType": 1, "functionId": 17, "searchStr": "靠近解锁/远离上锁"}}, {"source": "assets/table/vehicle/tab_car_vehicle.json:/0/subItem/2", "attributes": {"viewType": 52, "functionType": 1, "functionId": 17, "currentPage": "car_vehicle_sub_1"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/8/subItem/3", "attributes": {"viewType": 44, "functionType": 1, "functionId": 17, "currentPage": "key"}}]
+
+TYPE=1 ID=278 | 外后视镜
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/29", "attributes": {"target": "vehicle", "targetAction": "9", "currentPage": "search_content_car", "functionType": 1, "functionId": 278, "searchStr": "外后视镜"}}]
+
+TYPE=1 ID=22 | 倒车时外后视镜倾斜 / ECO / Наклон  наружного зеркала заднего вида при движении автомобиля задним ходом
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537461504
+Варианты: [[{"name": "Выкл."}, {"name": "Левое"}, {"name": "Правое"}, {"name": "Оба"}], [{"name": "关闭"}, {"name": "主驾"}, {"name": "副驾"}, {"name": "两侧"}]]
+Параметры/источники: [{"source": "assets/table/tab_search.json:/30", "attributes": {"target": "vehicle", "targetAction": "9", "currentPage": "search_content_car", "searchStr": "倒车时外后视镜倾斜", "functionType": 1, "functionId": 22}}, {"source": "assets/table/vehicle/tab_back_mirror.json:/0", "attributes": {"viewType": 12, "currentPage": "back_mirror", "functionId": 22, "functionType": 1}}, {"source": "assets/table/vehicle/tab_back_mirror.json:/0/subItem/0", "attributes": {"viewType": 11, "functionType": 1, "functionId": 22}}, {"source": "assets/table/vehicle/tab_back_mirror.json:/0/subItem/1", "attributes": {"viewType": 11, "functionType": 1, "functionId": 22}}, {"source": "assets/table/vehicle/tab_back_mirror.json:/0/subItem/2", "attributes": {"viewType": 11, "functionType": 1, "functionId": 22}}, {"source": "assets/table/vehicle/tab_back_mirror.json:/0/subItem/3", "attributes": {"viewType": 11, "functionType": 1, "functionId": 22}}, {"source": "assets/table/vehicle/tab_car_vehicle.json:/4/subItem/0", "attributes": {"viewType": 51, "functionType": 1, "functionId": 22, "currentPage": "car_vehicle_sub_1"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/9/subItem/0", "attributes": {"viewType": 17, "functionType": 1, "functionId": 22}}]
+
+TYPE=1 ID=21 | 锁车时外后视镜折叠 / ECO / Автоматическое складывание наружных зеркал при запирании автомобиля / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537461248
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/31", "attributes": {"target": "vehicle", "targetAction": "9", "currentPage": "search_content_car", "functionType": 1, "functionId": 21, "searchStr": "锁车时外后视镜折叠"}}, {"source": "assets/table/vehicle/tab_back_mirror.json:/1", "attributes": {"viewType": 3, "currentPage": "back_mirror", "functionType": 1, "functionId": 21}}, {"source": "assets/table/vehicle/tab_car_vehicle.json:/4/subItem/1", "attributes": {"viewType": 52, "functionType": 1, "functionId": 21, "currentPage": "car_vehicle_sub_1"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/9/subItem/1", "attributes": {"viewType": 3, "currentPage": "key", "functionType": 1, "functionId": 21}}]
+
+TYPE=1 ID=124 | 前雨刮维修位置 / ECO / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537657600
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/33", "attributes": {"target": "vehicle", "targetAction": "10", "currentPage": "search_content_car", "functionType": 1, "functionId": 124, "searchStr": "前雨刮维修位置"}}, {"source": "assets/table/vehicle/tab_rain_wiper.json:/0", "attributes": {"viewType": 44, "currentPage": "rain_wiper", "functionType": 1, "functionId": 124}}, {"source": "assets/table/vehicle/tab_vehicle.json:/10/subItem/0", "attributes": {"viewType": 44, "currentPage": "key", "functionType": 1, "functionId": 124}}]
+
+TYPE=1 ID=27 | 倒车关联后雨刮 / NORMAL / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537657856
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/34", "attributes": {"target": "vehicle", "targetAction": "10", "currentPage": "search_content_car", "functionType": 1, "functionId": 27, "searchStr": "倒车关联后雨刮"}}, {"source": "assets/table/vehicle/tab_rain_wiper.json:/1", "attributes": {"viewType": 3, "currentPage": "rain_wiper", "functionType": 1, "functionId": 27}}, {"source": "assets/table/vehicle/tab_vehicle.json:/10/subItem/1", "attributes": {"viewType": 3, "currentPage": "key", "functionType": 1, "functionId": 27}}]
+
+TYPE=1 ID=123 | 寻车模式 / ECO / Vehicle / Car find
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 538313728
+Варианты: [[{"name": "Звуковой и световой сигналы"}, {"name": "Только световой сигнал"}], [{"name": "NA"}, {"name": "NA"}]]
+Параметры/источники: [{"source": "assets/table/tab_search.json:/35", "attributes": {"target": "vehicle", "targetAction": "11", "currentPage": "search_content_car", "functionType": 1, "functionId": 123, "searchStr": "寻车模式"}}, {"source": "assets/table/vehicle/tab_car_vehicle.json:/5/subItem/0", "attributes": {"viewType": 54, "functionType": 1, "functionId": 123, "currentPage": "car_vehicle_sub_1"}}, {"source": "assets/table/vehicle/tab_find_car_mode.json:/0", "attributes": {"viewType": 12, "currentPage": "find_car_mode", "functionType": 1, "functionId": 123}}, {"source": "assets/table/vehicle/tab_find_car_mode.json:/0/subItem/0", "attributes": {"viewType": 11, "functionType": 1, "functionId": 123, "currentPage": "key"}}, {"source": "assets/table/vehicle/tab_find_car_mode.json:/0/subItem/1", "attributes": {"viewType": 11, "functionType": 1, "functionId": 123, "currentPage": "key"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/11", "attributes": {"viewType": 10, "currentPage": "vehicle", "functionId": 123, "functionType": 1, "target": "find_car_mode"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/11/subItem/0", "attributes": {"viewType": 30, "functionType": 1, "functionId": 123}}]
+
+TYPE=38 ID=293 | 行驶里程 / 平均油耗 / 平均车速 / 行驶时间
+Обработчик: Lecarx/settings/proxy/DriveModeProxy;
+Support map: 612369920
+Варианты: [[{"name": "Driven distance"}, {"name": "Average fuel consumption"}, {"name": "Average speed"}, {"name": "Driving time"}]]
+Параметры/источники: [{"source": "assets/table/tab_search.json:/40", "attributes": {"target": "vehicle", "targetAction": "12", "currentPage": "search_content_car", "functionType": 38, "functionId": 293, "searchStr": "行驶里程"}}, {"source": "assets/table/tab_search.json:/41", "attributes": {"target": "vehicle", "targetAction": "12", "currentPage": "search_content_car", "functionType": 38, "functionId": 293, "searchStr": "平均油耗"}}, {"source": "assets/table/tab_search.json:/42", "attributes": {"target": "vehicle", "targetAction": "12", "currentPage": "search_content_car", "functionType": 38, "functionId": 293, "searchStr": "平均车速"}}, {"source": "assets/table/tab_search.json:/43", "attributes": {"target": "vehicle", "targetAction": "12", "currentPage": "search_content_car", "functionType": 38, "functionId": 293, "searchStr": "行驶时间"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/12/subItem/0", "attributes": {"viewType": 42, "functionType": 38, "functionId": 293}}]
+
+TYPE=1 ID=39 | 手机无线充电 / Беспроводная зарядка / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 637600000
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/47", "attributes": {"target": "vehicle", "targetAction": "13", "currentPage": "search_content_car", "functionType": 1, "functionId": 39, "searchStr": "手机无线充电"}}, {"source": "assets/table/vehicle/tab_car_more.json:/2", "attributes": {"viewType": 56, "functionType": 1, "functionId": 39, "currentPage": "car_more"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/13/subItem/0", "attributes": {"viewType": 3, "currentPage": "vehicle", "functionType": 1, "functionId": 39}}]
+
+TYPE=1 ID=15 | 锁车鸣笛 / Звуковой сигнал при запирании / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537920256
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/48", "attributes": {"target": "vehicle", "targetAction": "13", "currentPage": "search_content_car", "functionType": 1, "functionId": 15, "searchStr": "锁车鸣笛"}}, {"source": "assets/table/vehicle/tab_car_more.json:/6", "attributes": {"viewType": 56, "functionType": 1, "functionId": 15, "currentPage": "car_more"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/13/subItem/1", "attributes": {"viewType": 3, "currentPage": "vehicle", "functionType": 1, "functionId": 15}}]
+
+TYPE=1 ID=130 | 陡坡缓降 / Система HDC / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537265408
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/49", "attributes": {"target": "vehicle", "targetAction": "13", "currentPage": "search_content_car", "functionType": 1, "functionId": 130, "searchStr": "陡坡缓降"}}, {"source": "assets/table/vehicle/tab_car_more.json:/7", "attributes": {"viewType": 56, "functionType": 1, "functionId": 130, "currentPage": "car_more", "res": {"imgGuide": "selector_exclamatory_mark"}}}, {"source": "assets/table/vehicle/tab_vehicle.json:/13/subItem/7", "attributes": {"viewType": 44, "currentPage": "vehicle", "functionType": 1, "functionId": 130}}]
+
+TYPE=1 ID=131 | 发动机启停 / Запуск/остановка двигателя / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537002240
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/50", "attributes": {"target": "vehicle", "targetAction": "13", "currentPage": "search_content_car", "functionType": 1, "functionId": 131, "searchStr": "发动机启停"}}, {"source": "assets/table/vehicle/tab_car_more.json:/0", "attributes": {"viewType": 56, "functionType": 1, "functionId": 131, "currentPage": "car_more", "res": {"imgGuide": "selector_exclamatory_mark"}}}, {"source": "assets/table/vehicle/tab_vehicle.json:/13/subItem/3", "attributes": {"viewType": 44, "currentPage": "vehicle", "functionType": 1, "functionId": 131}}]
+
+TYPE=1 ID=80 | ESC运动模式 / ESC Sport / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537002752
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/51", "attributes": {"target": "vehicle", "targetAction": "13", "currentPage": "search_content_car", "functionType": 1, "functionId": 80, "searchStr": "ESC运动模式"}}, {"source": "assets/table/vehicle/tab_car_more.json:/8", "attributes": {"viewType": 56, "functionType": 1, "functionId": 80, "currentPage": "car_more", "res": {"imgGuide": "selector_exclamatory_mark"}}}, {"source": "assets/table/vehicle/tab_vehicle.json:/13/subItem/5", "attributes": {"viewType": 44, "currentPage": "vehicle", "functionType": 1, "functionId": 80}}]
+
+TYPE=1 ID=132 | 自动驻车 / Auto-Hold / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537265152
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/52", "attributes": {"target": "vehicle", "targetAction": "13", "currentPage": "search_content_car", "functionType": 1, "functionId": 132, "searchStr": "自动驻车"}}, {"source": "assets/table/vehicle/tab_car_more.json:/1", "attributes": {"viewType": 56, "functionType": 1, "functionId": 132, "currentPage": "car_more", "res": {"imgGuide": "selector_exclamatory_mark"}}}, {"source": "assets/table/vehicle/tab_vehicle.json:/13/subItem/4", "attributes": {"viewType": 44, "currentPage": "vehicle", "functionType": 1, "functionId": 132}}]
+
+TYPE=1 ID=133 | EPB AUTO / Автоматическое включение системы EPB / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537264384
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/53", "attributes": {"target": "vehicle", "targetAction": "13", "currentPage": "search_content_car", "functionType": 1, "functionId": 133, "searchStr": "EPB AUTO"}}, {"source": "assets/table/vehicle/tab_car_more.json:/9", "attributes": {"viewType": 56, "functionType": 1, "functionId": 133, "currentPage": "car_more", "res": {"imgGuide": "selector_exclamatory_mark"}}}, {"source": "assets/table/vehicle/tab_vehicle.json:/13/subItem/6", "attributes": {"viewType": 44, "currentPage": "vehicle", "functionType": 1, "functionId": 133}}]
+
+TYPE=1 ID=134 | 被动设防 / Пассивная безопасность / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537921280
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/54", "attributes": {"target": "vehicle", "targetAction": "13", "currentPage": "search_content_car", "functionType": 1, "functionId": 134, "searchStr": "被动设防"}}, {"source": "assets/table/vehicle/tab_car_more.json:/10", "attributes": {"viewType": 56, "functionType": 1, "functionId": 134, "currentPage": "car_more"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/13/subItem/2", "attributes": {"viewType": 3, "currentPage": "vehicle", "functionType": 1, "functionId": 134}}]
+
+TYPE=1 ID=135 | 低灵敏度报警 / Слабое оповещение / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537921536
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/55", "attributes": {"target": "vehicle", "targetAction": "13", "currentPage": "search_content_car", "functionType": 1, "functionId": 135, "searchStr": "低灵敏度报警"}}, {"source": "assets/table/vehicle/tab_car_more.json:/11", "attributes": {"viewType": 56, "functionType": 1, "functionId": 135, "currentPage": "car_more"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/13/subItem/8", "attributes": {"viewType": 3, "currentPage": "vehicle", "functionType": 1, "functionId": 135}}]
+
+TYPE=1 ID=295 | 智能节油 / Интеллектуальный режим экономии топлива / Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 538904064
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/56", "attributes": {"target": "vehicle", "targetAction": "13", "currentPage": "search_content_car", "functionType": 1, "functionId": 295, "searchStr": "智能节油"}}, {"source": "assets/table/vehicle/tab_car_more.json:/3", "attributes": {"viewType": 56, "functionType": 1, "functionId": 295, "currentPage": "car_more", "res": {"imgGuide": "selector_exclamatory_mark"}}}, {"source": "assets/table/vehicle/tab_vehicle.json:/13/subItem/9", "attributes": {"viewType": 44, "currentPage": "vehicle", "functionType": 1, "functionId": 295}}]
+
+TYPE=1 ID=243 | 网络复位
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 2
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/57", "attributes": {"target": "vehicle", "targetAction": "13", "currentPage": "search_content_car", "functionType": 1, "functionId": 243, "searchStr": "网络复位"}}, {"source": "assets/table/vehicle/tab_vehicle.json:/13/subItem/10", "attributes": {"viewType": 1, "currentPage": "vehicle", "functionType": 1, "target": "special_tcam", "functionId": 243}}]
+
+TYPE=1 ID=81 | 前向预碰撞灵敏度
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537788672
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/67", "attributes": {"target": "assist_safe", "targetAction": "2", "currentPage": "search_content_car", "functionType": 1, "functionId": 81, "searchStr": "前向预碰撞灵敏度"}}]
+
+TYPE=1 ID=222 | 限速信息识别报警
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 671482112
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/74", "attributes": {"target": "assist_safe", "targetAction": "3", "currentPage": "search_content_car", "functionType": 1, "functionId": 222, "searchStr": "限速信息识别报警"}}]
+
+TYPE=None ID=245 | 座椅调节
+Обработчик: None
+Support map: 0
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/96", "attributes": {"target": "comfort", "targetAction": "0", "currentPage": "search_content_car", "functionId": 245, "searchStr": "座椅调节"}}]
+
+TYPE=1 ID=152 | 驾驶员方便进出 / Вкл/Выкл / Easy ingress egress
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 538378496
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/97", "attributes": {"target": "comfort", "targetAction": "1", "currentPage": "search_content_car", "functionType": 1, "functionId": 152, "searchStr": "驾驶员方便进出"}}, {"source": "assets/table/vehicle/tab_car_vehicle.json:/1/subItem/0", "attributes": {"viewType": 52, "functionType": 1, "functionId": 152, "currentPage": "car_vehicle_sub_1", "target": "special_easy_ingress_egress"}}, {"source": "assets/table/vehicle/tab_comfort.json:/1", "attributes": {"viewType": 10, "functionType": 1, "functionId": 152, "currentPage": "comfort", "target": "special_easy_ingress_egress"}}]
+
+TYPE=1 ID=284 | 空调设置
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/98", "attributes": {"target": "comfort", "targetAction": "2", "currentPage": "search_content_car", "functionType": 1, "functionId": 284, "searchStr": "空调设置"}}]
+
+TYPE=1 ID=150 | 方向盘自动加热 / Автоматический обогрев рулевого колеса
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 269026304
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/99", "attributes": {"target": "comfort", "targetAction": "2", "currentPage": "search_content_car", "functionType": 1, "functionId": 150, "searchStr": "方向盘自动加热"}}, {"source": "assets/table/vehicle/tab_car_more.json:/4", "attributes": {"viewType": 56, "functionType": 1, "functionId": 150, "currentPage": "car_more"}}, {"source": "assets/table/vehicle/tab_comfort.json:/2/subItem/0", "attributes": {"viewType": 3, "functionType": 1, "functionId": 150, "currentPage": "comfort"}}]
+
+TYPE=1 ID=151 | 空调舒适性智能提醒 / Интеллектуальное оповещение для поддержания комфортной температуры климат-контроля
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 269418752
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/100", "attributes": {"target": "comfort", "targetAction": "2", "currentPage": "search_content_car", "functionType": 1, "functionId": 151, "searchStr": "空调舒适性智能提醒"}}, {"source": "assets/table/vehicle/tab_car_more.json:/5", "attributes": {"viewType": 56, "functionType": 1, "functionId": 151, "currentPage": "car_more", "res": {"imgGuide": "selector_exclamatory_mark"}}}, {"source": "assets/table/vehicle/tab_comfort.json:/2/subItem/1", "attributes": {"viewType": 44, "currentPage": "comfort", "functionType": 1, "functionId": 151}}]
+
+TYPE=5 ID=210 | SoundTrue 音源修复 / AudioPilot 噪音补偿
+Обработчик: Lecarx/settings/proxy/custom/CustomSound;
+Support map: 771818240
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/114", "attributes": {"target": "sound", "targetAction": "0", "currentPage": "search_content_sys", "functionType": 5, "functionId": 210, "searchStr": "SoundTrue 音源修复"}}, {"source": "assets/table/tab_search.json:/115", "attributes": {"target": "sound", "targetAction": "0", "currentPage": "search_content_sys", "functionType": 5, "functionId": 210, "searchStr": "AudioPilot 噪音补偿"}}]
+
+TYPE=5 ID=165 | 导航混音模式
+Обработчик: Lecarx/settings/proxy/custom/CustomSound;
+Support map: 2
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/116", "attributes": {"target": "sound", "targetAction": "2", "currentPage": "search_content_sys", "functionType": 5, "functionId": 165, "searchStr": "导航混音模式"}}]
+
+TYPE=5 ID=160 | 仪表报警音
+Обработчик: Lecarx/settings/proxy/custom/CustomSound;
+Support map: 538771712
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/121", "attributes": {"target": "sound", "targetAction": "1", "currentPage": "search_content_sys", "functionType": 5, "functionId": 160, "searchStr": "仪表报警音"}}]
+
+TYPE=5 ID=143 | 导航播报音量
+Обработчик: Lecarx/settings/proxy/custom/CustomSound;
+Support map: 2
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/123", "attributes": {"target": "sound", "targetAction": "1", "currentPage": "search_content_sys", "functionType": 5, "functionId": 143, "searchStr": "导航播报音量"}}]
+
+TYPE=5 ID=145 | 语音助手提示音量
+Обработчик: Lecarx/settings/proxy/custom/CustomSound;
+Support map: 2
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/126", "attributes": {"target": "sound", "targetAction": "1", "currentPage": "search_content_sys", "functionType": 5, "functionId": 145, "searchStr": "语音助手提示音量"}}]
+
+TYPE=5 ID=53 | 触屏声音提醒
+Обработчик: Lecarx/settings/proxy/custom/CustomSound;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/127", "attributes": {"target": "sound", "targetAction": "6", "currentPage": "search_content_sys", "functionType": 5, "functionId": 53, "searchStr": "触屏声音提醒"}}]
+
+TYPE=101 ID=260 | 投屏偏好设置 / 仪表地图模式
+Обработчик: Lecarx/settings/proxy/custom/CustomVehicle;
+Support map: 2
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/138", "attributes": {"target": "display", "targetAction": "2", "currentPage": "search_content_sys", "functionType": 101, "functionId": 260, "searchStr": "投屏偏好设置"}}, {"source": "assets/table/tab_search.json:/139", "attributes": {"target": "display", "targetAction": "2", "currentPage": "search_content_sys", "functionType": 101, "functionId": 260, "searchStr": "仪表地图模式"}}]
+
+TYPE=101 ID=261 | 屏保设置
+Обработчик: Lecarx/settings/proxy/custom/CustomVehicle;
+Support map: 0
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/140", "attributes": {"target": "display", "targetAction": "3", "currentPage": "search_content_sys", "functionType": 101, "functionId": 261, "searchStr": "屏保设置"}}]
+
+TYPE=101 ID=273 | 字体 / 字体大小
+Обработчик: Lecarx/settings/proxy/custom/CustomVehicle;
+Support map: 2
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/142", "attributes": {"target": "display", "targetAction": "4", "currentPage": "search_content_sys", "functionType": 101, "functionId": 273, "searchStr": "字体"}}, {"source": "assets/table/tab_search.json:/143", "attributes": {"target": "display", "targetAction": "4", "currentPage": "search_content_sys", "functionType": 101, "functionId": 273, "searchStr": "字体大小"}}]
+
+TYPE=1 ID=250 | Units
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 0
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/148", "attributes": {"target": "system", "targetAction": "0", "currentPage": "search_content_sys", "functionType": 1, "functionId": 250, "searchStr": "单位设置"}}]
+
+TYPE=1 ID=155 | Fuel consumption Unit / Единицы измерения расхода топлива
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 620822784
+Варианты: [[{"name": "л/100км"}, {"name": "км/л"}, {"name": "mpg(US)"}, {"name": "mpg(UK)"}]]
+Параметры/источники: [{"source": "assets/table/tab_search.json:/149", "attributes": {"target": "system", "targetAction": "0", "currentPage": "search_content_sys", "functionType": 1, "functionId": 155, "searchStr": "单位设置"}}, {"source": "assets/table/vehicle/tab_system.json:/1/subItem/0", "attributes": {"viewType": 27, "currentPage": "system", "functionType": 1, "functionId": 155}}]
+
+TYPE=1 ID=156 | Speed and mileage Unit / Единицы измерения скорости и пробега
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 620823808
+Варианты: [[{"name": "км/ч"}, {"name": "миль/ч"}]]
+Параметры/источники: [{"source": "assets/table/tab_search.json:/150", "attributes": {"target": "system", "targetAction": "0", "currentPage": "search_content_sys", "functionType": 1, "functionId": 156, "searchStr": "单位设置"}}, {"source": "assets/table/vehicle/tab_system.json:/1/subItem/1", "attributes": {"viewType": 17, "currentPage": "system", "functionType": 1, "functionId": 156}}]
+
+TYPE=1 ID=157 | Temperature Unit / Единицы измерения температуры
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 620823296
+Варианты: [[{"name": "℃"}, {"name": "℉"}]]
+Параметры/источники: [{"source": "assets/table/tab_search.json:/151", "attributes": {"target": "system", "targetAction": "0", "currentPage": "search_content_sys", "functionType": 1, "functionId": 157, "searchStr": "单位设置"}}, {"source": "assets/table/vehicle/tab_system.json:/1/subItem/2", "attributes": {"viewType": 17, "currentPage": "system", "functionType": 1, "functionId": 157}}]
+
+TYPE=1 ID=158 | Pressure Unit / Единицы измерения давления
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 620823552
+Варианты: [[{"name": "кПа"}, {"name": "бар"}, {"name": "PSI"}]]
+Параметры/источники: [{"source": "assets/table/tab_search.json:/152", "attributes": {"target": "system", "targetAction": "0", "currentPage": "search_content_sys", "functionType": 1, "functionId": 158, "searchStr": "单位设置", "subSearchStr": "压力测试"}}, {"source": "assets/table/vehicle/tab_system.json:/1/subItem/3", "attributes": {"viewType": 17, "currentPage": "system", "functionType": 1, "functionId": 158}}]
+
+TYPE=None ID=251 | System
+Обработчик: None
+Support map: 0
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/153", "attributes": {"target": "system", "targetAction": "1", "functionId": 251, "currentPage": "search_content_sys", "searchStr": "时间设置"}}]
+
+TYPE=1 ID=153 | 时间显示格式 / Формат отображения времени
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 620888320
+Варианты: [[{"name": "12h"}, {"name": "24h"}]]
+Параметры/источники: [{"source": "assets/table/tab_search.json:/154", "attributes": {"target": "system", "targetAction": "1", "currentPage": "search_content_sys", "functionType": 1, "functionId": 153, "searchStr": "时间设置"}}, {"source": "assets/table/vehicle/tab_system.json:/0/subItem/0", "attributes": {"viewType": 17, "currentPage": "system", "functionType": 1, "functionId": 153}}]
+
+TYPE=1 ID=154 | 日期格式 / Формат отображения даты
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 620888576
+Варианты: [[{"name": "Г/М/Д"}, {"name": "Д/М/Г"}, {"name": "М/Д/Г"}]]
+Параметры/источники: [{"source": "assets/table/tab_search.json:/155", "attributes": {"target": "system", "targetAction": "1", "currentPage": "search_content_sys", "functionType": 1, "functionId": 154, "searchStr": "时间设置"}}, {"source": "assets/table/vehicle/tab_system.json:/0/subItem/1", "attributes": {"viewType": 17, "currentPage": "system", "functionType": 1, "functionId": 154}}]
+
+TYPE=101 ID=173 | 自动设置 / Auto
+Обработчик: Lecarx/settings/proxy/custom/CustomVehicle;
+Support map: 2
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/156", "attributes": {"target": "system", "targetAction": "1", "currentPage": "search_content_sys", "functionType": 101, "functionId": 173, "searchStr": "时间设置", "subSearchStr": "自动设置"}}, {"source": "assets/table/vehicle/tab_system.json:/0/subItem/2", "attributes": {"viewType": 15, "currentPage": "system", "functionType": 101, "functionId": 173}}]
+
+TYPE=1 ID=174 | 时间调整
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/157", "attributes": {"target": "system", "targetAction": "1", "currentPage": "search_content_sys", "functionType": 1, "functionId": 174, "searchStr": "时间设置", "subSearchStr": "时间调整"}}, {"source": "assets/table/vehicle/tab_system.json:/0/subItem/4", "attributes": {"viewType": 1, "currentPage": "system", "target": "dialog_time_adjustment", "functionType": 1, "functionId": 174}}]
+
+TYPE=1 ID=175 | 时区调整 / Часовой пояс
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 2
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/158", "attributes": {"target": "system", "targetAction": "1", "currentPage": "search_content_sys", "functionType": 1, "functionId": 175, "searchStr": "时间设置", "subSearchStr": "时区调整"}}, {"source": "assets/table/vehicle/tab_system.json:/0/subItem/3", "attributes": {"viewType": 1, "currentPage": "system", "target": "dialog_time_zone_adjustment", "functionType": 1, "functionId": 175}}]
+
+TYPE=101 ID=171 | 夏令时
+Обработчик: Lecarx/settings/proxy/custom/CustomVehicle;
+Support map: 2
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/159", "attributes": {"target": "system", "targetAction": "1", "currentPage": "search_content_sys", "functionType": 101, "functionId": 171, "searchStr": "时间设置", "subSearchStr": "夏令时"}}, {"source": "assets/table/vehicle/tab_system.json:/0/subItem/5", "attributes": {"viewType": 3, "currentPage": "system", "functionType": 101, "functionId": 171}}]
+
+TYPE=101 ID=256 | Notifications / 通知设置 / Настройка уведомлений
+Обработчик: Lecarx/settings/proxy/custom/CustomVehicle;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/160", "attributes": {"target": "notify", "targetAction": "2", "currentPage": "search_content_sys", "searchStr": "通知设置", "functionType": 101, "functionId": 256}}, {"source": "assets/table/tab_search.json:/164", "attributes": {"target": "notify", "targetAction": "2", "currentPage": "search_content_sys", "functionType": 101, "functionId": 256, "searchStr": "应用管理"}}, {"source": "assets/table/vehicle/system/tab_special_notification_center.json:/0", "attributes": {"viewType": 1, "functionType": 101, "functionId": 256, "currentPage": "special_notification_center", "target": "notify", "res": {"imgGuide": "ic_launcher"}}}, {"source": "assets/table/vehicle/tab_system.json:/3", "attributes": {"viewType": 10, "functionType": 101, "functionId": 256, "target": "special_notification_center", "currentPage": "system"}}]
+
+TYPE=101 ID=270 | Default Apps / 导航 / 默认应用
+Обработчик: Lecarx/settings/proxy/custom/CustomVehicle;
+Support map: 2
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/165", "attributes": {"target": "system", "targetAction": "4", "currentPage": "search_content_sys", "functionType": 101, "functionId": 270, "searchStr": "默认应用"}}, {"source": "assets/table/tab_search.json:/166", "attributes": {"target": "system", "targetAction": "4", "currentPage": "search_content_sys", "functionType": 101, "functionId": 270, "searchStr": "导航"}}, {"source": "assets/table/vehicle/system/tab_special_notification_center.json:/1", "attributes": {"viewType": 1, "functionType": 101, "functionId": 270, "currentPage": "special_notification_center", "target": "default_app"}}]
+
+TYPE=None ID=14 | Entertainment limited
+Обработчик: None
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/167", "attributes": {"target": "system", "targetAction": "5", "currentPage": "search_content_sys", "searchStr": "行车娱乐限制", "functionId": 14}}]
+
+TYPE=1 ID=217 | Restore factory settings / Сброс до заводских настроек
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/tab_search.json:/169", "attributes": {"target": "system", "targetAction": "6", "currentPage": "search_content_sys", "functionType": 1, "functionId": 217, "searchStr": "恢复出厂设置"}}, {"source": "assets/table/vehicle/tab_system.json:/5/subItem/0", "attributes": {"viewType": 1, "currentPage": "system", "functionType": 1, "target": "special_restore_factory", "functionId": 217}}]
+
+TYPE=1 ID=213 | 驾驶模式关联仪表主题
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 570687744
+Варианты: [[{"name": "COMFORT"}, {"name": "ECO"}, {"name": "SPORT"}]]
+Параметры/источники: [{"source": "assets/table/vehicle/drive_mode_related_theme.json:/0", "attributes": {"viewType": 34, "functionType": 1, "functionId": 213, "currentPage": "drive_mode_related_theme"}}]
+
+TYPE=3 ID=67 | System version
+Обработчик: None
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/system/tab_machine.json:/0", "attributes": {"viewType": 8, "functionType": 3, "functionId": 67, "currentPage": "machine"}}]
+
+TYPE=3 ID=68 | Hardware version
+Обработчик: None
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/system/tab_machine.json:/1", "attributes": {"viewType": 8, "functionType": 3, "functionId": 68, "currentPage": "machine"}}]
+
+TYPE=3 ID=69 | Firmware version
+Обработчик: None
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/system/tab_machine.json:/2", "attributes": {"viewType": 8, "functionType": 3, "functionId": 69, "currentPage": "machine"}}]
+
+TYPE=3 ID=70 | XDSN
+Обработчик: None
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/system/tab_machine.json:/3", "attributes": {"viewType": 8, "functionType": 3, "functionId": 70, "currentPage": "machine"}}]
+
+TYPE=3 ID=71 | Bluetooth address
+Обработчик: None
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/system/tab_machine.json:/4", "attributes": {"viewType": 8, "functionType": 3, "functionId": 71, "currentPage": "machine"}}]
+
+TYPE=3 ID=72 | WLAN MAC
+Обработчик: None
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/system/tab_machine.json:/5", "attributes": {"viewType": 8, "functionType": 3, "functionId": 72, "currentPage": "machine"}}]
+
+TYPE=23 ID=76 | 隐藏通知的内容
+Обработчик: Lecarx/settings/proxy/branch/NotifyMessageProxy;
+Support map: 0
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/system/tab_notify.json:/1", "attributes": {"viewType": 3, "functionType": 23, "functionId": 76, "currentPage": "notify"}}]
+
+TYPE=1 ID=247 | N/A
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_adjust_seat.json:/0", "attributes": {"viewType": 11, "currentPage": "adjust_seat", "functionType": 1, "functionId": 247}}]
+
+TYPE=1 ID=248 | N/A
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_adjust_seat.json:/1", "attributes": {"viewType": 11, "currentPage": "adjust_seat", "functionType": 1, "functionId": 248}}]
+
+TYPE=1 ID=249 | N/A
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_adjust_seat.json:/2", "attributes": {"viewType": 11, "currentPage": "adjust_seat", "functionType": 1, "functionId": 249}}]
+
+TYPE=2 ID=292 | Световое приветствие
+Обработчик: Lecarx/settings/proxy/branch/LightingProxy;
+Support map: 0
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_car_light.json:/0", "attributes": {"viewType": 59, "functionType": 2, "currentPage": "car_light", "functionId": 292}}, {"source": "assets/table/vehicle/tab_car_light.json:/0/subItem/0", "attributes": {"viewType": 59, "functionType": 2, "functionId": 292, "subItemViews": 1, "currentPage": "car_light", "target": "light_show", "res": {"iconLeft": "icon_light_show"}}}]
+
+TYPE=2 ID=102 | Атмосферная подсветка
+Обработчик: Lecarx/settings/proxy/branch/LightingProxy;
+Support map: 537526784
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_car_light.json:/0/subItem/1", "attributes": {"viewType": 59, "functionType": 2, "functionId": 102, "subItemViews": 1, "currentPage": "car_light", "target": "Atmosphere_lamp_mode", "res": {"iconLeft": "icon_60_ambient_light"}}}]
+
+TYPE=2 ID=308 | Тип подсветки
+Обработчик: Lecarx/settings/proxy/branch/LightingProxy;
+Support map: 539495936
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_car_light.json:/0/subItem/2", "attributes": {"viewType": 59, "functionType": 2, "functionId": 308, "subItemViews": 1, "currentPage": "car_light", "target": "lamp_mode", "res": {"iconLeft": "icon_60_light_language"}}}]
+
+TYPE=2 ID=204 | Приветственная подсветка
+Обработчик: Lecarx/settings/proxy/branch/LightingProxy;
+Support map: 704971008
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_car_light.json:/1", "attributes": {"viewType": 60, "functionType": 2, "functionId": 204, "currentPage": "car_light", "res": {"iconLeft": "icon_60_welcome"}}}]
+
+TYPE=2 ID=205 | Подсветка при выходе из автомобиля
+Обработчик: Lecarx/settings/proxy/branch/LightingProxy;
+Support map: 704971264
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_car_light.json:/2", "attributes": {"viewType": 60, "functionType": 2, "functionId": 205, "currentPage": "car_light", "res": {"iconLeft": "icon_60_farewell"}}}]
+
+TYPE=2 ID=200 | Подсветка при открытии дверей
+Обработчик: Lecarx/settings/proxy/branch/LightingProxy;
+Support map: 537134592
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_car_light.json:/3", "attributes": {"viewType": 60, "functionType": 2, "functionId": 200, "currentPage": "car_light", "res": {"iconLeft": "icon_60_door_control"}}}]
+
+TYPE=None ID=258 | Настраиваемая  кнопка на рулевом колесе
+Обработчик: None
+Support map: 554762496
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_car_vehicle.json:/2", "attributes": {"viewType": 50, "currentPage": "car_vehicle", "functionId": 258}}]
+
+TYPE=1 ID=258 | Настраиваемая  кнопка на рулевом колесе
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 554762496
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_car_vehicle.json:/2/subItem/0", "attributes": {"viewType": 53, "functionType": 1, "functionId": 258, "currentPage": "car_vehicle_sub_1", "target": "special_easy_ingress_egress"}}]
+
+TYPE=1 ID=310 | Уровень рекуперации энергии
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 537003264
+Варианты: [[{"name": "Низкий"}, {"name": "Средний"}, {"name": "Высокий"}]]
+Параметры/источники: [{"source": "assets/table/vehicle/tab_car_vehicle.json:/6/subItem/0", "attributes": {"viewType": 51, "functionType": 1, "functionId": 310, "currentPage": "car_vehicle_sub_1"}}]
+
+TYPE=1 ID=293 | Сброс  значений промежуточного пробега
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 612369920
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_car_vehicle.json:/7/subItem/0", "attributes": {"viewType": 55, "functionType": 1, "functionId": 293, "currentPage": "car_vehicle_sub_1"}}]
+
+TYPE=1 ID=294 | Пробег за текущую поездку
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 612369152
+Варианты: [[{"name": "Сброс счетчика остановок"}, {"name": "Сброс счетчика заправок"}]]
+Параметры/источники: [{"source": "assets/table/vehicle/tab_car_vehicle.json:/7/subItem/1", "attributes": {"viewType": 51, "functionType": 1, "functionId": 294, "currentPage": "car_vehicle_sub_1"}}]
+
+TYPE=None ID=285 | Adjust seat
+Обработчик: None
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_comfort.json:/0", "attributes": {"viewType": 10, "functionId": 285, "currentPage": "comfort", "target": "special_adjust_seat"}}]
+
+TYPE=None ID=284 | AC settings
+Обработчик: None
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_comfort.json:/2", "attributes": {"viewType": 10, "functionId": 284, "currentPage": "comfort", "target": "special_air_comfort"}}]
+
+TYPE=101 ID=40 | Function switch
+Обработчик: Lecarx/settings/proxy/custom/CustomVehicle;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_custom_key.json:/0", "attributes": {"viewType": 3, "functionType": 101, "functionId": 40, "currentPage": "custom_key"}}]
+
+TYPE=101 ID=42 | 自定义按键
+Обработчик: Lecarx/settings/proxy/custom/CustomVehicle;
+Support map: None
+Варианты: [[{"name": "Navigation"}, {"name": "Network hotspot"}, {"name": "Mute"}]]
+Параметры/источники: [{"source": "assets/table/vehicle/tab_custom_key.json:/1", "attributes": {"viewType": 2, "functionType": 101, "functionId": 42, "currentPage": "custom_key"}}]
+
+TYPE=101 ID=41 | Popup prompt
+Обработчик: Lecarx/settings/proxy/custom/CustomVehicle;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_custom_key.json:/2", "attributes": {"viewType": 3, "functionType": 101, "functionId": 41, "currentPage": "custom_key"}}]
+
+TYPE=101 ID=14 | Вкл/Выкл
+Обработчик: Lecarx/settings/proxy/custom/CustomVehicle;
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_system.json:/4/subItem/0", "attributes": {"viewType": 3, "functionType": 101, "functionId": 14}}]
+
+TYPE=1 ID=121 | Windows
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 553844992
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_vehicle.json:/2", "attributes": {"viewType": 10, "functionId": 121, "functionType": 1, "currentPage": "vehicle", "target": "window"}}]
+
+TYPE=1 ID=231 | Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 553844992
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_vehicle.json:/2/subItem/0", "attributes": {"viewType": 8, "currentPage": "key", "functionType": 1, "functionId": 231}}]
+
+TYPE=1 ID=116 | HUD adjustment
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 654378240
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_vehicle.json:/3/subItem/0/subItem/0", "attributes": {"viewType": 15, "functionType": 1, "functionId": 116, "currentPage": "hud"}}]
+
+TYPE=1 ID=215 | Customize
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 654443008
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_vehicle.json:/3/subItem/0/subItem/1", "attributes": {"viewType": 15, "currentPage": "hud", "functionId": 215, "functionType": 1}}]
+
+TYPE=1 ID=33 | Customize
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 654442752
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_vehicle.json:/3/subItem/0/subItem/2", "attributes": {"viewType": 15, "currentPage": "hud", "functionId": 33, "functionType": 1}}]
+
+TYPE=38 ID=109 | 
+Обработчик: Lecarx/settings/proxy/DriveModeProxy;
+Support map: 570491136
+Варианты: [[{"name": "COMFORT MODE"}, {"name": "ECO MODE"}, {"name": "SPORT MODE"}, {"name": "SNOW MODE"}, {"name": "OFF ROAD"}]]
+Параметры/источники: [{"source": "assets/table/vehicle/tab_vehicle.json:/4/subItem/0", "attributes": {"viewType": 30, "functionType": 38, "functionId": 109}}]
+
+TYPE=None ID=278 | Back mirror
+Обработчик: None
+Support map: None
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_vehicle.json:/9", "attributes": {"viewType": 10, "functionId": 278, "currentPage": "vehicle", "target": "back_mirror"}}]
+
+TYPE=1 ID=232 | Vehicle
+Обработчик: Lecarx/settings/proxy/branch/CarFunctionProxy;
+Support map: 553844992
+Варианты: []
+Параметры/источники: [{"source": "assets/table/vehicle/tab_window.json:/0", "attributes": {"viewType": 10, "currentPage": "window", "functionType": 1, "functionId": 232}}]
+
+TYPE=5 ID=231 | 天窗和遮阳帘控制
+Обработчик: Lecarx/settings/proxy/custom/CustomSound;
+Support map: 553844992
+Варианты: [[{"name": "天窗", "tips": "短按一键开闭天窗/遮阳帘,长按超过1.5秒松手即停止开闭", "functionType": "1", "functionId": "121"}, {"name": "遮阳帘", "tips": "短按一键开闭天窗/遮阳帘,长按超过1.5秒松手即停止开闭", "functionType": "1", "functionId": "122"}]]
+Параметры/источники: [{"source": "assets/table/vehicle/tab_window.json:/0/subItem/0", "attributes": {"viewType": 22, "defaultValue": 1, "functionType": 5, "functionId": 231, "currentPage": "volume_control"}}]

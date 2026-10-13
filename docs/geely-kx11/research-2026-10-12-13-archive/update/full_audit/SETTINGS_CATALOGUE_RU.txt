@@ -1,0 +1,918 @@
+Ключи с разрешённым строковым именем. Это нижняя граница, не полный список всех runtime-настроек.
+SharedPreferences разных APK не объединяются: имена файлов и runtime user могут быть неизвестны.
+Defaults в evidence — аргументы конкретного вызова, а не гарантия текущего значения.
+
+
+GMCSoft
+Settings.Global | CURRENT_NAVI_WIDGET_ID | write
+  La/da/a;-><init>(Landroid/content/Context;)V @34 write {"kind": "literal", "value": 0}
+  La/da/a;->b(Landroid/content/Context;)V @34 write {"kind": "literal", "value": 0}
+  La/ea/a;->i(Landroid/content/Context;)V @48 write {"kind": "literal", "value": 1}
+Settings.Global | LOCATION.CITY | read,write
+  La/ea/a;->m(Landroid/content/Context;)V @82 read {"kind": "unknown"}
+  La/g3/l1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @164 read {"kind": "unknown"}
+  La/g3/v0;->run()V @42 read {"kind": "unknown"}
+  La/m4/a;->onClick(Landroid/view/View;)V @190 read {"kind": "unknown"}
+  La/m4/d;->onClick(Landroid/view/View;)V @132 write {"kind": "unknown"}
+  La/m4/f;->run()V @60 read {"kind": "unknown"}
+  Lcom/logstas/service/AutoRadioGeoService;->onLocationChanged(Landroid/location/Location;)V @778 read {"kind": "unknown"}
+Settings.Global | LOCATION.IGNORE.GPS | read,write
+  La/g3/e0;->b(I)V @48 write {"kind": "parameter", "index": 0}
+  La/g3/t1;->P()V @3490 read {"kind": "unknown"}
+  Lcom/logstas/service/AutoRadioGeoService;->onLocationChanged(Landroid/location/Location;)V @282 read {"kind": "literal", "value": 0}
+Settings.Global | LOCATION.PROVINCE | read,write
+  La/ea/a;->m(Landroid/content/Context;)V @118 read {"kind": "unknown"}
+  La/g3/l1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @130 read {"kind": "unknown"}
+  La/g3/t1;->P()V @26 read {"kind": "unknown"}
+  La/m4/a;->onClick(Landroid/view/View;)V @160 read {"kind": "unknown"}
+  La/m4/d;->onClick(Landroid/view/View;)V @96 write {"kind": "unknown"}
+  La/m4/g;->a(Landroid/content/Context;Landroid/widget/Spinner;Landroid/widget/Spinner;)V @90 read {"kind": "unknown"}
+  Lcom/logstas/service/AutoRadioGeoService;->onLocationChanged(Landroid/location/Location;)V @740 read {"kind": "unknown"}
+Settings.Global | ac_sync_auto | read,write
+  La/g3/e0;->b(I)V @86 write {"kind": "parameter", "index": 0}
+  La/g3/t1;->P()V @3826 read {"kind": "unknown"}
+Settings.Global | active_music_player | read,write
+  La/g3/m1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/g3/t1;->P()V @272 read {"kind": "unknown"}
+Settings.Global | alice_action_type_key | read,write
+  La/g3/a1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/g3/t1;->P()V @2378 read {"kind": "unknown"}
+  La/q2/c$b;->handleMessage(Landroid/os/Message;)V @554 read {"kind": "unknown"}
+Settings.Global | allow_to_connect_wifi | write
+  La/ha/h;->run()V @32 write {"kind": "literal", "value": 1}
+Settings.Global | allow_to_moving_apps | write
+  La/bc/m;->e(Landroid/content/Context;)V @356 write {"kind": "unknown"}
+Settings.Global | allow_to_use_bt_headphones_in_multimedia | write
+  La/c6/a;->run()V @52 write {"kind": "literal", "value": 1}
+Settings.Global | always_open_screen_saved_on_two_display | read,write
+  La/g3/b;->b(I)V @110 write {"kind": "unknown"}
+  La/g3/t1;->P()V @5066 read {"kind": "unknown"}
+  La/q2/b;->c()Z @28 read {"kind": "literal", "value": 0}
+Settings.Global | apps_to_show_on_second_screen | read,write
+  La/l2/b;->c()Ljava/util/ArrayList; @26 read {"kind": "unknown"}
+  La/l2/b;->e(Ljava/util/Collection;)V @38 write {"kind": "unknown"}
+Settings.Global | apps_to_show_on_second_screen_first_init | read
+  La/k3/d;->run()V @594 read {"kind": "unknown"}
+Settings.Global | auto_check_updates | write
+  La/g3/w1;->onCheckedChanged(Landroid/widget/CompoundButton;Z)V @34 write {"kind": "parameter", "index": 1}
+Settings.Global | auto_enable_bluetooth | read,write
+  La/g3/d;->b(I)V @52 write {"kind": "unknown"}
+  La/g3/t1;->P()V @3742 read {"kind": "unknown"}
+  La/q2/h;->c()Z @28 read {"kind": "literal", "value": -1}
+Settings.Global | auto_enable_wifi | read,write
+  La/g3/c;->b(I)V @92 write {"kind": "parameter", "index": 0}
+  La/g3/t1;->P()V @3658 read {"kind": "unknown"}
+  La/q2/i;->c()Z @28 read {"kind": "literal", "value": -1}
+Settings.Global | auto_start_active_music_player | read,write
+  La/b/j;->run()V @190 read {"kind": "unknown"}
+  La/g3/n1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @120 write {"kind": "unknown"}
+  La/g3/t1;->P()V @492 read {"kind": "unknown"}
+  Lcom/logstas/service/MusicService;->d()V @74 read {"kind": "unknown"}
+Settings.Global | auto_start_active_music_player_last_name | read,write
+  La/b/j;->run()V @252 read {"kind": "unknown"}
+  La/v9/e;->d()Z @30 read {"kind": "unknown"}
+  Lcom/logstas/service/NaviService;->a(Ljava/lang/String;)V @304 write {"kind": "unknown"}
+Settings.Global | auto_start_music_player_last_support_apps_key | read
+  Lcom/logstas/service/NaviService;->a(Ljava/lang/String;)V @22 read {"kind": "unknown"}
+  Lcom/logstas/service/NaviService;->c(Ljava/lang/String;)V @22 read {"kind": "unknown"}
+  Lcom/logstas/service/NaviService;->onCreate()V @378 read {"kind": "unknown"}
+Settings.Global | auto_update_first_start | read
+  La/g3/y1;->P()V @172 read {"kind": "unknown"}
+Settings.Global | autostart_multimedia_timeout | read,write
+  La/g3/o1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/g3/t1;->P()V @2514 read {"kind": "unknown"}
+  Lcom/logstas/service/MusicService;->d()V @116 read {"kind": "unknown"}
+Settings.Global | autostart_on_two_display | read,write
+  La/g3/f1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @118 write {"kind": "unknown"}
+  La/g3/t1;->P()V @2648 read {"kind": "unknown"}
+  Lcom/logstas/service/MusicService;->b()V @28 read {"kind": "unknown"}
+Settings.Global | autostart_on_two_display_timeout | read,write
+  La/g3/g1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/g3/t1;->P()V @2916 read {"kind": "unknown"}
+  Lcom/logstas/service/MusicService;->b()V @98 read {"kind": "unknown"}
+Settings.Global | back_win_auto_heat_in_repeat_mode_key | read,write
+  La/g3/m0;->b(I)V @154 write {"kind": "unknown"}
+  La/g3/g;->P()V @2432 read {"kind": "literal", "value": -1}
+  La/s2/a$b;->handleMessage(Landroid/os/Message;)V @352 read {"kind": "literal", "value": -1}
+Settings.Global | bluetooth_is_connect | read,write
+  La/k3/d;->run()V @494 write {"kind": "literal", "value": -1}
+  La/v9/d;->f(Landroid/content/Context;J)V @24 read {"kind": "literal", "value": -1}
+Settings.Global | close_windows_after_ventilation_mode | read,write
+  La/g3/g;->P()V @2674 read {"kind": "unknown"}
+  La/g3/p0;->b(I)V @144 write {"kind": "unknown"}
+  La/r2/e;->c()Z @28 read {"kind": "literal", "value": -1}
+Settings.Global | current.connection.status | write
+  Lcom/logstas/service/CheckPingService$e$a;->run()V @400 write {"kind": "unknown"}
+Settings.Global | current.pause.value | write
+  La/e2/b;->a(Z)V @30 write {"kind": "parameter", "index": 0}
+Settings.Global | custom.music.player.package | write
+  La/g3/m1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @102 write {"kind": "unknown"}
+Settings.Global | dashboard_language | read,write
+  La/g3/h1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/g3/t1;->P()V @3054 read {"kind": "literal", "value": 25}
+Settings.Global | dashboard_music_active_key | read,write
+  La/g3/h0;->b(I)V @46 write {"kind": "unknown"}
+  La/g3/t1;->P()V @4862 read {"kind": "literal", "value": 1}
+  La/z9/d;->b(Landroid/content/Context;La/u9/a;)V @146 read {"kind": "literal", "value": 1}
+  La/z9/d;->c(Landroid/content/Context;)V @146 read {"kind": "literal", "value": 1}
+Settings.Global | dashboard_navigation_active_key | read,write
+  La/g3/s0;->b(I)V @46 write {"kind": "unknown"}
+  La/ea/a;->k(Landroid/content/Context;Z)V @92 read {"kind": "literal", "value": 1}
+  La/g3/t1;->P()V @4606 read {"kind": "literal", "value": 1}
+Settings.Global | dashboard_navigation_hud_active_key | read,write
+  La/g3/t0;->b(I)V @46 write {"kind": "unknown"}
+  La/ea/a;->j(Landroid/content/Context;La/ca/a;)V @14 read {"kind": "literal", "value": 1}
+  La/g3/t1;->P()V @4670 read {"kind": "literal", "value": 1}
+Settings.Global | dashboard_navigation_show_street_key | read,write
+  La/g3/u0;->b(I)V @46 write {"kind": "unknown"}
+  La/g3/t1;->P()V @4734 read {"kind": "literal", "value": 1}
+Settings.Global | dashboard_navigation_street_translit_key | read,write
+  La/g3/f0;->b(I)V @46 write {"kind": "unknown"}
+  La/g3/t1;->P()V @4798 read {"kind": "literal", "value": 1}
+Settings.Global | development_settings_enabled | write
+  La/bc/m;->e(Landroid/content/Context;)V @214 write {"kind": "unknown"}
+Settings.Global | disable_drive_mode_sound | read,write
+  La/g3/g;->P()V @2758 read {"kind": "unknown"}
+  La/g3/q0;->b(I)V @144 write {"kind": "unknown"}
+Settings.Global | disable_start_stop_system_value | read,write
+  La/g3/g;->P()V @2590 read {"kind": "unknown"}
+  La/g3/o0;->b(I)V @144 write {"kind": "unknown"}
+  La/r2/j$a;->onFunctionValueChanged(III)V @42 read {"kind": "literal", "value": -1}
+  La/r2/j;->e()Z @28 read {"kind": "literal", "value": -1}
+Settings.Global | drive_mode_select_key | read,write
+  La/g3/g;->P()V @1400 read {"kind": "unknown"}
+  La/g3/j;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/r2/h;->a()V @38 read {"kind": "unknown"}
+Settings.Global | drive_mode_select_last_active_key | read,write
+  La/r2/g;->run()V @144 write {"kind": "unknown"}
+  La/r2/h;->a()V @104 read {"kind": "unknown"}
+Settings.Global | enable_gPilot_hwa_key | read,write
+  La/g3/g;->P()V @1700 read {"kind": "unknown"}
+  La/g3/l;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/r2/k;->a()V @42 read {"kind": "unknown"}
+  La/r2/k;->c()Z @38 read {"kind": "unknown"}
+Settings.Global | enable_intelligent_fuel_control_function_key | read,write
+  La/g3/g;->P()V @1850 read {"kind": "unknown"}
+  La/g3/m;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/r2/l;->a()V @38 read {"kind": "unknown"}
+  La/r2/l;->c()Z @38 read {"kind": "unknown"}
+Settings.Global | enable_split_from_ui | read
+  La/q2/g$a;->handleMessage(Landroid/os/Message;)V @32 read {"kind": "literal", "value": 0}
+Settings.Global | engine_working_check_last_time | read,write
+  La/r2/b$a;->handleMessage(Landroid/os/Message;)V @76 write {"kind": "unknown"}
+  La/r2/d$a;->handleMessage(Landroid/os/Message;)V @364 read {"kind": "literal", "value": -1}
+  La/s2/a$b;->handleMessage(Landroid/os/Message;)V @530 read {"kind": "unknown"}
+  La/s2/b$a;->handleMessage(Landroid/os/Message;)V @470 read {"kind": "unknown"}
+  La/s2/c$b;->handleMessage(Landroid/os/Message;)V @568 read {"kind": "unknown"}
+  La/s2/d$a;->handleMessage(Landroid/os/Message;)V @504 read {"kind": "unknown"}
+  La/s2/e$a;->handleMessage(Landroid/os/Message;)V @616 read {"kind": "unknown"}
+  La/t2/a$a;->handleMessage(Landroid/os/Message;)V @652 read {"kind": "unknown"}
+  La/t2/b$a;->handleMessage(Landroid/os/Message;)V @656 read {"kind": "unknown"}
+Settings.Global | fix_last_temperature_driver | read,write
+  La/r2/n$a;->onCustomizeFunctionValueChanged(IIF)V @46 write {"kind": "parameter", "index": 2}
+  La/r2/n;->a()V @60 read {"kind": "literal", "value": -1.0}
+Settings.Global | fix_last_temperature_passenger | read,write
+  La/r2/n$a;->onCustomizeFunctionValueChanged(IIF)V @84 write {"kind": "parameter", "index": 2}
+  La/r2/n$b;->handleMessage(Landroid/os/Message;)V @86 read {"kind": "literal", "value": -1.0}
+  La/r2/n;->a()V @30 read {"kind": "literal", "value": -1.0}
+Settings.Global | front_washing_auto_heat_in_repeat_mode_key | read,write
+  La/g3/b;->b(I)V @68 write {"kind": "unknown"}
+  La/g3/g;->P()V @2132 read {"kind": "literal", "value": -1}
+Settings.Global | front_win_auto_heat_in_repeat_mode_key | read,write
+  La/g3/d;->b(I)V @110 write {"kind": "unknown"}
+  La/g3/g;->P()V @2282 read {"kind": "literal", "value": -1}
+  La/s2/c$b;->handleMessage(Landroid/os/Message;)V @432 read {"kind": "literal", "value": -1}
+Settings.Global | gmc.theme.mode | read,write
+  La/f3/d;->onClick(Landroid/view/View;)V @150 write {"kind": "literal", "value": 2}
+  La/f3/e;->onClick(Landroid/view/View;)V @150 write {"kind": "unknown"}
+  La/f3/f;->onClick(Landroid/view/View;)V @156 write {"kind": "unknown"}
+  La/f3/k;->a(La/g/d;)V @24 read {"kind": "literal", "value": 0}
+  Lcom/logstas/myregion/HomeActivity;->onCreate(Landroid/os/Bundle;)V @192 read {"kind": "unknown"}
+Settings.Global | handle_alice_action | read
+  La/q2/c$b;->handleMessage(Landroid/os/Message;)V @82 read {"kind": "unknown"}
+Settings.Global | handle_next_action | read
+  La/q2/c$d;->handleMessage(Landroid/os/Message;)V @62 read {"kind": "literal", "value": -1}
+Settings.Global | handle_play_pause | read
+  La/e2/b$a;->handleMessage(Landroid/os/Message;)V @90 read {"kind": "literal", "value": -1}
+Settings.Global | handle_prev_action | read
+  La/q2/c$d;->handleMessage(Landroid/os/Message;)V @100 read {"kind": "literal", "value": -1}
+Settings.Global | handle_voice_action | read,write
+  La/k3/d;->run()V @540 write {"kind": "literal", "value": 0}
+  La/q2/c$a;->handleMessage(Landroid/os/Message;)V @82 read {"kind": "unknown"}
+Settings.Global | handle_we_chat_action | read
+  La/q2/c$c;->handleMessage(Landroid/os/Message;)V @82 read {"kind": "unknown"}
+Settings.Global | handle_we_chat_action_app | read,write
+  La/g3/d1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @118 write {"kind": "unknown"}
+  La/g3/t1;->P()V @2108 read {"kind": "unknown"}
+  La/q2/c$b;->handleMessage(Landroid/os/Message;)V @268 read {"kind": "unknown"}
+Settings.Global | hide_usb_dialog | read,write
+  La/g3/g0;->b(I)V @34 write {"kind": "parameter", "index": 0}
+  La/g3/t1;->P()V @3574 read {"kind": "unknown"}
+Settings.Global | hud_ar_variant | read,write
+  La/g3/i1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/g3/t1;->P()V @3178 read {"kind": "unknown"}
+  La/j1/n;->run()V @744 read {"kind": "literal", "value": 0}
+Settings.Global | hud_non_ar_variant | read,write
+  La/g3/j1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/g3/t1;->P()V @3302 read {"kind": "unknown"}
+  La/j1/n;->run()V @794 read {"kind": "literal", "value": 0}
+Settings.Global | is_notify_by_fuel_step_key | read,write
+  La/g3/g;->P()V @984 read {"kind": "unknown"}
+  La/g3/p;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/r2/c$a;->onSensorValueChanged(IF)V @344 read {"kind": "unknown"}
+Settings.Global | is_notify_by_low_fuel_step_key | read,write
+  La/g3/g;->P()V @1120 read {"kind": "unknown"}
+  La/g3/q;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/r2/c$a;->onSensorValueChanged(IF)V @232 read {"kind": "unknown"}
+Settings.Global | is_notify_by_low_mileage_step_key | read,write
+  La/g3/g;->P()V @824 read {"kind": "unknown"}
+  La/g3/o;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/q2/d$a;->onSensorValueChanged(IF)V @214 read {"kind": "unknown"}
+Settings.Global | is_notify_by_mileage_step_key | read,write
+  La/g3/g;->P()V @670 read {"kind": "unknown"}
+  La/g3/n;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/q2/d$a;->onSensorValueChanged(IF)V @314 read {"kind": "unknown"}
+Settings.Global | last_mileage_state_key | write
+  La/q2/d$a;->onSensorValueChanged(IF)V @100 write {"kind": "unknown"}
+  La/q2/d;->a()V @114 write {"kind": "unknown"}
+Settings.Global | lock_screen_lock | read,write
+  La/f3/f;->onClick(Landroid/view/View;)V @252 write {"kind": "unknown"}
+  La/k3/d;->run()V @912 read {"kind": "unknown"}
+  Lcom/logstas/service/LockScreenService$b;->handleMessage(Landroid/os/Message;)V @186 read {"kind": "literal", "value": -1}
+  Lcom/logstas/service/LockScreenService;->b()V @78 read {"kind": "literal", "value": -1}
+Settings.Global | lock_screen_password | write
+  La/f3/f;->onClick(Landroid/view/View;)V @238 write {"kind": "unknown"}
+Settings.Global | media_is_playing | read,write
+  La/k3/d;->run()V @446 write {"kind": "literal", "value": 0}
+  La/q2/c$d;->handleMessage(Landroid/os/Message;)V @188 read {"kind": "unknown"}
+  La/z9/d;->b(Landroid/content/Context;La/u9/a;)V @104 read {"kind": "unknown"}
+  La/z9/d;->c(Landroid/content/Context;)V @104 read {"kind": "unknown"}
+  Lcom/logstas/service/NaviService;->a(Ljava/lang/String;)V @164 read {"kind": "unknown"}
+Settings.Global | music.subtitle | write
+  La/g/f;->run()V @488 write {"kind": "literal", "value": 0}
+  La/j4/c;->run()V @142 write {"kind": "unknown"}
+  La/k3/d;->run()V @352 write {"kind": "literal", "value": 0}
+Settings.Global | music.title | write
+  La/g/f;->run()V @460 write {"kind": "literal", "value": 0}
+  La/j4/c;->run()V @110 write {"kind": "unknown"}
+  La/k3/d;->run()V @324 write {"kind": "literal", "value": 0}
+Settings.Global | music.widget.custom.enable | write
+  La/g/f;->run()V @590 write {"kind": "unknown"}
+Settings.Global | music_widget_support_apps_key | read
+  Lcom/logstas/service/NaviService;->b(Ljava/lang/String;Landroid/app/Notification;)V @22 read {"kind": "unknown"}
+  Lcom/logstas/service/NaviService;->onCreate()V @408 read {"kind": "unknown"}
+Settings.Global | navi_activity | read,write
+  La/g3/p1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @102 write {"kind": "unknown"}
+  La/k3/d;->run()V @214 read {"kind": "unknown"}
+  Lcom/logstas/service/NaviService;->onCreate()V @288 read {"kind": "unknown"}
+Settings.Global | navi_package | read,write
+  La/b2/f0;->c()V @178 read {"kind": "unknown"}
+  La/b2/f0;->d()V @110 read {"kind": "unknown"}
+  La/b4/a;->m()Z @26 read {"kind": "unknown"}
+  La/b4/a;->o(Ljava/lang/String;)La/p4/a; @26 read {"kind": "unknown"}
+  La/b4/b;->d(La/q4/a;)Z @26 read {"kind": "unknown"}
+  La/b4/b;->h(La/q4/a;)La/l4/d; @26 read {"kind": "unknown"}
+  La/b4/c;->i(La/k4/c;La/q4/a;)La/p4/a; @26 read {"kind": "unknown"}
+  La/b4/d;->i(La/k4/c;La/q4/a;)La/p4/a; @26 read {"kind": "unknown"}
+  La/g3/p1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/g3/t1;->P()V @814 read {"kind": "unknown"}
+  La/k3/d;->run()V @184 read {"kind": "unknown"}
+  Lcom/logstas/service/NaviService;->onCreate()V @258 read {"kind": "unknown"}
+Settings.Global | notify_about_heat_engine_exclude_key | read
+  La/r2/d$a;->handleMessage(Landroid/os/Message;)V @406 read {"kind": "unknown"}
+Settings.Global | notify_about_heat_engine_key | read,write
+  La/g3/g;->P()V @1250 read {"kind": "literal", "value": -2147483648}
+  La/g3/r;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/r2/d$a;->handleMessage(Landroid/os/Message;)V @34 read {"kind": "literal", "value": -2147483648}
+Settings.Global | on_start_engine_last_time | read,write
+  La/r2/b;->a()V @78 write {"kind": "unknown"}
+  La/r2/d$a;->handleMessage(Landroid/os/Message;)V @266 read {"kind": "unknown"}
+Settings.Global | on_stop_engine_last_time | write
+  La/r2/b;->b()V @34 write {"kind": "unknown"}
+Settings.Global | on_stop_engine_last_time_option | read,write
+  La/g3/g;->P()V @106 read {"kind": "unknown"}
+  La/g3/s;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @72 write {"kind": "unknown"}
+  La/s2/a$b;->handleMessage(Landroid/os/Message;)V @710 read {"kind": "unknown"}
+  La/s2/b$a;->handleMessage(Landroid/os/Message;)V @650 read {"kind": "unknown"}
+  La/s2/c$b;->handleMessage(Landroid/os/Message;)V @748 read {"kind": "unknown"}
+  La/s2/d$a;->handleMessage(Landroid/os/Message;)V @684 read {"kind": "unknown"}
+  La/s2/e$a;->handleMessage(Landroid/os/Message;)V @796 read {"kind": "unknown"}
+Settings.Global | on_stop_engine_last_time_option_ventilation | read,write
+  La/g3/f;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @72 write {"kind": "unknown"}
+  La/g3/g;->P()V @254 read {"kind": "unknown"}
+  La/t2/a$a;->handleMessage(Landroid/os/Message;)V @832 read {"kind": "unknown"}
+  La/t2/b$a;->handleMessage(Landroid/os/Message;)V @836 read {"kind": "unknown"}
+Settings.Global | open_shadow_on_start | read
+  La/r2/m;->c()Z @28 read {"kind": "literal", "value": 0}
+Settings.Global | open_sunroof_winter_disable_value | read,write
+  La/d4/a;->i(La/k4/c;La/q4/a;)La/p4/a; @28 read {"kind": "literal", "value": 0}
+  La/g3/g;->P()V @2506 read {"kind": "unknown"}
+  La/g3/n0;->b(I)V @144 write {"kind": "unknown"}
+  La/z3/e$b;->handleMessage(Landroid/os/Message;)V @324 read {"kind": "literal", "value": 0}
+  La/z3/g;->n()La/p4/a; @88 read {"kind": "literal", "value": 0}
+  La/z3/i;->n()La/p4/a; @28 read {"kind": "literal", "value": 0}
+Settings.Global | radio.band | read,write
+  Lcom/logstas/service/CheckPingService$a;->handleMessage(Landroid/os/Message;)V @148 read {"kind": "literal", "value": -1}
+  Lcom/logstas/service/CheckPingService$a;->handleMessage(Landroid/os/Message;)V @660 write {"kind": "unknown"}
+Settings.Global | radio.freq | read,write
+  Lcom/logstas/service/CheckPingService$a;->handleMessage(Landroid/os/Message;)V @114 read {"kind": "literal", "value": -1}
+  Lcom/logstas/service/CheckPingService$a;->handleMessage(Landroid/os/Message;)V @628 write {"kind": "unknown"}
+Settings.Global | radio.name | read
+  Lcom/logstas/service/CheckPingService$a;->handleMessage(Landroid/os/Message;)V @78 read {"kind": "unknown"}
+Settings.Global | radio_is_playing | read,write
+  La/k3/d;->run()V @400 write {"kind": "literal", "value": 0}
+  La/q2/c$d;->handleMessage(Landroid/os/Message;)V @138 read {"kind": "literal", "value": -1}
+  La/z9/d;->b(Landroid/content/Context;La/u9/a;)V @42 read {"kind": "literal", "value": 0}
+  La/z9/d;->c(Landroid/content/Context;)V @42 read {"kind": "literal", "value": 0}
+  Lcom/logstas/service/NaviService;->a(Ljava/lang/String;)V @94 read {"kind": "literal", "value": 0}
+Settings.Global | radio_name | write
+  Lcom/logstas/service/CheckPingService$a;->handleMessage(Landroid/os/Message;)V @596 write {"kind": "unknown"}
+Settings.Global | save_last_temperature_state_key | read
+  La/r2/n;->a()V @92 read {"kind": "literal", "value": 0}
+Settings.Global | saved_timezone_shell_key | read,write
+  La/g3/q1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @60 write {"kind": "unknown"}
+  La/g3/t1;->P()V @1026 read {"kind": "unknown"}
+Settings.Global | second_screen_apps_trigger | write
+  La/l2/b;->e(Ljava/util/Collection;)V @68 write {"kind": "literal", "value": 1}
+Settings.Global | sended.data.to.dashboard | write
+  La/c0/a;->run()V @50 write {"kind": "literal", "value": 1}
+  La/g/g;->run()V @62 write {"kind": "literal", "value": 0}
+  La/n/c1;->run()V @50 write {"kind": "unknown"}
+  La/z9/a;->run()V @36 write {"kind": "literal", "value": 1}
+Settings.Global | show_battery_status_key | read,write
+  La/g3/n0;->b(I)V @62 write {"kind": "unknown"}
+  La/g3/t1;->P()V @3966 read {"kind": "literal", "value": -1}
+Settings.Global | show_connection_status_key | read,write
+  La/g3/m0;->b(I)V @62 write {"kind": "unknown"}
+  La/g3/t1;->P()V @3902 read {"kind": "literal", "value": -1}
+Settings.Global | show_coolant_temperature_key | read,write
+  La/g3/o0;->b(I)V @62 write {"kind": "unknown"}
+  La/g3/t1;->P()V @4030 read {"kind": "literal", "value": -1}
+Settings.Global | show_fuel_level_key | read,write
+  La/g3/p0;->b(I)V @62 write {"kind": "unknown"}
+  La/g3/t1;->P()V @4094 read {"kind": "literal", "value": -1}
+Settings.Global | show_music_info_key | read,write
+  La/g3/q0;->b(I)V @62 write {"kind": "unknown"}
+  La/g3/t1;->P()V @4158 read {"kind": "literal", "value": -1}
+Settings.Global | show_music_on_hud_display | read
+  La/z9/d;->b(Landroid/content/Context;La/u9/a;)V @380 read {"kind": "literal", "value": -1}
+  La/z9/d;->c(Landroid/content/Context;)V @260 read {"kind": "literal", "value": -1}
+Settings.Global | speed_compensation_store_key | read,write
+  La/g3/g;->P()V @1550 read {"kind": "unknown"}
+  La/g3/k;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/r2/a$a;->handleMessage(Landroid/os/Message;)V @60 read {"kind": "unknown"}
+Settings.Global | split_screen_enable | read,write
+  La/g3/a;->b(I)V @92 write {"kind": "parameter", "index": 0}
+  La/g3/t1;->P()V @4934 read {"kind": "unknown"}
+  La/q2/g;->a()V @28 read {"kind": "literal", "value": 0}
+Settings.Global | split_screen_first_app | read,write
+  La/g3/s1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @120 write {"kind": "unknown"}
+  La/g3/t1;->P()V @1302 read {"kind": "unknown"}
+  La/j1/l;->run()V @132 read {"kind": "unknown"}
+  La/r2/i;->run()V @198 read {"kind": "unknown"}
+Settings.Global | split_screen_second_app | read,write
+  La/g3/t1;->P()V @1566 read {"kind": "unknown"}
+  La/g3/x0;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @120 write {"kind": "unknown"}
+  La/j1/l;->run()V @162 read {"kind": "unknown"}
+  La/r2/i;->run()V @228 read {"kind": "unknown"}
+Settings.Global | split_screen_timeout | read,write
+  La/g3/t1;->P()V @1838 read {"kind": "unknown"}
+  La/g3/y0;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/q2/g;->a()V @90 read {"kind": "unknown"}
+Settings.Global | status_bar_date_time_format | read,write
+  La/g3/r1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/g3/t1;->P()V @1164 read {"kind": "unknown"}
+Settings.Global | status_bar_date_time_format_12 | write
+  La/g3/r1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @102 write {"kind": "unknown"}
+Settings.Global | status_bar_date_time_format_24 | write
+  La/g3/r1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @142 write {"kind": "unknown"}
+Settings.Global | system.location.lat.last | read,write
+  Lcom/logstas/service/AutoRadioGeoService$d;->handleMessage(Landroid/os/Message;)V @102 read {"kind": "unknown"}
+  Lcom/logstas/service/AutoRadioGeoService;->onLocationChanged(Landroid/location/Location;)V @186 write {"kind": "concat", "parts": [{"kind": "unknown"}, {"kind": "literal", "value": ""}]}
+Settings.Global | system.location.lon.last | read,write
+  Lcom/logstas/service/AutoRadioGeoService$d;->handleMessage(Landroid/os/Message;)V @140 read {"kind": "unknown"}
+  Lcom/logstas/service/AutoRadioGeoService;->onLocationChanged(Landroid/location/Location;)V @244 write {"kind": "concat", "parts": [{"kind": "unknown"}, {"kind": "literal", "value": ""}]}
+Settings.Global | system.weather.last.icon | write
+  Lcom/logstas/service/AutoRadioGeoService$d;->handleMessage(Landroid/os/Message;)V @276 write {"kind": "literal", "value": 0}
+  Lcom/logstas/service/AutoRadioGeoService$e;->a(Ljava/lang/Object;)V @364 write {"kind": "unknown"}
+Settings.Global | system.weather.last.temperature | write
+  Lcom/logstas/service/AutoRadioGeoService$d;->handleMessage(Landroid/os/Message;)V @248 write {"kind": "literal", "value": 0}
+  Lcom/logstas/service/AutoRadioGeoService$e;->a(Ljava/lang/Object;)V @426 write {"kind": "concat", "parts": [{"kind": "unknown"}, {"kind": "literal", "value": "°"}]}
+Settings.Global | system.weather.last.update | read,write
+  Lcom/logstas/service/AutoRadioGeoService$d;->handleMessage(Landroid/os/Message;)V @56 read {"kind": "literal", "value": -1}
+  Lcom/logstas/service/AutoRadioGeoService$e;->a(Ljava/lang/Object;)V @454 write {"kind": "unknown"}
+Settings.Global | voice.assistant.assistant_custom_activation_phrase | read,write
+  La/g3/a2;->onClick(Landroid/view/View;)V @268 read {"kind": "unknown"}
+  La/g3/c2;->T()V @26 read {"kind": "unknown"}
+  La/j4/a;->c(Ljava/lang/String;)V @164 read {"kind": "unknown"}
+  La/m4/w;->onClick(Landroid/view/View;)V @128 write {"kind": "unknown"}
+  La/m4/x;->onClick(Landroid/view/View;)V @80 write {"kind": "literal", "value": 0}
+Settings.Global | voice.assistant.is.allowed.phrase.activation | read
+  La/g3/c2;->P()V @128 read {"kind": "unknown"}
+  La/g3/e;->b(I)V @94 read {"kind": "literal", "value": 1}
+  La/j4/g;->h()V @36 read {"kind": "literal", "value": 0}
+Settings.Global | voice.assistant.say.result | read,write
+  La/g3/c2;->P()V @40 read {"kind": "literal", "value": 1}
+  La/g3/d;->b(I)V @152 write {"kind": "unknown"}
+  La/k4/b;->h(La/l4/d;)V @58 read {"kind": "literal", "value": 1}
+  La/k4/b;->m(Z)V @46 read {"kind": "literal", "value": 1}
+Settings.Global | voice.assistant.volume.correction | read,write
+  La/g3/b2;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @66 write {"kind": "unknown"}
+  La/g3/c2;->P()V @304 read {"kind": "unknown"}
+  La/o4/g;->a(Z)V @204 read {"kind": "unknown"}
+Settings.Global | voice.assistant.volume.media.remember | write
+  La/k3/d;->run()V @760 write {"kind": "literal", "value": -100}
+Settings.Global | we_chat_action_type_key | read,write
+  La/g3/t1;->P()V @1984 read {"kind": "unknown"}
+  La/g3/z0;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62 write {"kind": "unknown"}
+  La/q2/c$b;->handleMessage(Landroid/os/Message;)V @206 read {"kind": "unknown"}
+Settings.Global | wpc_charging_status_charging_notification_key | read,write
+  La/g3/t1;->P()V @4222 read {"kind": "literal", "value": -1}
+  La/q2/l$b;->onFunctionValueChanged(III)V @312 read {"kind": "literal", "value": -1}
+  La/g3/m0;->b(I)V @102 write {"kind": "unknown"}
+Settings.Global | wpc_charging_status_error_notification_key | read,write
+  La/g3/t1;->P()V @4286 read {"kind": "literal", "value": -1}
+  La/q2/l$b;->onFunctionValueChanged(III)V @226 read {"kind": "literal", "value": -1}
+  La/g3/n0;->b(I)V @102 write {"kind": "unknown"}
+Settings.Global | wpc_charging_status_fod_notification_key | read,write
+  La/g3/t1;->P()V @4350 read {"kind": "literal", "value": -1}
+  La/q2/l$b;->onFunctionValueChanged(III)V @160 read {"kind": "literal", "value": -1}
+  La/g3/o0;->b(I)V @102 write {"kind": "unknown"}
+Settings.Global | wpc_charging_status_fully_charged_notification_key | read,write
+  La/g3/t1;->P()V @4414 read {"kind": "literal", "value": -1}
+  La/q2/l$b;->onFunctionValueChanged(III)V @378 read {"kind": "literal", "value": -1}
+  La/g3/p0;->b(I)V @102 write {"kind": "unknown"}
+Settings.Global | wpc_charging_status_take_mobile_always_key | read,write
+  La/g3/t1;->P()V @4542 read {"kind": "literal", "value": -1}
+  La/q2/l$a;->onSensorEventChanged(II)V @98 read {"kind": "literal", "value": -1}
+  La/g3/r0;->b(I)V @38 write {"kind": "unknown"}
+Settings.Global | wpc_charging_status_take_mobile_key | read,write
+  La/g3/t1;->P()V @4478 read {"kind": "literal", "value": -1}
+  La/q2/l$a;->onSensorEventChanged(II)V @60 read {"kind": "literal", "value": -1}
+  La/g3/q0;->b(I)V @102 write {"kind": "unknown"}
+Settings.Secure | animator_duration_scale | write
+  La/bc/m;->e(Landroid/content/Context;)V @302 write {"kind": "literal", "value": 0.5}
+Settings.Secure | enabled_accessibility_services | read,write
+  La/bc/m;->e(Landroid/content/Context;)V @186 read {"kind": "unknown"}
+  La/bc/m;->e(Landroid/content/Context;)V @186 write {"kind": "unknown"}
+Settings.Secure | enabled_notification_listeners | read,write
+  La/bc/m;->e(Landroid/content/Context;)V @46 read {"kind": "unknown"}
+  La/bc/m;->e(Landroid/content/Context;)V @46 write {"kind": "unknown"}
+Settings.Secure | transition_animation_scale | write
+  La/bc/m;->e(Landroid/content/Context;)V @274 write {"kind": "literal", "value": 0.5}
+Settings.Secure | window_animation_scale | write
+  La/bc/m;->e(Landroid/content/Context;)V @246 write {"kind": "literal", "value": 0.5}
+SharedPreferences (file unresolved) | CITY | read
+  La/m4/f;->run()V @96 read {"kind": "literal", "value": 0}
+SharedPreferences (file unresolved) | PROVINCE | read
+  La/m4/g;->a(Landroid/content/Context;Landroid/widget/Spinner;Landroid/widget/Spinner;)V @126 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | admob_app_id | read
+  La/y6/y3;->run()V @2282 read {"kind": "literal", "value": 0}
+SharedPreferences (file unresolved) | consent_settings | read,write
+  La/y6/e3;->n()La/y6/h; @32 read {"kind": "literal", "value": "G1"}
+  La/y6/r5;->C(La/y6/r5;La/y6/h;IJZZ)V @168 write {"kind": "unknown"}
+SharedPreferences (file unresolved) | consent_source | read,write
+  La/y6/e3;->s(I)Z @26 read {"kind": "literal", "value": 100}
+  La/y6/r5;->C(La/y6/r5;La/y6/h;IJZZ)V @188 write {"kind": "unknown"}
+  La/y6/y3;->run()V @1302 read {"kind": "literal", "value": 100}
+SharedPreferences (file unresolved) | crashlytics.installation.id | write
+  La/s8/f0;->a(Ljava/lang/String;Landroid/content/SharedPreferences;)Ljava/lang/String; @200 write {"kind": "unknown"}
+SharedPreferences (file unresolved) | deferred_analytics_collection | read,write
+  La/y6/e3;->q(Z)V @86 write {"kind": "parameter", "index": 0}
+  La/y6/w6;->q(Z)La/y6/i8; @1356 read {"kind": "literal", "value": 0}
+  La/y6/y3;->run()V @2850 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | existing_instance_identifier | read,write
+  La/o8/c;->b(La/m8/v;)Ljava/lang/Object; @1072 read {"kind": "unknown"}
+  La/z8/f;->a(Ljava/lang/Object;)La/z6/h; @560 write {"kind": "unknown"}
+SharedPreferences (file unresolved) | fire-count | read,write
+  La/h9/j;->a()V @24 read {"kind": "literal", "value": 0}
+  La/h9/j;->a()V @262 write {"kind": "unknown"}
+  La/h9/j;->b()V @118 write {"kind": "unknown"}
+  La/h9/j;->d(JLjava/lang/String;)V @124 read {"kind": "literal", "value": 0}
+  La/h9/j;->d(JLjava/lang/String;)V @176 read {"kind": "unknown"}
+  La/h9/j;->d(JLjava/lang/String;)V @258 write {"kind": "unknown"}
+SharedPreferences (file unresolved) | fire-global | write
+  La/h9/j;->c()Ljava/util/ArrayList; @170 write {"kind": "unknown"}
+SharedPreferences (file unresolved) | firebase.installation.id | read,write
+  La/s8/f0;->a(Ljava/lang/String;Landroid/content/SharedPreferences;)Ljava/lang/String; @222 write {"kind": "unknown"}
+  La/s8/f0;->c()Ljava/lang/String; @162 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | firebase_crashlytics_collection_enabled | read
+  La/s8/a0;-><init>(La/h8/e;)V @104 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | firebase_data_collection_default_enabled | read
+  La/n9/a;-><init>(Landroid/content/Context;Ljava/lang/String;La/g9/c;)V @84 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | gmp_app_id | read
+  La/y6/y3;->run()V @2224 read {"kind": "literal", "value": 0}
+SharedPreferences (file unresolved) | has_been_opened | read
+  La/y6/e3;->m()V @54 read {"kind": "literal", "value": 0}
+SharedPreferences (file unresolved) | last-used-date | read,write
+  La/h9/j;->d(JLjava/lang/String;)V @78 read {"kind": "literal", "value": ""}
+  La/h9/j;->d(JLjava/lang/String;)V @280 write {"kind": "unknown"}
+SharedPreferences (file unresolved) | measurement_enabled | read
+  La/y6/e3;->o()Ljava/lang/Boolean; @28 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | measurement_enabled_from_api | read
+  La/y6/r5;->v(La/y6/h;)V @184 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | previous_os_version | read
+  La/y6/r5;->D()V @290 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | use_service | read
+  La/y6/w6;->p()Z @78 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | |S|id | read
+  La/j9/d;->c(La/l9/a;)Ljava/lang/String; @172 read {"kind": "literal", "value": 0}
+SharedPreferences (file unresolved) | |S||P| | read
+  La/l9/b;->a()Ljava/lang/String; @26 read {"kind": "literal", "value": 0}
+
+XCSettings2
+Settings.Global | allow_to_connect_wifi | read,write
+  Lecarx/settings/Kx11App;->registerBroadCast()V @44 write {"kind": "literal", "value": 0}
+  Lecarx/settings/ui/EditFrag;->lambda$updateView$4$EditFrag(Landroid/view/View;)V @20 read {"kind": "unknown"}
+Settings.Global | auto_time | read,write
+  Lecarx/settings/proxy/utils/TimeUtils;->isDateTimeAuto()Z @20 read {"kind": "unknown"}
+  Lecarx/settings/proxy/utils/TimeUtils;->setAutoDateTime(Z)V @68 write {"kind": "parameter", "index": 0}
+Settings.Global | auto_time_zone | read,write
+  Lecarx/settings/proxy/utils/TimeUtils;->isTimeZoneAuto()Z @20 read {"kind": "unknown"}
+  Lecarx/settings/proxy/utils/TimeUtils;->setAutoTimeZone(Z)V @68 write {"kind": "parameter", "index": 0}
+Settings.Global | development_settings_enabled | read
+  Lcom/blankj/utilcode/util/DeviceUtils;->isDevelopmentSettingsEnabled()Z @22 read {"kind": "literal", "value": 0}
+Settings.Global | disable_drive_mode_sound | read
+  Lecarx/settings/widget/AndroidMediaPlayer$6;->onPrepared(Landroid/media/MediaPlayer;)V @30 read {"kind": "literal", "value": 0}
+Settings.Global | force_fsg_nav_bar | read,uri
+  Lcom/setting/popupdialog/util/navbar/NavigationBarObserver;->onChange(Z)V @88 read {"kind": "unknown"}
+  Lcom/setting/popupdialog/util/navbar/NavigationBarObserver;->register(Landroid/content/Context;)V @74 uri {"kind": "unknown"}
+Settings.Global | mobile_data | read,uri,write
+  Lecarx/settings/proxy/custom/G4Proxy$1;->onChange(Z)V @28 read {"kind": "literal", "value": -1}
+  Lecarx/settings/proxy/custom/G4Proxy;->init()V @88 uri {"kind": "unknown"}
+  Lecarx/settings/utils/NetWorkHelper;->getGlobalMobileData()I @18 read {"kind": "literal", "value": -1}
+  Lecarx/settings/utils/NetWorkHelper;->putGlobalMobileData(I)Z @16 write {"kind": "parameter", "index": 0}
+Settings.Global | navigationbar_hide_bar_enabled | read
+  Lcom/blankj/utilcode/util/BarUtils;->isNavBarVisible(Landroid/view/Window;)Z @164 read {"kind": "unknown"}
+Settings.Secure | adb_enabled | read
+  Lcom/blankj/utilcode/util/DeviceUtils;->isAdbEnabled()Z @22 read {"kind": "literal", "value": 0}
+Settings.Secure | android_id | read
+  Lcom/blankj/utilcode/util/DeviceUtils;->getAndroidID()Ljava/lang/String; @20 read {"kind": "unknown"}
+  Lcom/tencent/bugly/crashreport/common/info/b;->c(Landroid/content/Context;)Ljava/lang/String; @22 read {"kind": "unknown"}
+Settings.Secure | enabled_notification_listeners | read
+  Landroidx/core/app/NotificationManagerCompat;->getEnabledListenerPackages(Landroid/content/Context;)Ljava/util/Set; @12 read {"kind": "unknown"}
+  Landroidx/media/MediaSessionManagerImplBase;->isEnabledNotificationListener(Landroidx/media/MediaSessionManager$RemoteUserInfoImpl;)Z @8 read {"kind": "unknown"}
+Settings.Secure | location_mode | read
+  Lecarx/settings/proxy/utils/LocationUtils;->isLocationEnabled(Landroid/content/Context;)Z @14 read {"kind": "literal", "value": 0}
+Settings.Secure | ui_night_mode | uri
+  Lecarx/settings/service/WidgetService;->onCreate()V @134 uri {"kind": "unknown"}
+Settings.System | auto_time | uri
+  Lecarx/settings/proxy/branch/errorproxy/ErrorFunctionConvertProxy;->registerAutoDateTimeListener()V @24 uri {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomVehicle;->registerAutoDateTimeListener()V @24 uri {"kind": "unknown"}
+Settings.System | font_scale | read
+  Lecarx/settings/proxy/custom/CustomVehicle;->getFunctionIndex(II)I @258 read {"kind": "literal", "value": 1.0}
+Settings.System | key_notify_hide_body | uri
+  Lecarx/settings/proxy/branch/NotifyMessageProxy;-><init>()V @160 uri {"kind": "unknown"}
+Settings.System | key_notify_sound | uri
+  Lecarx/settings/proxy/branch/NotifyMessageProxy;-><init>()V @88 uri {"kind": "unknown"}
+Settings.System | key_notify_tts_play | uri
+  Lecarx/settings/proxy/branch/NotifyMessageProxy;-><init>()V @124 uri {"kind": "unknown"}
+Settings.System | key_system_notify_merge_group | uri
+  Lecarx/settings/proxy/branch/NotifyMessageProxy;-><init>()V @196 uri {"kind": "unknown"}
+Settings.System | positionLightSts_Day | uri
+  Lecarx/settings/proxy/branch/LightingProxy;->init()V @206 uri {"kind": "unknown"}
+Settings.System | positionLightSts_Night | uri
+  Lecarx/settings/proxy/branch/LightingProxy;->init()V @172 uri {"kind": "unknown"}
+Settings.System | ringtone | write
+  Lecarx/settings/utils/SoundManager;->setRingtone(Landroid/content/Context;Lecarx/settings/entity/RingtoneInfo;Z)V @122 write {"kind": "unknown"}
+Settings.System | ringtone_name_value | read,write
+  Lecarx/settings/utils/SoundManager;->getRingtone(Landroid/content/Context;Ljava/lang/String;)Ljava/lang/String; @12 read {"kind": "unknown"}
+  Lecarx/settings/utils/SoundManager;->setRingtone(Landroid/content/Context;Lecarx/settings/entity/RingtoneInfo;Z)V @96 write {"kind": "unknown"}
+Settings.System | screen_brightness | read,uri,write
+  Lcom/blankj/utilcode/util/BrightnessUtils;->getBrightness()I @20 read {"kind": "unknown"}
+  Lcom/blankj/utilcode/util/BrightnessUtils;->setBrightness(I)Z @20 write {"kind": "parameter", "index": 0}
+  Lcom/blankj/utilcode/util/BrightnessUtils;->setBrightness(I)Z @28 uri {"kind": "unknown"}
+Settings.System | screen_brightness_mode | read,write
+  Lcom/blankj/utilcode/util/BrightnessUtils;->isAutoBrightnessEnabled()Z @22 read {"kind": "unknown"}
+  Lcom/blankj/utilcode/util/BrightnessUtils;->setAutoBrightnessEnabled(Z)Z @20 write {"kind": "parameter", "index": 0}
+Settings.System | screen_off_timeout | read,write
+  Lcom/blankj/utilcode/util/ScreenUtils;->getSleepDuration()I @20 read {"kind": "unknown"}
+  Lcom/blankj/utilcode/util/ScreenUtils;->setSleepDuration(I)V @20 write {"kind": "parameter", "index": 0}
+  Lecarx/settings/proxy/custom/CustomVehicle;->getScreenOffTime()I @16 read {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomVehicle;->setFunctionIndex(III)V @182 write {"kind": "unknown"}
+Settings.System | sound_effects_enabled | read
+  Lecarx/settings/utils/SoundManager;->isTouchMusicEnable()Z @20 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | appassword | write
+  Lecarx/settings/proxy/custom/WifiProxy;->createWifiAPConfiguration(Ljava/lang/String;ILjava/lang/String;)Landroid/net/wifi/WifiConfiguration; @58 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/WifiProxy;->createWifiAPConfiguration(Ljava/lang/String;ILjava/lang/String;)Landroid/net/wifi/WifiConfiguration; @58 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/WifiProxy;->createWifiAPConfiguration(Ljava/lang/String;ILjava/lang/String;)Landroid/net/wifi/WifiConfiguration; @58 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/WifiProxy;->createWifiAPConfiguration(Ljava/lang/String;ILjava/lang/String;)Landroid/net/wifi/WifiConfiguration; @58 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/WifiProxy;->createWifiAPConfiguration(Ljava/lang/String;ILjava/lang/String;)Landroid/net/wifi/WifiConfiguration; @58 write {"kind": "unknown"}
+SharedPreferences (file unresolved) | config_loading_key | write
+  Lecarx/settings/proxy/custom/NoticeProxy;->lambda$null$0$NoticeProxy()V @22 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/NoticeProxy;->loadGKUIConfig()V @50 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/NoticeProxy;->lambda$null$0$NoticeProxy()V @22 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/NoticeProxy;->loadGKUIConfig()V @50 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/NoticeProxy;->lambda$null$0$NoticeProxy()V @22 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/NoticeProxy;->loadGKUIConfig()V @50 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/NoticeProxy;->lambda$null$0$NoticeProxy()V @22 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/NoticeProxy;->loadGKUIConfig()V @50 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/NoticeProxy;->lambda$null$0$NoticeProxy()V @22 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/NoticeProxy;->loadGKUIConfig()V @50 write {"kind": "unknown"}
+SharedPreferences (file unresolved) | hide_password | write
+  Lecarx/settings/proxy/custom/ApSafeProxy;->setPsdVisible(Z)Z @20 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/ApSafeProxy;->setPsdVisible(Z)Z @20 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/ApSafeProxy;->setPsdVisible(Z)Z @20 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/ApSafeProxy;->setPsdVisible(Z)Z @20 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/ApSafeProxy;->setPsdVisible(Z)Z @20 write {"kind": "unknown"}
+SharedPreferences (file unresolved) | installApkMd5 | write
+  Lcom/tencent/bugly/beta/global/d;->run()V @2896 write {"kind": "unknown"}
+SharedPreferences (file unresolved) | key_channelpath | read
+  Lcom/tencent/bugly/crashreport/common/info/AppInfo;->h(Landroid/content/Context;)Ljava/lang/String; @24 read {"kind": "literal", "value": ""}
+SharedPreferences (file unresolved) | safe_mode_count_1.9.13 | read,write
+  Lcom/tencent/tinker/loader/shareutil/ShareTinkerInternals;->getSafeModeCount(Landroid/content/Context;)I @56 read {"kind": "literal", "value": 0}
+  Lcom/tencent/tinker/loader/shareutil/ShareTinkerInternals;->setSafeModeCount(Landroid/content/Context;I)V @64 write {"kind": "parameter", "index": 1}
+SharedPreferences (file unresolved) | shared_key_psd_btaddress | write
+  Lecarx/settings/setting/BTQuickActivity$11;->run()V @240 write {"kind": "unknown"}
+  Lecarx/settings/setting/BTQuickActivity$11;->run()V @240 write {"kind": "unknown"}
+  Lecarx/settings/setting/BTQuickActivity$11;->run()V @240 write {"kind": "unknown"}
+  Lecarx/settings/setting/BTQuickActivity$11;->run()V @240 write {"kind": "unknown"}
+  Lecarx/settings/setting/BTQuickActivity$11;->run()V @240 write {"kind": "unknown"}
+SharedPreferences (file unresolved) | sound_mode | read,write
+  Lecarx/settings/proxy/branch/CarFunctionProxy;->getFunctionIndex(II)I @1536 read {"kind": "unknown"}
+  Lecarx/settings/proxy/branch/CarFunctionProxy;->setFunctionIndex(III)V @2246 write {"kind": "unknown"}
+  Lecarx/settings/proxy/branch/CarFunctionProxy;->setFunctionSwitched(IIZ)V @1070 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | sp_pre_balance_point_key | write
+  Lecarx/settings/proxy/branch/BalanceProxy;->setPreBalancePoint(F)V @82 write {"kind": "unknown"}
+  Lecarx/settings/proxy/branch/BalanceProxy;->setPreBalancePoint(F)V @82 write {"kind": "unknown"}
+  Lecarx/settings/proxy/branch/BalanceProxy;->setPreBalancePoint(F)V @82 write {"kind": "unknown"}
+  Lecarx/settings/proxy/branch/BalanceProxy;->setPreBalancePoint(F)V @82 write {"kind": "unknown"}
+  Lecarx/settings/proxy/branch/BalanceProxy;->setPreBalancePoint(F)V @82 write {"kind": "unknown"}
+SharedPreferences (file unresolved) | sp_pre_fader_point_key | write
+  Lecarx/settings/proxy/branch/BalanceProxy;->setPreFaderPoint(F)V @82 write {"kind": "unknown"}
+  Lecarx/settings/proxy/branch/BalanceProxy;->setPreFaderPoint(F)V @82 write {"kind": "unknown"}
+  Lecarx/settings/proxy/branch/BalanceProxy;->setPreFaderPoint(F)V @82 write {"kind": "unknown"}
+  Lecarx/settings/proxy/branch/BalanceProxy;->setPreFaderPoint(F)V @82 write {"kind": "unknown"}
+  Lecarx/settings/proxy/branch/BalanceProxy;->setPreFaderPoint(F)V @82 write {"kind": "unknown"}
+SharedPreferences (file unresolved) | startedFromLauncher | read
+  Landroidx/core/app/AppLaunchChecker;->hasStartedFromLauncher(Landroid/content/Context;)Z @18 read {"kind": "literal", "value": 0}
+  Landroidx/core/app/AppLaunchChecker;->onActivityCreate(Landroid/app/Activity;)V @18 read {"kind": "literal", "value": 0}
+SharedPreferences (file unresolved) | sun_roof_index | write
+  Lecarx/settings/ui/KXFunctionFragment;->lambda$registerRefreshCallBack$6$KXFunctionFragment(Landroid/os/Message;)V @32 write {"kind": "unknown"}
+  Lecarx/settings/ui/KXFunctionFragment;->lambda$registerRefreshCallBack$6$KXFunctionFragment(Landroid/os/Message;)V @32 write {"kind": "unknown"}
+  Lecarx/settings/ui/KXFunctionFragment;->lambda$registerRefreshCallBack$6$KXFunctionFragment(Landroid/os/Message;)V @32 write {"kind": "unknown"}
+  Lecarx/settings/ui/KXFunctionFragment;->lambda$registerRefreshCallBack$6$KXFunctionFragment(Landroid/os/Message;)V @32 write {"kind": "unknown"}
+  Lecarx/settings/ui/KXFunctionFragment;->lambda$registerRefreshCallBack$6$KXFunctionFragment(Landroid/os/Message;)V @32 write {"kind": "unknown"}
+SharedPreferences (file unresolved) | system_volume | write
+  Lecarx/settings/proxy/custom/CustomSound;->resetDefaultAudioAdjust()V @102 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->resetFactoryDefaultAudioAdjust()V @44 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->setFunctionIndex(III)V @278 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->setFunctionSwitched(IIZ)V @172 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->resetDefaultAudioAdjust()V @102 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->resetFactoryDefaultAudioAdjust()V @44 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->setFunctionIndex(III)V @278 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->setFunctionSwitched(IIZ)V @172 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->resetDefaultAudioAdjust()V @102 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->resetFactoryDefaultAudioAdjust()V @44 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->setFunctionIndex(III)V @278 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->setFunctionSwitched(IIZ)V @172 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->resetDefaultAudioAdjust()V @102 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->resetFactoryDefaultAudioAdjust()V @44 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->setFunctionIndex(III)V @278 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->setFunctionSwitched(IIZ)V @172 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->resetDefaultAudioAdjust()V @102 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->resetFactoryDefaultAudioAdjust()V @44 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->setFunctionIndex(III)V @278 write {"kind": "unknown"}
+  Lecarx/settings/proxy/custom/CustomSound;->setFunctionSwitched(IIZ)V @172 write {"kind": "unknown"}
+SystemProperties | persist.bluetooth.showdeviceswithoutnames | read
+  Lecarx/settings/proxy/branch/BluetoothProxy;->init()V @130 read {"kind": "literal", "value": 0}
+SystemProperties | ro.build.system.version | read
+  Lecarx/settings/proxy/utils/ConvertHelper;->convertSystem(Lecarx/settings/entity/FunctionScheme;)V @284 read {"kind": "unknown"}
+
+CarService
+Settings.Global | adb_enabled | read,write
+  Lcom/android/settingslib/development/AbstractEnableAdbPreferenceController;->isAdbEnabled()Z @18 read {"kind": "literal", "value": 0}
+  Lcom/android/settingslib/development/AbstractEnableAdbPreferenceController;->writeAdbSetting(Z)V @18 write {"kind": "parameter", "index": 0}
+Settings.Global | airplane_mode_on | read,uri,write
+  Lcom/android/car/AirplaneModeService$AirplaneModeHandler;-><init>(Lcom/android/car/AirplaneModeService;Landroid/os/Looper;)V @130 uri {"kind": "unknown"}
+  Lcom/android/car/AirplaneModeService$AirplaneModeHandler;->setAirplaneModeOn(Z)V @84 write {"kind": "parameter", "index": 0}
+  Lcom/android/car/AirplaneModeService$AirplaneModeHandler;->isAirplaneModeOn()Z @26 read {"kind": "literal", "value": 0}
+  Lcom/android/settingslib/WirelessUtils;->isAirplaneModeOn(Landroid/content/Context;)Z @14 read {"kind": "literal", "value": 0}
+Settings.Global | airplane_mode_toggleable_radios | read
+  Lcom/android/settingslib/WirelessUtils;->isRadioAllowed(Landroid/content/Context;Ljava/lang/String;)Z @28 read {"kind": "unknown"}
+Settings.Global | android.car.MASTER_MUTE | read,write
+  Lcom/android/car/CarAudioService;->callbackMasterMuteChange(I)V @114 write {"kind": "unknown"}
+  Lcom/android/car/CarAudioService;->init()V @84 read {"kind": "literal", "value": 0}
+Settings.Global | development_settings_enabled | read,write
+  Lcom/android/settingslib/development/DevelopmentSettingsEnabler;->isDevelopmentSettingsEnabled(Landroid/content/Context;)Z @44 read {"kind": "unknown"}
+  Lcom/android/settingslib/development/DevelopmentSettingsEnabler;->setDevelopmentSettingsEnabled(Landroid/content/Context;Z)V @14 write {"kind": "parameter", "index": 1}
+Settings.Global | device_provisioned | read
+  Lcom/android/settingslib/HelpUtils;->getHelpIntent(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent; @14 read {"kind": "literal", "value": 0}
+  Lcom/android/settingslib/HelpUtils;->prepareHelpMenuItem(Landroid/app/Activity;Landroid/view/MenuItem;Ljava/lang/String;Ljava/lang/String;)Z @14 read {"kind": "literal", "value": 0}
+  Lcom/android/settingslib/drawer/TileUtils;->getCategories(Landroid/content/Context;Ljava/util/Map;ZLjava/lang/String;Ljava/lang/String;)Ljava/util/List; @30 read {"kind": "literal", "value": 0}
+Settings.Global | low_power_mode_suggestion_params | read
+  Lcom/android/settingslib/fuelgauge/BatterySaverUtils$Parameters;-><init>(Landroid/content/Context;)V @26 read {"kind": "unknown"}
+Settings.Global | low_power_trigger_level | read,write
+  Lcom/android/settingslib/fuelgauge/BatterySaverUtils;->ensureAutoBatterySaver(Landroid/content/Context;I)V @14 read {"kind": "literal", "value": 0}
+  Lcom/android/settingslib/fuelgauge/BatterySaverUtils;->setAutoBatterySaverTriggerLevel(Landroid/content/Context;I)V @22 write {"kind": "parameter", "index": 1}
+  Lcom/android/settingslib/fuelgauge/BatterySaverUtils;->setPowerSaveMode(Landroid/content/Context;ZZ)Z @142 read {"kind": "unknown"}
+Settings.Global | network_scoring_ui_enabled | read
+  Lcom/android/settingslib/wifi/WifiTracker;->onStart()V @30 read {"kind": "literal", "value": 0}
+Settings.Global | speed_label_cache_eviction_age_millis | read
+  Lcom/android/settingslib/wifi/WifiTracker;->onStart()V @74 read {"kind": "literal", "value": 1200000}
+Settings.Global | wifi_connected_mac_randomization_enabled | read
+  Lcom/android/settingslib/deviceinfo/AbstractWifiMacAddressPreferenceController;->updateConnectivity()V @30 read {"kind": "literal", "value": 0}
+Settings.Global | zen_duration | read,write
+  Lcom/android/settingslib/notification/ZenDurationDialog;->createDialog()Landroid/app/Dialog; @18 read {"kind": "literal", "value": 0}
+  Lcom/android/settingslib/notification/ZenDurationDialog;->updateZenDuration(I)V @30 read {"kind": "literal", "value": 0}
+  Lcom/android/settingslib/notification/ZenDurationDialog;->updateZenDuration(I)V @130 write {"kind": "unknown"}
+Settings.Secure | accessibility_display_magnification_navbar_enabled | read
+  Lcom/android/settingslib/accessibility/AccessibilityButtonHelper;->isRequestedByMagnification(Landroid/content/Context;)Z @14 read {"kind": "literal", "value": 0}
+Settings.Secure | accessibility_shortcut_enabled | read
+  Lcom/android/settingslib/accessibility/AccessibilityUtils;->isShortcutEnabled(Landroid/content/Context;I)Z @14 read {"kind": "literal", "value": 1}
+Settings.Secure | accessibility_shortcut_target_service | read
+  Lcom/android/settingslib/accessibility/AccessibilityUtils;->getShortcutTargetServiceComponentNameString(Landroid/content/Context;I)Ljava/lang/String; @14 read {"kind": "parameter", "index": 1}
+Settings.Secure | android.car.BLUETOOTH_AUTOCONNECT_MESSAGING_DEVICES | read,write
+  Lcom/android/car/BluetoothDeviceConnectionPolicy;->readAndRebuildDeviceMapFromSettings()Z @248 read {"kind": "unknown"}
+  Lcom/android/car/BluetoothDeviceConnectionPolicy;->writeDeviceInfoToSettings(Lcom/android/car/BluetoothDeviceConnectionPolicy$ConnectionParams;)Z @298 write {"kind": "unknown"}
+Settings.Secure | android.car.BLUETOOTH_AUTOCONNECT_MUSIC_DEVICES | read,write
+  Lcom/android/car/BluetoothDeviceConnectionPolicy;->readAndRebuildDeviceMapFromSettings()Z @308 read {"kind": "unknown"}
+  Lcom/android/car/BluetoothDeviceConnectionPolicy;->writeDeviceInfoToSettings(Lcom/android/car/BluetoothDeviceConnectionPolicy$ConnectionParams;)Z @352 write {"kind": "unknown"}
+Settings.Secure | android.car.BLUETOOTH_AUTOCONNECT_NETWORK_DEVICES | read,write
+  Lcom/android/car/BluetoothDeviceConnectionPolicy;->readAndRebuildDeviceMapFromSettings()Z @338 read {"kind": "unknown"}
+  Lcom/android/car/BluetoothDeviceConnectionPolicy;->writeDeviceInfoToSettings(Lcom/android/car/BluetoothDeviceConnectionPolicy$ConnectionParams;)Z @378 write {"kind": "unknown"}
+Settings.Secure | android.car.BLUETOOTH_AUTOCONNECT_PHONE_DEVICES | read,write
+  Lcom/android/car/BluetoothDeviceConnectionPolicy;->readAndRebuildDeviceMapFromSettings()Z @278 read {"kind": "unknown"}
+  Lcom/android/car/BluetoothDeviceConnectionPolicy;->writeDeviceInfoToSettings(Lcom/android/car/BluetoothDeviceConnectionPolicy$ConnectionParams;)Z @326 write {"kind": "unknown"}
+Settings.Secure | default_input_method | read
+  Lcom/android/settingslib/inputmethod/InputMethodAndSubtypeUtil;->saveInputMethodSubtypeList(Landroid/support/v14/preference/PreferenceFragment;Landroid/content/ContentResolver;Ljava/util/List;Z)V @12 read {"kind": "unknown"}
+Settings.Secure | disabled_system_input_methods | read,write
+  Lcom/android/settingslib/inputmethod/InputMethodAndSubtypeUtil;->getDisabledSystemIMEs(Landroid/content/ContentResolver;)Ljava/util/HashSet; @14 read {"kind": "unknown"}
+  Lcom/android/settingslib/inputmethod/InputMethodAndSubtypeUtil;->saveInputMethodSubtypeList(Landroid/support/v14/preference/PreferenceFragment;Landroid/content/ContentResolver;Ljava/util/List;Z)V @640 write {"kind": "unknown"}
+Settings.Secure | enabled_accessibility_services | read,write
+  Lcom/android/settingslib/accessibility/AccessibilityUtils;->getEnabledServicesFromSettings(Landroid/content/Context;I)Ljava/util/Set; @14 read {"kind": "parameter", "index": 1}
+  Lcom/android/settingslib/accessibility/AccessibilityUtils;->setAccessibilityServiceState(Landroid/content/Context;Landroid/content/ComponentName;ZI)V @224 write {"kind": "unknown"}
+Settings.Secure | enabled_input_methods | read,write
+  Lcom/android/settingslib/inputmethod/InputMethodAndSubtypeUtil;->getEnabledInputMethodsAndSubtypeList(Landroid/content/ContentResolver;)Ljava/util/HashMap; @4 read {"kind": "unknown"}
+  Lcom/android/settingslib/inputmethod/InputMethodAndSubtypeUtil;->saveInputMethodSubtypeList(Landroid/support/v14/preference/PreferenceFragment;Landroid/content/ContentResolver;Ljava/util/List;Z)V @618 write {"kind": "unknown"}
+Settings.Secure | enabled_notification_listeners | read
+  Landroid/support/v4/app/NotificationManagerCompat;->getEnabledListenerPackages(Landroid/content/Context;)Ljava/util/Set; @14 read {"kind": "unknown"}
+  Landroid/support/v4/media/MediaSessionManagerImplBase;->isEnabledNotificationListener(Landroid/support/v4/media/MediaSessionManager$RemoteUserInfoImpl;)Z @8 read {"kind": "unknown"}
+Settings.Secure | location_changer | write
+  Lcom/android/settingslib/Utils;->updateLocationEnabled(Landroid/content/Context;ZII)V @14 write {"kind": "parameter", "index": 3}
+  Lcom/android/settingslib/Utils;->updateLocationMode(Landroid/content/Context;IIII)Z @14 write {"kind": "parameter", "index": 4}
+Settings.Secure | location_mode | read,write
+  Lcom/android/settingslib/Utils;->updateLocationEnabled(Landroid/content/Context;ZII)V @48 read {"kind": "literal", "value": 0}
+  Lcom/android/settingslib/Utils;->updateLocationMode(Landroid/content/Context;IIII)Z @88 write {"kind": "parameter", "index": 2}
+Settings.Secure | low_power_manual_activation_count | read,write
+  Lcom/android/settingslib/fuelgauge/BatterySaverUtils;->setPowerSaveMode(Landroid/content/Context;ZZ)Z @92 read {"kind": "unknown"}
+  Lcom/android/settingslib/fuelgauge/BatterySaverUtils;->setPowerSaveMode(Landroid/content/Context;ZZ)Z @106 write {"kind": "unknown"}
+Settings.Secure | low_power_warning_acknowledged | read,write
+  Lcom/android/settingslib/fuelgauge/BatterySaverUtils;->maybeShowBatterySaverConfirmation(Landroid/content/Context;)Z @14 read {"kind": "literal", "value": 0}
+  Lcom/android/settingslib/fuelgauge/BatterySaverUtils;->setBatterySaverConfirmationAcknowledged(Landroid/content/Context;)V @14 write {"kind": "literal", "value": 1}
+Settings.Secure | screensaver_activate_on_dock | read,write
+  Lcom/android/settingslib/dream/DreamBackend;->isActivatedOnDock()Z @8 read {"kind": "unknown"}
+  Lcom/android/settingslib/dream/DreamBackend;->setActivatedOnDock(Z)V @34 write {"kind": "parameter", "index": 0}
+Settings.Secure | screensaver_activate_on_sleep | read,write
+  Lcom/android/settingslib/dream/DreamBackend;->isActivatedOnSleep()Z @8 read {"kind": "unknown"}
+  Lcom/android/settingslib/dream/DreamBackend;->setActivatedOnSleep(Z)V @34 write {"kind": "parameter", "index": 0}
+Settings.Secure | screensaver_enabled | read,write
+  Lcom/android/settingslib/dream/DreamBackend;->isEnabled()Z @8 read {"kind": "unknown"}
+  Lcom/android/settingslib/dream/DreamBackend;->setEnabled(Z)V @34 write {"kind": "parameter", "index": 0}
+Settings.Secure | selected_input_method_subtype | read,write
+  Lcom/android/settingslib/inputmethod/InputMethodAndSubtypeUtil;->getInputMethodSubtypeSelected(Landroid/content/ContentResolver;)I @4 read {"kind": "unknown"}
+  Lcom/android/settingslib/inputmethod/InputMethodAndSubtypeUtil;->putSelectedInputMethodSubtype(Landroid/content/ContentResolver;I)V @4 write {"kind": "parameter", "index": 1}
+Settings.Secure | suppress_auto_battery_saver_suggestion | read,write
+  Lcom/android/settingslib/fuelgauge/BatterySaverUtils;->setPowerSaveMode(Landroid/content/Context;ZZ)Z @158 read {"kind": "unknown"}
+  Lcom/android/settingslib/fuelgauge/BatterySaverUtils;->suppressAutoBatterySaver(Landroid/content/Context;)V @14 write {"kind": "literal", "value": 1}
+Settings.System | screen_brightness | read,uri,write
+  Lcom/android/car/systeminterface/DisplayInterface$DefaultImpl$1;->onChange(Z)V @22 read {"kind": "unknown"}
+  Lcom/android/car/systeminterface/DisplayInterface$DefaultImpl;->setDisplayBrightness(I)V @36 write {"kind": "unknown"}
+  Lcom/android/car/systeminterface/DisplayInterface$DefaultImpl;->startDisplayStateMonitoring(Lcom/android/car/CarPowerManagementService;)V @28 uri {"kind": "unknown"}
+SharedPreferences (file unresolved) | _has_set_default_values | read,write
+  Landroid/support/v7/preference/PreferenceManager;->setDefaultValues(Landroid/content/Context;Ljava/lang/String;IIZ)V @22 read {"kind": "unknown"}
+  Landroid/support/v7/preference/PreferenceManager;->setDefaultValues(Landroid/content/Context;Ljava/lang/String;IIZ)V @78 write {"kind": "literal", "value": 1}
+SharedPreferences (file unresolved) | garage_mode_index | read,write
+  Lcom/android/car/garagemode/GarageModeService;->writeToPref(I)V @16 write {"kind": "parameter", "index": 0}
+  Lcom/android/car/garagemode/GarageModeService;->init(Lcom/android/car/garagemode/GarageModePolicy;Landroid/content/SharedPreferences;)V @32 read {"kind": "literal", "value": 0}
+SharedPreferences (file unresolved) | startedFromLauncher | read,write
+  Landroid/support/v4/app/AppLaunchChecker;->hasStartedFromLauncher(Landroid/content/Context;)Z @18 read {"kind": "literal", "value": 0}
+  Landroid/support/v4/app/AppLaunchChecker;->onActivityCreate(Landroid/app/Activity;)V @18 read {"kind": "literal", "value": 0}
+  Landroid/support/v4/app/AppLaunchChecker;->onActivityCreate(Landroid/app/Activity;)V @116 write {"kind": "literal", "value": 1}
+SystemProperties | android.car.airplane_mode_duration | read
+  Lcom/android/car/AirplaneModeService$AirplaneModeHandler;->calculateDuration()I @12 read {"kind": "literal", "value": 500}
+SystemProperties | android.car.systemuser.headless | read
+  Lcom/android/settingslib/users/UserManagerHelper;->isHeadlessSystemUser()Z @6 read {"kind": "literal", "value": 0}
+SystemProperties | boot.car_service_created | write
+  Lcom/android/car/CarService;->onCreate()V @178 write {"kind": "literal", "value": "1"}
+SystemProperties | ctl.start | write
+  Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->writeLogdSizeOption(Ljava/lang/Object;)V @380 write {"kind": "literal", "value": "logd-reinit"}
+SystemProperties | log.tag.snet_event_log | read
+  Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->writeLogdSizeOption(Ljava/lang/Object;)V @158 read {"kind": "unknown"}
+SystemProperties | logd.logpersistd | read,write
+  Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->setLogpersistOff(Z)V @104 read {"kind": "unknown"}
+  Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->updateLogpersistValues()V @14 read {"kind": "unknown"}
+  Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->updateLogpersistValues()V @346 write {"kind": "literal", "value": "clear"}
+  Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->writeLogpersistOption(Ljava/lang/Object;Z)V @178 read {"kind": "unknown"}
+  Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->writeLogpersistOption(Ljava/lang/Object;Z)V @258 read {"kind": "unknown"}
+SystemProperties | logd.logpersistd.buffer | read,write
+  Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->setLogpersistOff(Z)V @22 write {"kind": "literal", "value": ""}
+  Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->updateLogpersistValues()V @34 read {"kind": "unknown"}
+  Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->writeLogpersistOption(Ljava/lang/Object;Z)V @82 read {"kind": "unknown"}
+SystemProperties | logd.logpersistd.enable | read
+  Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->onLogdSizeSettingUpdate(Ljava/lang/String;)V @12 read {"kind": "unknown"}
+SystemProperties | net.tethering.noprovisioning | read
+  Lcom/android/settingslib/TetherUtil;->isProvisioningNeeded(Landroid/content/Context;)Z @28 read {"kind": "literal", "value": 0}
+SystemProperties | persist.log.tag | read,write
+  Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->updateLogdSizeValues()V @12 read {"kind": "unknown"}
+  Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->writeLogdSizeOption(Ljava/lang/Object;)V @38 read {"kind": "unknown"}
+  Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->writeLogdSizeOption(Ljava/lang/Object;)V @292 write {"kind": "unknown"}
+  Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->writeLogpersistOption(Ljava/lang/Object;Z)V @14 read {"kind": "unknown"}
+SystemProperties | persist.log.tag.snet_event_log | read,write
+  Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->writeLogdSizeOption(Ljava/lang/Object;)V @130 read {"kind": "unknown"}
+  Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->writeLogdSizeOption(Ljava/lang/Object;)V @190 write {"kind": "literal", "value": "I"}
+SystemProperties | persist.logd.logpersistd | write
+  Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->setLogpersistOff(Z)V @36 write {"kind": "literal", "value": ""}
+  Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->writeLogpersistOption(Ljava/lang/Object;Z)V @146 write {"kind": "literal", "value": "logcatd"}
+SystemProperties | persist.logd.logpersistd.buffer | write
+  Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->setLogpersistOff(Z)V @8 write {"kind": "literal", "value": ""}
+  Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->writeLogpersistOption(Ljava/lang/Object;Z)V @132 write {"kind": "unknown"}
+SystemProperties | persist.logd.size | read
+  Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->updateLogdSizeValues()V @24 read {"kind": "unknown"}
+SystemProperties | ro.config.low_ram | read
+  Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->defaultLogdSizeValue()Ljava/lang/String; @32 read {"kind": "unknown"}
+  Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->updateLogdSizeValues()V @178 read {"kind": "unknown"}
+SystemProperties | ro.debuggable | read
+  Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->isAvailable()Z @8 read {"kind": "literal", "value": "0"}
+SystemProperties | ro.logd.size | read
+  Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->defaultLogdSizeValue()Ljava/lang/String; @4 read {"kind": "unknown"}
+SystemProperties | ro.storage_manager.show_opt_in | read
+  Lcom/android/settingslib/Utils;->isStorageManagerEnabled(Landroid/content/Context;)Z @8 read {"kind": "literal", "value": 1}
+SystemProperties | settingsdebug.instant.packages | read
+  Lcom/android/settingslib/applications/AppUtils;->isInstant(Landroid/content/pm/ApplicationInfo;)Z @46 read {"kind": "unknown"}
+
+GPSProvider
+Settings.Global | night_mode | read,write
+  La/r3/d;->onCreate(Landroid/os/Bundle;)V @178 read {"kind": "unknown"}
+  La/r3/d;->onResume()V @24 read {"kind": "literal", "value": 0}
+  La/r3/j;->e(Landroidx/preference/Preference;Ljava/io/Serializable;)Z @54 write {"kind": "unknown"}
+  Lorg/broeuschmeul/android/gps/usb/provider/USBGpsApplication;->onCreate()V @84 read {"kind": "literal", "value": 0}
+Settings.Global | startOnBoot | write
+  La/r3/k;->e(Landroidx/preference/Preference;Ljava/io/Serializable;)Z @46 write {"kind": "parameter", "index": 1}
+SharedPreferences (file unresolved) | connectionRetries | read
+  La/r3/e$e;->d0()V @212 read {"kind": "unknown"}
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @158 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | enableGGA | read
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @736 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | enableGLL | read
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @168 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | enableGSA | read
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @314 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | enableGSV | read
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @386 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | enableNMEA | read
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @576 read {"kind": "unknown"}
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager;->b(Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager;Z)V @82 read {"kind": "literal", "value": 1}
+SharedPreferences (file unresolved) | enableRMC | read
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @802 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | enableSBAS | read
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @616 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | enableStaticNavigation | read
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @530 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | enableVTG | read
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @242 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | enableZDA | read
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @458 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | forceEnableProvider | read
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @912 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | gpsDeviceSpeed | read
+  La/r3/e;->e0()V @368 read {"kind": "unknown"}
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager;-><init>(La/q3/a;III)V @294 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | mockGpsName | read
+  La/r3/e$e;->d0()V @126 read {"kind": "unknown"}
+  La/r3/e;->H()V @146 read {"kind": "unknown"}
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @242 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | replaceStdtGps | read
+  La/r3/e;->H()V @208 read {"kind": "literal", "value": 1}
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @202 read {"kind": "literal", "value": 1}
+SharedPreferences (file unresolved) | setTime | read,write
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager;-><init>(La/q3/a;III)V @320 read {"kind": "literal", "value": 0}
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager;->n(Ljava/lang/String;)V @438 write {"kind": "literal", "value": 0}
+SharedPreferences (file unresolved) | showToasts | read
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->c()V @76 read {"kind": "literal", "value": 0}
+SharedPreferences (file unresolved) | sirfGps | read
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager;-><init>(La/q3/a;III)V @394 read {"kind": "literal", "value": 0}
+SharedPreferences (file unresolved) | startGps | read,write
+  La/r3/a;->onCheckedChanged(Landroid/widget/CompoundButton;Z)V @30 write {"kind": "parameter", "index": 1}
+  La/r3/d;->onRequestPermissionsResult(I[Ljava/lang/String;[I)V @116 write {"kind": "unknown"}
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager;->g()V @316 read {"kind": "literal", "value": 1}
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager;->g()V @342 write {"kind": "unknown"}
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService$a;->onReceive(Landroid/content/Context;Landroid/content/Intent;)V @192 read {"kind": "unknown"}
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->d()V @252 read {"kind": "unknown"}
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @796 read {"kind": "unknown"}
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @822 write {"kind": "unknown"}
+  Lorg/broeuschmeul/android/gps/usb/provider/ui/GpsInfoActivity;->x()V @20 read {"kind": "literal", "value": 0}
+SharedPreferences (file unresolved) | trackFileDirectory | read
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->e()V @142 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | trackFilePrefix | read
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->e()V @178 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | trackRecording | read,write
+  La/r3/d;->onRequestPermissionsResult(I[Ljava/lang/String;[I)V @262 write {"kind": "unknown"}
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService$a;->onReceive(Landroid/content/Context;Landroid/content/Intent;)V @452 read {"kind": "unknown"}
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @1248 read {"kind": "unknown"}
+SharedPreferences (file unresolved) | usbDeviceProductId | read
+  La/r3/e;->e0()V @60 read {"kind": "literal", "value": 8963}
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @122 read {"kind": "literal", "value": 8963}
+SharedPreferences (file unresolved) | usbDeviceVendorId | read
+  La/r3/e;->e0()V @90 read {"kind": "literal", "value": 1659}
+  Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @96 read {"kind": "literal", "value": 1659}

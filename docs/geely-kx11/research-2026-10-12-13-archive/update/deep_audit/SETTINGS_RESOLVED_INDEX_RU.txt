@@ -1,0 +1,1102 @@
+КАТАЛОГ УТОЧНЁННЫХ КЛЮЧЕЙ — 13 октября 2026
+Содержит исходные разрешённые ключи и новые CFG/wrapper-доказательства.
+Это каталог программы; реальные значения на машине не считывались.
+
+
+GMCSoft
+Settings.Global | CURRENT_NAVI_WIDGET_ID
+  write La/da/a;-><init>(Landroid/content/Context;)V @34
+  write La/da/a;->b(Landroid/content/Context;)V @34
+  write La/ea/a;->i(Landroid/content/Context;)V @48
+Settings.Global | LOCATION.CITY
+  read La/ea/a;->m(Landroid/content/Context;)V @82
+  read La/g3/l1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @164
+  read La/g3/v0;->run()V @42
+  read La/m4/a;->onClick(Landroid/view/View;)V @190
+  write La/m4/d;->onClick(Landroid/view/View;)V @132
+  read La/m4/f;->run()V @60
+  read Lcom/logstas/service/AutoRadioGeoService;->onLocationChanged(Landroid/location/Location;)V @778
+  write La/g3/l1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @230
+  write Lcom/logstas/service/AutoRadioGeoService;->onLocationChanged(Landroid/location/Location;)V @860
+Settings.Global | LOCATION.IGNORE.GPS
+  write La/g3/e0;->b(I)V @48
+  read La/g3/t1;->P()V @3490
+  read Lcom/logstas/service/AutoRadioGeoService;->onLocationChanged(Landroid/location/Location;)V @282
+Settings.Global | LOCATION.PROVINCE
+  read La/ea/a;->m(Landroid/content/Context;)V @118
+  read La/g3/l1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @130
+  read La/g3/t1;->P()V @26
+  read La/m4/a;->onClick(Landroid/view/View;)V @160
+  write La/m4/d;->onClick(Landroid/view/View;)V @96
+  read La/m4/g;->a(Landroid/content/Context;Landroid/widget/Spinner;Landroid/widget/Spinner;)V @90
+  read Lcom/logstas/service/AutoRadioGeoService;->onLocationChanged(Landroid/location/Location;)V @740
+  write La/g3/l1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @212
+  write Lcom/logstas/service/AutoRadioGeoService;->onLocationChanged(Landroid/location/Location;)V @838
+Settings.Global | ac_back_win_status
+  write La/g3/e;->b(I)V @50
+  read La/g3/g;->P()V @2356
+  read La/s2/a$b;->handleMessage(Landroid/os/Message;)V @226
+Settings.Global | ac_back_win_status_close_time
+  read La/s2/a$b;->handleMessage(Landroid/os/Message;)V @262
+  read La/s2/a$c;->handleMessage(Landroid/os/Message;)V @148
+  read La/s2/a$d;->handleMessage(Landroid/os/Message;)V @146
+Settings.Global | ac_front_status_close_time
+  read La/s2/c$b;->handleMessage(Landroid/os/Message;)V @262
+  read La/s2/c$c;->handleMessage(Landroid/os/Message;)V @146
+  read La/s2/c$d;->handleMessage(Landroid/os/Message;)V @142
+Settings.Global | ac_front_washing_status
+  write La/g3/a;->b(I)V @50
+  read La/g3/g;->P()V @2056
+Settings.Global | ac_front_win_status
+  write La/g3/c;->b(I)V @50
+  read La/g3/g;->P()V @2206
+  read La/s2/c$b;->handleMessage(Landroid/os/Message;)V @226
+Settings.Global | ac_steering_wheel_status
+  read La/g3/g;->P()V @398
+  write La/g3/i;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @68
+  read La/s2/e$a;->handleMessage(Landroid/os/Message;)V @256
+  read La/s2/e$a;->handleMessage(Landroid/os/Message;)V @376
+Settings.Global | ac_steering_wheel_status_close_time
+  read La/s2/e$a;->handleMessage(Landroid/os/Message;)V @292
+  read La/s2/e$b;->handleMessage(Landroid/os/Message;)V @148
+Settings.Global | ac_sync_auto
+  write La/g3/e0;->b(I)V @86
+  read La/g3/t1;->P()V @3826
+Settings.Global | active_music_player
+  write La/g3/m1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/g3/t1;->P()V @272
+Settings.Global | alice_action_type_key
+  write La/g3/a1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/g3/t1;->P()V @2378
+  read La/q2/c$b;->handleMessage(Landroid/os/Message;)V @554
+Settings.Global | allow_to_connect_wifi
+  write La/ha/h;->run()V @32
+Settings.Global | allow_to_moving_apps
+  write La/bc/m;->e(Landroid/content/Context;)V @356
+Settings.Global | allow_to_use_bt_headphones_in_multimedia
+  write La/c6/a;->run()V @52
+Settings.Global | always_open_screen_saved_on_two_display
+  write La/g3/b;->b(I)V @110
+  read La/g3/t1;->P()V @5066
+  read La/q2/b;->c()Z @28
+Settings.Global | apps_to_show_on_second_screen
+  read La/l2/b;->c()Ljava/util/ArrayList; @26
+  write La/l2/b;->e(Ljava/util/Collection;)V @38
+Settings.Global | apps_to_show_on_second_screen_first_init
+  read La/k3/d;->run()V @594
+  write La/k3/d;->run()V @636
+Settings.Global | auto_check_updates
+  write La/g3/w1;->onCheckedChanged(Landroid/widget/CompoundButton;Z)V @34
+  write La/g3/y1;->P()V @212
+  read La/g3/y1;->P()V @264
+Settings.Global | auto_enable_bluetooth
+  write La/g3/d;->b(I)V @52
+  read La/g3/t1;->P()V @3742
+  read La/q2/h;->c()Z @28
+Settings.Global | auto_enable_wifi
+  write La/g3/c;->b(I)V @92
+  read La/g3/t1;->P()V @3658
+  read La/q2/i;->c()Z @28
+Settings.Global | auto_start_active_music_player
+  read La/b/j;->run()V @190
+  write La/g3/n1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @120
+  read La/g3/t1;->P()V @492
+  read Lcom/logstas/service/MusicService;->d()V @74
+Settings.Global | auto_start_active_music_player_last_name
+  read La/b/j;->run()V @252
+  read La/v9/e;->d()Z @30
+  write Lcom/logstas/service/NaviService;->a(Ljava/lang/String;)V @304
+Settings.Global | auto_start_music_player_last_support_apps_key
+  read Lcom/logstas/service/NaviService;->a(Ljava/lang/String;)V @22
+  read Lcom/logstas/service/NaviService;->c(Ljava/lang/String;)V @22
+  read Lcom/logstas/service/NaviService;->onCreate()V @378
+  write Lcom/logstas/service/NaviService;->onCreate()V @638
+Settings.Global | auto_update_first_start
+  read La/g3/y1;->P()V @172
+  write La/g3/y1;->P()V @244
+Settings.Global | autostart_multimedia_timeout
+  write La/g3/o1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/g3/t1;->P()V @2514
+  read Lcom/logstas/service/MusicService;->d()V @116
+Settings.Global | autostart_on_two_display
+  write La/g3/f1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @118
+  read La/g3/t1;->P()V @2648
+  read Lcom/logstas/service/MusicService;->b()V @28
+Settings.Global | autostart_on_two_display_timeout
+  write La/g3/g1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/g3/t1;->P()V @2916
+  read Lcom/logstas/service/MusicService;->b()V @98
+Settings.Global | back_win_auto_heat_in_repeat_mode_key
+  write La/g3/m0;->b(I)V @154
+  read La/g3/g;->P()V @2432
+  read La/s2/a$b;->handleMessage(Landroid/os/Message;)V @352
+Settings.Global | bluetooth_is_connect
+  write La/k3/d;->run()V @494
+  read La/v9/d;->f(Landroid/content/Context;J)V @24
+Settings.Global | close_windows_after_ventilation_mode
+  read La/g3/g;->P()V @2674
+  write La/g3/p0;->b(I)V @144
+  read La/r2/e;->c()Z @28
+Settings.Global | current.connection.status
+  write Lcom/logstas/service/CheckPingService$e$a;->run()V @400
+Settings.Global | current.pause.value
+  write La/e2/b;->a(Z)V @30
+Settings.Global | custom.music.player.package
+  write La/g3/m1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @102
+Settings.Global | dashboard_language
+  write La/g3/h1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/g3/t1;->P()V @3054
+Settings.Global | dashboard_music_active_key
+  write La/g3/h0;->b(I)V @46
+  read La/g3/t1;->P()V @4862
+  read La/z9/d;->b(Landroid/content/Context;La/u9/a;)V @146
+  read La/z9/d;->c(Landroid/content/Context;)V @146
+Settings.Global | dashboard_navigation_active_key
+  write La/g3/s0;->b(I)V @46
+  read La/ea/a;->k(Landroid/content/Context;Z)V @92
+  read La/g3/t1;->P()V @4606
+Settings.Global | dashboard_navigation_hud_active_key
+  write La/g3/t0;->b(I)V @46
+  read La/ea/a;->j(Landroid/content/Context;La/ca/a;)V @14
+  read La/g3/t1;->P()V @4670
+Settings.Global | dashboard_navigation_show_street_key
+  write La/g3/u0;->b(I)V @46
+  read La/g3/t1;->P()V @4734
+Settings.Global | dashboard_navigation_street_translit_key
+  write La/g3/f0;->b(I)V @46
+  read La/g3/t1;->P()V @4798
+Settings.Global | development_settings_enabled
+  write La/bc/m;->e(Landroid/content/Context;)V @214
+Settings.Global | disable_drive_mode_sound
+  read La/g3/g;->P()V @2758
+  write La/g3/q0;->b(I)V @144
+Settings.Global | disable_start_stop_system_value
+  read La/g3/g;->P()V @2590
+  write La/g3/o0;->b(I)V @144
+  read La/r2/j$a;->onFunctionValueChanged(III)V @42
+  read La/r2/j;->e()Z @28
+Settings.Global | drive_mode_select_key
+  read La/g3/g;->P()V @1400
+  write La/g3/j;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/r2/h;->a()V @38
+Settings.Global | drive_mode_select_last_active_key
+  write La/r2/g;->run()V @144
+  read La/r2/h;->a()V @104
+Settings.Global | enable_gPilot_hwa_key
+  read La/g3/g;->P()V @1700
+  write La/g3/l;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/r2/k;->a()V @42
+  read La/r2/k;->c()Z @38
+Settings.Global | enable_intelligent_fuel_control_function_key
+  read La/g3/g;->P()V @1850
+  write La/g3/m;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/r2/l;->a()V @38
+  read La/r2/l;->c()Z @38
+Settings.Global | enable_split_from_ui
+  read La/q2/g$a;->handleMessage(Landroid/os/Message;)V @32
+  write La/q2/g$a;->handleMessage(Landroid/os/Message;)V @58
+Settings.Global | engine_working_check_last_time
+  write La/r2/b$a;->handleMessage(Landroid/os/Message;)V @76
+  read La/r2/d$a;->handleMessage(Landroid/os/Message;)V @364
+  read La/s2/a$b;->handleMessage(Landroid/os/Message;)V @530
+  read La/s2/b$a;->handleMessage(Landroid/os/Message;)V @470
+  read La/s2/c$b;->handleMessage(Landroid/os/Message;)V @568
+  read La/s2/d$a;->handleMessage(Landroid/os/Message;)V @504
+  read La/s2/e$a;->handleMessage(Landroid/os/Message;)V @616
+  read La/t2/a$a;->handleMessage(Landroid/os/Message;)V @652
+  read La/t2/b$a;->handleMessage(Landroid/os/Message;)V @656
+Settings.Global | fix_last_temperature_driver
+  write La/r2/n$a;->onCustomizeFunctionValueChanged(IIF)V @46
+  read La/r2/n;->a()V @60
+Settings.Global | fix_last_temperature_passenger
+  write La/r2/n$a;->onCustomizeFunctionValueChanged(IIF)V @84
+  read La/r2/n$b;->handleMessage(Landroid/os/Message;)V @86
+  read La/r2/n;->a()V @30
+Settings.Global | front_washing_auto_heat_in_repeat_mode_key
+  write La/g3/b;->b(I)V @68
+  read La/g3/g;->P()V @2132
+Settings.Global | front_win_auto_heat_in_repeat_mode_key
+  write La/g3/d;->b(I)V @110
+  read La/g3/g;->P()V @2282
+  read La/s2/c$b;->handleMessage(Landroid/os/Message;)V @432
+Settings.Global | gmc.theme.mode
+  write La/f3/d;->onClick(Landroid/view/View;)V @150
+  write La/f3/e;->onClick(Landroid/view/View;)V @150
+  write La/f3/f;->onClick(Landroid/view/View;)V @156
+  read La/f3/k;->a(La/g/d;)V @24
+  read Lcom/logstas/myregion/HomeActivity;->onCreate(Landroid/os/Bundle;)V @192
+Settings.Global | handle_alice_action
+  read La/q2/c$b;->handleMessage(Landroid/os/Message;)V @82
+  write La/q2/c$b;->handleMessage(Landroid/os/Message;)V @102
+Settings.Global | handle_next_action
+  read La/q2/c$d;->handleMessage(Landroid/os/Message;)V @62
+  write La/q2/c$d;->handleMessage(Landroid/os/Message;)V @228
+Settings.Global | handle_play_pause
+  read La/e2/b$a;->handleMessage(Landroid/os/Message;)V @90
+  write La/e2/b$a;->handleMessage(Landroid/os/Message;)V @114
+Settings.Global | handle_prev_action
+  read La/q2/c$d;->handleMessage(Landroid/os/Message;)V @100
+  write La/q2/c$d;->handleMessage(Landroid/os/Message;)V @414
+Settings.Global | handle_voice_action
+  write La/k3/d;->run()V @540
+  read La/q2/c$a;->handleMessage(Landroid/os/Message;)V @82
+  write La/q2/c$a;->handleMessage(Landroid/os/Message;)V @124
+Settings.Global | handle_we_chat_action
+  read La/q2/c$c;->handleMessage(Landroid/os/Message;)V @82
+  write La/q2/c$c;->handleMessage(Landroid/os/Message;)V @102
+Settings.Global | handle_we_chat_action_app
+  write La/g3/d1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @118
+  read La/g3/t1;->P()V @2108
+  read La/q2/c$b;->handleMessage(Landroid/os/Message;)V @268
+Settings.Global | hide_usb_dialog
+  write La/g3/g0;->b(I)V @34
+  read La/g3/t1;->P()V @3574
+Settings.Global | hud_ar_variant
+  write La/g3/i1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/g3/t1;->P()V @3178
+  read La/j1/n;->run()V @744
+Settings.Global | hud_non_ar_variant
+  write La/g3/j1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/g3/t1;->P()V @3302
+  read La/j1/n;->run()V @794
+Settings.Global | is_notify_by_fuel_step_key
+  read La/g3/g;->P()V @984
+  write La/g3/p;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/r2/c$a;->onSensorValueChanged(IF)V @344
+Settings.Global | is_notify_by_low_fuel_step_key
+  read La/g3/g;->P()V @1120
+  write La/g3/q;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/r2/c$a;->onSensorValueChanged(IF)V @232
+Settings.Global | is_notify_by_low_mileage_step_key
+  read La/g3/g;->P()V @824
+  write La/g3/o;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/q2/d$a;->onSensorValueChanged(IF)V @214
+Settings.Global | is_notify_by_mileage_step_key
+  read La/g3/g;->P()V @670
+  write La/g3/n;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/q2/d$a;->onSensorValueChanged(IF)V @314
+Settings.Global | last_mileage_state_key
+  write La/q2/d$a;->onSensorValueChanged(IF)V @100
+  write La/q2/d;->a()V @114
+Settings.Global | left_seat_blow
+  read La/g3/g$b;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @130
+  write La/g3/g$b;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @198
+  read La/h2/g;->b(Landroid/content/Context;)I @32
+Settings.Global | left_seat_blow_close_time
+  read La/t2/a$a;->handleMessage(Landroid/os/Message;)V @302
+  read La/t2/a$b;->handleMessage(Landroid/os/Message;)V @260
+Settings.Global | left_seat_heat
+  read La/g3/g$a;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @130
+  write La/g3/g$a;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @198
+  read La/s2/b$a;->handleMessage(Landroid/os/Message;)V @220
+  read La/s2/b$b;->handleMessage(Landroid/os/Message;)V @184
+Settings.Global | left_seat_heat_close_time
+  read La/s2/b$a;->handleMessage(Landroid/os/Message;)V @244
+  read La/s2/b$b;->handleMessage(Landroid/os/Message;)V @140
+Settings.Global | lock_screen_lock
+  write La/f3/f;->onClick(Landroid/view/View;)V @252
+  read La/k3/d;->run()V @912
+  read Lcom/logstas/service/LockScreenService$b;->handleMessage(Landroid/os/Message;)V @186
+  read Lcom/logstas/service/LockScreenService;->b()V @78
+Settings.Global | lock_screen_password
+  write La/f3/f;->onClick(Landroid/view/View;)V @238
+Settings.Global | media_is_playing
+  write La/k3/d;->run()V @446
+  read La/q2/c$d;->handleMessage(Landroid/os/Message;)V @188
+  read La/z9/d;->b(Landroid/content/Context;La/u9/a;)V @104
+  read La/z9/d;->c(Landroid/content/Context;)V @104
+  read Lcom/logstas/service/NaviService;->a(Ljava/lang/String;)V @164
+Settings.Global | music.subtitle
+  write La/g/f;->run()V @488
+  write La/j4/c;->run()V @142
+  write La/k3/d;->run()V @352
+Settings.Global | music.title
+  write La/g/f;->run()V @460
+  write La/j4/c;->run()V @110
+  write La/k3/d;->run()V @324
+Settings.Global | music.widget.custom.enable
+  write La/g/f;->run()V @590
+Settings.Global | music_widget_support_apps_key
+  read Lcom/logstas/service/NaviService;->b(Ljava/lang/String;Landroid/app/Notification;)V @22
+  read Lcom/logstas/service/NaviService;->onCreate()V @408
+  write Lcom/logstas/service/NaviService;->onCreate()V @890
+Settings.Global | navi_activity
+  write La/g3/p1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @102
+  read La/k3/d;->run()V @214
+  read Lcom/logstas/service/NaviService;->onCreate()V @288
+  write La/k3/d;->run()V @276
+  write Lcom/logstas/service/NaviService;->onCreate()V @350
+Settings.Global | navi_package
+  read La/b2/f0;->c()V @178
+  read La/b2/f0;->d()V @110
+  read La/b4/a;->m()Z @26
+  read La/b4/a;->o(Ljava/lang/String;)La/p4/a; @26
+  read La/b4/b;->d(La/q4/a;)Z @26
+  read La/b4/b;->h(La/q4/a;)La/l4/d; @26
+  read La/b4/c;->i(La/k4/c;La/q4/a;)La/p4/a; @26
+  read La/b4/d;->i(La/k4/c;La/q4/a;)La/p4/a; @26
+  write La/g3/p1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/g3/t1;->P()V @814
+  read La/k3/d;->run()V @184
+  read Lcom/logstas/service/NaviService;->onCreate()V @258
+  read La/j3/e;->onReceive(Landroid/content/Context;Landroid/content/Intent;)V @98
+  read La/j3/e;->onReceive(Landroid/content/Context;Landroid/content/Intent;)V @286
+  write La/k3/d;->run()V @246
+  write Lcom/logstas/service/NaviService;->onCreate()V @320
+Settings.Global | notify_about_heat_engine_exclude_key
+  read La/r2/d$a;->handleMessage(Landroid/os/Message;)V @406
+Settings.Global | notify_about_heat_engine_key
+  read La/g3/g;->P()V @1250
+  write La/g3/r;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/r2/d$a;->handleMessage(Landroid/os/Message;)V @34
+  read La/r2/d$a;->handleMessage(Landroid/os/Message;)V @182
+  read La/r2/d$a;->handleMessage(Landroid/os/Message;)V @210
+Settings.Global | on_start_engine_last_time
+  write La/r2/b;->a()V @78
+  read La/r2/d$a;->handleMessage(Landroid/os/Message;)V @266
+Settings.Global | on_stop_engine_last_time
+  write La/r2/b;->b()V @34
+Settings.Global | on_stop_engine_last_time_option
+  read La/g3/g;->P()V @106
+  write La/g3/s;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @72
+  read La/s2/a$b;->handleMessage(Landroid/os/Message;)V @710
+  read La/s2/b$a;->handleMessage(Landroid/os/Message;)V @650
+  read La/s2/c$b;->handleMessage(Landroid/os/Message;)V @748
+  read La/s2/d$a;->handleMessage(Landroid/os/Message;)V @684
+  read La/s2/e$a;->handleMessage(Landroid/os/Message;)V @796
+Settings.Global | on_stop_engine_last_time_option_ventilation
+  write La/g3/f;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @72
+  read La/g3/g;->P()V @254
+  read La/t2/a$a;->handleMessage(Landroid/os/Message;)V @832
+  read La/t2/b$a;->handleMessage(Landroid/os/Message;)V @836
+Settings.Global | open_shadow_on_start
+  read La/r2/m;->c()Z @28
+Settings.Global | open_sunroof_winter_disable_value
+  read La/d4/a;->i(La/k4/c;La/q4/a;)La/p4/a; @28
+  read La/g3/g;->P()V @2506
+  write La/g3/n0;->b(I)V @144
+  read La/z3/e$b;->handleMessage(Landroid/os/Message;)V @324
+  read La/z3/g;->n()La/p4/a; @88
+  read La/z3/i;->n()La/p4/a; @28
+Settings.Global | radio.band
+  read Lcom/logstas/service/CheckPingService$a;->handleMessage(Landroid/os/Message;)V @148
+  write Lcom/logstas/service/CheckPingService$a;->handleMessage(Landroid/os/Message;)V @660
+Settings.Global | radio.freq
+  read Lcom/logstas/service/CheckPingService$a;->handleMessage(Landroid/os/Message;)V @114
+  write Lcom/logstas/service/CheckPingService$a;->handleMessage(Landroid/os/Message;)V @628
+Settings.Global | radio.name
+  read Lcom/logstas/service/CheckPingService$a;->handleMessage(Landroid/os/Message;)V @78
+Settings.Global | radio_is_playing
+  write La/k3/d;->run()V @400
+  read La/q2/c$d;->handleMessage(Landroid/os/Message;)V @138
+  read La/z9/d;->b(Landroid/content/Context;La/u9/a;)V @42
+  read La/z9/d;->c(Landroid/content/Context;)V @42
+  read Lcom/logstas/service/NaviService;->a(Ljava/lang/String;)V @94
+Settings.Global | radio_name
+  write Lcom/logstas/service/CheckPingService$a;->handleMessage(Landroid/os/Message;)V @596
+Settings.Global | right_seat_blow
+  read La/g3/g$b;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @292
+  write La/g3/g$b;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @360
+  read La/h2/g;->c(Landroid/content/Context;)I @32
+Settings.Global | right_seat_blow_close_time
+  read La/t2/b$a;->handleMessage(Landroid/os/Message;)V @306
+  read La/t2/b$b;->handleMessage(Landroid/os/Message;)V @256
+Settings.Global | right_seat_heat
+  read La/g3/g$a;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @292
+  write La/g3/g$a;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @360
+  read La/s2/d$a;->handleMessage(Landroid/os/Message;)V @222
+  read La/s2/d$b;->handleMessage(Landroid/os/Message;)V @180
+Settings.Global | right_seat_heat_close_time
+  read La/s2/d$a;->handleMessage(Landroid/os/Message;)V @246
+  read La/s2/d$b;->handleMessage(Landroid/os/Message;)V @136
+Settings.Global | save_last_temperature_state_key
+  read La/r2/n;->a()V @92
+Settings.Global | saved_timezone_shell_key
+  write La/g3/q1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @60
+  read La/g3/t1;->P()V @1026
+Settings.Global | second_screen_apps_trigger
+  write La/l2/b;->e(Ljava/util/Collection;)V @68
+Settings.Global | sended.data.to.dashboard
+  write La/c0/a;->run()V @50
+  write La/g/g;->run()V @62
+  write La/n/c1;->run()V @50
+  write La/z9/a;->run()V @36
+Settings.Global | show_battery_status_key
+  write La/g3/n0;->b(I)V @62
+  read La/g3/t1;->P()V @3966
+Settings.Global | show_connection_status_key
+  write La/g3/m0;->b(I)V @62
+  read La/g3/t1;->P()V @3902
+Settings.Global | show_coolant_temperature_key
+  write La/g3/o0;->b(I)V @62
+  read La/g3/t1;->P()V @4030
+Settings.Global | show_fuel_level_key
+  write La/g3/p0;->b(I)V @62
+  read La/g3/t1;->P()V @4094
+Settings.Global | show_music_info_key
+  write La/g3/q0;->b(I)V @62
+  read La/g3/t1;->P()V @4158
+Settings.Global | show_music_on_hud_display
+  read La/z9/d;->b(Landroid/content/Context;La/u9/a;)V @380
+  read La/z9/d;->c(Landroid/content/Context;)V @260
+Settings.Global | speed_compensation_store_key
+  read La/g3/g;->P()V @1550
+  write La/g3/k;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/r2/a$a;->handleMessage(Landroid/os/Message;)V @60
+Settings.Global | split_screen_enable
+  write La/g3/a;->b(I)V @92
+  read La/g3/t1;->P()V @4934
+  read La/q2/g;->a()V @28
+Settings.Global | split_screen_first_app
+  write La/g3/s1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @120
+  read La/g3/t1;->P()V @1302
+  read La/j1/l;->run()V @132
+  read La/r2/i;->run()V @198
+Settings.Global | split_screen_second_app
+  read La/g3/t1;->P()V @1566
+  write La/g3/x0;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @120
+  read La/j1/l;->run()V @162
+  read La/r2/i;->run()V @228
+Settings.Global | split_screen_timeout
+  read La/g3/t1;->P()V @1838
+  write La/g3/y0;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/q2/g;->a()V @90
+Settings.Global | status_bar_date_time_format
+  write La/g3/r1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/g3/t1;->P()V @1164
+Settings.Global | status_bar_date_time_format_12
+  write La/g3/r1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @102
+Settings.Global | status_bar_date_time_format_24
+  write La/g3/r1;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @142
+Settings.Global | system.location.lat.last
+  read Lcom/logstas/service/AutoRadioGeoService$d;->handleMessage(Landroid/os/Message;)V @102
+  write Lcom/logstas/service/AutoRadioGeoService;->onLocationChanged(Landroid/location/Location;)V @186
+Settings.Global | system.location.lon.last
+  read Lcom/logstas/service/AutoRadioGeoService$d;->handleMessage(Landroid/os/Message;)V @140
+  write Lcom/logstas/service/AutoRadioGeoService;->onLocationChanged(Landroid/location/Location;)V @244
+Settings.Global | system.weather.last.icon
+  write Lcom/logstas/service/AutoRadioGeoService$d;->handleMessage(Landroid/os/Message;)V @276
+  write Lcom/logstas/service/AutoRadioGeoService$e;->a(Ljava/lang/Object;)V @364
+Settings.Global | system.weather.last.temperature
+  write Lcom/logstas/service/AutoRadioGeoService$d;->handleMessage(Landroid/os/Message;)V @248
+  write Lcom/logstas/service/AutoRadioGeoService$e;->a(Ljava/lang/Object;)V @426
+Settings.Global | system.weather.last.update
+  read Lcom/logstas/service/AutoRadioGeoService$d;->handleMessage(Landroid/os/Message;)V @56
+  write Lcom/logstas/service/AutoRadioGeoService$e;->a(Ljava/lang/Object;)V @454
+Settings.Global | voice.assistant.assistant_custom_activation_phrase
+  read La/g3/a2;->onClick(Landroid/view/View;)V @268
+  read La/g3/c2;->T()V @26
+  read La/j4/a;->c(Ljava/lang/String;)V @164
+  write La/m4/w;->onClick(Landroid/view/View;)V @128
+  write La/m4/x;->onClick(Landroid/view/View;)V @80
+Settings.Global | voice.assistant.is.allowed.phrase.activation
+  read La/g3/c2;->P()V @128
+  read La/g3/e;->b(I)V @94
+  read La/j4/g;->h()V @36
+  write La/g3/e;->b(I)V @118
+Settings.Global | voice.assistant.say.result
+  read La/g3/c2;->P()V @40
+  write La/g3/d;->b(I)V @152
+  read La/k4/b;->h(La/l4/d;)V @58
+  read La/k4/b;->m(Z)V @46
+Settings.Global | voice.assistant.volume.correction
+  write La/g3/b2;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @66
+  read La/g3/c2;->P()V @304
+  read La/o4/g;->a(Z)V @204
+Settings.Global | voice.assistant.volume.media.remember
+  write La/k3/d;->run()V @760
+  read La/o4/g;->a(Z)V @70
+  write La/o4/g;->a(Z)V @106
+  write La/o4/g;->a(Z)V @156
+Settings.Global | we_chat_action_type_key
+  read La/g3/t1;->P()V @1984
+  write La/g3/z0;->onItemSelected(Landroid/widget/AdapterView;Landroid/view/View;IJ)V @62
+  read La/q2/c$b;->handleMessage(Landroid/os/Message;)V @206
+Settings.Global | wpc_charging_status_charging_notification_key
+  read La/g3/t1;->P()V @4222
+  read La/q2/l$b;->onFunctionValueChanged(III)V @312
+  write La/g3/m0;->b(I)V @102
+Settings.Global | wpc_charging_status_error_notification_key
+  read La/g3/t1;->P()V @4286
+  read La/q2/l$b;->onFunctionValueChanged(III)V @226
+  write La/g3/n0;->b(I)V @102
+Settings.Global | wpc_charging_status_fod_notification_key
+  read La/g3/t1;->P()V @4350
+  read La/q2/l$b;->onFunctionValueChanged(III)V @160
+  write La/g3/o0;->b(I)V @102
+Settings.Global | wpc_charging_status_fully_charged_notification_key
+  read La/g3/t1;->P()V @4414
+  read La/q2/l$b;->onFunctionValueChanged(III)V @378
+  write La/g3/p0;->b(I)V @102
+Settings.Global | wpc_charging_status_take_mobile_always_key
+  read La/g3/t1;->P()V @4542
+  read La/q2/l$a;->onSensorEventChanged(II)V @98
+  write La/g3/r0;->b(I)V @38
+Settings.Global | wpc_charging_status_take_mobile_key
+  read La/g3/t1;->P()V @4478
+  read La/q2/l$a;->onSensorEventChanged(II)V @60
+  write La/g3/q0;->b(I)V @102
+Settings.Secure | animator_duration_scale
+  write La/bc/m;->e(Landroid/content/Context;)V @302
+Settings.Secure | enabled_accessibility_services
+  read La/bc/m;->e(Landroid/content/Context;)V @186
+  write La/bc/m;->e(Landroid/content/Context;)V @186
+Settings.Secure | enabled_notification_listeners
+  read La/bc/m;->e(Landroid/content/Context;)V @46
+  write La/bc/m;->e(Landroid/content/Context;)V @46
+Settings.Secure | transition_animation_scale
+  write La/bc/m;->e(Landroid/content/Context;)V @274
+Settings.Secure | window_animation_scale
+  write La/bc/m;->e(Landroid/content/Context;)V @246
+SharedPreferences (file unresolved) | CITY
+  read La/m4/f;->run()V @96
+SharedPreferences (file unresolved) | PROVINCE
+  read La/m4/g;->a(Landroid/content/Context;Landroid/widget/Spinner;Landroid/widget/Spinner;)V @126
+SharedPreferences (file unresolved) | admob_app_id
+  read La/y6/y3;->run()V @2282
+  write La/y6/y3;->run()V @2528
+SharedPreferences (file unresolved) | consent_settings
+  read La/y6/e3;->n()La/y6/h; @32
+  write La/y6/r5;->C(La/y6/r5;La/y6/h;IJZZ)V @168
+SharedPreferences (file unresolved) | consent_source
+  read La/y6/e3;->s(I)Z @26
+  write La/y6/r5;->C(La/y6/r5;La/y6/h;IJZZ)V @188
+  read La/y6/y3;->run()V @1302
+SharedPreferences (file unresolved) | crashlytics.installation.id
+  write La/s8/f0;->a(Ljava/lang/String;Landroid/content/SharedPreferences;)Ljava/lang/String; @200
+  read La/s8/f0;->c()Ljava/lang/String; @440
+SharedPreferences (file unresolved) | deeplink
+  write La/y6/t5;->run()V @474
+SharedPreferences (file unresolved) | deferred_analytics_collection
+  write La/y6/e3;->q(Z)V @86
+  read La/y6/w6;->q(Z)La/y6/i8; @1356
+  read La/y6/y3;->run()V @2850
+SharedPreferences (file unresolved) | existing_instance_identifier
+  read La/o8/c;->b(La/m8/v;)Ljava/lang/Object; @1072
+  write La/z8/f;->a(Ljava/lang/Object;)La/z6/h; @560
+SharedPreferences (file unresolved) | fire-count
+  read La/h9/j;->a()V @24
+  write La/h9/j;->a()V @262
+  write La/h9/j;->b()V @118
+  read La/h9/j;->d(JLjava/lang/String;)V @124
+  read La/h9/j;->d(JLjava/lang/String;)V @176
+  write La/h9/j;->d(JLjava/lang/String;)V @258
+SharedPreferences (file unresolved) | fire-global
+  write La/h9/j;->c()Ljava/util/ArrayList; @170
+SharedPreferences (file unresolved) | firebase.installation.id
+  write La/s8/f0;->a(Ljava/lang/String;Landroid/content/SharedPreferences;)Ljava/lang/String; @222
+  read La/s8/f0;->c()Ljava/lang/String; @162
+SharedPreferences (file unresolved) | firebase_crashlytics_collection_enabled
+  read La/s8/a0;-><init>(La/h8/e;)V @104
+  read La/s8/a0;-><init>(La/h8/e;)V @124
+SharedPreferences (file unresolved) | firebase_data_collection_default_enabled
+  read La/n9/a;-><init>(Landroid/content/Context;Ljava/lang/String;La/g9/c;)V @84
+  read La/n9/a;-><init>(Landroid/content/Context;Ljava/lang/String;La/g9/c;)V @98
+SharedPreferences (file unresolved) | gmp_app_id
+  read La/y6/y3;->run()V @2224
+  write La/y6/y3;->run()V @2476
+SharedPreferences (file unresolved) | has_been_opened
+  read La/y6/e3;->m()V @54
+  write La/y6/e3;->m()V @84
+SharedPreferences (file unresolved) | last-used-date
+  read La/h9/j;->d(JLjava/lang/String;)V @78
+  write La/h9/j;->d(JLjava/lang/String;)V @280
+SharedPreferences (file unresolved) | measurement_enabled
+  read La/y6/e3;->o()Ljava/lang/Boolean; @28
+  read La/y6/e3;->o()Ljava/lang/Boolean; @50
+  write La/y6/e3;->p(Ljava/lang/Boolean;)V @48
+  write La/y6/e3;->p(Ljava/lang/Boolean;)V @58
+SharedPreferences (file unresolved) | measurement_enabled_from_api
+  read La/y6/r5;->v(La/y6/h;)V @184
+  read La/y6/r5;->v(La/y6/h;)V @204
+  write La/y6/r5;->y(Ljava/lang/Boolean;Z)V @132
+  write La/y6/r5;->y(Ljava/lang/Boolean;Z)V @142
+SharedPreferences (file unresolved) | previous_os_version
+  read La/y6/r5;->D()V @290
+  write La/y6/r5;->D()V @364
+SharedPreferences (file unresolved) | timestamp
+  write La/y6/t5;->run()V @488
+SharedPreferences (file unresolved) | use_service
+  read La/y6/w6;->p()Z @78
+  read La/y6/w6;->p()Z @106
+  write La/y6/w6;->p()Z @820
+SharedPreferences (file unresolved) | |S|id
+  read La/j9/d;->c(La/l9/a;)Ljava/lang/String; @172
+SharedPreferences (file unresolved) | |S||P|
+  read La/l9/b;->a()Ljava/lang/String; @26
+
+XCSettings2
+Settings.Global | allow_to_connect_wifi
+  write Lecarx/settings/Kx11App;->registerBroadCast()V @44
+  read Lecarx/settings/ui/EditFrag;->lambda$updateView$4$EditFrag(Landroid/view/View;)V @20
+Settings.Global | animator_duration_scale
+  read Lcom/airbnb/lottie/utils/Utils;->getAnimationScale(Landroid/content/Context;)F @28
+Settings.Global | auto_time
+  read Lecarx/settings/proxy/utils/TimeUtils;->isDateTimeAuto()Z @20
+  write Lecarx/settings/proxy/utils/TimeUtils;->setAutoDateTime(Z)V @68
+Settings.Global | auto_time_zone
+  read Lecarx/settings/proxy/utils/TimeUtils;->isTimeZoneAuto()Z @20
+  write Lecarx/settings/proxy/utils/TimeUtils;->setAutoTimeZone(Z)V @68
+Settings.Global | development_settings_enabled
+  read Lcom/blankj/utilcode/util/DeviceUtils;->isDevelopmentSettingsEnabled()Z @22
+Settings.Global | disable_drive_mode_sound
+  read Lecarx/settings/widget/AndroidMediaPlayer$6;->onPrepared(Landroid/media/MediaPlayer;)V @30
+Settings.Global | ecarx.xclog.debug
+  read Lcom/ecarx/log/Lg;->isDebugMode(Landroid/content/Context;)Z @148
+Settings.Global | force_fsg_nav_bar
+  read Lcom/setting/popupdialog/util/navbar/NavigationBarObserver;->onChange(Z)V @88
+  uri Lcom/setting/popupdialog/util/navbar/NavigationBarObserver;->register(Landroid/content/Context;)V @74
+Settings.Global | mobile_data
+  read Lecarx/settings/proxy/custom/G4Proxy$1;->onChange(Z)V @28
+  uri Lecarx/settings/proxy/custom/G4Proxy;->init()V @88
+  read Lecarx/settings/utils/NetWorkHelper;->getGlobalMobileData()I @18
+  write Lecarx/settings/utils/NetWorkHelper;->putGlobalMobileData(I)Z @16
+  write Lecarx/settings/proxy/custom/G4Proxy;->setEnabled(Z)V @96
+Settings.Global | navigationbar_hide_bar_enabled
+  read Lcom/blankj/utilcode/util/BarUtils;->isNavBarVisible(Landroid/view/Window;)Z @164
+Settings.Global | navigationbar_is_min
+  read Lcom/setting/popupdialog/util/navbar/NavigationBarObserver;->onChange(Z)V @152
+  uri Lcom/setting/popupdialog/util/navbar/NavigationBarObserver;->register(Landroid/content/Context;)V @126
+Settings.Secure | adb_enabled
+  read Lcom/blankj/utilcode/util/DeviceUtils;->isAdbEnabled()Z @22
+Settings.Secure | android_id
+  read Lcom/blankj/utilcode/util/DeviceUtils;->getAndroidID()Ljava/lang/String; @20
+  read Lcom/tencent/bugly/crashreport/common/info/b;->c(Landroid/content/Context;)Ljava/lang/String; @22
+Settings.Secure | enabled_notification_listeners
+  read Landroidx/core/app/NotificationManagerCompat;->getEnabledListenerPackages(Landroid/content/Context;)Ljava/util/Set; @12
+  read Landroidx/media/MediaSessionManagerImplBase;->isEnabledNotificationListener(Landroidx/media/MediaSessionManager$RemoteUserInfoImpl;)Z @8
+Settings.Secure | location_mode
+  read Lecarx/settings/proxy/utils/LocationUtils;->isLocationEnabled(Landroid/content/Context;)Z @14
+Settings.Secure | ui_night_mode
+  uri Lecarx/settings/service/WidgetService;->onCreate()V @134
+Settings.System | animator_duration_scale
+  read Lcom/airbnb/lottie/utils/Utils;->getAnimationScale(Landroid/content/Context;)F @46
+Settings.System | auto_time
+  uri Lecarx/settings/proxy/branch/errorproxy/ErrorFunctionConvertProxy;->registerAutoDateTimeListener()V @24
+  uri Lecarx/settings/proxy/custom/CustomVehicle;->registerAutoDateTimeListener()V @24
+Settings.System | font_scale
+  read Lecarx/settings/proxy/custom/CustomVehicle;->getFunctionIndex(II)I @258
+  write Lecarx/settings/proxy/custom/CustomVehicle;->setFunctionIndex(III)V @314
+  write Lecarx/settings/proxy/custom/CustomVehicle;->setFunctionIndex(III)V @340
+  write Lecarx/settings/proxy/custom/CustomVehicle;->setFunctionIndex(III)V @364
+Settings.System | key_notify_hide_body
+  uri Lecarx/settings/proxy/branch/NotifyMessageProxy;-><init>()V @160
+Settings.System | key_notify_sound
+  uri Lecarx/settings/proxy/branch/NotifyMessageProxy;-><init>()V @88
+Settings.System | key_notify_tts_play
+  uri Lecarx/settings/proxy/branch/NotifyMessageProxy;-><init>()V @124
+Settings.System | key_system_notify_merge_group
+  uri Lecarx/settings/proxy/branch/NotifyMessageProxy;-><init>()V @196
+Settings.System | navigationbar_is_min
+  read Lcom/setting/popupdialog/util/navbar/NavigationBarObserver;->onChange(Z)V @174
+  uri Lcom/setting/popupdialog/util/navbar/NavigationBarObserver;->register(Landroid/content/Context;)V @136
+Settings.System | positionLightSts_Day
+  uri Lecarx/settings/proxy/branch/LightingProxy;->init()V @206
+Settings.System | positionLightSts_Night
+  uri Lecarx/settings/proxy/branch/LightingProxy;->init()V @172
+Settings.System | ringtone
+  write Lecarx/settings/utils/SoundManager;->setRingtone(Landroid/content/Context;Lecarx/settings/entity/RingtoneInfo;Z)V @122
+Settings.System | ringtone_name_value
+  read Lecarx/settings/utils/SoundManager;->getRingtone(Landroid/content/Context;Ljava/lang/String;)Ljava/lang/String; @12
+  write Lecarx/settings/utils/SoundManager;->setRingtone(Landroid/content/Context;Lecarx/settings/entity/RingtoneInfo;Z)V @96
+Settings.System | screen_brightness
+  read Lcom/blankj/utilcode/util/BrightnessUtils;->getBrightness()I @20
+  write Lcom/blankj/utilcode/util/BrightnessUtils;->setBrightness(I)Z @20
+  uri Lcom/blankj/utilcode/util/BrightnessUtils;->setBrightness(I)Z @28
+Settings.System | screen_brightness_mode
+  read Lcom/blankj/utilcode/util/BrightnessUtils;->isAutoBrightnessEnabled()Z @22
+  write Lcom/blankj/utilcode/util/BrightnessUtils;->setAutoBrightnessEnabled(Z)Z @20
+Settings.System | screen_off_timeout
+  read Lcom/blankj/utilcode/util/ScreenUtils;->getSleepDuration()I @20
+  write Lcom/blankj/utilcode/util/ScreenUtils;->setSleepDuration(I)V @20
+  read Lecarx/settings/proxy/custom/CustomVehicle;->getScreenOffTime()I @16
+  write Lecarx/settings/proxy/custom/CustomVehicle;->setFunctionIndex(III)V @182
+Settings.System | sound_effects_enabled
+  read Lecarx/settings/utils/SoundManager;->isTouchMusicEnable()Z @20
+  write Lecarx/settings/utils/SoundManager;->setTouchMusicEnable(Z)V @62
+  write Lecarx/settings/utils/SoundManager;->setTouchMusicEnable(Z)V @72
+SharedPreferences (file unresolved) | ambience_type
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->getCarAmbientMode()Lcom/ecarx/kanziproto/vehiclesetting/LightSettings$AmbientLightSetting$AmbientModes; @460
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->getCarAmbientMode()Lcom/ecarx/kanziproto/vehiclesetting/LightSettings$AmbientLightSetting$AmbientModes; @602
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onCheckedChanged(Lcom/ecarx/widget/XCSwitchButton;Z)V @174
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onCheckedChanged(Lcom/ecarx/widget/XCSwitchButton;Z)V @208
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onClick(Landroid/view/View;)V @70
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onClick(Landroid/view/View;)V @170
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->getCarAmbientMode()Lcom/ecarx/kanziproto/vehiclesetting/LightSettings$AmbientLightSetting$AmbientModes; @460
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->getCarAmbientMode()Lcom/ecarx/kanziproto/vehiclesetting/LightSettings$AmbientLightSetting$AmbientModes; @602
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onCheckedChanged(Lcom/ecarx/widget/XCSwitchButton;Z)V @174
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onCheckedChanged(Lcom/ecarx/widget/XCSwitchButton;Z)V @208
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onClick(Landroid/view/View;)V @70
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onClick(Landroid/view/View;)V @170
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->getCarAmbientMode()Lcom/ecarx/kanziproto/vehiclesetting/LightSettings$AmbientLightSetting$AmbientModes; @460
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->getCarAmbientMode()Lcom/ecarx/kanziproto/vehiclesetting/LightSettings$AmbientLightSetting$AmbientModes; @602
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onCheckedChanged(Lcom/ecarx/widget/XCSwitchButton;Z)V @174
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onCheckedChanged(Lcom/ecarx/widget/XCSwitchButton;Z)V @208
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onClick(Landroid/view/View;)V @70
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onClick(Landroid/view/View;)V @170
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->getCarAmbientMode()Lcom/ecarx/kanziproto/vehiclesetting/LightSettings$AmbientLightSetting$AmbientModes; @460
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->getCarAmbientMode()Lcom/ecarx/kanziproto/vehiclesetting/LightSettings$AmbientLightSetting$AmbientModes; @602
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onCheckedChanged(Lcom/ecarx/widget/XCSwitchButton;Z)V @174
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onCheckedChanged(Lcom/ecarx/widget/XCSwitchButton;Z)V @208
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onClick(Landroid/view/View;)V @70
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onClick(Landroid/view/View;)V @170
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->getCarAmbientMode()Lcom/ecarx/kanziproto/vehiclesetting/LightSettings$AmbientLightSetting$AmbientModes; @460
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->getCarAmbientMode()Lcom/ecarx/kanziproto/vehiclesetting/LightSettings$AmbientLightSetting$AmbientModes; @602
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onCheckedChanged(Lcom/ecarx/widget/XCSwitchButton;Z)V @174
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onCheckedChanged(Lcom/ecarx/widget/XCSwitchButton;Z)V @208
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onClick(Landroid/view/View;)V @70
+  write Lecarx/settings/ui/light/KXAmbienceFrag;->onClick(Landroid/view/View;)V @170
+SharedPreferences (file unresolved) | appassword
+  write Lecarx/settings/proxy/custom/WifiProxy;->createWifiAPConfiguration(Ljava/lang/String;ILjava/lang/String;)Landroid/net/wifi/WifiConfiguration; @58
+  write Lecarx/settings/proxy/custom/WifiProxy;->createWifiAPConfiguration(Ljava/lang/String;ILjava/lang/String;)Landroid/net/wifi/WifiConfiguration; @58
+  write Lecarx/settings/proxy/custom/WifiProxy;->createWifiAPConfiguration(Ljava/lang/String;ILjava/lang/String;)Landroid/net/wifi/WifiConfiguration; @58
+  write Lecarx/settings/proxy/custom/WifiProxy;->createWifiAPConfiguration(Ljava/lang/String;ILjava/lang/String;)Landroid/net/wifi/WifiConfiguration; @58
+  write Lecarx/settings/proxy/custom/WifiProxy;->createWifiAPConfiguration(Ljava/lang/String;ILjava/lang/String;)Landroid/net/wifi/WifiConfiguration; @58
+SharedPreferences (file unresolved) | config_loading_key
+  write Lecarx/settings/proxy/custom/NoticeProxy;->lambda$null$0$NoticeProxy()V @22
+  write Lecarx/settings/proxy/custom/NoticeProxy;->loadGKUIConfig()V @50
+  write Lecarx/settings/proxy/custom/NoticeProxy;->lambda$null$0$NoticeProxy()V @22
+  write Lecarx/settings/proxy/custom/NoticeProxy;->loadGKUIConfig()V @50
+  write Lecarx/settings/proxy/custom/NoticeProxy;->lambda$null$0$NoticeProxy()V @22
+  write Lecarx/settings/proxy/custom/NoticeProxy;->loadGKUIConfig()V @50
+  write Lecarx/settings/proxy/custom/NoticeProxy;->lambda$null$0$NoticeProxy()V @22
+  write Lecarx/settings/proxy/custom/NoticeProxy;->loadGKUIConfig()V @50
+  write Lecarx/settings/proxy/custom/NoticeProxy;->lambda$null$0$NoticeProxy()V @22
+  write Lecarx/settings/proxy/custom/NoticeProxy;->loadGKUIConfig()V @50
+SharedPreferences (file unresolved) | hide_password
+  write Lecarx/settings/proxy/custom/ApSafeProxy;->setPsdVisible(Z)Z @20
+  write Lecarx/settings/proxy/custom/ApSafeProxy;->setPsdVisible(Z)Z @20
+  write Lecarx/settings/proxy/custom/ApSafeProxy;->setPsdVisible(Z)Z @20
+  write Lecarx/settings/proxy/custom/ApSafeProxy;->setPsdVisible(Z)Z @20
+  write Lecarx/settings/proxy/custom/ApSafeProxy;->setPsdVisible(Z)Z @20
+SharedPreferences (file unresolved) | installApkMd5
+  write Lcom/tencent/bugly/beta/global/d;->run()V @2896
+SharedPreferences (file unresolved) | key_channelpath
+  read Lcom/tencent/bugly/crashreport/common/info/AppInfo;->h(Landroid/content/Context;)Ljava/lang/String; @24
+SharedPreferences (file unresolved) | safe_mode_count_1.9.13
+  read Lcom/tencent/tinker/loader/shareutil/ShareTinkerInternals;->getSafeModeCount(Landroid/content/Context;)I @56
+  write Lcom/tencent/tinker/loader/shareutil/ShareTinkerInternals;->setSafeModeCount(Landroid/content/Context;I)V @64
+SharedPreferences (file unresolved) | shared_key_psd_btaddress
+  write Lecarx/settings/setting/BTQuickActivity$11;->run()V @240
+  write Lecarx/settings/setting/BTQuickActivity$11;->run()V @240
+  write Lecarx/settings/setting/BTQuickActivity$11;->run()V @240
+  write Lecarx/settings/setting/BTQuickActivity$11;->run()V @240
+  write Lecarx/settings/setting/BTQuickActivity$11;->run()V @240
+SharedPreferences (file unresolved) | sound_mode
+  read Lecarx/settings/proxy/branch/CarFunctionProxy;->getFunctionIndex(II)I @1536
+  write Lecarx/settings/proxy/branch/CarFunctionProxy;->setFunctionIndex(III)V @2246
+  read Lecarx/settings/proxy/branch/CarFunctionProxy;->setFunctionSwitched(IIZ)V @1070
+SharedPreferences (file unresolved) | sp_pre_balance_point_key
+  write Lecarx/settings/proxy/branch/BalanceProxy;->setPreBalancePoint(F)V @82
+  write Lecarx/settings/proxy/branch/BalanceProxy;->setPreBalancePoint(F)V @82
+  write Lecarx/settings/proxy/branch/BalanceProxy;->setPreBalancePoint(F)V @82
+  write Lecarx/settings/proxy/branch/BalanceProxy;->setPreBalancePoint(F)V @82
+  write Lecarx/settings/proxy/branch/BalanceProxy;->setPreBalancePoint(F)V @82
+SharedPreferences (file unresolved) | sp_pre_fader_point_key
+  write Lecarx/settings/proxy/branch/BalanceProxy;->setPreFaderPoint(F)V @82
+  write Lecarx/settings/proxy/branch/BalanceProxy;->setPreFaderPoint(F)V @82
+  write Lecarx/settings/proxy/branch/BalanceProxy;->setPreFaderPoint(F)V @82
+  write Lecarx/settings/proxy/branch/BalanceProxy;->setPreFaderPoint(F)V @82
+  write Lecarx/settings/proxy/branch/BalanceProxy;->setPreFaderPoint(F)V @82
+SharedPreferences (file unresolved) | startedFromLauncher
+  read Landroidx/core/app/AppLaunchChecker;->hasStartedFromLauncher(Landroid/content/Context;)Z @18
+  read Landroidx/core/app/AppLaunchChecker;->onActivityCreate(Landroid/app/Activity;)V @18
+  write Landroidx/core/app/AppLaunchChecker;->onActivityCreate(Landroid/app/Activity;)V @112
+SharedPreferences (file unresolved) | sun_roof_index
+  write Lecarx/settings/ui/KXFunctionFragment;->lambda$registerRefreshCallBack$6$KXFunctionFragment(Landroid/os/Message;)V @32
+  write Lecarx/settings/ui/KXFunctionFragment;->lambda$registerRefreshCallBack$6$KXFunctionFragment(Landroid/os/Message;)V @32
+  write Lecarx/settings/ui/KXFunctionFragment;->lambda$registerRefreshCallBack$6$KXFunctionFragment(Landroid/os/Message;)V @32
+  write Lecarx/settings/ui/KXFunctionFragment;->lambda$registerRefreshCallBack$6$KXFunctionFragment(Landroid/os/Message;)V @32
+  write Lecarx/settings/ui/KXFunctionFragment;->lambda$registerRefreshCallBack$6$KXFunctionFragment(Landroid/os/Message;)V @32
+SharedPreferences (file unresolved) | system_volume
+  write Lecarx/settings/proxy/custom/CustomSound;->resetDefaultAudioAdjust()V @102
+  write Lecarx/settings/proxy/custom/CustomSound;->resetFactoryDefaultAudioAdjust()V @44
+  write Lecarx/settings/proxy/custom/CustomSound;->setFunctionIndex(III)V @278
+  write Lecarx/settings/proxy/custom/CustomSound;->setFunctionSwitched(IIZ)V @172
+  write Lecarx/settings/proxy/custom/CustomSound;->resetDefaultAudioAdjust()V @102
+  write Lecarx/settings/proxy/custom/CustomSound;->resetFactoryDefaultAudioAdjust()V @44
+  write Lecarx/settings/proxy/custom/CustomSound;->setFunctionIndex(III)V @278
+  write Lecarx/settings/proxy/custom/CustomSound;->setFunctionSwitched(IIZ)V @172
+  write Lecarx/settings/proxy/custom/CustomSound;->resetDefaultAudioAdjust()V @102
+  write Lecarx/settings/proxy/custom/CustomSound;->resetFactoryDefaultAudioAdjust()V @44
+  write Lecarx/settings/proxy/custom/CustomSound;->setFunctionIndex(III)V @278
+  write Lecarx/settings/proxy/custom/CustomSound;->setFunctionSwitched(IIZ)V @172
+  write Lecarx/settings/proxy/custom/CustomSound;->resetDefaultAudioAdjust()V @102
+  write Lecarx/settings/proxy/custom/CustomSound;->resetFactoryDefaultAudioAdjust()V @44
+  write Lecarx/settings/proxy/custom/CustomSound;->setFunctionIndex(III)V @278
+  write Lecarx/settings/proxy/custom/CustomSound;->setFunctionSwitched(IIZ)V @172
+  write Lecarx/settings/proxy/custom/CustomSound;->resetDefaultAudioAdjust()V @102
+  write Lecarx/settings/proxy/custom/CustomSound;->resetFactoryDefaultAudioAdjust()V @44
+  write Lecarx/settings/proxy/custom/CustomSound;->setFunctionIndex(III)V @278
+  write Lecarx/settings/proxy/custom/CustomSound;->setFunctionSwitched(IIZ)V @172
+SystemProperties | persist.bluetooth.showdeviceswithoutnames
+  read Lecarx/settings/proxy/branch/BluetoothProxy;->init()V @130
+SystemProperties | ro.build.system.version
+  read Lecarx/settings/proxy/utils/ConvertHelper;->convertSystem(Lecarx/settings/entity/FunctionScheme;)V @284
+
+CarService
+Settings.Global | adb_enabled
+  read Lcom/android/settingslib/development/AbstractEnableAdbPreferenceController;->isAdbEnabled()Z @18
+  write Lcom/android/settingslib/development/AbstractEnableAdbPreferenceController;->writeAdbSetting(Z)V @18
+Settings.Global | airplane_mode_on
+  uri Lcom/android/car/AirplaneModeService$AirplaneModeHandler;-><init>(Lcom/android/car/AirplaneModeService;Landroid/os/Looper;)V @130
+  write Lcom/android/car/AirplaneModeService$AirplaneModeHandler;->setAirplaneModeOn(Z)V @84
+  read Lcom/android/car/AirplaneModeService$AirplaneModeHandler;->isAirplaneModeOn()Z @26
+  read Lcom/android/settingslib/WirelessUtils;->isAirplaneModeOn(Landroid/content/Context;)Z @14
+Settings.Global | airplane_mode_toggleable_radios
+  read Lcom/android/settingslib/WirelessUtils;->isRadioAllowed(Landroid/content/Context;Ljava/lang/String;)Z @28
+Settings.Global | android.car.MASTER_MUTE
+  write Lcom/android/car/CarAudioService;->callbackMasterMuteChange(I)V @114
+  read Lcom/android/car/CarAudioService;->init()V @84
+Settings.Global | development_settings_enabled
+  read Lcom/android/settingslib/development/DevelopmentSettingsEnabler;->isDevelopmentSettingsEnabled(Landroid/content/Context;)Z @44
+  write Lcom/android/settingslib/development/DevelopmentSettingsEnabler;->setDevelopmentSettingsEnabled(Landroid/content/Context;Z)V @14
+Settings.Global | device_provisioned
+  read Lcom/android/settingslib/HelpUtils;->getHelpIntent(Landroid/content/Context;Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent; @14
+  read Lcom/android/settingslib/HelpUtils;->prepareHelpMenuItem(Landroid/app/Activity;Landroid/view/MenuItem;Ljava/lang/String;Ljava/lang/String;)Z @14
+  read Lcom/android/settingslib/drawer/TileUtils;->getCategories(Landroid/content/Context;Ljava/util/Map;ZLjava/lang/String;Ljava/lang/String;)Ljava/util/List; @30
+Settings.Global | low_power_mode_suggestion_params
+  read Lcom/android/settingslib/fuelgauge/BatterySaverUtils$Parameters;-><init>(Landroid/content/Context;)V @26
+Settings.Global | low_power_trigger_level
+  read Lcom/android/settingslib/fuelgauge/BatterySaverUtils;->ensureAutoBatterySaver(Landroid/content/Context;I)V @14
+  write Lcom/android/settingslib/fuelgauge/BatterySaverUtils;->setAutoBatterySaverTriggerLevel(Landroid/content/Context;I)V @22
+  read Lcom/android/settingslib/fuelgauge/BatterySaverUtils;->setPowerSaveMode(Landroid/content/Context;ZZ)Z @142
+Settings.Global | network_scoring_ui_enabled
+  read Lcom/android/settingslib/wifi/WifiTracker;->onStart()V @30
+Settings.Global | speed_label_cache_eviction_age_millis
+  read Lcom/android/settingslib/wifi/WifiTracker;->onStart()V @74
+Settings.Global | wifi_connected_mac_randomization_enabled
+  read Lcom/android/settingslib/deviceinfo/AbstractWifiMacAddressPreferenceController;->updateConnectivity()V @30
+Settings.Global | zen_duration
+  read Lcom/android/settingslib/notification/ZenDurationDialog;->createDialog()Landroid/app/Dialog; @18
+  read Lcom/android/settingslib/notification/ZenDurationDialog;->updateZenDuration(I)V @30
+  write Lcom/android/settingslib/notification/ZenDurationDialog;->updateZenDuration(I)V @130
+Settings.Secure | accessibility_display_magnification_navbar_enabled
+  read Lcom/android/settingslib/accessibility/AccessibilityButtonHelper;->isRequestedByMagnification(Landroid/content/Context;)Z @14
+Settings.Secure | accessibility_shortcut_enabled
+  read Lcom/android/settingslib/accessibility/AccessibilityUtils;->isShortcutEnabled(Landroid/content/Context;I)Z @14
+Settings.Secure | accessibility_shortcut_target_service
+  read Lcom/android/settingslib/accessibility/AccessibilityUtils;->getShortcutTargetServiceComponentNameString(Landroid/content/Context;I)Ljava/lang/String; @14
+Settings.Secure | android.car.BLUETOOTH_AUTOCONNECT_MESSAGING_DEVICES
+  read Lcom/android/car/BluetoothDeviceConnectionPolicy;->readAndRebuildDeviceMapFromSettings()Z @248
+  write Lcom/android/car/BluetoothDeviceConnectionPolicy;->writeDeviceInfoToSettings(Lcom/android/car/BluetoothDeviceConnectionPolicy$ConnectionParams;)Z @298
+Settings.Secure | android.car.BLUETOOTH_AUTOCONNECT_MUSIC_DEVICES
+  read Lcom/android/car/BluetoothDeviceConnectionPolicy;->readAndRebuildDeviceMapFromSettings()Z @308
+  write Lcom/android/car/BluetoothDeviceConnectionPolicy;->writeDeviceInfoToSettings(Lcom/android/car/BluetoothDeviceConnectionPolicy$ConnectionParams;)Z @352
+Settings.Secure | android.car.BLUETOOTH_AUTOCONNECT_NETWORK_DEVICES
+  read Lcom/android/car/BluetoothDeviceConnectionPolicy;->readAndRebuildDeviceMapFromSettings()Z @338
+  write Lcom/android/car/BluetoothDeviceConnectionPolicy;->writeDeviceInfoToSettings(Lcom/android/car/BluetoothDeviceConnectionPolicy$ConnectionParams;)Z @378
+Settings.Secure | android.car.BLUETOOTH_AUTOCONNECT_PHONE_DEVICES
+  read Lcom/android/car/BluetoothDeviceConnectionPolicy;->readAndRebuildDeviceMapFromSettings()Z @278
+  write Lcom/android/car/BluetoothDeviceConnectionPolicy;->writeDeviceInfoToSettings(Lcom/android/car/BluetoothDeviceConnectionPolicy$ConnectionParams;)Z @326
+Settings.Secure | automatic_storage_manager_enabled
+  read Lcom/android/settingslib/Utils;->isStorageManagerEnabled(Landroid/content/Context;)Z @50
+Settings.Secure | default_input_method
+  read Lcom/android/settingslib/inputmethod/InputMethodAndSubtypeUtil;->saveInputMethodSubtypeList(Landroid/support/v14/preference/PreferenceFragment;Landroid/content/ContentResolver;Ljava/util/List;Z)V @12
+  write Lcom/android/settingslib/inputmethod/InputMethodAndSubtypeUtil;->saveInputMethodSubtypeList(Landroid/support/v14/preference/PreferenceFragment;Landroid/content/ContentResolver;Ljava/util/List;Z)V @664
+Settings.Secure | disabled_system_input_methods
+  read Lcom/android/settingslib/inputmethod/InputMethodAndSubtypeUtil;->getDisabledSystemIMEs(Landroid/content/ContentResolver;)Ljava/util/HashSet; @14
+  write Lcom/android/settingslib/inputmethod/InputMethodAndSubtypeUtil;->saveInputMethodSubtypeList(Landroid/support/v14/preference/PreferenceFragment;Landroid/content/ContentResolver;Ljava/util/List;Z)V @640
+Settings.Secure | enabled_accessibility_services
+  read Lcom/android/settingslib/accessibility/AccessibilityUtils;->getEnabledServicesFromSettings(Landroid/content/Context;I)Ljava/util/Set; @14
+  write Lcom/android/settingslib/accessibility/AccessibilityUtils;->setAccessibilityServiceState(Landroid/content/Context;Landroid/content/ComponentName;ZI)V @224
+Settings.Secure | enabled_input_methods
+  read Lcom/android/settingslib/inputmethod/InputMethodAndSubtypeUtil;->getEnabledInputMethodsAndSubtypeList(Landroid/content/ContentResolver;)Ljava/util/HashMap; @4
+  write Lcom/android/settingslib/inputmethod/InputMethodAndSubtypeUtil;->saveInputMethodSubtypeList(Landroid/support/v14/preference/PreferenceFragment;Landroid/content/ContentResolver;Ljava/util/List;Z)V @618
+Settings.Secure | enabled_notification_listeners
+  read Landroid/support/v4/app/NotificationManagerCompat;->getEnabledListenerPackages(Landroid/content/Context;)Ljava/util/Set; @14
+  read Landroid/support/v4/media/MediaSessionManagerImplBase;->isEnabledNotificationListener(Landroid/support/v4/media/MediaSessionManager$RemoteUserInfoImpl;)Z @8
+Settings.Secure | location_changer
+  write Lcom/android/settingslib/Utils;->updateLocationEnabled(Landroid/content/Context;ZII)V @14
+  write Lcom/android/settingslib/Utils;->updateLocationMode(Landroid/content/Context;IIII)Z @14
+Settings.Secure | location_mode
+  read Lcom/android/settingslib/Utils;->updateLocationEnabled(Landroid/content/Context;ZII)V @48
+  write Lcom/android/settingslib/Utils;->updateLocationMode(Landroid/content/Context;IIII)Z @88
+Settings.Secure | low_power_manual_activation_count
+  read Lcom/android/settingslib/fuelgauge/BatterySaverUtils;->setPowerSaveMode(Landroid/content/Context;ZZ)Z @92
+  write Lcom/android/settingslib/fuelgauge/BatterySaverUtils;->setPowerSaveMode(Landroid/content/Context;ZZ)Z @106
+Settings.Secure | low_power_warning_acknowledged
+  read Lcom/android/settingslib/fuelgauge/BatterySaverUtils;->maybeShowBatterySaverConfirmation(Landroid/content/Context;)Z @14
+  write Lcom/android/settingslib/fuelgauge/BatterySaverUtils;->setBatterySaverConfirmationAcknowledged(Landroid/content/Context;)V @14
+Settings.Secure | screensaver_activate_on_dock
+  read Lcom/android/settingslib/dream/DreamBackend;->isActivatedOnDock()Z @8
+  write Lcom/android/settingslib/dream/DreamBackend;->setActivatedOnDock(Z)V @34
+Settings.Secure | screensaver_activate_on_sleep
+  read Lcom/android/settingslib/dream/DreamBackend;->isActivatedOnSleep()Z @8
+  write Lcom/android/settingslib/dream/DreamBackend;->setActivatedOnSleep(Z)V @34
+Settings.Secure | screensaver_enabled
+  read Lcom/android/settingslib/dream/DreamBackend;->isEnabled()Z @8
+  write Lcom/android/settingslib/dream/DreamBackend;->setEnabled(Z)V @34
+Settings.Secure | selected_input_method_subtype
+  read Lcom/android/settingslib/inputmethod/InputMethodAndSubtypeUtil;->getInputMethodSubtypeSelected(Landroid/content/ContentResolver;)I @4
+  write Lcom/android/settingslib/inputmethod/InputMethodAndSubtypeUtil;->putSelectedInputMethodSubtype(Landroid/content/ContentResolver;I)V @4
+Settings.Secure | suppress_auto_battery_saver_suggestion
+  read Lcom/android/settingslib/fuelgauge/BatterySaverUtils;->setPowerSaveMode(Landroid/content/Context;ZZ)Z @158
+  write Lcom/android/settingslib/fuelgauge/BatterySaverUtils;->suppressAutoBatterySaver(Landroid/content/Context;)V @14
+Settings.System | screen_brightness
+  read Lcom/android/car/systeminterface/DisplayInterface$DefaultImpl$1;->onChange(Z)V @22
+  write Lcom/android/car/systeminterface/DisplayInterface$DefaultImpl;->setDisplayBrightness(I)V @36
+  uri Lcom/android/car/systeminterface/DisplayInterface$DefaultImpl;->startDisplayStateMonitoring(Lcom/android/car/CarPowerManagementService;)V @28
+SharedPreferences (file unresolved) | _has_set_default_values
+  read Landroid/support/v7/preference/PreferenceManager;->setDefaultValues(Landroid/content/Context;Ljava/lang/String;IIZ)V @22
+  write Landroid/support/v7/preference/PreferenceManager;->setDefaultValues(Landroid/content/Context;Ljava/lang/String;IIZ)V @78
+SharedPreferences (file unresolved) | garage_mode_index
+  write Lcom/android/car/garagemode/GarageModeService;->writeToPref(I)V @16
+  read Lcom/android/car/garagemode/GarageModeService;->init(Lcom/android/car/garagemode/GarageModePolicy;Landroid/content/SharedPreferences;)V @32
+SharedPreferences (file unresolved) | startedFromLauncher
+  read Landroid/support/v4/app/AppLaunchChecker;->hasStartedFromLauncher(Landroid/content/Context;)Z @18
+  read Landroid/support/v4/app/AppLaunchChecker;->onActivityCreate(Landroid/app/Activity;)V @18
+  write Landroid/support/v4/app/AppLaunchChecker;->onActivityCreate(Landroid/app/Activity;)V @116
+SystemProperties | android.car.airplane_mode_duration
+  read Lcom/android/car/AirplaneModeService$AirplaneModeHandler;->calculateDuration()I @12
+SystemProperties | android.car.systemuser.headless
+  read Lcom/android/settingslib/users/UserManagerHelper;->isHeadlessSystemUser()Z @6
+SystemProperties | boot.car_service_created
+  write Lcom/android/car/CarService;->onCreate()V @178
+SystemProperties | ctl.start
+  write Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->writeLogdSizeOption(Ljava/lang/Object;)V @380
+SystemProperties | log.tag.snet_event_log
+  read Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->writeLogdSizeOption(Ljava/lang/Object;)V @158
+SystemProperties | logd.logpersistd
+  read Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->setLogpersistOff(Z)V @104
+  read Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->updateLogpersistValues()V @14
+  write Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->updateLogpersistValues()V @346
+  read Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->writeLogpersistOption(Ljava/lang/Object;Z)V @178
+  read Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->writeLogpersistOption(Ljava/lang/Object;Z)V @258
+  write Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->setLogpersistOff(Z)V @60
+SystemProperties | logd.logpersistd.buffer
+  write Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->setLogpersistOff(Z)V @22
+  read Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->updateLogpersistValues()V @34
+  read Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->writeLogpersistOption(Ljava/lang/Object;Z)V @82
+SystemProperties | logd.logpersistd.enable
+  read Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->onLogdSizeSettingUpdate(Ljava/lang/String;)V @12
+SystemProperties | net.tethering.noprovisioning
+  read Lcom/android/settingslib/TetherUtil;->isProvisioningNeeded(Landroid/content/Context;)Z @28
+SystemProperties | persist.log.tag
+  read Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->updateLogdSizeValues()V @12
+  read Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->writeLogdSizeOption(Ljava/lang/Object;)V @38
+  write Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->writeLogdSizeOption(Ljava/lang/Object;)V @292
+  read Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->writeLogpersistOption(Ljava/lang/Object;Z)V @14
+SystemProperties | persist.log.tag.snet_event_log
+  read Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->writeLogdSizeOption(Ljava/lang/Object;)V @130
+  write Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->writeLogdSizeOption(Ljava/lang/Object;)V @190
+SystemProperties | persist.logd.logpersistd
+  write Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->setLogpersistOff(Z)V @36
+  write Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->writeLogpersistOption(Ljava/lang/Object;Z)V @146
+SystemProperties | persist.logd.logpersistd.buffer
+  write Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->setLogpersistOff(Z)V @8
+  write Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->writeLogpersistOption(Ljava/lang/Object;Z)V @132
+SystemProperties | persist.logd.size
+  read Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->updateLogdSizeValues()V @24
+  write Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->writeLogdSizeOption(Ljava/lang/Object;)V @366
+SystemProperties | ro.config.low_ram
+  read Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->defaultLogdSizeValue()Ljava/lang/String; @32
+  read Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->updateLogdSizeValues()V @178
+SystemProperties | ro.debuggable
+  read Lcom/android/settingslib/development/AbstractLogpersistPreferenceController;->isAvailable()Z @8
+SystemProperties | ro.logd.size
+  read Lcom/android/settingslib/development/AbstractLogdSizePreferenceController;->defaultLogdSizeValue()Ljava/lang/String; @4
+SystemProperties | ro.storage_manager.show_opt_in
+  read Lcom/android/settingslib/Utils;->isStorageManagerEnabled(Landroid/content/Context;)Z @8
+SystemProperties | settingsdebug.instant.packages
+  read Lcom/android/settingslib/applications/AppUtils;->isInstant(Landroid/content/pm/ApplicationInfo;)Z @46
+
+GPSProvider
+Settings.Global | night_mode
+  read La/r3/d;->onCreate(Landroid/os/Bundle;)V @178
+  read La/r3/d;->onResume()V @24
+  write La/r3/j;->e(Landroidx/preference/Preference;Ljava/io/Serializable;)Z @54
+  read Lorg/broeuschmeul/android/gps/usb/provider/USBGpsApplication;->onCreate()V @84
+Settings.Global | startOnBoot
+  write La/r3/k;->e(Landroidx/preference/Preference;Ljava/io/Serializable;)Z @46
+SharedPreferences (file unresolved) | connectionRetries
+  read La/r3/e$e;->d0()V @212
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @158
+SharedPreferences (file unresolved) | disableReason
+  read La/r3/d;->onSharedPreferenceChanged(Landroid/content/SharedPreferences;Ljava/lang/String;)V @318
+  write Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager;->g()V @90
+  write Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @1208
+SharedPreferences (file unresolved) | enableGGA
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @736
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @748
+SharedPreferences (file unresolved) | enableGLL
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @168
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @182
+SharedPreferences (file unresolved) | enableGSA
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @314
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @326
+SharedPreferences (file unresolved) | enableGSV
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @386
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @398
+SharedPreferences (file unresolved) | enableNMEA
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @576
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager;->b(Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager;Z)V @82
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @588
+SharedPreferences (file unresolved) | enableRMC
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @802
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @814
+SharedPreferences (file unresolved) | enableSBAS
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @616
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @628
+SharedPreferences (file unresolved) | enableStaticNavigation
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @530
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @544
+SharedPreferences (file unresolved) | enableVTG
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @242
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @254
+SharedPreferences (file unresolved) | enableZDA
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @458
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager$c;->run()V @470
+SharedPreferences (file unresolved) | forceEnableProvider
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @912
+SharedPreferences (file unresolved) | gpsDeviceSpeed
+  read La/r3/e;->e0()V @368
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager;-><init>(La/q3/a;III)V @294
+SharedPreferences (file unresolved) | mockGpsName
+  read La/r3/e$e;->d0()V @126
+  read La/r3/e;->H()V @146
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @242
+SharedPreferences (file unresolved) | replaceStdtGps
+  read La/r3/e;->H()V @208
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @202
+SharedPreferences (file unresolved) | setTime
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager;-><init>(La/q3/a;III)V @320
+  write Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager;->n(Ljava/lang/String;)V @438
+SharedPreferences (file unresolved) | showToasts
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->c()V @76
+SharedPreferences (file unresolved) | sirfGps
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager;-><init>(La/q3/a;III)V @394
+  read La/r3/d;->onSharedPreferenceChanged(Landroid/content/SharedPreferences;Ljava/lang/String;)V @160
+SharedPreferences (file unresolved) | startGps
+  write La/r3/a;->onCheckedChanged(Landroid/widget/CompoundButton;Z)V @30
+  write La/r3/d;->onRequestPermissionsResult(I[Ljava/lang/String;[I)V @116
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager;->g()V @316
+  write Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsManager;->g()V @342
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService$a;->onReceive(Landroid/content/Context;Landroid/content/Intent;)V @192
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->d()V @252
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @796
+  write Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @822
+  read Lorg/broeuschmeul/android/gps/usb/provider/ui/GpsInfoActivity;->x()V @20
+  read La/r3/d;->onSharedPreferenceChanged(Landroid/content/SharedPreferences;Ljava/lang/String;)V @148
+  read La/r3/d;->onSharedPreferenceChanged(Landroid/content/SharedPreferences;Ljava/lang/String;)V @644
+  read La/r3/d;->onSharedPreferenceChanged(Landroid/content/SharedPreferences;Ljava/lang/String;)V @684
+  write Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService$a;->onReceive(Landroid/content/Context;Landroid/content/Intent;)V @204
+  write Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->d()V @264
+SharedPreferences (file unresolved) | trackFileDirectory
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->e()V @142
+SharedPreferences (file unresolved) | trackFilePrefix
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->e()V @178
+SharedPreferences (file unresolved) | trackRecording
+  write La/r3/d;->onRequestPermissionsResult(I[Ljava/lang/String;[I)V @262
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService$a;->onReceive(Landroid/content/Context;Landroid/content/Intent;)V @452
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @1248
+  write Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService$a;->onReceive(Landroid/content/Context;Landroid/content/Intent;)V @464
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->h()V @192
+  write Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->h()V @204
+  write Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->h()V @254
+SharedPreferences (file unresolved) | usbDeviceProductId
+  read La/r3/e;->e0()V @60
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @122
+SharedPreferences (file unresolved) | usbDeviceVendorId
+  read La/r3/e;->e0()V @90
+  read Lorg/broeuschmeul/android/gps/usb/provider/driver/USBGpsProviderService;->i()V @96

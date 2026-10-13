@@ -1,0 +1,52 @@
+Белая полоса и графические ресурсы DIM: проверка 2026-10-12
+
+Новая зацепка: штатный DimMenu.apk содержит res/drawable/full_pop_bg.png,
+светлую горизонтальную подложку 1894x85. Она связана с FullContainerView
+в res/layout/full_map_fragment.xml. Контейнер имеет width=match_parent,
+height=pop_full_height=63px, marginTop=x638=638px. FullMapLayout:1920x720.
+Это сильный кандидат на наблюдаемую нижнюю полосу, но физическое совпадение
+с пользовательским экраном не проверено. Картинка не является найденными крыльями.
+
+Цепочка Natro проверена по AGKulikov/Status commit
+38bf14147dee36a154e69a5d57aa63b238e6736f, fix/hud-dim-20261010.
+hide_oem_white_bar -> InstrumentOemController.setWhiteBarHidden ->
+scheduleWhiteBar -> applyWhiteBarNow -> InstrumentOemPolicy.suppressWhiteBar.
+Условие deny: включена настройка и NaviMode==3.
+Команда: appops set com.ecarx.dimmenu SYSTEM_ALERT_WINDOW deny.
+В других режимах применяется allow. Состояние проверяется appops get.
+Это механизм запрета наложений пакета целиком; не точечное удаление PNG.
+Readback подтверждает AppOp, а не исчезновение физических пикселей.
+
+Штатный DimMenu: FullMapPresentation -> full_map_layout -> FullMapFragment ->
+full_map_fragment -> FullContainerView с full_pop_bg.png.
+FullContainerView содержит MediaFullPopView, CallFullPopView, WeChatFullPopView.
+onNavModeChanged показывает viewFullMapContainer только при mode==3.
+onVolumeChange скрывает FullContainerView и показывает FullVolumePopView.
+onVolumeHide снова показывает FullContainerView без проверки наличия его
+видимого содержимого в этой функции. Поэтому показ пустой подложки после
+громкости является проверяемой гипотезой, не подтвержденной причиной инцидента.
+switchDisplay отдельно отслеживает приоритеты; при пустом списке ставит
+скрытие GONE через500мс. Эти два пути нужно сопоставлять по событиям.
+
+Связь с крыльями: общий вход NaviMode есть. Локальная ветвь DimMenu управляет
+контейнерами Android; ранее изученный switchNaviMode отправляет opcode14
+через DIMProtocol. Найденный код видимости FullContainerView не содержит
+выбора геометрии штатных шкал. Одинаковое условие mode==3 само по себе не
+доказывает общего renderer полосы и крыльев.
+
+Поиск изображений: перечислены растровые ресурсы APK из двух архивов
+KX11-QNX-IPCP-Evidence 2.zip и ecarx-hud-system-20260727-010640.zip.
+Визуально просмотрены первые360из411растров DimMenu (много повторов Android)
+и135представителей крупных графических семейств XCSettings2 (один кадр на
+нормализованное имя, без проверки всех кадров анимации и вариантов тем).
+Иконки звонков, медиа, навигации найдены. Подтвержденных крыльев нет.
+Белые U-образные рамки comfort_round_shape и аналогичные в XCSettings2
+относятся по именованию к ресурсам driving mode; принадлежность крыльям
+не доказана. Проверены только перечисленные ресурсы, не все когда-либо
+переданные архивы и не произвольные встроенные/зашифрованные текстуры.
+
+Исходный APK: ecarx-hud-system-20260727-010640.zip!
+packages/com.ecarx.dimmenu/base.apk.
+Автомобиль и APK не менялись. Следующий точечный кандидат для проверки полосы:
+фон FullContainerView и повторный показ в onVolumeHide. Для крыльев
+нужна отдельная цепочка получателя навигационного режима на стороне DIM.

@@ -1,0 +1,77 @@
+ПРИНИМАЮЩИЙ ОБРАБОТЧИК: ПРОВЕРКА cluster_controller
+13.10.2026. Офлайн, без исполнения прошивки и команд автомобиля.
+
+РЕЗУЛЬТАТ
+Разобран реальный диспетчер приёма IPCLModule::parsePayload и его входной
+канал. Это SPI/IPCL обработчик, не прямой разборщик захваченных UART-пакетов
+79 6C. Конечный получатель команды навигационного режима14 не найден.
+Это исключает конкретную прямую привязку, а не всякую возможную связь
+QNX с приборкой через промежуточные преобразователи.
+
+ИСТОЧНИК
+KX11-QNX-Deep-Evidence/qnx/files/usr/bin/cluster_controller
+SHA256 d9b7573cf3933d5a58f6c6132b1f76902f52ea108dadb91d5b76a59a474273d8
+В обновлённом inspect_cluster.py извлечено17 функций, разрешены PLT-импорты,
+сохранены структуры DWARF. См. dim_evidence/receiver/cluster-controller.*.
+
+1. ПОДТВЕРЖДЁННЫЙ ВХОД
+IPCLModule::spi_handle0x52ab0:
+  0x52bc4..0x52be0 копирует строку /dev/spi4 из VA0x697e0;
+  0x52c20 вызывает spi_open;
+  0x5313c вызывает spi_transfer;
+  0x53148 вызывает check_frame;
+  0x5316c вызывает parsePayload (в соответствующей ветке цикла).
+spi_transfer0x53800 получает read/write буферы и вызывает spi_xchange
+в0x5383c с размером0x100 (256 байт).
+check_frame0x24c14:
+  0x24c60..0x24c6c сравнивает первые16бит с0x4d51;
+  little-endian означает байты51 4D, не79 6C;
+  0x24d28..0x24d2c вызывает crc_16 по254 байтам.
+Для ранее разобранных навигационных UART-кадров были magic79 6C и CRC32.
+Это различие установлено по инструкциям, не по имени бинарника.
+
+2. ПОЛНЫЙ НАБОР ВЕТОК parsePayload0x53cf0
+Вход unpack_frame0x250b8, цикл get_payload(index)0x2599c.
+DWARF структуры результата:
+offset0 crc_status,1 crc_length,2 length,4 domain_id,
+8 payload_header,16 data.
+В заголовке MessageType@0,CookieId@1,OpCode@2.
+Диспетчер использует domain_id и big-endian OpCode из заголовка:
+
+domain0x96,opcode1 -> savePayloadToMA(payload), телеметрия;
+domain0x01,opcode1 -> saveSettingsToMA(settings);
+domain0x03,opcode1 -> saveCarconfigToMA(carconfig) и saveCarConfig;
+domain0x07,opcode9 -> saveFanFunctionToMA(FanFunction);
+domain0x99,opcode1 -> saveRoutineControlToMA(RoutineControl).
+
+Сравнения domain находятся в0x53e04,0x53f34,0x53fb4,0x54080,0x540fc.
+Вызовы обработчиков0x53f24,0x53fa4,0x5402c/0x54070,0x540ec,0x54178.
+Иные domain идут в журнал unknown Opcode0x54180; несовпавший opcode
+в известной ветке переходит к следующему элементу0x541a8.
+В этом диспетчере нет веток opcode14 или opcode8. Числа domain нельзя
+смешивать с UART opcode: это разные поля и разные протоколы.
+
+3. ЧТО ИМЕННО В settings
+DWARF: settings размер1, единственное поле AVMThemeMod@0.
+saveSettingsToMA0x55c90 получает через GOT@0x9ded8 объект@0xb4d70;
+релокация и символ подтверждают MA_AVMThemeMod.
+0x55cac вызывает AtomicNumber<unsigned char>::setValue.
+Таким образом здесь нет найденной настройки wings/navigation theme:
+название поля и назначение — AVMThemeMod. Графический эффект не проверялся.
+
+4. ДРУГИЕ КАНДИДАТЫ И ОГРАНИЧЕНИЯ
+У sc_qnx_vip_proxy просмотрены экспортированные функции приёма:
+onRecvRegRvcEvent,onRecvUsbupdateReq,onRecvLocalTimeSyncEvent,
+onRecvHealthMenagerHeartBeat,onRecvHeartBeat,onRecvACK.
+Это инвентаризация символов, не полный анализ всех их тел; отсутствие
+навигационного имени не доказывает отсутствие возможного моста.
+Строковый поиск LinOverLVDS|ttydim|DIMPROTOCOL|sendFullMapModeReq во всех
+файлах локального QNX Deep экспорта дал только VsomeipTestService.
+Отрицательный строковый поиск не исключает безымянную реализацию протокола.
+Ранее найденная sendFullMapModeReq — передающая функция; объявлять её
+искомым принимающим обработчиком оснований нет.
+
+Следующий необходимый объект — реальный UART-получатель либо мост,
+преобразующий79 6C opcode14/8 в другой внутренний протокол. Идентификация
+образа этой стороны пока отсутствует. Патч на основании SPI settings или
+VehCfgPrm был бы неподтверждённой заменой не того параметра.

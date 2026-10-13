@@ -1,0 +1,399 @@
+ВОССТАНОВЛЕННЫЕ СХЕМЫ KANZI
+Числа enum и номера protobuf-полей не являются CAN-ID.
+Дескрипторы сверены с исходными строками DEX; зависимости проверены DescriptorPool.
+
+
+FILE climate/ACAnimations.proto
+PACKAGE com.ecarx.kanziproto.climate
+DEPENDENCIES 
+MESSAGE com.ecarx.kanziproto.climate.ACGesture
+  1: isEnterGestureMode | TYPE_BOOL | LABEL_OPTIONAL
+  2: gestureModeAnimDuration | TYPE_INT64 | LABEL_OPTIONAL
+MESSAGE com.ecarx.kanziproto.climate.ACGestureAnimEvent
+  1: isEnterGestureMode | TYPE_BOOL | LABEL_OPTIONAL
+  2: gestureModeAnimPercent | TYPE_FLOAT | LABEL_OPTIONAL
+
+FILE climate/ACSettings.proto
+PACKAGE com.ecarx.kanziproto.climate
+DEPENDENCIES 
+ENUM com.ecarx.kanziproto.climate.ACControlArea
+  ACA_ALL = 0
+  ACA_FRONT = 1
+  ACA_BACK = 2
+  ACA_DRIVER = 4
+  ACA_GUIDER = 8
+MESSAGE com.ecarx.kanziproto.climate.ACWindSet
+  1: windDirection | .com.ecarx.kanziproto.climate.ACWindSet.WindDirection | LABEL_OPTIONAL
+  2: windLevel | .com.ecarx.kanziproto.climate.ACWindSet.WindLevel | LABEL_OPTIONAL
+  3: windMode | .com.ecarx.kanziproto.climate.ACWindSet.WindMode | LABEL_OPTIONAL
+  4: gCleanState | .com.ecarx.kanziproto.climate.ACWindSet.GClean | LABEL_OPTIONAL
+  5: isAutoMode | TYPE_BOOL | LABEL_OPTIONAL
+  6: controlArea | .com.ecarx.kanziproto.climate.ACControlArea | LABEL_OPTIONAL
+ENUM com.ecarx.kanziproto.climate.ACWindSet.WindDirection
+  WD_CLOSED = 0
+  WD_WINDOW = 1
+  WD_BODY = 2
+  WD_FOOT = 4
+ENUM com.ecarx.kanziproto.climate.ACWindSet.WindLevel
+  WL_0 = 0
+  WL_1 = 1
+  WL_2 = 2
+  WL_3 = 3
+  WL_4 = 4
+  WL_5 = 5
+  WL_6 = 6
+  WL_7 = 7
+  WL_8 = 8
+  WL_9 = 9
+ENUM com.ecarx.kanziproto.climate.ACWindSet.WindMode
+  NORMAL = 0
+  COLD = 1
+  WARM = 2
+ENUM com.ecarx.kanziproto.climate.ACWindSet.GClean
+  GCLEAN_INVALID = 0
+  GCLEAN_CLOSED = 1
+  GCLEAN_OPEN = 2
+MESSAGE com.ecarx.kanziproto.climate.ACStatus
+  1: acState | .com.ecarx.kanziproto.climate.ACStatus.ACState | LABEL_OPTIONAL
+  2: controlArea | .com.ecarx.kanziproto.climate.ACControlArea | LABEL_OPTIONAL
+  3: isACMax | TYPE_BOOL | LABEL_OPTIONAL
+  4: isSYNC | TYPE_BOOL | LABEL_OPTIONAL
+ENUM com.ecarx.kanziproto.climate.ACStatus.ACState
+  AC_INVALID = 0
+  AC_OPENED = 1
+  AC_CLOSED = 2
+
+FILE climate/Constants.proto
+PACKAGE com.ecarx.kanziproto.climate
+DEPENDENCIES 
+ENUM com.ecarx.kanziproto.climate.ClimateCmds
+  HEART_BEAT = 0
+  REQ_COMMON_SETTING = 1
+  REQ_ANIMATION_TO = 1000
+  REQ_AC_WIND_SET = 1001
+  REQ_AC_STATUS = 1002
+  REQ_AC_GESTURE_ANIM = 1003
+  REQ_SEAT_SW_WARM_CONTROL = 1004
+  REQ_VENTILATE_CONTROL = 1006
+  ACK_ANIMATION_TO = 2000
+  ACK_AC_WIND_SET = 2001
+  ACK_AC_GESTURE_ANIM = 2003
+  ACK_WARM_CONTROL_AREA_SELECTED = 2005
+  ACK_VENTILATE_CONTROL_AREA_SELECTED = 2007
+
+FILE climate/PageAnimation.proto
+PACKAGE com.ecarx.kanziproto.climate
+DEPENDENCIES 
+ENUM com.ecarx.kanziproto.climate.AnimationPages
+  PAGE_HIDE = 0
+  FRONT_AC = 1
+  BACK_AC = 2
+  SEAT_HEAT = 3
+  SEAT_WIND = 4
+MESSAGE com.ecarx.kanziproto.climate.AnimationTo
+  1: toPage | .com.ecarx.kanziproto.climate.AnimationPages | LABEL_OPTIONAL
+  2: animDuration | TYPE_INT64 | LABEL_OPTIONAL
+MESSAGE com.ecarx.kanziproto.climate.AnimationPageEvent
+  1: fromPage | .com.ecarx.kanziproto.climate.AnimationPages | LABEL_OPTIONAL
+  2: toPage | .com.ecarx.kanziproto.climate.AnimationPages | LABEL_OPTIONAL
+  3: currentAnimationPercent | TYPE_FLOAT | LABEL_OPTIONAL
+
+FILE climate/SeatSWSettings.proto
+PACKAGE com.ecarx.kanziproto.climate
+DEPENDENCIES 
+ENUM com.ecarx.kanziproto.climate.ControlAreas
+  CA_ALL = 0
+  CA_STEERING_WHEEL = 1
+  CA_DRIVER = 2
+  CA_GUIDER = 4
+  CA_BACK_PASSENGER = 8
+MESSAGE com.ecarx.kanziproto.climate.SeatSWWarmControl
+  1: controlArea | .com.ecarx.kanziproto.climate.ControlAreas | LABEL_OPTIONAL
+  2: warnLevel | .com.ecarx.kanziproto.climate.SeatSWWarmControl.WARM_LEVELS | LABEL_OPTIONAL
+ENUM com.ecarx.kanziproto.climate.SeatSWWarmControl.WARM_LEVELS
+  WL_INVALID = 0
+  WL_CLOSED = 1
+  WL_OPENED = 2
+  WL_LEVEL_1 = 11
+  WL_LEVEL_2 = 12
+  WL_LEVEL_3 = 13
+MESSAGE com.ecarx.kanziproto.climate.WarmAreaSelectedEvent
+  1: currentControlArea | .com.ecarx.kanziproto.climate.ControlAreas | LABEL_OPTIONAL
+MESSAGE com.ecarx.kanziproto.climate.SeatVentilateControl
+  1: controlArea | .com.ecarx.kanziproto.climate.ControlAreas | LABEL_OPTIONAL
+  2: ventilateLevel | .com.ecarx.kanziproto.climate.SeatVentilateControl.VENTILATE_LEVELS | LABEL_OPTIONAL
+ENUM com.ecarx.kanziproto.climate.SeatVentilateControl.VENTILATE_LEVELS
+  VL_INVALID = 0
+  VL_CLOSED = 1
+  VL_OPENED = 2
+  VL_LEVEL_1 = 11
+  VL_LEVEL_2 = 12
+  VL_LEVEL_3 = 13
+MESSAGE com.ecarx.kanziproto.climate.VentilateAreaSelectedEvent
+  1: currentControlArea | .com.ecarx.kanziproto.climate.ControlAreas | LABEL_OPTIONAL
+
+FILE comon/Settings.proto
+PACKAGE com.ecarx.kanziproto.common
+DEPENDENCIES 
+MESSAGE com.ecarx.kanziproto.common.CommonSet
+  1: uiMode | .com.ecarx.kanziproto.common.CommonSet.UIModeTypes | LABEL_OPTIONAL
+  2: countryISO | TYPE_STRING | LABEL_OPTIONAL
+ENUM com.ecarx.kanziproto.common.CommonSet.UIModeTypes
+  DAY = 0
+  Night = 1
+
+FILE vehiclesetting/ComfortSettings.proto
+PACKAGE com.ecarx.kanziproto.vehiclesetting
+DEPENDENCIES 
+MESSAGE com.ecarx.kanziproto.vehiclesetting.SeatAdjustment
+  1: adjSeat | .com.ecarx.kanziproto.vehiclesetting.SeatAdjustment.AdjSeatTypes | LABEL_OPTIONAL
+  2: adjMode | .com.ecarx.kanziproto.vehiclesetting.SeatAdjustment.SeatAdjMode | LABEL_OPTIONAL
+  3: adjPlus | TYPE_BOOL | LABEL_OPTIONAL
+  4: isPressDown | TYPE_BOOL | LABEL_OPTIONAL
+ENUM com.ecarx.kanziproto.vehiclesetting.SeatAdjustment.SeatAdjMode
+  SAM_FB = 0
+  SAM_UD = 1
+  SAM_Backrest = 2
+  SAM_Oblique = 3
+ENUM com.ecarx.kanziproto.vehiclesetting.SeatAdjustment.AdjSeatTypes
+  AST_DRIVER = 0
+  AST_PASSENGER = 1
+MESSAGE com.ecarx.kanziproto.vehiclesetting.DriverEasyInoutSetting
+  1: openEasyInout | TYPE_BOOL | LABEL_OPTIONAL
+MESSAGE com.ecarx.kanziproto.vehiclesetting.ACComfortSetting
+  1: openSWAutoWarm | TYPE_BOOL | LABEL_OPTIONAL
+  2: openAirComfortPrompt | TYPE_BOOL | LABEL_OPTIONAL
+
+FILE vehiclesetting/Constants.proto
+PACKAGE com.ecarx.kanziproto.vehiclesetting
+DEPENDENCIES 
+ENUM com.ecarx.kanziproto.vehiclesetting.VehicleCmds
+  HEART_BEAT = 0
+  REQ_COMMON_SETTING = 1
+  REQ_ANIMATION_TO = 3000
+  REQ_TRUNK_CONTROL = 3001
+  REQ_SUNROOF_CONTROL = 3002
+  REQ_DRIVE_MODE_SET = 3003
+  REQ_HUD_SET = 3004
+  REQ_SEAT_BELT_SET = 3005
+  REQ_CAR_LOCK = 3006
+  REQ_OUTSIDE_REAR_MIRROR_SET = 3007
+  REQ_RAIN_WIPER_SET = 3008
+  REQ_CAR_LOCATE = 3009
+  REQ_AMBIENT_LIGHT_SET = 3010
+  REQ_WELCOME_LIGHT_SET = 3011
+  REQ_DOOR_LIGHT_SET = 3012
+  REQ_OUTSIDE_LIGHT_SET = 3013
+  REQ_SEAT_ADJ = 3014
+  REQ_DRIVER_EASY_INOUT_SET = 3015
+  REQ_AC_SET = 3016
+  REQ_CAR_CONTROL = 3017
+  REQ_CAR_STEERING_WHEEL = 3018
+  REQ_CAR_STEERING_DOOR = 3019
+  REQ_CAR_STEERING_HOOD = 3020
+  ACK_ANIMATION_TO = 4000
+  ACK_TRUNK_CONTROL = 4001
+  ACK_SUNROOF_CONTROL = 4002
+
+FILE vehiclesetting/LightSettings.proto
+PACKAGE com.ecarx.kanziproto.vehiclesetting
+DEPENDENCIES vehiclesetting/VehicleBaseSettings.proto
+MESSAGE com.ecarx.kanziproto.vehiclesetting.AmbientLightSetting
+  1: color | TYPE_INT32 | LABEL_OPTIONAL
+  2: toColor | TYPE_INT32 | LABEL_OPTIONAL
+  4: brigness | TYPE_FLOAT | LABEL_OPTIONAL
+  3: driveMode | .com.ecarx.kanziproto.vehiclesetting.DriveModeSet.DriveModes | LABEL_OPTIONAL
+  5: ambientMode | .com.ecarx.kanziproto.vehiclesetting.AmbientLightSetting.AmbientModes | LABEL_OPTIONAL
+ENUM com.ecarx.kanziproto.vehiclesetting.AmbientLightSetting.AmbientModes
+  AM_CLOSED = 0
+  AM_SOLID_COLOR = 1
+  AM_GRADIENT_COLOR = 2
+  AM_BREATHING = 3
+  AM_DRIVE_MODE = 4
+MESSAGE com.ecarx.kanziproto.vehiclesetting.WelcomeLightSettings
+  1: openWelcomeLight | TYPE_BOOL | LABEL_OPTIONAL
+  2: openFarewellLight | TYPE_BOOL | LABEL_OPTIONAL
+MESSAGE com.ecarx.kanziproto.vehiclesetting.DoorLightSetting
+  1: openDoorLight | TYPE_BOOL | LABEL_OPTIONAL
+MESSAGE com.ecarx.kanziproto.vehiclesetting.OutsideLightSetting
+  1: receiveVisitorsLight | TYPE_BOOL | LABEL_OPTIONAL
+  2: openOutsideWelcomeLight | TYPE_BOOL | LABEL_OPTIONAL
+  3: outsideWelcomeLightMode | .com.ecarx.kanziproto.vehiclesetting.OutsideLightSetting.OutsideWelcomeLightModes | LABEL_OPTIONAL
+  4: goHomeLightMode | .com.ecarx.kanziproto.vehiclesetting.OutsideLightSetting.GoHomeLightModes | LABEL_OPTIONAL
+ENUM com.ecarx.kanziproto.vehiclesetting.OutsideLightSetting.OutsideWelcomeLightModes
+  LIGHT_MODE_FIRST = 0
+  LIGHT_MODE_SECOND = 1
+  LIGHT_MODE_THIRD = 2
+ENUM com.ecarx.kanziproto.vehiclesetting.OutsideLightSetting.GoHomeLightModes
+  GO_HOME_LIGHT_MODE_FIRST = 0
+  GO_HOME_LIGHT_MODE_SECOND = 1
+  GO_HOME_LIGHT_MODE_THIRD = 2
+  GO_HOME_LIGHT_MODE_Fourth = 3
+
+FILE vehiclesetting/MessageWrapper.proto
+PACKAGE com.ecarx.kanziproto
+DEPENDENCIES 
+MESSAGE com.ecarx.kanziproto.MessageWrapper
+  1: cmdID | TYPE_INT32 | LABEL_OPTIONAL
+  2: version | TYPE_INT32 | LABEL_OPTIONAL
+  3: messageBytes | TYPE_BYTES | LABEL_OPTIONAL
+  4: extraData | TYPE_BYTES | LABEL_OPTIONAL
+
+FILE vehiclesetting/PageAnimation.proto
+PACKAGE com.ecarx.kanziproto.vehiclesetting
+DEPENDENCIES 
+ENUM com.ecarx.kanziproto.vehiclesetting.AnimationPages
+  PAGE_HIDE = 0
+  PAGE_TRUNK = 1
+  PAGE_SUNROOF = 2
+  PAGE_DRIVE_MODE = 3
+  PAGE_HUD = 4
+  PAGE_SEAT_BELT = 5
+  PAGE_CAR_LOCK = 6
+  PAGE_RAIN_WIPER = 7
+  PAGE_CAR_LOCATE = 8
+  PAGE_AMBIENT_LIGHT = 9
+  PAGE_WELCOME_LIGHT = 10
+  PAGE_DOOR_LIGHT = 11
+  PAGE_OUTSIDE_LIGHT = 12
+  PAGE_SEAT_ADJ = 13
+  PAGE_DRIVER_EASY_INOUT = 14
+  PAGE_AC_SET = 15
+  PAGE_OUTSIDE_REAR_MIRROR = 16
+  PAGE_CAR_CONTROL = 17
+  PAGE_STEERING_FORCE = 18
+  PAGE_STEERING_WHEEL_KEY = 19
+  PAGE_MORE_SETTINGS = 20
+  PAGE_CAR_INTERIOR = 21
+MESSAGE com.ecarx.kanziproto.vehiclesetting.AnimationTo
+  1: toPage | .com.ecarx.kanziproto.vehiclesetting.AnimationPages | LABEL_OPTIONAL
+  2: animDuration | TYPE_INT64 | LABEL_OPTIONAL
+MESSAGE com.ecarx.kanziproto.vehiclesetting.AnimationPageEvent
+  1: fromPage | .com.ecarx.kanziproto.vehiclesetting.AnimationPages | LABEL_OPTIONAL
+  2: toPage | .com.ecarx.kanziproto.vehiclesetting.AnimationPages | LABEL_OPTIONAL
+  3: currentAnimationPercent | TYPE_FLOAT | LABEL_OPTIONAL
+
+FILE vehiclesetting/VehicleBaseSettings.proto
+PACKAGE com.ecarx.kanziproto.vehiclesetting
+DEPENDENCIES 
+MESSAGE com.ecarx.kanziproto.vehiclesetting.CarControl
+  1: trunkStatus | TYPE_BOOL | LABEL_OPTIONAL
+  2: carLockSettingStatus | TYPE_BOOL | LABEL_OPTIONAL
+  3: sunroofControlStatus | TYPE_BOOL | LABEL_OPTIONAL
+  4: leftMirrorStatus | TYPE_BOOL | LABEL_OPTIONAL
+  5: rightMirrorStatus | TYPE_BOOL | LABEL_OPTIONAL
+  6: carWiper | TYPE_BOOL | LABEL_OPTIONAL
+  7: carLampSignal | TYPE_BOOL | LABEL_OPTIONAL
+  8: carInteriorAtmosphereLamp | TYPE_BOOL | LABEL_OPTIONAL
+  9: carInteriorSeat | TYPE_BOOL | LABEL_OPTIONAL
+  10: carInteriorHUD | TYPE_BOOL | LABEL_OPTIONAL
+  11: carInteriorSteeringWheel | TYPE_BOOL | LABEL_OPTIONAL
+  12: carInteriorDriver | TYPE_BOOL | LABEL_OPTIONAL
+  20: rightSeatStatus | TYPE_BOOL | LABEL_OPTIONAL
+MESSAGE com.ecarx.kanziproto.vehiclesetting.TrunkControl
+  1: fullControlDuration | TYPE_INT64 | LABEL_OPTIONAL
+  2: trunkCtrlType | .com.ecarx.kanziproto.vehiclesetting.TrunkControl.TrunkControlTypes | LABEL_OPTIONAL
+  3: trunkCtrlStatus | .com.ecarx.kanziproto.vehiclesetting.TrunkControl.TrunkControlStatus | LABEL_OPTIONAL
+  4: currentPercent | TYPE_FLOAT | LABEL_OPTIONAL
+  5: ctrlPercent | TYPE_FLOAT | LABEL_OPTIONAL
+  6: targetPercent | TYPE_FLOAT | LABEL_OPTIONAL
+ENUM com.ecarx.kanziproto.vehiclesetting.TrunkControl.TrunkControlTypes
+  TRUNK_CTRL_BY_TIME = 0
+  TRUNK_CTRL_BY_PERCENT = 1
+  TRUNK_CTRL_BY_SELECT = 2
+ENUM com.ecarx.kanziproto.vehiclesetting.TrunkControl.TrunkControlStatus
+  TRUNK_CLOSED = 0
+  TRUNK_CLOSING = 1
+  TRUNK_STOPPED = 2
+  TRUNK_OPENING = 3
+  TRUNK_OPENED = 4
+MESSAGE com.ecarx.kanziproto.vehiclesetting.TrunkControlEvent
+  1: trunkCtrlStatus | .com.ecarx.kanziproto.vehiclesetting.TrunkControl.TrunkControlStatus | LABEL_OPTIONAL
+  2: ctrlPercent | TYPE_FLOAT | LABEL_OPTIONAL
+MESSAGE com.ecarx.kanziproto.vehiclesetting.SunroofControl
+  1: sunroofControlDuration | TYPE_INT64 | LABEL_OPTIONAL
+  2: sunroofCtrlType | .com.ecarx.kanziproto.vehiclesetting.SunroofControl.SunroofControlTypes | LABEL_OPTIONAL
+  3: sunroofCtrlStatus | .com.ecarx.kanziproto.vehiclesetting.SunroofControl.SunroofControlStatus | LABEL_OPTIONAL
+  4: sunshadeCtrlStatus | .com.ecarx.kanziproto.vehiclesetting.SunroofControl.SunroofControlStatus | LABEL_OPTIONAL
+  5: controlArea | .com.ecarx.kanziproto.vehiclesetting.SunroofControl.SunroofAreas | LABEL_OPTIONAL
+  6: currentSunroofPercent | TYPE_FLOAT | LABEL_OPTIONAL
+  7: currentSunshadePercent | TYPE_FLOAT | LABEL_OPTIONAL
+  8: sunroofCtrlPercent | TYPE_FLOAT | LABEL_OPTIONAL
+  9: sunshadeCtrlPercent | TYPE_FLOAT | LABEL_OPTIONAL
+ENUM com.ecarx.kanziproto.vehiclesetting.SunroofControl.SunroofControlTypes
+  SUNROOF_CTRL_BY_TIME = 0
+  SUNROOF_CTRL_BY_PERCENT = 1
+ENUM com.ecarx.kanziproto.vehiclesetting.SunroofControl.SunroofControlStatus
+  SUNROOF_CLOSED = 0
+  SUNROOF_CLOSING = 1
+  SUNROOF_STOPPED = 2
+  SUNROOF_OPENING = 3
+  SUNROOF_OPENED = 4
+ENUM com.ecarx.kanziproto.vehiclesetting.SunroofControl.SunroofAreas
+  SUNROOF_ALL = 0
+  SUNROOF = 1
+  SUNSHADE = 2
+MESSAGE com.ecarx.kanziproto.vehiclesetting.SunroofControlEvent
+  1: sunroofCtrlStatus | .com.ecarx.kanziproto.vehiclesetting.SunroofControl.SunroofControlStatus | LABEL_OPTIONAL
+  2: sunroofCtrlPercent | TYPE_FLOAT | LABEL_OPTIONAL
+  3: sunshadeCtrlStatus | .com.ecarx.kanziproto.vehiclesetting.SunroofControl.SunroofControlStatus | LABEL_OPTIONAL
+  4: sunshadeCtrlPercent | TYPE_FLOAT | LABEL_OPTIONAL
+MESSAGE com.ecarx.kanziproto.vehiclesetting.DriveModeSet
+  1: driveMode | .com.ecarx.kanziproto.vehiclesetting.DriveModeSet.DriveModes | LABEL_OPTIONAL
+ENUM com.ecarx.kanziproto.vehiclesetting.DriveModeSet.DriveModes
+  DM_COMFORT = 0
+  DM_ECO = 1
+  DM_SPORT = 2
+  DM_SNOW = 3
+  DM_OFFROAD = 4
+  DM_ADAPTIVE = 5
+MESSAGE com.ecarx.kanziproto.vehiclesetting.HUDSetting
+  1: isOpen | TYPE_BOOL | LABEL_OPTIONAL
+  2: isOpenHeightAndBrightness | TYPE_BOOL | LABEL_OPTIONAL
+  3: isOpenAR | TYPE_BOOL | LABEL_OPTIONAL
+  4: isOpenHudSnow | TYPE_BOOL | LABEL_OPTIONAL
+MESSAGE com.ecarx.kanziproto.vehiclesetting.SeatBeltSetting
+  1: isOpen | TYPE_BOOL | LABEL_OPTIONAL
+MESSAGE com.ecarx.kanziproto.vehiclesetting.SteeringWheelSettings
+  1: isSteeringWheelOpen | TYPE_BOOL | LABEL_OPTIONAL
+  2: steeringWheelTypes | .com.ecarx.kanziproto.vehiclesetting.SteeringWheelSettings.SteeringWheelTypes | LABEL_OPTIONAL
+ENUM com.ecarx.kanziproto.vehiclesetting.SteeringWheelSettings.SteeringWheelTypes
+  SW_LADY = 0
+  SW_STANDARD = 1
+  SW_GUY = 2
+MESSAGE com.ecarx.kanziproto.vehiclesetting.CarLockSetting
+  1: keylessUnlockType | .com.ecarx.kanziproto.vehiclesetting.CarLockSetting.KeylessUnlockTypes | LABEL_OPTIONAL
+  2: isTwoStepUnlock | TYPE_BOOL | LABEL_OPTIONAL
+  3: autoLock | TYPE_BOOL | LABEL_OPTIONAL
+  4: autoLockUnlock | TYPE_BOOL | LABEL_OPTIONAL
+ENUM com.ecarx.kanziproto.vehiclesetting.CarLockSetting.KeylessUnlockTypes
+  KEYLESS_UNLOCK_UNSUPPORT = 0
+  UNLOCK_DRIVER_DOOR = 1
+  UNLOCK_WHOLE_CAR = 2
+MESSAGE com.ecarx.kanziproto.vehiclesetting.OutsideRearMirrorSetting
+  2: lockOutsideRear | TYPE_BOOL | LABEL_OPTIONAL
+  1: carLockPullMirrorType | .com.ecarx.kanziproto.vehiclesetting.OutsideRearMirrorSetting.CarLockPullMirrorTypes | LABEL_OPTIONAL
+ENUM com.ecarx.kanziproto.vehiclesetting.OutsideRearMirrorSetting.CarLockPullMirrorTypes
+  ORM_BOTH = 0
+  ORM_PASSENGER = 1
+  ORM_DRIVER = 2
+  ORM_CLOSE = 3
+MESSAGE com.ecarx.kanziproto.vehiclesetting.RainWiperSetting
+  1: openFrontRainWiperWhenCarReversing | TYPE_BOOL | LABEL_OPTIONAL
+  2: openBackRainWiperWhenCarReversing | TYPE_BOOL | LABEL_OPTIONAL
+MESSAGE com.ecarx.kanziproto.vehiclesetting.CarLocateSetting
+  1: carLocateType | .com.ecarx.kanziproto.vehiclesetting.CarLocateSetting.CarLocateTypes | LABEL_OPTIONAL
+ENUM com.ecarx.kanziproto.vehiclesetting.CarLocateSetting.CarLocateTypes
+  WHISTLE_LAMP = 0
+  WHISTLE = 1
+  LAMP = 2
+MESSAGE com.ecarx.kanziproto.vehiclesetting.CarSettingDoor
+  1: carSettingDoorType | .com.ecarx.kanziproto.vehiclesetting.CarSettingDoor.CarSettingDoorType | LABEL_OPTIONAL
+  2: isOpen | TYPE_BOOL | LABEL_OPTIONAL
+ENUM com.ecarx.kanziproto.vehiclesetting.CarSettingDoor.CarSettingDoorType
+  DOOR_ROW_1_LEFT = 0
+  DOOR_ROW_1_RIGHT = 1
+  DOOR_ROW_2_LEFT = 2
+  DOOR_ROW_2_RIGHT = 3
+MESSAGE com.ecarx.kanziproto.vehiclesetting.CarSettingHook
+  1: isOpen | TYPE_BOOL | LABEL_OPTIONAL

@@ -1,0 +1,445 @@
+XCSettings2: декларативные пункты меню
+ID из FunctionSupportUtils — карта проверки поддержки, не CAN-код и не универсальная команда записи.
+Значения 0..4 могут быть служебными маркерами. functionType выбирает обработчик.
+Присутствие пункта не доказывает доступность: Build.PRODUCT, ACC, API support и текущие состояния меняют UI.
+
+type=None id=14 support=None handler=None | Entertainment limited
+  assets/table/tab_search.json#/167
+type=None id=245 support=0 handler=None | 座椅调节
+  assets/table/tab_search.json#/96
+type=None id=251 support=0 handler=None | System
+  assets/table/tab_search.json#/153
+type=None id=258 support=554762496 handler=None | Настраиваемая  кнопка на рулевом колесе
+  assets/table/vehicle/tab_car_vehicle.json#/2
+type=None id=278 support=None handler=None | Back mirror
+  assets/table/vehicle/tab_vehicle.json#/9
+type=None id=279 support=None handler=None | Интеллектуальные ассистенты помощи водителю
+  assets/table/safe/tab_assist_safe.json#/0
+type=None id=280 support=None handler=None | Ассистент предупреждения о столкновении
+  assets/table/safe/tab_assist_safe.json#/6
+type=None id=281 support=None handler=None | Мониторинг безопасности движения
+  assets/table/safe/tab_assist_safe.json#/9
+type=None id=282 support=None handler=None | Парковка
+  assets/table/safe/tab_assist_safe.json#/16
+type=None id=284 support=None handler=None | AC settings
+  assets/table/vehicle/tab_comfort.json#/2
+type=None id=285 support=None handler=None | Adjust seat
+  assets/table/vehicle/tab_comfort.json#/0
+type=1 id=105 support=2 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 自动落锁 / Vehicle
+  assets/table/tab_search.json#/27
+  assets/table/vehicle/tab_vehicle.json#/8/subItem/2
+type=1 id=111 support=553779456 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Дверь багажника / 行李箱开闭
+  assets/table/tab_car_quick.json#/1
+  assets/table/vehicle/tab_trunk.json#/0
+type=1 id=114 support=537922048 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 钥匙解锁 / Управление с помощью ключа / Vehicle
+  assets/table/tab_search.json#/26
+  assets/table/vehicle/tab_car_vehicle.json#/0/subItem/1
+  assets/table/vehicle/tab_vehicle.json#/8/subItem/1
+type=1 id=116 support=654378240 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | HUD adjustment
+  assets/table/vehicle/tab_vehicle.json#/3/subItem/0/subItem/0
+type=1 id=121 support=553844992 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Windows
+  assets/table/vehicle/tab_vehicle.json#/2
+type=1 id=123 support=538313728 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 寻车模式 / ECO / Vehicle / Car find
+  assets/table/tab_search.json#/35
+  assets/table/vehicle/tab_car_vehicle.json#/5/subItem/0
+  assets/table/vehicle/tab_find_car_mode.json#/0
+  assets/table/vehicle/tab_find_car_mode.json#/0/subItem/0
+  assets/table/vehicle/tab_find_car_mode.json#/0/subItem/1
+  assets/table/vehicle/tab_vehicle.json#/11
+  assets/table/vehicle/tab_vehicle.json#/11/subItem/0
+type=1 id=124 support=537657600 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 前雨刮维修位置 / ECO / Vehicle
+  assets/table/tab_search.json#/33
+  assets/table/vehicle/tab_rain_wiper.json#/0
+  assets/table/vehicle/tab_vehicle.json#/10/subItem/0
+type=1 id=125 support=537331712 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Регулировка  усилия на руле / 方向盘转向力调节 / Vehicle
+  assets/table/tab_car_quick.json#/3/subItem/1
+  assets/table/tab_search.json#/15
+  assets/table/vehicle/tab_vehicle.json#/5/subItem/1
+type=1 id=126 support=2 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Автоматическое ограничение скорости круиз-контроля / 巡航自动限速辅助
+  assets/table/safe/tab_assist_safe.json#/1
+  assets/table/tab_search.json#/61
+type=1 id=127 support=671351040 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Ассистент смены полосы движения G-Pilot / G-Pilot变道辅助
+  assets/table/safe/tab_assist_safe.json#/2
+  assets/table/tab_search.json#/62
+type=1 id=128 support=537333504 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 安全带自动收紧 / Вкл/Выкл / Vehicle / Electronic safe
+  assets/table/tab_search.json#/23
+  assets/table/vehicle/tab_car_vehicle.json#/3/subItem/0
+  assets/table/vehicle/tab_electronic_safe.json#/0
+  assets/table/vehicle/tab_vehicle.json#/7
+type=1 id=130 support=537265408 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 陡坡缓降 / Система HDC / Vehicle
+  assets/table/tab_search.json#/49
+  assets/table/vehicle/tab_car_more.json#/7
+  assets/table/vehicle/tab_vehicle.json#/13/subItem/7
+type=1 id=131 support=537002240 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 发动机启停 / Запуск/остановка двигателя / Vehicle
+  assets/table/tab_search.json#/50
+  assets/table/vehicle/tab_car_more.json#/0
+  assets/table/vehicle/tab_vehicle.json#/13/subItem/3
+type=1 id=132 support=537265152 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 自动驻车 / Auto-Hold / Vehicle
+  assets/table/tab_search.json#/52
+  assets/table/vehicle/tab_car_more.json#/1
+  assets/table/vehicle/tab_vehicle.json#/13/subItem/4
+type=1 id=133 support=537264384 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | EPB AUTO / Автоматическое включение системы EPB / Vehicle
+  assets/table/tab_search.json#/53
+  assets/table/vehicle/tab_car_more.json#/9
+  assets/table/vehicle/tab_vehicle.json#/13/subItem/6
+type=1 id=134 support=537921280 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 被动设防 / Пассивная безопасность / Vehicle
+  assets/table/tab_search.json#/54
+  assets/table/vehicle/tab_car_more.json#/10
+  assets/table/vehicle/tab_vehicle.json#/13/subItem/2
+type=1 id=135 support=537921536 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 低灵敏度报警 / Слабое оповещение / Vehicle
+  assets/table/tab_search.json#/55
+  assets/table/vehicle/tab_car_more.json#/11
+  assets/table/vehicle/tab_vehicle.json#/13/subItem/8
+type=1 id=137 support=537330176 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Система LDW / 车道偏离报警
+  assets/table/safe/tab_assist_safe.json#/4
+  assets/table/tab_search.json#/65
+type=1 id=139 support=537788928 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Чувствительность системы FCW
+  assets/table/safe/tab_assist_safe.json#/7
+type=1 id=142 support=537723136 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Система помощи при парковке (PAS) / 泊车辅助系统
+  assets/table/safe/tab_assist_safe.json#/18
+  assets/table/tab_search.json#/81
+type=1 id=15 support=537920256 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 锁车鸣笛 / Звуковой сигнал при запирании / Vehicle
+  assets/table/tab_search.json#/48
+  assets/table/vehicle/tab_car_more.json#/6
+  assets/table/vehicle/tab_vehicle.json#/13/subItem/1
+type=1 id=150 support=269026304 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 方向盘自动加热 / Автоматический обогрев рулевого колеса
+  assets/table/tab_search.json#/99
+  assets/table/vehicle/tab_car_more.json#/4
+  assets/table/vehicle/tab_comfort.json#/2/subItem/0
+type=1 id=151 support=269418752 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 空调舒适性智能提醒 / Интеллектуальное оповещение для поддержания комфортной температуры климат-контроля
+  assets/table/tab_search.json#/100
+  assets/table/vehicle/tab_car_more.json#/5
+  assets/table/vehicle/tab_comfort.json#/2/subItem/1
+type=1 id=152 support=538378496 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 驾驶员方便进出 / Вкл/Выкл / Easy ingress egress
+  assets/table/tab_search.json#/97
+  assets/table/vehicle/tab_car_vehicle.json#/1/subItem/0
+  assets/table/vehicle/tab_comfort.json#/1
+type=1 id=153 support=620888320 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 时间显示格式 / Формат отображения времени
+  assets/table/tab_search.json#/154
+  assets/table/vehicle/tab_system.json#/0/subItem/0
+type=1 id=154 support=620888576 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 日期格式 / Формат отображения даты
+  assets/table/tab_search.json#/155
+  assets/table/vehicle/tab_system.json#/0/subItem/1
+type=1 id=155 support=620822784 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Fuel consumption Unit / Единицы измерения расхода топлива
+  assets/table/tab_search.json#/149
+  assets/table/vehicle/tab_system.json#/1/subItem/0
+type=1 id=156 support=620823808 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Speed and mileage Unit / Единицы измерения скорости и пробега
+  assets/table/tab_search.json#/150
+  assets/table/vehicle/tab_system.json#/1/subItem/1
+type=1 id=157 support=620823296 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Temperature Unit / Единицы измерения температуры
+  assets/table/tab_search.json#/151
+  assets/table/vehicle/tab_system.json#/1/subItem/2
+type=1 id=158 support=620823552 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Pressure Unit / Единицы измерения давления
+  assets/table/tab_search.json#/152
+  assets/table/vehicle/tab_system.json#/1/subItem/3
+type=1 id=160 support=538771712 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Громкость сигналов панели приборов
+  assets/table/sound/tab_sound.json#/2/subItem/0
+type=1 id=163 support=771883264 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Звук при касании экрана
+  assets/table/sound/tab_sound.json#/6
+type=1 id=17 support=738263296 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 靠近解锁/远离上锁 / Автоматическое отпирание дверей при приближении к автомобилю / Автоматическое запирание дверей при отдалении от автомобиля / Vehicle
+  assets/table/tab_search.json#/28
+  assets/table/vehicle/tab_car_vehicle.json#/0/subItem/2
+  assets/table/vehicle/tab_vehicle.json#/8/subItem/3
+type=1 id=172 support=537723392 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Громкость уведомлений системы помощи при парковке (PAS) / 泊车辅助系统音量
+  assets/table/sound/tab_sound.json#/2/subItem/1
+  assets/table/tab_search.json#/124
+type=1 id=174 support=None handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 时间调整
+  assets/table/tab_search.json#/157
+  assets/table/vehicle/tab_system.json#/0/subItem/4
+type=1 id=175 support=2 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 时区调整 / Часовой пояс
+  assets/table/tab_search.json#/158
+  assets/table/vehicle/tab_system.json#/0/subItem/3
+type=1 id=176 support=671482368 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Уведомление системы TSI / Предупреждение о превышении скорости
+  assets/table/safe/tab_assist_safe.json#/14
+  assets/table/safe/tab_assist_safe.json#/14/subItem/0
+type=1 id=21 support=537461248 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 锁车时外后视镜折叠 / ECO / Автоматическое складывание наружных зеркал при запирании автомобиля / Vehicle
+  assets/table/tab_search.json#/31
+  assets/table/vehicle/tab_back_mirror.json#/1
+  assets/table/vehicle/tab_car_vehicle.json#/4/subItem/1
+  assets/table/vehicle/tab_vehicle.json#/9/subItem/1
+type=1 id=211 support=771818240 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Воспроизведение с технологией SoundTrue
+  assets/table/sound/tab_sound.json#/0/subItem/1
+type=1 id=212 support=771883264 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Звук при касании экрана
+  assets/table/sound/tab_sound.json#/6/subItem/0
+type=1 id=213 support=570687744 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 驾驶模式关联仪表主题
+  assets/table/vehicle/drive_mode_related_theme.json#/0
+type=1 id=215 support=654443008 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Customize
+  assets/table/vehicle/tab_vehicle.json#/3/subItem/0/subItem/1
+type=1 id=216 support=570688256 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Cвязь с реж. вождения / 转向力与驾驶模式联动 / Vehicle
+  assets/table/tab_car_quick.json#/3/subItem/0
+  assets/table/tab_search.json#/14
+  assets/table/vehicle/tab_vehicle.json#/5/subItem/0
+type=1 id=217 support=None handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Restore factory settings / Сброс до заводских настроек
+  assets/table/tab_search.json#/169
+  assets/table/vehicle/tab_system.json#/5/subItem/0
+type=1 id=22 support=537461504 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 倒车时外后视镜倾斜 / ECO / Наклон  наружного зеркала заднего вида при движении автомобиля задним ходом
+  assets/table/tab_search.json#/30
+  assets/table/vehicle/tab_back_mirror.json#/0
+  assets/table/vehicle/tab_back_mirror.json#/0/subItem/0
+  assets/table/vehicle/tab_back_mirror.json#/0/subItem/1
+  assets/table/vehicle/tab_back_mirror.json#/0/subItem/2
+  assets/table/vehicle/tab_back_mirror.json#/0/subItem/3
+  assets/table/vehicle/tab_car_vehicle.json#/4/subItem/0
+  assets/table/vehicle/tab_vehicle.json#/9/subItem/0
+type=1 id=222 support=671482112 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 限速信息识别报警
+  assets/table/tab_search.json#/74
+type=1 id=229 support=537329920 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Система LDP / 车道偏离辅助
+  assets/table/safe/tab_assist_safe.json#/5
+  assets/table/tab_search.json#/64
+type=1 id=230 support=537329920 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Система LKA / 车道保持辅助
+  assets/table/safe/tab_assist_safe.json#/3
+  assets/table/tab_search.json#/63
+type=1 id=231 support=553844992 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Vehicle
+  assets/table/vehicle/tab_vehicle.json#/2/subItem/0
+type=1 id=232 support=553844992 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Vehicle
+  assets/table/vehicle/tab_window.json#/0
+type=1 id=233 support=587596288 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Ассистент для удаленной парковки / 遥控泊车辅助
+  assets/table/safe/tab_assist_safe.json#/19
+  assets/table/tab_search.json#/82
+type=1 id=235 support=671351296 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Звук / 声音
+  assets/table/safe/tab_assist_safe.json#/10/subItem/0
+  assets/table/tab_search.json#/70
+type=1 id=236 support=671482880 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Настройка ограничения скорости / 限速偏差设定
+  assets/table/safe/tab_assist_safe.json#/14/subItem/1
+  assets/table/tab_search.json#/75
+type=1 id=237 support=671483136 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Настройка предупреждений / 报警值设置
+  assets/table/safe/tab_assist_safe.json#/8/subItem/0
+  assets/table/tab_search.json#/78
+type=1 id=238 support=537592064 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Cистема TSI / 道路标志识别
+  assets/table/safe/tab_assist_safe.json#/15
+  assets/table/tab_search.json#/76
+type=1 id=239 support=671484160 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Персонализация предупреждений о превышении скорости / 自定义超速报警
+  assets/table/safe/tab_assist_safe.json#/8
+  assets/table/tab_search.json#/77
+type=1 id=242 support=587596032 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Интеллектуальные рекомендации при парковке / 泊车方式智能推荐
+  assets/table/safe/tab_assist_safe.json#/17
+  assets/table/tab_search.json#/80
+type=1 id=243 support=2 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 网络复位
+  assets/table/tab_search.json#/57
+  assets/table/vehicle/tab_vehicle.json#/13/subItem/10
+type=1 id=247 support=None handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | N/A
+  assets/table/vehicle/tab_adjust_seat.json#/0
+type=1 id=248 support=None handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | N/A
+  assets/table/vehicle/tab_adjust_seat.json#/1
+type=1 id=249 support=None handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | N/A
+  assets/table/vehicle/tab_adjust_seat.json#/2
+type=1 id=250 support=0 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Units
+  assets/table/tab_search.json#/148
+type=1 id=252 support=537920512 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 无钥匙进入 / Бесключевой доступ / Vehicle
+  assets/table/tab_search.json#/25
+  assets/table/vehicle/tab_car_vehicle.json#/0/subItem/0
+  assets/table/vehicle/tab_vehicle.json#/8/subItem/0
+type=1 id=258 support=554762496 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Настраиваемая  кнопка на рулевом колесе
+  assets/table/vehicle/tab_car_vehicle.json#/2/subItem/0
+type=1 id=259 support=0 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Частоты / 低中高频
+  assets/table/sound/tab_sound.json#/3
+  assets/table/tab_search.json#/117
+type=1 id=27 support=537657856 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 倒车关联后雨刮 / NORMAL / Vehicle
+  assets/table/tab_search.json#/34
+  assets/table/vehicle/tab_rain_wiper.json#/1
+  assets/table/vehicle/tab_vehicle.json#/10/subItem/1
+type=1 id=277 support=None handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Люк и солнцезащитная шторка
+  assets/table/tab_car_quick.json#/0/subItem/1
+type=1 id=278 support=None handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 外后视镜
+  assets/table/tab_search.json#/29
+type=1 id=284 support=None handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 空调设置
+  assets/table/tab_search.json#/98
+type=1 id=285 support=None handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Регул. сидений
+  assets/table/tab_car_quick.json#/0/subItem/0
+type=1 id=293 support=612369920 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Сброс  значений промежуточного пробега
+  assets/table/vehicle/tab_car_vehicle.json#/7/subItem/0
+type=1 id=294 support=612369152 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Пробег за текущую поездку
+  assets/table/vehicle/tab_car_vehicle.json#/7/subItem/1
+type=1 id=295 support=538904064 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 智能节油 / Интеллектуальный режим экономии топлива / Vehicle
+  assets/table/tab_search.json#/56
+  assets/table/vehicle/tab_car_more.json#/3
+  assets/table/vehicle/tab_vehicle.json#/13/subItem/9
+type=1 id=305 support=None handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Стеклоочиститель
+  assets/table/tab_car_quick.json#/2/subItem/0
+type=1 id=308 support=539495936 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Экран переднего пассажира / 副驾屏幕
+  assets/table/tab_display.json#/1
+  assets/table/tab_search.json#/136
+type=1 id=31 support=537985280 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Проекционный  дисплей (HUD) / HUD抬头显示 / HUD / HUD switch
+  assets/table/tab_car_quick.json#/2/subItem/1
+  assets/table/tab_search.json#/12
+  assets/table/vehicle/tab_vehicle.json#/3
+  assets/table/vehicle/tab_vehicle.json#/3/subItem/0
+type=1 id=310 support=537003264 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Уровень рекуперации энергии
+  assets/table/vehicle/tab_car_vehicle.json#/6/subItem/0
+type=1 id=33 support=654442752 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Customize
+  assets/table/vehicle/tab_vehicle.json#/3/subItem/0/subItem/2
+type=1 id=39 support=637600000 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 手机无线充电 / Беспроводная зарядка / Vehicle
+  assets/table/tab_search.json#/47
+  assets/table/vehicle/tab_car_more.json#/2
+  assets/table/vehicle/tab_vehicle.json#/13/subItem/0
+type=1 id=44 support=0 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Эквалайзер / 均衡器
+  assets/table/sound/tab_sound.json#/4
+  assets/table/tab_search.json#/118
+type=1 id=80 support=537002752 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | ESC运动模式 / ESC Sport / Vehicle
+  assets/table/tab_search.json#/51
+  assets/table/vehicle/tab_car_more.json#/8
+  assets/table/vehicle/tab_vehicle.json#/13/subItem/5
+type=1 id=81 support=537788672 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 前向预碰撞灵敏度
+  assets/table/tab_search.json#/67
+type=1 id=86 support=537332224 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Предупреждение системы RCTA / 后方横向来车预警
+  assets/table/safe/tab_assist_safe.json#/13
+  assets/table/tab_search.json#/73
+type=1 id=87 support=537331456 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Cистема LCA / 变道安全预警
+  assets/table/safe/tab_assist_safe.json#/10
+  assets/table/tab_search.json#/69
+type=1 id=88 support=538050816 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Cистема DOW / 开门安全预警
+  assets/table/safe/tab_assist_safe.json#/11
+  assets/table/tab_search.json#/71
+type=1 id=89 support=537333760 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | Cистема CMSR / 后碰撞安全预警
+  assets/table/safe/tab_assist_safe.json#/12
+  assets/table/tab_search.json#/72
+type=1 id=93 support=537395456 handler=Lecarx/settings/proxy/branch/CarFunctionProxy; | 锁车自动关闭遮阳帘 / Vehicle
+  assets/table/tab_search.json#/6
+  assets/table/vehicle/tab_vehicle.json#/2/subItem/1
+  assets/table/vehicle/tab_window.json#/1
+type=2 id=1 support=537134848 handler=Lecarx/settings/proxy/branch/LightingProxy; | Функция задержки выключения света фар / 伴我回家
+  assets/table/light/tab_light_lamp.json#/2
+  assets/table/tab_search.json#/91
+type=2 id=102 support=537526784 handler=Lecarx/settings/proxy/branch/LightingProxy; | Атмосферная подсветка
+  assets/table/vehicle/tab_car_light.json#/0/subItem/1
+type=2 id=169 support=538248192 handler=Lecarx/settings/proxy/branch/LightingProxy; | Регулировка яркости экрана переднего пассажира / 副驾屏亮度调节
+  assets/table/tab_display.json#/0/subItem/3
+  assets/table/tab_search.json#/135
+type=2 id=200 support=537134592 handler=Lecarx/settings/proxy/branch/LightingProxy; | Подсветка при открытии дверей
+  assets/table/vehicle/tab_car_light.json#/3
+type=2 id=203 support=537135360 handler=Lecarx/settings/proxy/branch/LightingProxy; | Приветственная подсветка / 迎宾灯
+  assets/table/light/tab_light_lamp.json#/0
+  assets/table/tab_search.json#/92
+type=2 id=204 support=704971008 handler=Lecarx/settings/proxy/branch/LightingProxy; | Приветственная подсветка
+  assets/table/vehicle/tab_car_light.json#/1
+type=2 id=205 support=704971264 handler=Lecarx/settings/proxy/branch/LightingProxy; | Подсветка при выходе из автомобиля
+  assets/table/vehicle/tab_car_light.json#/2
+type=2 id=292 support=0 handler=Lecarx/settings/proxy/branch/LightingProxy; | Световое приветствие
+  assets/table/vehicle/tab_car_light.json#/0
+  assets/table/vehicle/tab_car_light.json#/0/subItem/0
+type=2 id=308 support=539495936 handler=Lecarx/settings/proxy/branch/LightingProxy; | Тип подсветки
+  assets/table/vehicle/tab_car_light.json#/0/subItem/2
+type=2 id=4 support=721617152 handler=Lecarx/settings/proxy/branch/LightingProxy; | Световые сигналы приветственной подсветки / 欢迎灯语
+  assets/table/light/tab_light_lamp.json#/1
+  assets/table/tab_search.json#/93
+type=2 id=402 support=688062976 handler=Lecarx/settings/proxy/branch/LightingProxy; | Яркость дисплея / 屏幕亮度
+  assets/table/tab_display.json#/0/subItem/1
+  assets/table/tab_search.json#/132
+type=2 id=57 support=538247936 handler=Lecarx/settings/proxy/branch/LightingProxy; | Яркость дисплея / 中控屏亮度调节
+  assets/table/tab_display.json#/0/subItem/2
+  assets/table/tab_search.json#/134
+type=2 id=58 support=687997184 handler=Lecarx/settings/proxy/branch/LightingProxy; | Яркость подсветки панели приборов / 仪表/开关亮度调节
+  assets/table/tab_display.json#/0/subItem/0
+  assets/table/tab_search.json#/133
+type=2 id=65 support=538247424 handler=Lecarx/settings/proxy/branch/LightingProxy; | Настройка день/ночь / 日夜主题
+  assets/table/tab_display.json#/2
+  assets/table/tab_search.json#/144
+type=3 id=67 support=None handler=None | System version
+  assets/table/vehicle/system/tab_machine.json#/0
+type=3 id=68 support=None handler=None | Hardware version
+  assets/table/vehicle/system/tab_machine.json#/1
+type=3 id=69 support=None handler=None | Firmware version
+  assets/table/vehicle/system/tab_machine.json#/2
+type=3 id=70 support=None handler=None | XDSN
+  assets/table/vehicle/system/tab_machine.json#/3
+type=3 id=71 support=None handler=None | Bluetooth address
+  assets/table/vehicle/system/tab_machine.json#/4
+type=3 id=72 support=None handler=None | WLAN MAC
+  assets/table/vehicle/system/tab_machine.json#/5
+type=5 id=143 support=2 handler=Lecarx/settings/proxy/custom/CustomSound; | 导航播报音量
+  assets/table/tab_search.json#/123
+type=5 id=145 support=2 handler=Lecarx/settings/proxy/custom/CustomSound; | 语音助手提示音量
+  assets/table/tab_search.json#/126
+type=5 id=146 support=None handler=Lecarx/settings/proxy/custom/CustomSound; | Громкость мультимедийной системы / 多媒体音量
+  assets/table/sound/tab_sound.json#/2/subItem/2
+  assets/table/tab_search.json#/122
+type=5 id=147 support=None handler=Lecarx/settings/proxy/custom/CustomSound; | Громкость Bluetooth / 蓝牙电话音量
+  assets/table/sound/tab_sound.json#/2/subItem/3
+  assets/table/tab_search.json#/125
+type=5 id=148 support=4 handler=Lecarx/settings/proxy/custom/CustomSound; | Аудиосистема Bose / BOSE高级音响
+  assets/table/sound/tab_sound.json#/0
+  assets/table/tab_search.json#/113
+type=5 id=149 support=4 handler=Lecarx/settings/proxy/custom/CustomSound; | Звуковые эффекты
+  assets/table/sound/tab_sound.json#/0/subItem/0
+  assets/table/sound/tab_sound.json#/1/subItem/0
+type=5 id=160 support=538771712 handler=Lecarx/settings/proxy/custom/CustomSound; | 仪表报警音
+  assets/table/tab_search.json#/121
+type=5 id=164 support=0 handler=Lecarx/settings/proxy/custom/CustomSound; | Подавление шума Audio Pilot / Звукокомпенсация в зависимости от скорости движения
+  assets/table/sound/tab_sound.json#/0/subItem/2
+  assets/table/sound/tab_sound.json#/7/subItem/0
+type=5 id=165 support=2 handler=Lecarx/settings/proxy/custom/CustomSound; | 导航混音模式
+  assets/table/tab_search.json#/116
+type=5 id=210 support=771818240 handler=Lecarx/settings/proxy/custom/CustomSound; | SoundTrue 音源修复 / AudioPilot 噪音补偿
+  assets/table/tab_search.json#/114
+  assets/table/tab_search.json#/115
+type=5 id=231 support=553844992 handler=Lecarx/settings/proxy/custom/CustomSound; | 天窗和遮阳帘控制
+  assets/table/vehicle/tab_window.json#/0/subItem/0
+type=5 id=301 support=4 handler=Lecarx/settings/proxy/custom/CustomSound; | Звуковые эффекты
+  assets/table/sound/tab_sound.json#/1
+type=5 id=53 support=None handler=Lecarx/settings/proxy/custom/CustomSound; | 触屏声音提醒
+  assets/table/tab_search.json#/127
+type=5 id=54 support=None handler=Lecarx/settings/proxy/custom/CustomSound; | Звукокомпенсация в зависимости от скорости движения / 音量随车速调节
+  assets/table/sound/tab_sound.json#/7
+  assets/table/tab_search.json#/128
+type=23 id=256 support=None handler=Lecarx/settings/proxy/branch/NotifyMessageProxy; | Push-уведомления / Notifications
+  assets/config.json#/0
+  assets/table/tab_search.json#/161
+type=23 id=75 support=2 handler=Lecarx/settings/proxy/branch/NotifyMessageProxy; | Настройки голосовых сообщений / Notifications / Настройки  голосовых сообщений
+  assets/config.json#/2
+  assets/table/tab_search.json#/163
+  assets/table/vehicle/system/tab_notify.json#/0
+type=23 id=76 support=0 handler=Lecarx/settings/proxy/branch/NotifyMessageProxy; | 隐藏通知的内容
+  assets/table/vehicle/system/tab_notify.json#/1
+type=23 id=77 support=0 handler=Lecarx/settings/proxy/branch/NotifyMessageProxy; | Объединение оповещений / Notifications / Объединение  оповещений
+  assets/config.json#/1
+  assets/table/tab_search.json#/162
+  assets/table/vehicle/system/tab_notify.json#/2
+type=38 id=109 support=570491136 handler=Lecarx/settings/proxy/DriveModeProxy; | 
+  assets/table/vehicle/tab_vehicle.json#/4/subItem/0
+type=38 id=293 support=612369920 handler=Lecarx/settings/proxy/DriveModeProxy; | 行驶里程 / 平均油耗 / 平均车速 / 行驶时间
+  assets/table/tab_search.json#/40
+  assets/table/tab_search.json#/41
+  assets/table/tab_search.json#/42
+  assets/table/tab_search.json#/43
+  assets/table/vehicle/tab_vehicle.json#/12/subItem/0
+type=101 id=14 support=None handler=Lecarx/settings/proxy/custom/CustomVehicle; | Вкл/Выкл
+  assets/table/vehicle/tab_system.json#/4/subItem/0
+type=101 id=171 support=2 handler=Lecarx/settings/proxy/custom/CustomVehicle; | 夏令时
+  assets/table/tab_search.json#/159
+  assets/table/vehicle/tab_system.json#/0/subItem/5
+type=101 id=173 support=2 handler=Lecarx/settings/proxy/custom/CustomVehicle; | 自动设置 / Auto
+  assets/table/tab_search.json#/156
+  assets/table/vehicle/tab_system.json#/0/subItem/2
+type=101 id=177 support=None handler=Lecarx/settings/proxy/custom/CustomVehicle; | 方向盘自定义按键 / DVR拍照/录像 / 360全景 / 一键导航回家 / 仪表全屏地图 / 多媒体音源切换 / 多媒体节目收藏 / Steering custom
+  assets/table/tab_search.json#/16
+  assets/table/tab_search.json#/17
+  assets/table/tab_search.json#/18
+  assets/table/tab_search.json#/19
+  assets/table/tab_search.json#/20
+  assets/table/tab_search.json#/21
+  assets/table/tab_search.json#/22
+  assets/table/vehicle/tab_vehicle.json#/6
+  assets/table/vehicle/tab_vehicle.json#/6/subItem/0
+type=101 id=256 support=None handler=Lecarx/settings/proxy/custom/CustomVehicle; | Notifications / 通知设置 / Настройка уведомлений
+  assets/table/tab_search.json#/160
+  assets/table/tab_search.json#/164
+  assets/table/vehicle/system/tab_special_notification_center.json#/0
+  assets/table/vehicle/tab_system.json#/3
+type=101 id=260 support=2 handler=Lecarx/settings/proxy/custom/CustomVehicle; | 投屏偏好设置 / 仪表地图模式
+  assets/table/tab_search.json#/138
+  assets/table/tab_search.json#/139
+type=101 id=261 support=0 handler=Lecarx/settings/proxy/custom/CustomVehicle; | 屏保设置
+  assets/table/tab_search.json#/140
+type=101 id=270 support=2 handler=Lecarx/settings/proxy/custom/CustomVehicle; | Default Apps / 导航 / 默认应用
+  assets/table/tab_search.json#/165
+  assets/table/tab_search.json#/166
+  assets/table/vehicle/system/tab_special_notification_center.json#/1
+type=101 id=273 support=2 handler=Lecarx/settings/proxy/custom/CustomVehicle; | 字体 / 字体大小
+  assets/table/tab_search.json#/142
+  assets/table/tab_search.json#/143
+type=101 id=40 support=None handler=Lecarx/settings/proxy/custom/CustomVehicle; | Function switch
+  assets/table/vehicle/tab_custom_key.json#/0
+type=101 id=41 support=None handler=Lecarx/settings/proxy/custom/CustomVehicle; | Popup prompt
+  assets/table/vehicle/tab_custom_key.json#/2
+type=101 id=42 support=None handler=Lecarx/settings/proxy/custom/CustomVehicle; | 自定义按键
+  assets/table/vehicle/tab_custom_key.json#/1
