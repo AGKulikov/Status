@@ -13,6 +13,22 @@ import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=28,application=Application.class)
 public class BackupDefaultsMigrationTest {
+    @Test public void systemDumpReleasePreservesDefaultsAndRejectsFuture() throws Exception {
+        for(int source=208021335;source<=208021347;source++) {
+            JSONObject metadata=new JSONObject().put("sourceVersionCode",source).put("defaultsSchema",source)
+                    .put("declaredMainDefaults",BackupPreferencesXml.encode(Collections.singletonMap("enabled",false)));
+            File snapshot=new File(RuntimeEnvironment.getApplication().getCacheDir(),"314-"+source);
+            File main=BackupFiles.child(snapshot,"de_prefs/example_preferences.xml");
+            BackupPreferencesXml.write(main,Collections.singletonMap("enabled",true));
+            BackupDefaultsMigration.materialize(snapshot,"example",metadata,208021347);
+            assertEquals(Boolean.TRUE,BackupPreferencesXml.read(main).get("enabled"));
+        }
+        for(int invalid:new int[]{208021334,208021348}) {
+            JSONObject metadata=new JSONObject().put("sourceVersionCode",invalid).put("defaultsSchema",invalid)
+                    .put("declaredMainDefaults",BackupPreferencesXml.encode(Collections.emptyMap()));
+            try { BackupDefaultsMigration.validate(metadata,208021347);fail(); } catch(IOException expected) {}
+        }
+    }
     @Test public void startupIconsReleasePreservesOldDefaultsAndRejectsFuture() throws Exception {
         for(int source=208021335;source<=208021346;source++) {
             JSONObject metadata=new JSONObject().put("sourceVersionCode",source).put("defaultsSchema",source)
