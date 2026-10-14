@@ -1,5 +1,15 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 14.10.2026 — уточнение firmware-кандидатов
+
+vdh-qnx-boot.img из Cruise Trace — QNX6 persist, а не доказанный boot/DIM image:
+оба CRC superblock проверены, 17/17 inode достижимы, /.boot пустой, размер32MiB.
+linux.config связывает vdh с hostdev /dev/disk/qnx_persist. Дополнительный
+IPCP Evidence 2 содержит QNX_FILES=0 из-за Connection refused, не свидетельство
+отсутствия QNX renderer. В историческом Deep Evidence variant.cfg=KX11_HIGH;
+в свежем dump файла нет. Receiver/отдельный флаг крыльев остаются OPEN.
+[Хеши и границы дополнительного поиска](docs/geely-kx11/research-2026-10-14-dim/FIRMWARE_SEARCH_RU.md).
+
 ## 14.10.2026 — свежие QNX-библиотеки и привязка ttyHS2
 
 Проверены CRC/SHA/размеры13 payloads системного дампа2d6041b5… от Natro3.1.6.

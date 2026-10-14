@@ -209,6 +209,13 @@
           "finding": "Свежий sysfs связывает ttyHS2 с 0x890000/QUP4. Получены три QNX panel library; MAX96755_QC_0 выбирает variant, ограниченно инициализирует сериализатор через ser4, закрывает порт и завершает worker с pthread_join. Это не постоянный nav receiver и не найденный renderer крыльев. CRC/SHA/размеры 13 payloads проверены; физический gate OPEN.",
           "source": "research-2026-10-14-dim/README_RU.md",
           "next_step": "Уточнить фактические variant.cfg и загруженную panel library; искать прошивку и dispatcher внешнего DIM endpoint. Не подменять это MPC5746C со SPI-протоколом или переключением всего navigation mode."
+        },
+        {
+          "date": "2026-10-14",
+          "level": "ARCHIVE_METADATA_VERIFIED",
+          "finding": "vdh-qnx-boot.img идентифицирован как QNX6 persist: два валидных superblock CRC, 17/17 inode, пустой /.boot. Дополнительный IPCP архив имеет QNX_FILES=0 из-за Connection refused; просмотрены каталоги 10 APK. Исторический variant.cfg=KX11_HIGH подтверждён. DIM receiver и независимое отключение крыльев не установлены.",
+          "source": "research-2026-10-14-dim/FIRMWARE_SEARCH_RU.md",
+          "next_step": "Получить read-only связь работающих QNX graphics-процессов с executable/library либо идентифицированный пакет внешнего DIM; не повторять persist/init/SPI как кандидатов без новых свидетельств."
         }
       ],
       "coverage_ids": [
