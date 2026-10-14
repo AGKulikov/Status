@@ -26,6 +26,8 @@ public final class SystemFileDumpReplay {
             check(command.startsWith("su 0 sh -c "));
             // Recover nested shell quoting only inside the inert test transport.
             String script=command.substring("su 0 sh -c '".length(),command.length()-1).replace("'\"'\"'", "'");
+            if(script.startsWith("date +%s")||script.startsWith("dumpsys "))return result("graphics metadata");
+            if(script.contains("NATRO_DLT_LIST"))return result("NATRO_DLT_LIST\nNATRO_DLT_END");
             if(script.startsWith("if "))return result(""+raw.length);
             if(script.startsWith("sha256sum "))return result(sha+"  "+script.substring(11,script.length()-1));
             if(script.startsWith("dd ")) {

@@ -340,7 +340,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "bc64928bb8eb3bcbced5e4a6836de74951267d039fbe5aa24e6c09e53bcd0967",
+      "sha256": "f19b49da04f30aa5812652beb384cb1108f8e7313321e4dcf6d1ae44f2f2284e",
       "access_kinds": [
         "files"
       ]
@@ -426,13 +426,13 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/DiagnosticsActivity.java": {
-      "sha256": "3ee97a0d1049fc424fc20e9122bf139f6bfc75dc855ecb368637d4c904b08267",
+      "sha256": "f65818ddc0db690ee2996d694282a61a235ccb1101963a025fbcafb4a3e8d4e4",
       "access_kinds": [
         "files"
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/SystemFileDump.java": {
-      "sha256": "d9cf22460a08ce1afa5193bd2f6554045181cbde4e8e5b860d45f11319332466",
+      "sha256": "4b4e10fc1999e8d606769023dd292fd1b32036e409fcd7ff7ab41b7ec64864c9",
       "access_kinds": [
         "files"
       ]

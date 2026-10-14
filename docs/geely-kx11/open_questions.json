@@ -223,6 +223,13 @@
           "finding": "Пользовательский дамп3.1.8 содержит11/11 QNX файлов; CRC и20 payload hashes проверены. Свежий variant KX11_HIGH; четыре graphics ELF получены. Directory/exefile работают,25 PID до screen; mappings превысил наш64KiB cap, дальнейший обход остановлен. Telltale — OpenWFD test app; выбранные client/server call sites подтверждают графический обмен, не отдельный флаг крыльев.",
           "source": "research-2026-10-14-dim/DUMP_318_RU.md",
           "next_step": "Разобрать handlers/source/pipeline по полученным ELF. Для следующего изменения сборщика отделить полный bounded exefile inventory от mappings и сохранять truncated prefix. Нового дампа для текущего статического разбора не требуется."
+        },
+        {
+          "date": "2026-10-14",
+          "level": "STATIC",
+          "finding": "Сопоставлены transparency0x772e/global alpha0x772f и их чтение GetDisplayCompositionInfo вместе с rectangles/input sources. Единый слой обоих крыльев с прозрачным центром не исключён. Renderer и независимый hide flag не найдены; runtime запросы не выполнялись.",
+          "source": "research-2026-10-14-dim/OPENWFD_COMPOSITION_RU.md",
+          "next_step": "Composition query требует type2/locked driver: не внедрять как пассивный сбор. STATIC blending до QDI9/DS; точных сообщений в1051 текстовых entries12 ZIP нет. Подготовлен SOURCE3.1.9: inventory-first, truncated mappings prefix,22 fixed QNX targets, Android graphics context, bounded existing DLT ranges. CI/APK/FIELD отражать отдельно; внешний DIM/renderer крыльев остаются OPEN."
         }
       ],
       "coverage_ids": [

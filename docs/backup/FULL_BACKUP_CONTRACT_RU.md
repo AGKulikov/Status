@@ -1,5 +1,18 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review 3.1.9 — expanded graphics evidence
+
+SystemFileDump сохраняет прежний cache/exports ZIP и retention2. GraphicsEvidence
+не создаёт отдельного persistent storage: callback передаёт ограниченные metadata
+и DLT ranges внутрь того же диагностического ZIP. Журналы могут содержать личные
+данные; UI предупреждает, автоматической публикации/restore/активации нет.
+DiagnosticsActivity добавляет только RAM user label, не preference/default.
+QnxFileReader использует прежний транспорт и GET, не пишет на QNX; секреты и
+RSA-файлы AdbTransport не меняются. BackupDefaultsMigration явно разрешает
+335…351→352 при прежних keys/types/defaults;334/353 отклоняются. Пересмотрены
+три изменённых storage owners (UI/export/migration); новый reader не владеет
+новыми roots. Fingerprints обновляются после этой ревизии. FIELD restore OPEN.
+
 ### Review 3.1.8 — целевой graphics dump
 
 SystemFileDump сохраняет прежние cache/exports ZIP и политику двух последних

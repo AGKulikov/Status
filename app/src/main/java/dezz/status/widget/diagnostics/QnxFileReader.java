@@ -18,9 +18,15 @@ public final class QnxFileReader {
         "/bin/screen", "/lib/libopenwfd_qnx.so",
         "/lib/libMAX96755_QC_0_UART.so", "/lib/libMAX96755_QC_1_UART.so",
         "/lib/libDP_COMMON_QC_UART.so", "/bin/qcdisplaycfg.xml",
-        "/scripts/startup.sh", "/ramdisk/linux.config"
+        "/scripts/startup.sh", "/ramdisk/linux.config",
+        "/bin/wfd_be", "/lib/libWFD.so.1", "/lib/libplanedef.so",
+        "/lib/libdalconfig.so.1", "/lib/libhalmdputil_s8155.so",
+        "/etc/dlt_logadapter.conf", "/etc/dlt_usbdatalogger.conf",
+        "/lib/graphics.conf", "/etc/dlt.conf",
+        "/var/log/display_recovery_info.txt", "/var/log/la_gvm.txt"
     };
     public static final String[] SNAPSHOTS = {"processes.tsv", "graphics-mappings.txt"};
+    public static final int MAPPING_LIMIT = 256 * 1024, GRAPHICS_LIMIT = 8;
     private final Wire wire;
     private byte[] pending = new byte[0];
     private int cursor;
@@ -173,13 +179,16 @@ public final class QnxFileReader {
     public void collectProcesses(Receiver receiver) throws Exception {
         StringBuilder index=new StringBuilder("pid\tstatus\texecutable\n");
         StringBuilder maps=new StringBuilder("QNX mappings: metadata only; non-atomic live snapshot\n");
-        String result="collected_snapshot";
+        String indexStatus="collected_snapshot", mapsStatus="collected_snapshot";
+        java.util.Set<String> pids=new java.util.LinkedHashSet<>();
+        java.util.Set<String> indexed=new java.util.HashSet<>(), mapped=new java.util.HashSet<>();
+        java.util.Map<String,String> graphics=new java.util.LinkedHashMap<>();
+        boolean inventoryDone=false;
         try {
             path="/proc";handshake();stage="proc_directory";
             send("o:\"/proc\":0:4000\r\n");String opened=reply();
             if(opened.startsWith("e:"))throw new IOException("qnx_proc_open_denied_or_unavailable");
             long fd=descriptor(opened);
-            java.util.Set<String> pids=new java.util.LinkedHashSet<>();
             boolean eof=false;
             int total=0;
             for(int page=0;page<256;page++) {
@@ -193,53 +202,105 @@ public final class QnxFileReader {
                 for(int n=0;n<size;n+=2048)data.write(exact(Math.min(2048,size-n)));
                 for(String name:new String(data.toByteArray(),StandardCharsets.US_ASCII).split("\r\n",-1)) {
                     if(name.matches("[1-9][0-9]{0,9}")) {
-                        pids.add(name);if(pids.size()>256)throw new IOException("qnx_pid_limit");
+                        if(!pids.contains(name) && pids.size()==256)throw new IOException("qnx_pid_limit");
+                        pids.add(name);
                     }
                 }
             }
             send("c:"+fd+"\r\n");fields();
             if(!eof)throw new IOException("qnx_directory_page_limit");
-            int graphics=0;
+            // Inventory first. A large mappings file must never hide later process names.
             for(String pid:pids) {
                 path="/proc/"+pid+"/exefile";stage="proc_exefile";
-                byte[] data=procText(path,4096);
-                if(data==null){result="partial_or_unavailable";index.append(pid).append("\tdenied_or_exited\t-\n");continue;}
-                String exe=new String(data,StandardCharsets.UTF_8).replace("\u0000", "").trim();
+                ProcRead data;
+                try { data=procText(path,4096); }
+                catch(ProcFailure error) {
+                    indexed.add(pid);
+                    index.append(pid).append("\tread_or_protocol_failed\t-")
+                            .append("\n# exefile_prefix=").append(safe(new String(error.prefix,StandardCharsets.UTF_8))).append('\n');
+                    throw error;
+                }
+                indexed.add(pid);
+                if(!data.status.equals("read")) {
+                    indexStatus="partial_or_unavailable";
+                    index.append(pid).append('\t').append(data.status).append("\t-\n");continue;
+                }
+                String exe=new String(data.bytes,StandardCharsets.UTF_8).replace("\u0000", "").trim();
                 index.append(pid).append("\tread\t").append(safe(exe)).append('\n');
                 String name=exe.substring(exe.lastIndexOf('/')+1);
-                if(Arrays.asList("openwfd_server","openwfd_telltale","screen","screen-pwrmgr","cluster_controller").contains(name)) {
-                    if(++graphics>8)throw new IOException("qnx_graphics_process_limit");
-                    path="/proc/"+pid+"/mappings";stage="proc_mappings";
-                    maps.append("--- pid=").append(pid).append(" executable=").append(safe(exe)).append('\n');
-                    byte[] mapping=procText(path,65536);
-                    if(mapping==null)result="partial_or_unavailable";
-                    maps.append(mapping==null?"denied_or_exited\n":new String(mapping,StandardCharsets.UTF_8)+"\n");
-                }
+                if(Arrays.asList("openwfd_server","openwfd_telltale","wfd_be","screen",
+                        "screen-pwrmgr","cluster_controller","sc_qnx_vip_proxy").contains(name))
+                    graphics.put(pid,exe);
             }
-            maps.append("graphics_processes=").append(graphics).append('\n');
+            inventoryDone=true;
+            if(!indexStatus.equals("collected_snapshot"))mapsStatus="partial_or_unavailable";
+            // One denied/exited or truncated process is a result, not a broken transport.
+            for(java.util.Map.Entry<String,String> process:graphics.entrySet()) {
+                String pid=process.getKey();
+                maps.append("--- pid=").append(pid).append(" executable=").append(safe(process.getValue())).append('\n');
+                if(mapped.size()>=GRAPHICS_LIMIT) {
+                    mapsStatus="partial_or_unavailable";maps.append("status=not_attempted_process_limit\n");continue;
+                }
+                path="/proc/"+pid+"/mappings";stage="proc_mappings";mapped.add(pid);
+                ProcRead mapping;
+                try { mapping=procText(path,MAPPING_LIMIT); }
+                catch(ProcFailure error) {
+                    appendMapping(maps,"read_or_protocol_failed",error.prefix);throw error;
+                }
+                if(!mapping.status.equals("read"))mapsStatus="partial_or_unavailable";
+                appendMapping(maps,mapping.status,mapping.bytes);
+            }
+            maps.append("graphics_processes_found=").append(graphics.size())
+                    .append("\ngraphics_processes_attempted=").append(mapped.size()).append('\n');
         } catch(Exception error) {
-            result="partial_or_unavailable";
-            index.append("# ").append(safe(report(error))).append('\n');
+            if(!inventoryDone) {
+                indexStatus="partial_or_unavailable";
+                index.append("# ").append(safe(report(error))).append('\n');
+            }
+            mapsStatus="partial_or_unavailable";
+            maps.append("# ").append(safe(report(error))).append('\n');
+            for(String pid:pids)if(!indexed.contains(pid))index.append(pid).append("\tnot_attempted_after_failure\t-\n");
+            for(String pid:graphics.keySet())if(!mapped.contains(pid))maps.append("--- pid=").append(pid)
+                    .append(" status=not_attempted_after_failure\n");
             throw new Failure(path,report(error),error);
         } finally {
-            receiver.snapshot(SNAPSHOTS[0],result,index.toString().getBytes(StandardCharsets.UTF_8));
-            receiver.snapshot(SNAPSHOTS[1],result,maps.toString().getBytes(StandardCharsets.UTF_8));
+            receiver.snapshot(SNAPSHOTS[0],indexStatus,index.toString().getBytes(StandardCharsets.UTF_8));
+            receiver.snapshot(SNAPSHOTS[1],mapsStatus,maps.toString().getBytes(StandardCharsets.UTF_8));
         }
     }
-    private byte[] procText(String target,int limit) throws Exception {
+    private static void appendMapping(StringBuilder out,String status,byte[] bytes) {
+        out.append("status=").append(status).append(" bytes=").append(bytes.length).append('\n')
+                .append(new String(bytes,StandardCharsets.UTF_8).replace('\ufffd','?')).append('\n');
+    }
+    private static final class ProcRead {
+        final byte[] bytes;final String status;
+        ProcRead(byte[] bytes,String status){this.bytes=bytes;this.status=status;}
+    }
+    private static final class ProcFailure extends IOException {
+        final byte[] prefix;
+        ProcFailure(byte[] prefix,Exception cause){super(cause.getMessage(),cause);this.prefix=prefix;}
+    }
+    private ProcRead procText(String target,int limit) throws Exception {
         if(!target.matches("/proc/[1-9][0-9]{0,9}/(exefile|mappings)"))throw new IOException("qnx_proc_target_not_allowed");
-        send("o:\""+target+"\":0\r\n");String opened=reply();
-        if(opened.startsWith("e:"))return null;
-        long fd=descriptor(opened);ByteArrayOutputStream data=new ByteArrayOutputStream();
-        while(true) {
-            offset=data.size();int count=Math.min(2048,limit+1-data.size());
-            send("r:"+fd+":"+Integer.toHexString(data.size())+":"+Integer.toHexString(count)+":0\r\n");
-            String[] f=fields();if(f.length<2)throw new IOException("qnx_bad_proc_reply");
-            long got=number(f[1],16);if(got>count)throw new IOException("qnx_bad_proc_count");
-            if(got==0)break;
-            data.write(exact((int)got));
-            if(data.size()>limit)throw new IOException("qnx_proc_size_limit");
+        ByteArrayOutputStream data=new ByteArrayOutputStream();
+        try {
+            offset=0;send("o:\""+target+"\":0\r\n");String opened=reply();
+            if(opened.startsWith("e:"))return new ProcRead(new byte[0],"denied_or_exited");
+            long fd=descriptor(opened);String status="read";
+            while(true) {
+                offset=data.size();int count=Math.min(2048,limit+1-data.size());
+                send("r:"+fd+":"+Integer.toHexString(data.size())+":"+Integer.toHexString(count)+":0\r\n");
+                String[] f=fields();if(f.length<2)throw new IOException("qnx_bad_proc_reply");
+                long got=number(f[1],16);if(got>count)throw new IOException("qnx_bad_proc_count");
+                if(got==0)break;
+                byte[] part=exact((int)got);
+                int keep=Math.min(part.length,limit-data.size());data.write(part,0,keep);
+                if(keep<part.length){status="truncated_size_limit";break;}
+            }
+            send("c:"+fd+"\r\n");fields();return new ProcRead(data.toByteArray(),status);
+        } catch(Exception error) {
+            // Preserve validated payload chunks; never resume a desynchronised stream.
+            throw new ProcFailure(data.toByteArray(),error);
         }
-        send("c:"+fd+"\r\n");fields();return data.toByteArray();
     }
 }

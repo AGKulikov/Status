@@ -1,5 +1,54 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 14.10.2026 — SOURCE расширенного сбора3.1.9
+
+Разделены exefile inventory и mappings; cap256KiB сохраняет префикс с явным
+status, не обрывает оставшиеся PID. Новые allowlisted QNX targets основаны на
+fresh exefile/NEEDED и исторических конфигурациях/логах, не runtime-proof путей.
+DLT inventory только /mnt/userdata/DLT, canonical guards, depth2,128entries,
+до4 recent logs по2MiB; logger/driver не меняются. Список слоёв Android и clocks
+сохраняются отдельно; user label режима не считается vehicle feedback.
+CI/APK/FIELD отражаются отдельно в docs/releases/3.1.9/; wings renderer OPEN.
+
+## 14.10.2026 — исторический DLT route
+
+В августовском dlt_logadapter.conf включены graphics buffers screen/display/
+wfd_be/openwfd_server (SCRE/DISP/WFDB/WSER), loggerpath /dev/shmem/slogger2/.
+Архивный Android init.logqnx.sh экспортирует /mnt/userdata/DLT. Текущая
+доступность каталога и наличие blending log-level не подтверждены. Следующая
+возможная диагностика — bounded read-only inventory, без запуска экспорта,
+logger или изменения прав/маски. SHA/ограничения: OPENWFD_COMPOSITION_RU.md.
+
+## 14.10.2026 — STATIC blending до QDI/DS
+
+configurePipelineBlending (имя из diagnostic string) читает transparency/global
+alpha, проверяет alpha pixel format и передаёт QDI_LAYER_PROPERTY_BLEND=9
+через QDI_Layer_SetProperty в DS_Layer_SetProperty. Встроенный success log
+содержит src_layer/dest_layerid/iTransparency, но gated log-level bit4.
+Это кандидат существующего пассивного свидетельства, не полученный runtime
+результат. Ни log mask, ни driver state не изменялись. Renderer крыльев OPEN.
+Адреса и границы проверки: OPENWFD_COMPOSITION_RU.md.
+
+## 14.10.2026 — уточнение границ GetDisplayCompositionInfo
+
+STATIC: запрос требует AuthenticateClientHandle(type2) и locked driver;
+при отсутствии lock возвращает0x7518. Он обходит клиентов данного OpenWFD
+server, но видимость внешнего DIM не доказана. Ответ содержит descriptors
+источников, клиент вызывает shmem_import. Это не готовый пассивный probe.
+Никакой блокировки/подмены клиента/runtime вызова не выполнялось.
+Детали: docs/geely-kx11/research-2026-10-14-dim/OPENWFD_COMPOSITION_RU.md.
+
+## 14.10.2026 — STATIC OpenWFD composition и alpha
+
+В свежем openwfd_server сопоставлены0x772e TRANSPARENCY_ENABLE и0x772f
+GLOBAL_ALPHA по diagnostic strings и branches. GetDisplayCompositionInfo
+читает эти поля, rectangles и input sources. ABI/auth/lifecycle ещё не проверены
+для runtime применения; никаких запросов на автомобиль не отправлялось.
+Один LA_GVM pipeline не исключает общий слой обоих крыльев с прозрачным центром
+или композицию во внешнем DIM. Renderer/независимый hide остаются OPEN.
+Адреса, SHA и ограничения: research-2026-10-14-dim/OPENWFD_COMPOSITION_RU.md
+в docs/geely-kx11/.
+
 ## 14.10.2026 — FIELD сбора новых QNX graphics файлов
 
 Дамп3.1.8 1c4ac026… дал11/11 QNX файлов, включая четыре недостающих ELF,

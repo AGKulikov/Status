@@ -47,7 +47,8 @@ public class QnxFileReaderReplay {
                 current=s.split("\"",-1)[1];
                 if(!current.equals("/proc")&&!current.matches("/proc/(12|34)/(exefile|mappings)"))
                     throw new AssertionError("Unexpected path "+current);
-                if(scenario==1 || (scenario==2&&current.endsWith("/exefile"))){add("e:permission\r\n");return;}
+                if(scenario==1 || (scenario==2&&current.endsWith("/exefile"))
+                        || (scenario==8&&current.equals("/proc/12/mappings"))){add("e:permission\r\n");return;}
                 add("o:0\r\n");return;
             }
             if(s.equals("c:0\r\n")){add("o\r\n");return;}
@@ -62,8 +63,18 @@ public class QnxFileReaderReplay {
                 }
                 if(!f[4].equals("0"))throw new AssertionError();
                 byte[] raw=(current.endsWith("/mappings")?"1000 2000 /lib/libopenwfd_qnx.so\n":
-                        current.contains("/12/")?"/bin/screen\n":"/bin/unrelated\n").getBytes(StandardCharsets.US_ASCII);
+                        current.contains("/12/")?"/bin/screen\n":scenario>=6?"/bin/wfd_be\n":"/bin/unrelated\n").getBytes(StandardCharsets.US_ASCII);
                 if(scenario==5)raw=new byte[4097];
+                if((scenario==6||scenario==9)&&current.equals("/proc/12/mappings")) {
+                    raw=new byte[QnxFileReader.MAPPING_LIMIT+(scenario==6?1:0)];Arrays.fill(raw,(byte)'X');
+                }
+                if(scenario==10&&current.equals("/proc/12/mappings")) {
+                    raw=new byte[65537];Arrays.fill(raw,(byte)'F');
+                }
+                if(scenario==7&&current.equals("/proc/12/mappings")) {
+                    if(off>=2048)throw new IOException("synthetic socket closed");
+                    raw=new byte[4096];Arrays.fill(raw,(byte)'P');
+                }
                 int n=Math.min(count,Math.max(0,raw.length-off));
                 add("o:"+Integer.toHexString(n)+"\r\n");queue.write(raw,off,n);return;
             }
@@ -71,18 +82,19 @@ public class QnxFileReaderReplay {
         }
     }
     static void processTests()throws Exception {
-        for(int mode=0;mode<=5;mode++) {
+        for(int mode=0;mode<=10;mode++) {
             ProcPeer peer=new ProcPeer(mode);Map<String,String> payloads=new HashMap<>();
             final int scenario=mode;
             boolean failed=false;
             try {new QnxFileReader(peer).collectProcesses(new QnxFileReader.Receiver(){
                 public void file(String p,String s,byte[] b){throw new AssertionError();}
                 public void snapshot(String n,String s,byte[] b){
-                    if(!s.equals(scenario==0?"collected_snapshot":"partial_or_unavailable"))throw new AssertionError(s);
+                    boolean complete=scenario==0||scenario==9||scenario==10||(scenario>=6&&n.equals("processes.tsv"));
+                    if(!s.equals(complete?"collected_snapshot":"partial_or_unavailable"))throw new AssertionError(n+" "+s);
                     payloads.put(n,new String(b,StandardCharsets.UTF_8));
                 }
             });}catch(QnxFileReader.Failure expected){failed=true;}
-            if(failed!=(mode==1||mode>=3)||payloads.size()!=2)throw new AssertionError("mode "+mode);
+            if(failed!=(mode==1||mode==3||mode==4||mode==7)||payloads.size()!=2)throw new AssertionError("mode "+mode);
             if(mode==0) {
                 if(!payloads.get("processes.tsv").contains("12\tread\t/bin/screen"))throw new AssertionError();
                 if(!payloads.get("graphics-mappings.txt").contains("libopenwfd_qnx.so"))throw new AssertionError();
@@ -90,6 +102,17 @@ public class QnxFileReaderReplay {
                 if(peer.frames.stream().anyMatch(s->s.contains("/34/mappings")))throw new AssertionError();
             }
             if(mode==2&&!payloads.get("processes.tsv").contains("denied_or_exited"))throw new AssertionError();
+            if(mode>=6) {
+                if(!payloads.get("processes.tsv").contains("34\tread\t/bin/wfd_be"))throw new AssertionError();
+                if(peer.frames.indexOf("o:\"/proc/34/exefile\":0\r\n")>
+                        peer.frames.indexOf("o:\"/proc/12/mappings\":0\r\n"))throw new AssertionError("inventory must finish first");
+                if(mode!=7&&!peer.frames.contains("o:\"/proc/34/mappings\":0\r\n"))throw new AssertionError("later mapping lost");
+                if(mode==6&&!payloads.get("graphics-mappings.txt").contains("status=truncated_size_limit bytes=262144"))throw new AssertionError();
+                if(mode==7&&(!payloads.get("graphics-mappings.txt").contains("status=read_or_protocol_failed bytes=2048")
+                        ||!payloads.get("graphics-mappings.txt").contains("pid=34 status=not_attempted_after_failure")))throw new AssertionError();
+                if(mode==9&&payloads.get("graphics-mappings.txt").contains("truncated_size_limit"))throw new AssertionError("exact limit is not truncated");
+                if(mode==10&&!payloads.get("graphics-mappings.txt").contains("status=read bytes=65537"))throw new AssertionError("field-size regression");
+            }
         }
     }
     public static void main(String[] args)throws Exception {

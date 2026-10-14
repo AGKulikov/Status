@@ -545,20 +545,30 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
     }
 
     private void confirmSystemDump() {
+        final String[] states={"unspecified","normal","navigation"};
+        final int[] selected={0};
         new AlertDialog.Builder(this).setTitle("Снять системный дамп?")
-                .setMessage("Только чтение 9 файлов Android DIM/UART и 11 файлов QNX, плюс привязка ttyHS2. "
-                        + "Дополнительно: имена процессов QNX и карты библиотек графических процессов, без чтения памяти. До 8 МиБ на файл, "
+                .setMessage("Только чтение 9 файлов Android DIM/UART и "
+                        + dezz.status.widget.diagnostics.QnxFileReader.TARGETS.length + " файлов QNX, плюс привязка ttyHS2. "
+                        + "Отдельно сохраняются перечень процессов и карты библиотек (до 8 процессов, по 256 КиБ), список слоёв Android. "
+                        + "Из существующей папки DLT — перечень и до 2 МиБ последних данных каждого из 4 свежих журналов. "
+                        + "Обрезанные данные сохраняются с пометкой. Без чтения памяти, запуска логгеров или переключения приборки. До 8 МиБ на системный файл, "
                         + "64 МиБ суммарно и до 10 минут. Нужен доступ к встроенному ADB; доступный su 0 "
                         + "проверяется без перезапуска adbd. QNX читается прежним способом через ADB и qconn; "
                         + "если сервис недоступен, службы и firewall не меняются. Прошивка и настройки не изменяются. "
                         + "Отсутствующие или недоступные файлы будут отмечены. Архив содержит закрытые "
-                        + "системные файлы — передавайте его лично, не публикуйте. Хранятся два последних ZIP "
+                        + "системные файлы и журналы, которые могут содержать личные данные — передавайте его лично, не публикуйте. Хранятся два последних ZIP "
                         + "во временной памяти приложения. При закрытии экрана сбор отменяется.")
                 .setNegativeButton("Отмена", null)
-                .setPositiveButton("Снять дамп", (dialog, which) -> startSystemDump()).show();
+                .setPositiveButton("Продолжить", (dialog, which) ->
+                        new AlertDialog.Builder(this).setTitle("Какой режим приборки сейчас?")
+                                .setSingleChoiceItems(new String[]{"Не отмечать", "Обычный режим", "Навигационный режим"},0,
+                                        (choice,index)->selected[0]=index)
+                                .setNegativeButton("Отмена",null)
+                                .setPositiveButton("Снять дамп",(choice,index)->startSystemDump(states[selected[0]])).show()).show();
     }
 
-    private void startSystemDump() {
+    private void startSystemDump(String captureState) {
         if (!dezz.status.widget.diagnostics.SystemFileDump.RUNNING.compareAndSet(false, true)) {
             systemDumpState.setText("Другой сбор ещё выполняется. Дождитесь завершения.");
             return;
@@ -578,7 +588,7 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
             result.set(dezz.status.widget.diagnostics.SystemFileDump.collect(
                     new File(getCacheDir(), "exports"), adb::command, text -> runOnUiThread(() -> {
                         if (!isDestroyed() && systemDumpSession == session) systemDumpState.setText(text);
-                    }), BuildConfig.VERSION_NAME, adb::collectQnx));
+                    }), BuildConfig.VERSION_NAME, adb::collectQnx,captureState));
         }, error -> {
             session.close();
             dezz.status.widget.diagnostics.SystemFileDump.RUNNING.set(false);
@@ -596,7 +606,7 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
                     systemDumpSave.setEnabled(true);
                     systemDumpState.setText((report.complete && error == null ? "Сбор завершён. " : "Частичный дамп. ")
                             + "Получено " + report.collected + "/" + report.requested + " файлов. "
-                            + "Причины пропусков — в manifest.tsv, подробности QNX — в qnx-diagnostics.txt. Нажмите «Отправить дамп ZIP».");
+                            + "Причины пропусков — в manifest.tsv, QNX — в qnx-diagnostics.txt, журналы — в graphics/dlt/inventory.tsv. Нажмите «Отправить дамп ZIP».");
                 }
             });
         });

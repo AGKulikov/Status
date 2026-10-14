@@ -1,5 +1,62 @@
 # Единый реестр требований Natro
 
+## 14.10.2026 15:21 МСК — расширенный сбор и исправление потери metadata
+
+Прямая команда пользователя: подготовить расширенный сбор и исправить прошлый
+неполный сбор. Кандидат3.1.9/code208021352, прежний package/cert/данные; Helper
+и Navigator не меняются. Новый код готовится, CI/APK/FIELD до проверки OPEN.
+
+- Inventory-first: до256 exefile, затем до8 графических mappings по256KiB;
+  wfd_be/sc_qnx_vip_proxy включены в выбор. Усечение не останавливает следующие
+  процессы; при protocol/transport failure сохранить валидный префикс и явно
+  отметить оставшееся, не продолжать повреждённый stream.
+- 22 фиксированных QNX файла (вместо11): graphics dependencies/configs и два
+  ранее наблюдённых recovery/guest logs. Без произвольной загрузки найденных
+  путей, памяти, cmdline/environment, driver lock, setter/режимных команд.
+- Android display/layer names/clock; bounded DLT inventory текущего каталога,
+  затем до4 свежих dlt/log/txt, хвост до2MiB. Явные offsets/stats/local SHA,
+  live non-atomic, не выдавать за полный/неизменный журнал. Отказы не обходить.
+- Ручная метка обычного/навигационного режима без автоматического переключения.
+  UI описывает состав, лимиты и чувствительность. Прежние600с/64MiB и retention2.
+
+Подробные границы и regression gates: docs/releases/3.1.9/SOURCE_REVIEW_RU.md.
+Отключение крыльев НЕ реализовано и не объявляется исправленным этим выпуском.
+
+## 14.10.2026 — архивный путь QNX DLT
+
+Проверка12 доступных ZIP не дала точных blending-сообщений в1051 текстовых
+entries. Исторические dlt_logadapter.conf и Android init.logqnx.sh указывают
+штатный сбор graphics logs и /mnt/userdata/DLT. Это кандидат bounded read-only
+inventory, не подтверждённая текущая доступность и не основание запускать
+скрипт экспорта/менять log mask. Старый recovery dump display2/3 не связывать
+с текущей белой полосой или крыльями без evidence. Подробности OPENWFD_COMPOSITION_RU.md.
+
+## 14.10.2026 — продолжение пути прозрачности
+
+STATIC: прослежены transparency/global alpha до QDI blend property и DS setter;
+найдены встроенные сообщения с src_layer/dest_layerid/iTransparency.
+Это не идентифицирует крылья, но сохраняет версию единого слоя с прозрачным
+центром. Следующий кандидат — уже записанные сообщения QNX без изменения
+log mask/driver state. Runtime доказательства отсутствуют, acceptance OPEN.
+
+## 14.10.2026 — ограничение диагностического composition query
+
+STATIC проверка выявила: GetDisplayCompositionInfo требует client type2 и
+locked driver. Не включать этот API как пассивное чтение в автоматический
+сбор Natro; не блокировать драйвер и не подменять тип клиента для исследования.
+Продолжать статический разбор и существующие read-only metadata. Подробности
+в OPENWFD_COMPOSITION_RU.md; отключение крыльев остаётся OPEN.
+
+## 14.10.2026 — проверка единого прозрачного слоя крыльев
+
+Пользователь уточнил: оба крыла могут быть одним слоем с прозрачной серединой.
+Версия остаётся OPEN; один LA_GVM pipeline её не исключает. STATIC: сопоставлены
+TRANSPARENCY_ENABLE/GLOBAL_ALPHA и чтение их через GetDisplayCompositionInfo.
+Никаких команд на машине, изменений alpha или нового APK на этом этапе нет.
+Отчёт: docs/geely-kx11/research-2026-10-14-dim/OPENWFD_COMPOSITION_RU.md.
+Acceptance прежний: скрыть OEM крылья, сохранив карту и штатные предупреждения;
+наличие generic alpha API не закрывает этот gate.
+
 ## 14.10.2026 14:45 МСК — пользовательский дамп3.1.8 проверен
 
 Новый ZIP1c4ac026…: CRC и20 payload hashes/размеров сверены. QNX11/11 получены

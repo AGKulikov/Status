@@ -99,6 +99,12 @@ public final class SystemFileDump {
         return collect(directory,shell,progress,version,null);
     }
     public static Report collect(File directory, Shell shell, Progress progress, String version, Qnx qnx) throws Exception {
+        return collect(directory,shell,progress,version,qnx,"unspecified");
+    }
+    public static Report collect(File directory, Shell shell, Progress progress, String version, Qnx qnx,String captureState) throws Exception {
+        if(!java.util.Arrays.asList("unspecified","normal","navigation").contains(captureState))
+            throw new IOException("invalid_capture_state");
+        final long startWall=System.currentTimeMillis(),startMono=System.nanoTime();
         if(!directory.isDirectory() && !directory.mkdirs()) throw new IOException("export_directory_unavailable");
         File partial=File.createTempFile("Natro-system-", ".part", directory);
         File target=new File(directory,partial.getName().replace(".part", ".zip"));
@@ -183,6 +189,24 @@ public final class SystemFileDump {
                     final java.util.Set<String> qnxStarted=new java.util.HashSet<>();
                     final java.util.Set<String> snapshots=new java.util.HashSet<>();
                     final boolean[] snapshotPartial={false};
+                    final java.util.Set<String> graphicsNames=new java.util.HashSet<>();
+                    boolean graphicsComplete;
+                    try {
+                        graphicsComplete=GraphicsEvidence.collect(shell,su,(name,status,bytes)-> {
+                            if(!name.matches("android/(before|after)-(clock|display|layers)\\.txt|dlt/inventory\\.tsv|dlt/files/[A-Za-z0-9][A-Za-z0-9._/-]{0,260}\\.range")
+                                    || name.contains("..") || !graphicsNames.add(name) || !status.matches("[a-z_]+"))
+                                throw new IOException("invalid_graphics_snapshot");
+                            if(bytes.length>GraphicsEvidence.RANGE_LIMIT || qtotal[0]+bytes.length>MAX_TOTAL) {
+                                status="size_limit";bytes=new byte[0];snapshotPartial[0]=true;
+                            }
+                            put(zip,"graphics/"+name,bytes);qtotal[0]+=bytes.length;
+                            manifest.append("graphics:").append(name).append('\t').append(status).append('\t')
+                                    .append(bytes.length).append('\t').append(digest(bytes)).append('\n');
+                        },progress);
+                    } catch(Exception error) {
+                        graphicsComplete=false;
+                        manifest.append("graphics:collection\tfailed\t0\t-\n");
+                    }
                     final String[] currentPath={"-"};
                     final StringBuilder qnxDetails=new StringBuilder("endpoint=198.18.34.2:8000\ntransport=adb-shell-toybox-nc\n"
                             +"connection_scope=one_file\noverall_deadline_seconds=600\nfile_deadline_seconds=60\nprocess_deadline_seconds=60\n");
@@ -193,7 +217,7 @@ public final class SystemFileDump {
                             public void snapshot(String name,String status,byte[] bytes) throws Exception {
                                 if(!java.util.Arrays.asList(QnxFileReader.SNAPSHOTS).contains(name)
                                         || !status.matches("collected_snapshot|partial_or_unavailable")
-                                        || bytes==null || bytes.length>1024*1024 || !snapshots.add(name))
+                                        || bytes==null || bytes.length>3*1024*1024 || !snapshots.add(name))
                                     throw new IOException("invalid_qnx_snapshot");
                                 if(qtotal[0]+bytes.length>MAX_TOTAL)throw new IOException("qnx_snapshot_total_limit");
                                 if(!status.equals("collected_snapshot"))snapshotPartial[0]=true;
@@ -237,7 +261,7 @@ public final class SystemFileDump {
                             qnxDetails.append("suppressed=").append(QnxFileReader.safe(suppressed.toString())).append('\n');
                     }
                     if(!qnxFailed)qnxDetails.append("result=completed\n");
-                    qnxComplete=!qnxFailed && !snapshotPartial[0] && snapshots.size()==QnxFileReader.SNAPSHOTS.length;
+                    qnxComplete=!qnxFailed && graphicsComplete && !snapshotPartial[0] && snapshots.size()==QnxFileReader.SNAPSHOTS.length;
                     qnxDetails.append("reported_files=").append(qnxAttempted.size())
                             .append("\ncollected_files=").append(qcount[0]).append('\n');
                     put(zip,"qnx-diagnostics.txt",qnxDetails.toString().getBytes(StandardCharsets.UTF_8));
@@ -252,11 +276,18 @@ public final class SystemFileDump {
                 put(zip,"manifest.tsv",manifest.toString().getBytes(StandardCharsets.UTF_8));
                 put(zip,"README.txt",("Natro system evidence\nversion="+version+"\naccess="+access
                     +"\ncollected="+count+"/"+(PATHS.length+(qnx==null?0:QnxFileReader.TARGETS.length))+"\nwall_ms="+System.currentTimeMillis()
+                    +"\ncapture_state_user_label="+captureState+"\nstart_wall_ms="+startWall
+                    +"\nelapsed_ms="+((System.nanoTime()-startMono)/1000000)
                     +"\nLimits: 8 MiB/file, 64 MiB total, dump session 600 seconds; QNX 60 seconds/file and process stage.\n"
                     +"Explicit allowlist only; not a complete firmware backup. Missing and inaccessible may be indistinguishable.\n"
                     +"Files are verified against remote SHA-256 before/after transfer, but not an atomic system snapshot.\n"
                     +"QNX exception: descriptor stat and two equal reads; SHA-256 computed locally, not remote authenticated hash.\n"
                     +"QNX process metadata: bounded single reads of exefile and selected graphics mappings, not atomic or double-read verified.\n"
+                    +"Process inventory first: max 256 PIDs, then max 8 graphics mappings, 256 KiB each; capped prefixes kept.\n"
+                    +"Graphics Android context: display/layer names and clock before/after DLT stage; up to 64 KiB each.\n"
+                    +"DLT: existing /mnt/userdata/DLT only, non-hidden entries, depth 2, 8 subdirectories, 128 entries, 4 newest dlt/log/txt files.\n"
+                    +"At most 2 MiB block-aligned tail per log. Range offsets/stat and local hashes recorded; live non-atomic bytes, not full log files.\n"
+                    +"Capture state is a user label, not detected vehicle feedback. No mode switching, screenshot, logger start or driver lock.\n"
                     +"No process memory, cmdline, environment, control, devctl or arbitrary discovered-file downloads.\n"
                     +"Read-only; no daemon restart, remount, reboot, vehicle commands or private /data.\n"
                     +"Contains proprietary firmware; share privately, do not publish.\n").getBytes(StandardCharsets.UTF_8));
