@@ -36,7 +36,7 @@ public final class SystemFileDumpReplay {
             throw new AssertionError(script);
         };
         SystemFileDump.Report full=SystemFileDump.collect(directory,good,s->{},"test");
-        check(full.collected==9 && reads.get()==27);
+        check(full.collected==9 && reads.get()==27 && full.complete);
         try(ZipFile zip=new ZipFile(full.file)) {
             check(Arrays.equals(raw,zip.getInputStream(zip.getEntry("files/vendor/lib/modules/dim_dtc.ko")).readAllBytes()));
             check(zip.size()==12);
@@ -71,12 +71,12 @@ public final class SystemFileDumpReplay {
         }
         SystemFileDump.Report metadata=SystemFileDump.collect(directory,
                 c->c.contains("readlink -f")?result("UART"):good.command(c),s->{},"test",receiver->{
-                    for(String path:QnxFileReader.TARGETS)receiver.file(path,"remote_open_failed",null);
+                    for(String path:QnxFileReader.TARGETS)receiver.file(path,"collected_double_read",raw);
                     receiver.snapshot("processes.tsv","partial_or_unavailable","pid\tstatus\texecutable\n".getBytes(StandardCharsets.UTF_8));
                     receiver.snapshot("graphics-mappings.txt","partial_or_unavailable","partial\n".getBytes(StandardCharsets.UTF_8));
                     throw new IOException("process metadata timeout");
                 });
-        check(metadata.collected==9);
+        check(metadata.collected==9+QnxFileReader.TARGETS.length && !metadata.complete);
         try(ZipFile zip=new ZipFile(metadata.file)) {
             check(zip.getEntry("qnx/metadata/processes.tsv")!=null);
             check(manifest(metadata).contains("qnx-meta:processes.tsv\tpartial_or_unavailable"));

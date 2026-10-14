@@ -203,7 +203,7 @@ public final class QnxFileReader {
             for(String pid:pids) {
                 path="/proc/"+pid+"/exefile";stage="proc_exefile";
                 byte[] data=procText(path,4096);
-                if(data==null){index.append(pid).append("\tdenied_or_exited\t-\n");continue;}
+                if(data==null){result="partial_or_unavailable";index.append(pid).append("\tdenied_or_exited\t-\n");continue;}
                 String exe=new String(data,StandardCharsets.UTF_8).replace("\u0000", "").trim();
                 index.append(pid).append("\tread\t").append(safe(exe)).append('\n');
                 String name=exe.substring(exe.lastIndexOf('/')+1);
@@ -212,6 +212,7 @@ public final class QnxFileReader {
                     path="/proc/"+pid+"/mappings";stage="proc_mappings";
                     maps.append("--- pid=").append(pid).append(" executable=").append(safe(exe)).append('\n');
                     byte[] mapping=procText(path,65536);
+                    if(mapping==null)result="partial_or_unavailable";
                     maps.append(mapping==null?"denied_or_exited\n":new String(mapping,StandardCharsets.UTF_8)+"\n");
                 }
             }

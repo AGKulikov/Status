@@ -78,7 +78,7 @@ public class QnxFileReaderReplay {
             try {new QnxFileReader(peer).collectProcesses(new QnxFileReader.Receiver(){
                 public void file(String p,String s,byte[] b){throw new AssertionError();}
                 public void snapshot(String n,String s,byte[] b){
-                    if(!s.equals(scenario==0||scenario==2?"collected_snapshot":"partial_or_unavailable"))throw new AssertionError(s);
+                    if(!s.equals(scenario==0?"collected_snapshot":"partial_or_unavailable"))throw new AssertionError(s);
                     payloads.put(n,new String(b,StandardCharsets.UTF_8));
                 }
             });}catch(QnxFileReader.Failure expected){failed=true;}

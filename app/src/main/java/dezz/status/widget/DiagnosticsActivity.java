@@ -594,7 +594,7 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
                     systemDumpFile = report.file;
                     systemDumpShare.setEnabled(true);
                     systemDumpSave.setEnabled(true);
-                    systemDumpState.setText((report.collected == report.requested && error == null ? "Сбор завершён. " : "Частичный дамп. ")
+                    systemDumpState.setText((report.complete && error == null ? "Сбор завершён. " : "Частичный дамп. ")
                             + "Получено " + report.collected + "/" + report.requested + " файлов. "
                             + "Причины пропусков — в manifest.tsv, подробности QNX — в qnx-diagnostics.txt. Нажмите «Отправить дамп ZIP».");
                 }

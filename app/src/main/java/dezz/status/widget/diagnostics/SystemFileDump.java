@@ -43,7 +43,10 @@ public final class SystemFileDump {
     public static final class Report {
         public final File file;
         public final int collected, requested;
-        Report(File file, int collected, int requested) { this.file=file; this.collected=collected; this.requested=requested; }
+        public final boolean complete;
+        Report(File file, int collected, int requested, boolean complete) {
+            this.file=file; this.collected=collected; this.requested=requested;this.complete=complete;
+        }
     }
     static String output(AdbShellResult.Result result) throws IOException {
         if (!result.success() || result.truncated) throw new IOException("shell_incomplete");
@@ -99,7 +102,7 @@ public final class SystemFileDump {
         if(!directory.isDirectory() && !directory.mkdirs()) throw new IOException("export_directory_unavailable");
         File partial=File.createTempFile("Natro-system-", ".part", directory);
         File target=new File(directory,partial.getName().replace(".part", ".zip"));
-        boolean published=false;
+        boolean published=false, qnxComplete=qnx==null;
         int count=0,total=0;
         StringBuilder manifest=new StringBuilder("path\tstatus\tbytes\tsha256\n");
         try {
@@ -179,6 +182,7 @@ public final class SystemFileDump {
                     final java.util.Set<String> qnxAttempted=new java.util.HashSet<>();
                     final java.util.Set<String> qnxStarted=new java.util.HashSet<>();
                     final java.util.Set<String> snapshots=new java.util.HashSet<>();
+                    final boolean[] snapshotPartial={false};
                     final String[] currentPath={"-"};
                     final StringBuilder qnxDetails=new StringBuilder("endpoint=198.18.34.2:8000\ntransport=adb-shell-toybox-nc\n"
                             +"connection_scope=one_file\noverall_deadline_seconds=600\nfile_deadline_seconds=60\nprocess_deadline_seconds=60\n");
@@ -192,6 +196,7 @@ public final class SystemFileDump {
                                         || bytes==null || bytes.length>1024*1024 || !snapshots.add(name))
                                     throw new IOException("invalid_qnx_snapshot");
                                 if(qtotal[0]+bytes.length>MAX_TOTAL)throw new IOException("qnx_snapshot_total_limit");
+                                if(!status.equals("collected_snapshot"))snapshotPartial[0]=true;
                                 put(zip,"qnx/metadata/"+name,bytes);qtotal[0]+=bytes.length;
                                 manifest.append("qnx-meta:").append(name).append('\t').append(status).append('\t')
                                         .append(bytes.length).append('\t').append(digest(bytes)).append('\n');
@@ -232,6 +237,7 @@ public final class SystemFileDump {
                             qnxDetails.append("suppressed=").append(QnxFileReader.safe(suppressed.toString())).append('\n');
                     }
                     if(!qnxFailed)qnxDetails.append("result=completed\n");
+                    qnxComplete=!qnxFailed && !snapshotPartial[0] && snapshots.size()==QnxFileReader.SNAPSHOTS.length;
                     qnxDetails.append("reported_files=").append(qnxAttempted.size())
                             .append("\ncollected_files=").append(qcount[0]).append('\n');
                     put(zip,"qnx-diagnostics.txt",qnxDetails.toString().getBytes(StandardCharsets.UTF_8));
@@ -261,7 +267,8 @@ public final class SystemFileDump {
             File[] old=archives(directory);
             int retained=0;
             for(File previous:old) if(!previous.equals(target) && retained++>=1) previous.delete();
-            return new Report(target,count,PATHS.length+(qnx==null?0:QnxFileReader.TARGETS.length));
+            int requested=PATHS.length+(qnx==null?0:QnxFileReader.TARGETS.length);
+            return new Report(target,count,requested,count==requested&&qnxComplete);
         } finally { if(!published) partial.delete(); }
     }
 }

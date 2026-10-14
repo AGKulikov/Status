@@ -426,13 +426,13 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/DiagnosticsActivity.java": {
-      "sha256": "2b7c3344dda50c10d41c32d900249a8a9827fefcbdaea07fc5098be4dbe4c5c7",
+      "sha256": "3ee97a0d1049fc424fc20e9122bf139f6bfc75dc855ecb368637d4c904b08267",
       "access_kinds": [
         "files"
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/SystemFileDump.java": {
-      "sha256": "a9d32158ab90ca2c4a63c26094be2dda8ef49d19cad03d1ea9e3ad408ce80339",
+      "sha256": "d9cf22460a08ce1afa5193bd2f6554045181cbde4e8e5b860d45f11319332466",
       "access_kinds": [
         "files"
       ]
