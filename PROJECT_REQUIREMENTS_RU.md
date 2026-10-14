@@ -3609,3 +3609,40 @@ SOURCE: отдельный список без автоматических ра
 Добавлены регрессии узкого редактора и dialog accept → root save. Проверка хранения:
 85 owners без изменений. Android CI и повторный опыт на KX11 пока pending.
 Не считать эти изменения установленными: выданный APK 3.1.5 их не содержит.
+
+## 2026-10-13 — 3.1.6: отказ QNX должен быть объясним
+
+FIELD дампа Natro-system-f641de68-7488-49d6-b649-d784f2f04c6a.zip: Android7/9,
+QNX0/6, доступ su_0. Общий unavailable_or_not_attempted не объясняет причину.
+SOURCE: qnx-diagnostics.txt хранит этап, путь, смещение, счётчики RX/TX, время,
+последнюю bounded служебную строку, класс/причину исключения и suppressed deadline.
+Android payload сохраняется при отказе QNX. Не пробовать другие диалекты/запуск
+qconn/изменение firewall. Перенесена из прежнего Python reader нормализация пустых
+строк и error linemode-or-echo-not-supported (лимит16), без изменения GET кадров.
+Точная причина прежнего отказа неизвестна; её нельзя объявлять устранённой без FIELD.
+Версия3.1.6/208021349, прежняя подпись, install-over3.1.5. Settings fixes включены.
+Backup review и regressions добавлены. Требуются успешный CI и подпись точного
+артефакта; аппаратное чтение QNX и проверка сохранения на KX11 остаются pending.
+
+## 2026-10-13 — сверка QNX с исходными успешными логами пользователя
+
+Проверен KX11-QNX-Deep-Evidence.zip от15.08.2026, SHA256
+6464fe0b604ae53b3d16c377b6e2dbbb0684a1287369c9022dc9c577e7b7636b.
+Все142 успешных download имеют payload с SHA256, совпавшим с sidecar.
+Это реальные пользовательские данные, в отличие от PROVENANCE сентябрьского
+macOS collector с physical_mac_kx11_execution=false. Нельзя приписывать физический
+успех позднему скрипту только на основании совпадения исходников.
+Попытка00450 подтверждает service file / open flags0 / stat / read(offset,count,type0)
+для qcdisplaycfg.xml,38529 байт, SHA256
+dcf30e51241bb57086c4f814bc8f7c17e96e91f90d19d796b68ae9acbd0a6b1e.
+
+SOURCE3.1.6: свежий qconn stream на каждый из6 allowlisted файлов; отсутствие retry
+при протокольной/транспортной ошибке,60с на файл и180с на весь dump, обычная консоль60с.
+Остаётся дополнительное двойное чтение Natro, которого старый host download не
+гарантирует: это проверка согласованности, не дистанционный SHA256. Физический успех
+нынешнего collector не выводится из старого архива; причина отказа3.1.5 неизвестна.
+TEST: production parser воспроизвёл записанные control headers с синтетическим
+payload и отдельно с реальным38529-byte payload из приватного архива. В Git только
+заголовки/хеши, закрытый firmware payload не публикуется. Проверены bounded noise,
+отмена, allowlist, manifest failed/not-attempted, сохранение Android и готового QNX
+payload при последующем отказе; общий QNX error содержит suppressed deadline.

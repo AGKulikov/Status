@@ -250,14 +250,21 @@ public class AdbTransport implements ShellTransport {
 
     /** Exact existing QNX endpoint, GET-only protocol; shares cancellation with the ADB socket. */
     public void collectQnx(dezz.status.widget.diagnostics.QnxFileReader.Receiver receiver) throws Exception {
-        try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 25_000L, "qnx-read")) {
-            AdbStream stream = openBounded("shell:toybox nc -w 30 198.18.34.2 8000");
-            try {
-                new dezz.status.widget.diagnostics.QnxFileReader(new dezz.status.widget.diagnostics.QnxFileReader.Wire() {
-                    public byte[] read() throws Exception { return stream.read(); }
-                    public void write(byte[] bytes) throws Exception { stream.write(bytes); }
-                }).collect(receiver);
-            } finally { try { stream.close(); } catch (Exception ignored) {} }
+        // A fresh file-service stream per file, not one 25-second budget for all six
+        // double reads. Stop after transport/protocol failure; never retry a failed file.
+        for (String path : dezz.status.widget.diagnostics.QnxFileReader.TARGETS) {
+            receiver.diagnostic(path, "stage=connect\npath=" + path + "\n");
+            if (Thread.currentThread().isInterrupted() || socket.isClosed())
+                throw new IOException("QNX collection cancelled or ADB disconnected");
+            try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 60_000L, "qnx-file:" + path)) {
+                AdbStream stream = openBounded("shell:toybox nc -w 30 198.18.34.2 8000");
+                try {
+                    new dezz.status.widget.diagnostics.QnxFileReader(new dezz.status.widget.diagnostics.QnxFileReader.Wire() {
+                        public byte[] read() throws Exception { return stream.read(); }
+                        public void write(byte[] bytes) throws Exception { stream.write(bytes); }
+                    }).collectSingle(path, receiver);
+                } finally { try { stream.close(); } catch (Exception ignored) {} }
+            }
         }
     }
 

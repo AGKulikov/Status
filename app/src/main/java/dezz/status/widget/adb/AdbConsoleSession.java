@@ -37,6 +37,13 @@ public final class AdbConsoleSession implements AutoCloseable {
     public String rootProbeSummary() { return rootProbeSummary; }
     public void stage(String value) { stage = value; }
     public synchronized boolean submit(Operation operation, Listener listener) {
+        return submitBounded(operation,listener,60);
+    }
+    /** Only the fixed, read-only system dump receives a longer overall budget. */
+    public synchronized boolean submitSystemDump(Operation operation, Listener listener) {
+        return submitBounded(operation,listener,180);
+    }
+    private boolean submitBounded(Operation operation, Listener listener, int timeoutSeconds) {
         if (closed || !busy.compareAndSet(false, true)) return false;
         cancelled.set(false); stopReason = "Отменено";
         worker.execute(() -> {
@@ -44,7 +51,7 @@ public final class AdbConsoleSession implements AutoCloseable {
             Exception failure = null;
             try {
                 checkCancelled();
-                deadline = timer.schedule(() -> cancel("Таймаут 60 секунд"), 60, TimeUnit.SECONDS);
+                deadline = timer.schedule(() -> cancel("Таймаут " + timeoutSeconds + " секунд"), timeoutSeconds, TimeUnit.SECONDS);
                 checkCancelled(); operation.run(this); checkCancelled();
             }
             catch (Exception error) { failure = cancelled.get() ? new IOException(stopReason

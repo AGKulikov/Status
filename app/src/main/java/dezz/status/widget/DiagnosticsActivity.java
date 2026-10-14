@@ -547,7 +547,7 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
     private void confirmSystemDump() {
         new AlertDialog.Builder(this).setTitle("Снять системный дамп?")
                 .setMessage("Только чтение 9 файлов Android DIM/UART и 6 файлов QNX, плюс привязка ttyHS2. До 8 МиБ на файл, "
-                        + "64 МиБ суммарно и 60 секунд. Нужен доступ к встроенному ADB; доступный su 0 "
+                        + "64 МиБ суммарно и до 3 минут. Нужен доступ к встроенному ADB; доступный su 0 "
                         + "проверяется без перезапуска adbd. QNX читается прежним способом через ADB и qconn; "
                         + "если сервис недоступен, службы и firewall не меняются. Прошивка и настройки не изменяются. "
                         + "Отсутствующие или недоступные файлы будут отмечены. Архив содержит закрытые "
@@ -572,7 +572,7 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
         systemDumpState.setText("Подключение к ADB…");
         final java.util.concurrent.atomic.AtomicReference<dezz.status.widget.diagnostics.SystemFileDump.Report> result =
                 new java.util.concurrent.atomic.AtomicReference<>();
-        session.submit(adb -> {
+        session.submitSystemDump(adb -> {
             adb.connect();
             result.set(dezz.status.widget.diagnostics.SystemFileDump.collect(
                     new File(getCacheDir(), "exports"), adb::command, text -> runOnUiThread(() -> {
@@ -595,7 +595,7 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
                     systemDumpSave.setEnabled(true);
                     systemDumpState.setText((report.collected == report.requested && error == null ? "Сбор завершён. " : "Частичный дамп. ")
                             + "Получено " + report.collected + "/" + report.requested + " файлов. "
-                            + "Причины пропусков — в manifest.tsv. Нажмите «Отправить дамп ZIP».");
+                            + "Причины пропусков — в manifest.tsv, подробности QNX — в qnx-diagnostics.txt. Нажмите «Отправить дамп ZIP».");
                 }
             });
         });

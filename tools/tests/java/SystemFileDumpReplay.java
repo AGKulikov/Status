@@ -42,6 +42,33 @@ public final class SystemFileDumpReplay {
             check(zip.size()==12);
         }
         check(manifest(full).contains("collected\t65539\t"+sha));
+        SystemFileDump.Report qnxFailure=SystemFileDump.collect(directory,
+                c->c.contains("readlink -f")?result("UART"):good.command(c),s->{},"test",
+                receiver->{throw new IOException("connection refused");});
+        check(qnxFailure.collected==9);
+        try(ZipFile zip=new ZipFile(qnxFailure.file)) {
+            String details=new String(zip.getInputStream(zip.getEntry("qnx-diagnostics.txt")).readAllBytes(),StandardCharsets.UTF_8);
+            check(details.contains("connection refused")&&details.contains("result=failed"));
+            check(manifest(qnxFailure).contains("not_attempted_after_qnx_failure"));
+        }
+        SystemFileDump.Report perFile=SystemFileDump.collect(directory,
+                c->c.contains("readlink -f")?result("UART"):good.command(c),s->{},"test",receiver->{
+                    receiver.diagnostic(QnxFileReader.TARGETS[0],"stage=open\nlast_control_reply=e:2\n");
+                    receiver.file(QnxFileReader.TARGETS[0],"remote_open_failed",null);
+                    receiver.diagnostic(QnxFileReader.TARGETS[1],"stage=connect\n");
+                    receiver.file(QnxFileReader.TARGETS[1],"collected_double_read",raw);
+                    receiver.diagnostic(QnxFileReader.TARGETS[2],"stage=connect\n");
+                    IOException failed=new IOException("socket closed");
+                    failed.addSuppressed(new IOException("ADB timeout at qnx-file"));throw failed;
+                });
+        check(perFile.collected==10);
+        try(ZipFile zip=new ZipFile(perFile.file)) {
+            String details=new String(zip.getInputStream(zip.getEntry("qnx-diagnostics.txt")).readAllBytes(),StandardCharsets.UTF_8);
+            check(details.contains("last_control_reply=e:2")&&details.contains("ADB timeout at qnx-file"));
+            check(manifest(perFile).contains("qnx:"+QnxFileReader.TARGETS[2]+"\tread_or_protocol_failed"));
+            check(manifest(perFile).contains("qnx:"+QnxFileReader.TARGETS[3]+"\tnot_attempted_after_qnx_failure"));
+            check(Arrays.equals(raw,zip.getInputStream(zip.getEntry("qnx/files"+QnxFileReader.TARGETS[1])).readAllBytes()));
+        }
         for(String bad:new String[]{"a","!!!!","AA==junk","AB=="}) {
             try{SystemFileDump.decode(bad,1);throw new AssertionError();}catch(IOException expected){}
         }

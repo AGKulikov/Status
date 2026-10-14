@@ -2198,3 +2198,31 @@ OKAY→потерянный notify→wait; теперь ожидание про�
 ограничены deadline, уже подтверждённый root не перезапускает adbd. В журнале
 применения добавлен этап. Хеши/offsets/режимы/backup/rollback не менялись.
 Результат на KX11 остаётся неподтверждённым; см. docs/3.0.8-log-fixes-RU.md.
+
+### 13.10.2026 — полевая проверка сборщика3.1.5
+
+Natro-system-f641de68-7488-49d6-b649-d784f2f04c6a.zip: fingerprint
+qti/kx11_high/kx11_high:9/20.24.10.23024.41151/539:userdebug/test-keys,
+Android7 файлов, QNX0. UART ttyHS2→/soc/qcom,qup_uart@0x890000,
+msm_geni_serial. Это наблюдение Android, не доказательство получателя команд
+в QNX и не параметр отключения OEM крыльев. Ошибка QNX в3.1.5 поглощена.
+3.1.6 сохраняет протокольный этап и bounded ответ; нормализация служебных строк
+сверена с tools/geely-macos-collector/lib/qconn_native.py._line. Физический
+успех новых QNX GET ещё не проверен.
+
+### 13.10.2026 — восстановлено первичное подтверждение QNX download
+
+В пользовательском KX11-QNX-Deep-Evidence.zip от15.08 проверены142 успешных
+download: фактические SHA256 payload совпадают с sidecars. Архив SHA256
+6464fe0b604ae53b3d16c377b6e2dbbb0684a1287369c9022dc9c577e7b7636b.
+broker-info: QCONN1.4.207944, QNX7.0.X/aarch64le, greeting QCONN CRLF+FFFD22,
+telnet_reply empty, prompt_mode none, read_request_variant with_type_zero.
+Маршрут198.18.34.2 dev eth0 table ecarx_ap_vp_route src198.18.34.15 uid2000.
+Попытка00450 реально прочитала /bin/qcdisplaycfg.xml (38529байт),00002 —
+/usr/bin/cluster_controller,00003 — /bin/sc_qnx_vip_proxy,00436 — startup.sh.
+Сентябрьский macOS collector сам по себе этого физического успеха не доказывает.
+Новый Android reader проверен локальным replay записанных control headers и
+реального qcdisplaycfg payload; на машине ещё не испытан. В3.1.6 отдельный stream
+на файл,60с/file и180с/dump, отчёт qnx-diagnostics.txt. No-service/no-route не лечить
+запуском демонов или firewall; сохранить ошибку. Это не новое доказательство
+способа отключения OEM крыльев или их QNX receiving handler.
