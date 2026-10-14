@@ -640,7 +640,7 @@ roots, persistent settings, секретов и defaults migration нет. Finge
 обновлены только у этих трёх рассмотренных owners. Runtime restore gate OPEN.
 
 
-### Review 3.1.10 — версия defaults
+### Review 3.2.0 — версия defaults
 
 BackupDefaultsMigration явно допускает335…352→353 с прежними keys/types/defaults.
 Неизвестная334 и будущая354 отвергаются; тест проверяет перенос explicit values.

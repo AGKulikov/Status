@@ -17,7 +17,7 @@ public class BackupDefaultsMigrationTest {
         for(int source=208021335;source<=208021353;source++) {
             JSONObject metadata=new JSONObject().put("sourceVersionCode",source).put("defaultsSchema",source)
                     .put("declaredMainDefaults",BackupPreferencesXml.encode(Collections.singletonMap("enabled",false)));
-            File snapshot=new File(RuntimeEnvironment.getApplication().getCacheDir(),"3110-"+source);
+            File snapshot=new File(RuntimeEnvironment.getApplication().getCacheDir(),"320-"+source);
             File main=BackupFiles.child(snapshot,"de_prefs/example_preferences.xml");
             BackupPreferencesXml.write(main,Collections.singletonMap("enabled",true));
             BackupDefaultsMigration.materialize(snapshot,"example",metadata,208021353);
