@@ -202,6 +202,13 @@
           "date": "2026-10-03",
           "level": "STATIC",
           "finding": "mHUD7.1 переключает HUD AR_ENGINE через ECARX/Settings; это не патч vendor .so из прежнего HUD/LCA-скрипта. Связь этой AR-команды с машинкой и крыльями DIM физически не подтверждена. Статус OPEN сохранён."
+        },
+        {
+          "date": "2026-10-14",
+          "level": "STATIC_WITH_CURRENT_DUMP",
+          "finding": "Свежий sysfs связывает ttyHS2 с 0x890000/QUP4. Получены три QNX panel library; MAX96755_QC_0 выбирает variant, ограниченно инициализирует сериализатор через ser4, закрывает порт и завершает worker с pthread_join. Это не постоянный nav receiver и не найденный renderer крыльев. CRC/SHA/размеры 13 payloads проверены; физический gate OPEN.",
+          "source": "research-2026-10-14-dim/README_RU.md",
+          "next_step": "Уточнить фактические variant.cfg и загруженную panel library; искать прошивку и dispatcher внешнего DIM endpoint. Не подменять это MPC5746C со SPI-протоколом или переключением всего navigation mode."
         }
       ],
       "coverage_ids": [
