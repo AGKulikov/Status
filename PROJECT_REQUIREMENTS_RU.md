@@ -1,5 +1,18 @@
 # Единый реестр требований Natro
 
+## Выпуск3.2.0 — SOURCE/TEST/APK; FIELD OPEN
+
+Правильный номер по REL-004:3.2.0/code208021353. CI38635938599 SUCCESS;
+build source6597996c9ff0342f023eb0667b7642df589a9c42,
+tree db1a4ad89a7d846ccecebccbed1d11985d387b7c.2143 Android-теста/422 suites,
+252 tool tests успешны,0 failures/errors/skips. Скачанные ZIP hashes сверены.
+APK29592088байт SHA2560062dab216dfa0a8e6c4cc4a47e1e583f5a2978d09ab8a665d50e6eec6ea061b.
+Stable cert/v2/v3/API28/zipalign16KiB/install-over metadata3.1.9 проверены;
+1516 payload entries после подписи неизменны. В DEX подтверждён новый collector.
+Navigator patch совпал с3.1.9; Helper не менялся. Исходники и исследования
+опубликованы build/qnx-graphics-320. Отчёт docs/releases/3.2.0/.
+Новый сбор на машине, renderer крыльев и причина порчи mappings остаются OPEN.
+
 ## 14.10.2026 — исправление номера выпуска по REL-004
 
 USER: читать требования; после3.1.9 выпускать3.2.0, а не3.1.10.

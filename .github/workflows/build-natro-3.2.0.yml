@@ -20,7 +20,9 @@ jobs:
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Enforce REL-004 before build
-        run: python3 tools/check_release_version.py "$VERSION_NAME"
+        run: |
+          python3 tools/check_release_version.py "$VERSION_NAME"
+          test "$VERSION_CODE" = 208021353
       - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
         with:
           distribution: temurin

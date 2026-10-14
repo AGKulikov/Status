@@ -17,6 +17,21 @@
 Владелец крыльев и первопричина порчи mappings пока не установлены. Этот выпуск
 расширяет наблюдение; исправление отрисовки крыльев не заявляется.
 
-Статус:12 локальных host tests прошли; Android CI, подпись и install-over
-проверяются перед выдачей APK. FIELD на KX11 остаётся OPEN.
-Navigator/Helper не менялись.
+Выпуск собран и подписан. CI38635938599 SUCCESS:2143 Android-теста/422 suites,
+252 проверки инструментов; ошибок и пропусков нет. XML totals проверены отдельно.
+Прежний сертификат, один подписант, v2/v3/API28, zipalign16KiB, package/label,
+versionCode+1 и install-over metadata поверх3.1.9 проверены. Физическая установка
+и новый сбор на KX11 остаются OPEN.
+
+Build source:6597996c9ff0342f023eb0667b7642df589a9c42;
+tree:db1a4ad89a7d846ccecebccbed1d11985d387b7c.
+APK29592088байт; SHA256:
+`0062dab216dfa0a8e6c4cc4a47e1e583f5a2978d09ab8a665d50e6eec6ea061b`.
+1516 payload entries сохранены при подписи. В DEX проверены маркеры
+proc-read-trace/slog2/full SurfaceFlinger/windows и read_content_invalid.
+
+Navigator patch SHA710af1b6fa476a5e78c3e19809a59a89de70a698135f4b296c45df98962b0f96
+совпадает с отчётом3.1.9: переустановка Navigator не нужна. Поле pairRequired
+в исходном staging report — общий консервативный флаг; эта отдельная проверка
+разрешает повторное использование прежнего совместимого мода. Helper не менялся.
+См. [проверки исходников](SOURCE_REVIEW_RU.md) и [отчёт APK](release-report.json).
