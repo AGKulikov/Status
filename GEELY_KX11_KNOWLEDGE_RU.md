@@ -1,5 +1,16 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 14.10.2026 — FIELD сбора новых QNX graphics файлов
+
+Дамп3.1.8 1c4ac026… дал11/11 QNX файлов, включая четыре недостающих ELF,
+и свежий variant.cfg=KX11_HIGH. Directory/exefile подтверждены на машине;
+mappings screen превысил64KiB и остановил обход после25 PID, отсутствующие
+далее имена не являются отрицательным runtime-свидетельством. Новый telltale
+описывает себя как OpenWFD test app; client wfdCreateDevice/DeviceCommit ведут
+к user_os_utils_send_recv, server main создаёт resource manager/thread pool.
+Это уточнение графического пути, не найденный флаг крыльев. [Хеши, call sites,
+ограничения и дефект сбора](docs/geely-kx11/research-2026-10-14-dim/DUMP_318_RU.md).
+
 ## 14.10.2026 — SOURCE сборщика3.1.8
 
 Старый Deep Evidence inventory подтверждает /bin/openwfd_server,

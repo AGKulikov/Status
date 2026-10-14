@@ -1,5 +1,18 @@
 # Единый реестр требований Natro
 
+## 14.10.2026 14:45 МСК — пользовательский дамп3.1.8 проверен
+
+Новый ZIP1c4ac026…: CRC и20 payload hashes/размеров сверены. QNX11/11 получены
+двойным чтением, свежий variant.cfg=KX11_HIGH. Android7/9, альтернативные пути
+модуля недоступны. Directory/exefile работают,25 PID сохранены. Mappings screen
+превысил наш64KiB limit (65537 bytes), это не отказ доступа; prefix не сохранён
+и дальнейшие PID не прочитаны. Требуется сохранить bounded/truncated mappings
+и отделить inventory от этой фазы. Нового APK/патча в этом отчёте нет.
+Новые4 graphics ELF получены и первично разобраны; telltale — test application,
+OpenWFD client/server сами по себе не доказывают владельца крыльев. Принимающий
+nav dispatcher/независимый флаг и полная process metadata остаются OPEN.
+Отчёт:docs/geely-kx11/research-2026-10-14-dim/DUMP_318_RU.md.
+
 ## 14.10.2026 —3.1.8 собран, подписан и сохранён; FIELD OPEN
 
 Source18520800dd0a91e10c2daa2e2aaf9778e24948a9,
