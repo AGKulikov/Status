@@ -79,11 +79,12 @@ class SystemDumpTest(unittest.TestCase):
         method=transport.split('public void collectQnx(',1)[1].split('public String execLongRunning',1)[0]
         self.assertIn('for (String path : dezz.status.widget.diagnostics.QnxFileReader.TARGETS)',method)
         self.assertIn('.collectSingle(path, receiver)',method)
-        self.assertEqual(method.count('openBounded("shell:toybox nc -w 30 198.18.34.2 8000")'),1)
+        self.assertEqual(method.count('openBounded("shell:toybox nc -w 30 198.18.34.2 8000")'),2)
+        self.assertIn('.collectProcesses(receiver)',method)
         self.assertIn('60_000L',method)
         session=(SOURCE/'adb/AdbConsoleSession.java').read_text()
         self.assertIn('return submitBounded(operation,listener,60);',session)
-        self.assertIn('return submitBounded(operation,listener,180);',session)
+        self.assertIn('return submitBounded(operation,listener,600);',session)
         self.assertIn('session.submitSystemDump(', (SOURCE/'DiagnosticsActivity.java').read_text())
 
 if __name__ == '__main__': unittest.main()

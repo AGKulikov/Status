@@ -91,7 +91,7 @@ public final class SystemFileDump {
     static void put(ZipOutputStream zip, String name, byte[] bytes) throws IOException {
         zip.putNextEntry(new ZipEntry(name)); zip.write(bytes); zip.closeEntry();
     }
-    /** Caller supplies a private, cancellable ADB dump session (180-second overall deadline). */
+    /** Caller supplies a private, cancellable ADB dump session (600-second overall deadline). */
     public static Report collect(File directory, Shell shell, Progress progress, String version) throws Exception {
         return collect(directory,shell,progress,version,null);
     }
@@ -178,13 +178,24 @@ public final class SystemFileDump {
                     final int[] qcount={0}, qtotal={total};
                     final java.util.Set<String> qnxAttempted=new java.util.HashSet<>();
                     final java.util.Set<String> qnxStarted=new java.util.HashSet<>();
+                    final java.util.Set<String> snapshots=new java.util.HashSet<>();
                     final String[] currentPath={"-"};
                     final StringBuilder qnxDetails=new StringBuilder("endpoint=198.18.34.2:8000\ntransport=adb-shell-toybox-nc\n"
-                            +"connection_scope=one_file\noverall_deadline_seconds=180\nfile_deadline_seconds=60\n");
+                            +"connection_scope=one_file\noverall_deadline_seconds=600\nfile_deadline_seconds=60\nprocess_deadline_seconds=60\n");
                     boolean qnxFailed=false;
                     try {
                         progress.update("Чтение QNX через ADB/qconn…");
                         qnx.collect(new QnxFileReader.Receiver() {
+                            public void snapshot(String name,String status,byte[] bytes) throws Exception {
+                                if(!java.util.Arrays.asList(QnxFileReader.SNAPSHOTS).contains(name)
+                                        || !status.matches("collected_snapshot|partial_or_unavailable")
+                                        || bytes==null || bytes.length>1024*1024 || !snapshots.add(name))
+                                    throw new IOException("invalid_qnx_snapshot");
+                                if(qtotal[0]+bytes.length>MAX_TOTAL)throw new IOException("qnx_snapshot_total_limit");
+                                put(zip,"qnx/metadata/"+name,bytes);qtotal[0]+=bytes.length;
+                                manifest.append("qnx-meta:").append(name).append('\t').append(status).append('\t')
+                                        .append(bytes.length).append('\t').append(digest(bytes)).append('\n');
+                            }
                             public void file(String path,String status,byte[] bytes) throws Exception {
                                 if(!java.util.Arrays.asList(QnxFileReader.TARGETS).contains(path)
                                         || !status.matches("[a-z_]+") || !qnxAttempted.add(path))
@@ -224,6 +235,8 @@ public final class SystemFileDump {
                     qnxDetails.append("reported_files=").append(qnxAttempted.size())
                             .append("\ncollected_files=").append(qcount[0]).append('\n');
                     put(zip,"qnx-diagnostics.txt",qnxDetails.toString().getBytes(StandardCharsets.UTF_8));
+                    for(String name:QnxFileReader.SNAPSHOTS)if(!snapshots.contains(name))
+                        manifest.append("qnx-meta:").append(name).append("\tnot_collected\t0\t-\n");
                     for(String path:QnxFileReader.TARGETS) if(!qnxAttempted.contains(path))
                         manifest.append("qnx:").append(path).append('\t')
                                 .append(path.equals(currentPath[0])?"read_or_protocol_failed":"not_attempted_after_qnx_failure")
@@ -233,10 +246,12 @@ public final class SystemFileDump {
                 put(zip,"manifest.tsv",manifest.toString().getBytes(StandardCharsets.UTF_8));
                 put(zip,"README.txt",("Natro system evidence\nversion="+version+"\naccess="+access
                     +"\ncollected="+count+"/"+(PATHS.length+(qnx==null?0:QnxFileReader.TARGETS.length))+"\nwall_ms="+System.currentTimeMillis()
-                    +"\nLimits: 8 MiB/file, 64 MiB total, dump session 180 seconds; QNX 60 seconds/file.\n"
+                    +"\nLimits: 8 MiB/file, 64 MiB total, dump session 600 seconds; QNX 60 seconds/file and process stage.\n"
                     +"Explicit allowlist only; not a complete firmware backup. Missing and inaccessible may be indistinguishable.\n"
                     +"Files are verified against remote SHA-256 before/after transfer, but not an atomic system snapshot.\n"
                     +"QNX exception: descriptor stat and two equal reads; SHA-256 computed locally, not remote authenticated hash.\n"
+                    +"QNX process metadata: bounded single reads of exefile and selected graphics mappings, not atomic or double-read verified.\n"
+                    +"No process memory, cmdline, environment, control, devctl or arbitrary discovered-file downloads.\n"
                     +"Read-only; no daemon restart, remount, reboot, vehicle commands or private /data.\n"
                     +"Contains proprietary firmware; share privately, do not publish.\n").getBytes(StandardCharsets.UTF_8));
             }

@@ -37,7 +37,74 @@ public class QnxFileReaderReplay {
             throw new AssertionError("Forbidden frame: "+s);
         }
     }
+    static class ProcPeer extends Peer {
+        final int scenario;String current="";
+        ProcPeer(int scenario)throws Exception{super(0);this.scenario=scenario;}
+        public void write(byte[] bytes)throws Exception {
+            String s=new String(bytes,StandardCharsets.US_ASCII);frames.add(s);
+            if(s.equals("service file\r\n")){add("OK\r\n");return;}
+            if(s.startsWith("o:")) {
+                current=s.split("\"",-1)[1];
+                if(!current.equals("/proc")&&!current.matches("/proc/(12|34)/(exefile|mappings)"))
+                    throw new AssertionError("Unexpected path "+current);
+                if(scenario==1 || (scenario==2&&current.endsWith("/exefile"))){add("e:permission\r\n");return;}
+                add("o:0\r\n");return;
+            }
+            if(s.equals("c:0\r\n")){add("o\r\n");return;}
+            if(s.startsWith("r:0:")) {
+                String[] f=s.trim().split(":");int off=Integer.parseInt(f[2],16),count=Integer.parseInt(f[3],16);
+                if(current.equals("/proc")) {
+                    if(!f[4].equals("1"))throw new AssertionError();
+                    if(scenario==3){add("o:0:100000000:0\r\n");return;}
+                    String listing=off==0||scenario==4?".\r\n..\r\n12\r\n34\r\n12\r\n../as\r\n12/ctl\r\nboot\r\n":"";
+                    byte[] raw=listing.getBytes(StandardCharsets.US_ASCII);
+                    add("o:0:"+Integer.toHexString(raw.length)+":0\r\n");queue.write(raw);return;
+                }
+                if(!f[4].equals("0"))throw new AssertionError();
+                byte[] raw=(current.endsWith("/mappings")?"1000 2000 /lib/libopenwfd_qnx.so\n":
+                        current.contains("/12/")?"/bin/screen\n":"/bin/unrelated\n").getBytes(StandardCharsets.US_ASCII);
+                if(scenario==5)raw=new byte[4097];
+                int n=Math.min(count,Math.max(0,raw.length-off));
+                add("o:"+Integer.toHexString(n)+"\r\n");queue.write(raw,off,n);return;
+            }
+            throw new AssertionError("Unexpected process frame "+s);
+        }
+    }
+    static void processTests()throws Exception {
+        for(int mode=0;mode<=5;mode++) {
+            ProcPeer peer=new ProcPeer(mode);Map<String,String> payloads=new HashMap<>();
+            final int scenario=mode;
+            boolean failed=false;
+            try {new QnxFileReader(peer).collectProcesses(new QnxFileReader.Receiver(){
+                public void file(String p,String s,byte[] b){throw new AssertionError();}
+                public void snapshot(String n,String s,byte[] b){
+                    if(!s.equals(scenario==0||scenario==2?"collected_snapshot":"partial_or_unavailable"))throw new AssertionError(s);
+                    payloads.put(n,new String(b,StandardCharsets.UTF_8));
+                }
+            });}catch(QnxFileReader.Failure expected){failed=true;}
+            if(failed!=(mode==1||mode>=3)||payloads.size()!=2)throw new AssertionError("mode "+mode);
+            if(mode==0) {
+                if(!payloads.get("processes.tsv").contains("12\tread\t/bin/screen"))throw new AssertionError();
+                if(!payloads.get("graphics-mappings.txt").contains("libopenwfd_qnx.so"))throw new AssertionError();
+                if(peer.frames.stream().filter(s->s.equals("o:\"/proc/12/exefile\":0\r\n")).count()!=1)throw new AssertionError();
+                if(peer.frames.stream().anyMatch(s->s.contains("/34/mappings")))throw new AssertionError();
+            }
+            if(mode==2&&!payloads.get("processes.tsv").contains("denied_or_exited"))throw new AssertionError();
+        }
+    }
     public static void main(String[] args)throws Exception {
+        processTests();
+        for(String stat:new String[]{"o:1:800001:0:0:0:0:1:1:1:81a4:1:0:0:0:0\r\n",
+                "o:1:0:0:0:0:0:1:1:1:41a4:1:0:0:0:0\r\n"}) {
+            Peer rejected=new Peer(0){public void write(byte[] bytes)throws Exception {
+                if(new String(bytes,StandardCharsets.US_ASCII).equals("s:0\r\n")){add(stat);return;}
+                super.write(bytes);
+            }};
+            new QnxFileReader(rejected).collectSingle(QnxFileReader.TARGETS[0],(p,s,b)->{
+                if(b!=null||!s.equals(stat.contains("800001")?"size_limit":"not_regular"))throw new AssertionError();
+            });
+            if(rejected.reads!=0||!rejected.frames.contains("c:0\r\n"))throw new AssertionError();
+        }
         for(int mode=0;mode<5;mode++) {
             Peer p=new Peer(mode);int[] received={0};final int m=mode;
             try {new QnxFileReader(p).collect((path,status,bytes)->{
@@ -48,7 +115,7 @@ public class QnxFileReaderReplay {
             });if(mode==2)throw new AssertionError("Oversized read accepted");}
             catch(QnxFileReader.Failure e){if(mode!=2)throw e;
                 if(!e.report.contains("stage=read_first")||!e.report.contains("qnx_short_read"))throw new AssertionError(e.report);}
-            if(mode!=2&&received[0]!=6)throw new AssertionError();
+            if(mode!=2&&received[0]!=QnxFileReader.TARGETS.length)throw new AssertionError();
         }
         QnxFileReader.Wire unavailable=new QnxFileReader.Wire(){
             public byte[] read(){return "nc: connection refused\n".getBytes(StandardCharsets.US_ASCII);}

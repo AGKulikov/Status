@@ -41,7 +41,7 @@ public final class AdbConsoleSession implements AutoCloseable {
     }
     /** Only the fixed, read-only system dump receives a longer overall budget. */
     public synchronized boolean submitSystemDump(Operation operation, Listener listener) {
-        return submitBounded(operation,listener,180);
+        return submitBounded(operation,listener,600);
     }
     private boolean submitBounded(Operation operation, Listener listener, int timeoutSeconds) {
         if (closed || !busy.compareAndSet(false, true)) return false;

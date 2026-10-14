@@ -1,5 +1,18 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 14.10.2026 — SOURCE сборщика3.1.8
+
+Старый Deep Evidence inventory подтверждает /bin/openwfd_server,
+/bin/openwfd_telltale, /bin/screen, /lib/libopenwfd_qnx.so: добавлены точные GET
+цели и /etc/system/config/variant.cfg, прежние6 целей сохранены. Дополнительно
+GET-only /proc directory → numeric PID/exefile → mappings для выбранных graphics
+процессов. Это метаданные, не чтение process memory или запуск pidin. Format
+directory ported из существующего qconn_native.py; новый Java-путь нуждается
+в физической проверке. При отказе нет запуска служб/изменения firewall/retry.
+Новый дамп должен дать код и runtime-связь; их наличие ещё не доказывает владельца
+крыльев. Документация QNX описывает exefile/mappings отдельно от ctl/as:
+https://qnx.com/developers/docs/7.1/com.qnx.doc.neutrino.prog/topic/process_proc_filesystem.html
+
 ## 14.10.2026 — уточнение firmware-кандидатов
 
 vdh-qnx-boot.img из Cruise Trace — QNX6 persist, а не доказанный boot/DIM image:

@@ -69,6 +69,24 @@ public final class SystemFileDumpReplay {
             check(manifest(perFile).contains("qnx:"+QnxFileReader.TARGETS[3]+"\tnot_attempted_after_qnx_failure"));
             check(Arrays.equals(raw,zip.getInputStream(zip.getEntry("qnx/files"+QnxFileReader.TARGETS[1])).readAllBytes()));
         }
+        SystemFileDump.Report metadata=SystemFileDump.collect(directory,
+                c->c.contains("readlink -f")?result("UART"):good.command(c),s->{},"test",receiver->{
+                    for(String path:QnxFileReader.TARGETS)receiver.file(path,"remote_open_failed",null);
+                    receiver.snapshot("processes.tsv","partial_or_unavailable","pid\tstatus\texecutable\n".getBytes(StandardCharsets.UTF_8));
+                    receiver.snapshot("graphics-mappings.txt","partial_or_unavailable","partial\n".getBytes(StandardCharsets.UTF_8));
+                    throw new IOException("process metadata timeout");
+                });
+        check(metadata.collected==9);
+        try(ZipFile zip=new ZipFile(metadata.file)) {
+            check(zip.getEntry("qnx/metadata/processes.tsv")!=null);
+            check(manifest(metadata).contains("qnx-meta:processes.tsv\tpartial_or_unavailable"));
+            check(manifest(metadata).contains("qnx-meta:graphics-mappings.txt\tpartial_or_unavailable"));
+        }
+        SystemFileDump.Report rejected=SystemFileDump.collect(directory,
+                c->c.contains("readlink -f")?result("UART"):good.command(c),s->{},"test",receiver->{
+                    receiver.snapshot("../escape","collected_snapshot",new byte[1]);
+                });
+        check(manifest(rejected).contains("qnx-meta:processes.tsv\tnot_collected"));
         for(String bad:new String[]{"a","!!!!","AA==junk","AB=="}) {
             try{SystemFileDump.decode(bad,1);throw new AssertionError();}catch(IOException expected){}
         }

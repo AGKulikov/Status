@@ -1,5 +1,17 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review 3.1.8 — целевой graphics dump
+
+SystemFileDump сохраняет прежние cache/exports ZIP и политику двух последних
+архивов; новые files/metadata входят только в приватный диагностический экспорт,
+не managed backup roots. DiagnosticsActivity меняет объяснение состава/600с.
+AdbTransport использует прежние RSA-файлы/endpoint, не добавляет секретов или
+настроек; новые операции только read-only qconn GET. Эти три storage owners
+пересмотрены без изменения правил восстановления. BackupDefaultsMigration
+явно разрешает335…350→351 с прежними effective defaults/explicit values;
+334/352 отвергаются. Новых preferences/defaults нет. Fingerprints этих четырёх
+владельцев обновляются после review. Runtime restore gate остаётся OPEN.
+
 ### Review 3.1.7 — источник заряда и мягкое скрытие OEM overlay
 
 WidgetService сохраняет прежние два persistent low-battery latch и их правила

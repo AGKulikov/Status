@@ -11,12 +11,16 @@ public final class QnxFileReader {
     public interface Receiver {
         void file(String path, String status, byte[] bytes) throws Exception;
         default void diagnostic(String path, String details) throws Exception {}
+        default void snapshot(String name, String status, byte[] bytes) throws Exception {}
     }
     public static final String[] TARGETS = {
+        "/etc/system/config/variant.cfg", "/bin/openwfd_server", "/bin/openwfd_telltale",
+        "/bin/screen", "/lib/libopenwfd_qnx.so",
         "/lib/libMAX96755_QC_0_UART.so", "/lib/libMAX96755_QC_1_UART.so",
         "/lib/libDP_COMMON_QC_UART.so", "/bin/qcdisplaycfg.xml",
         "/scripts/startup.sh", "/ramdisk/linux.config"
     };
+    public static final String[] SNAPSHOTS = {"processes.tsv", "graphics-mappings.txt"};
     private final Wire wire;
     private byte[] pending = new byte[0];
     private int cursor;
@@ -95,8 +99,6 @@ public final class QnxFileReader {
         send("s:"+fd+"\r\n"); String[] f=fields();
         if(f.length<16) throw new IOException("qnx_bad_stat");
         long[] s=new long[15];for(int i=0;i<15;i++)s[i]=number(f[i+1],16);
-        if((s[9]&0xf000)!=0x8000) throw new IOException("qnx_not_regular");
-        if(s[1]>8*1024*1024) throw new IOException("qnx_size_limit");
         return s;
     }
     private byte[] readFile(long fd,int size) throws Exception {
@@ -125,12 +127,7 @@ public final class QnxFileReader {
         catch(Exception error) { throw new Failure(path,report(error),error); }
     }
     private void collectFiles(String[] targets,Receiver receiver) throws Exception {
-        if(!line().equals("QCONN"))throw new IOException("qnx_greeting_mismatch");
-        stage="negotiation";
-        if(!Arrays.equals(exact(3),new byte[]{(byte)255,(byte)253,34}))
-            throw new IOException("qnx_handshake_mismatch");
-        stage="service_file";
-        send("service file\r\n");if(!reply().equals("OK"))throw new IOException("qnx_service_failed");
+        handshake();
         for(String path:targets) {
             this.path=path;stage="open";offset=0;
             send("o:\""+path+"\":0\r\n");
@@ -139,10 +136,13 @@ public final class QnxFileReader {
                 receiver.diagnostic(path,report(new IOException("qnx_remote_open_error")));
                 receiver.file(path,"remote_open_failed",null); continue;
             }
-            String[] f=reply.split(":",-1);
-            if(f.length<2 || !f[0].equals("o"))throw new IOException("qnx_bad_open");
-            long fd=number(f[1],10);if(fd>1000000)throw new IOException("qnx_bad_descriptor");
+            long fd=descriptor(reply);
             stage="stat_before";long[] before=stat(fd);
+            if((before[9]&0xf000)!=0x8000 || before[1]>8*1024*1024) {
+                stage="close";send("c:"+fd+"\r\n");fields();
+                receiver.file(path,(before[9]&0xf000)!=0x8000?"not_regular":"size_limit",null);
+                receiver.diagnostic(path,report(null));continue;
+            }
             stage="read_first";byte[] bytes=readFile(fd,(int)before[1]);
             // qconn has no remote SHA operation: independently reread the descriptor.
             stage="read_second";byte[] second=readFile(fd,(int)before[1]);
@@ -154,5 +154,91 @@ public final class QnxFileReader {
             receiver.file(path,same?"collected_double_read":"changed_during_read",same?bytes:null);
             receiver.diagnostic(path,report(null));
         }
+    }
+    private long descriptor(String reply) throws Exception {
+        String[] f=reply.split(":",-1);
+        if(f.length<2 || !f[0].equals("o"))throw new IOException("qnx_bad_open");
+        long fd=number(f[1],10);if(fd>1000000)throw new IOException("qnx_bad_descriptor");
+        return fd;
+    }
+    private void handshake() throws Exception {
+        if(!line().equals("QCONN"))throw new IOException("qnx_greeting_mismatch");
+        stage="negotiation";
+        if(!Arrays.equals(exact(3),new byte[]{(byte)255,(byte)253,34}))
+            throw new IOException("qnx_handshake_mismatch");
+        stage="service_file";
+        send("service file\r\n");if(!reply().equals("OK"))throw new IOException("qnx_service_failed");
+    }
+    /** No cmdline, environment, address-space reads, devctl, launcher or process control. */
+    public void collectProcesses(Receiver receiver) throws Exception {
+        StringBuilder index=new StringBuilder("pid\tstatus\texecutable\n");
+        StringBuilder maps=new StringBuilder("QNX mappings: metadata only; non-atomic live snapshot\n");
+        String result="collected_snapshot";
+        try {
+            path="/proc";handshake();stage="proc_directory";
+            send("o:\"/proc\":0:4000\r\n");String opened=reply();
+            if(opened.startsWith("e:"))throw new IOException("qnx_proc_open_denied_or_unavailable");
+            long fd=descriptor(opened);
+            java.util.Set<String> pids=new java.util.LinkedHashSet<>();
+            boolean eof=false;
+            int total=0;
+            for(int page=0;page<256;page++) {
+                send("r:"+fd+":"+Integer.toHexString(page)+":400:1\r\n");
+                String[] f=fields();if(f.length<4)throw new IOException("qnx_bad_directory_reply");
+                long length=number(f[2],16);
+                if(length>65536 || total+length>131072)throw new IOException("qnx_directory_size_limit");
+                int size=(int)length;
+                if(size==0){eof=true;break;}
+                total+=size;ByteArrayOutputStream data=new ByteArrayOutputStream(size);
+                for(int n=0;n<size;n+=2048)data.write(exact(Math.min(2048,size-n)));
+                for(String name:new String(data.toByteArray(),StandardCharsets.US_ASCII).split("\r\n",-1)) {
+                    if(name.matches("[1-9][0-9]{0,9}")) {
+                        pids.add(name);if(pids.size()>256)throw new IOException("qnx_pid_limit");
+                    }
+                }
+            }
+            send("c:"+fd+"\r\n");fields();
+            if(!eof)throw new IOException("qnx_directory_page_limit");
+            int graphics=0;
+            for(String pid:pids) {
+                path="/proc/"+pid+"/exefile";stage="proc_exefile";
+                byte[] data=procText(path,4096);
+                if(data==null){index.append(pid).append("\tdenied_or_exited\t-\n");continue;}
+                String exe=new String(data,StandardCharsets.UTF_8).replace("\u0000", "").trim();
+                index.append(pid).append("\tread\t").append(safe(exe)).append('\n');
+                String name=exe.substring(exe.lastIndexOf('/')+1);
+                if(Arrays.asList("openwfd_server","openwfd_telltale","screen","screen-pwrmgr","cluster_controller").contains(name)) {
+                    if(++graphics>8)throw new IOException("qnx_graphics_process_limit");
+                    path="/proc/"+pid+"/mappings";stage="proc_mappings";
+                    maps.append("--- pid=").append(pid).append(" executable=").append(safe(exe)).append('\n');
+                    byte[] mapping=procText(path,65536);
+                    maps.append(mapping==null?"denied_or_exited\n":new String(mapping,StandardCharsets.UTF_8)+"\n");
+                }
+            }
+            maps.append("graphics_processes=").append(graphics).append('\n');
+        } catch(Exception error) {
+            result="partial_or_unavailable";
+            index.append("# ").append(safe(report(error))).append('\n');
+            throw new Failure(path,report(error),error);
+        } finally {
+            receiver.snapshot(SNAPSHOTS[0],result,index.toString().getBytes(StandardCharsets.UTF_8));
+            receiver.snapshot(SNAPSHOTS[1],result,maps.toString().getBytes(StandardCharsets.UTF_8));
+        }
+    }
+    private byte[] procText(String target,int limit) throws Exception {
+        if(!target.matches("/proc/[1-9][0-9]{0,9}/(exefile|mappings)"))throw new IOException("qnx_proc_target_not_allowed");
+        send("o:\""+target+"\":0\r\n");String opened=reply();
+        if(opened.startsWith("e:"))return null;
+        long fd=descriptor(opened);ByteArrayOutputStream data=new ByteArrayOutputStream();
+        while(true) {
+            offset=data.size();int count=Math.min(2048,limit+1-data.size());
+            send("r:"+fd+":"+Integer.toHexString(data.size())+":"+Integer.toHexString(count)+":0\r\n");
+            String[] f=fields();if(f.length<2)throw new IOException("qnx_bad_proc_reply");
+            long got=number(f[1],16);if(got>count)throw new IOException("qnx_bad_proc_count");
+            if(got==0)break;
+            data.write(exact((int)got));
+            if(data.size()>limit)throw new IOException("qnx_proc_size_limit");
+        }
+        send("c:"+fd+"\r\n");fields();return data.toByteArray();
     }
 }
