@@ -247,6 +247,8 @@ public final class QnxFileReader {
                 catch(ProcFailure error) {
                     appendMapping(maps,"read_or_protocol_failed",error.prefix);throw error;
                 }
+                if(mapping.status.equals("read") && !validMappings(mapping.bytes))
+                    mapping=new ProcRead(mapping.bytes,"read_content_invalid");
                 if(!mapping.status.equals("read"))mapsStatus="partial_or_unavailable";
                 appendMapping(maps,mapping.status,mapping.bytes);
             }
@@ -267,6 +269,24 @@ public final class QnxFileReader {
             receiver.snapshot(SNAPSHOTS[0],indexStatus,index.toString().getBytes(StandardCharsets.UTF_8));
             receiver.snapshot(SNAPSHOTS[1],mapsStatus,maps.toString().getBytes(StandardCharsets.UTF_8));
         }
+    }
+    /** Format gate only: valid rows do not prove an atomic or complete live snapshot. */
+    static boolean validMappings(byte[] bytes) {
+        String text=new String(bytes,StandardCharsets.UTF_8);
+        if(text.indexOf('\ufffd')>=0 || !text.endsWith("\n"))return false;
+        String[] rows=text.split("\n",-1);
+        String header="mi_vaddr,ri_flags,mi_flags,mi_pte_prot,mi_prot,ri_prot,ri_maxprot,mi_paddr,mi_hwattr,mi_pgsize,mi_sharecnt,dev,ino,ri_offset,object_name";
+        if(!rows[0].equals(header))return false;
+        for(int row=1;row<rows.length-1;row++) {
+            // A comma in an object name is legitimate; only the first 14 delimiters matter.
+            String[] fields=rows[row].split(",",15);
+            if(fields.length!=15)return false;
+            for(int field=0;field<14;field++)
+                if(!fields[field].matches("(?:0x)?[0-9a-fA-F]{1,16}"))return false;
+            for(int i=0;i<fields[14].length();i++)
+                if(Character.isISOControl(fields[14].charAt(i)))return false;
+        }
+        return true;
     }
     private static void appendMapping(StringBuilder out,String status,byte[] bytes) {
         out.append("status=").append(status).append(" bytes=").append(bytes.length).append('\n')

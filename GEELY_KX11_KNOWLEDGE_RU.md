@@ -1,5 +1,17 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 14.10.2026 — FIELD дампа3.1.9 и повреждённые mappings
+
+22/22 QNX файла,92 PID,6 mappings; все6 содержат нарушения структуры.
+Целые строки указывают на screen_QC/openwfd_server_QC/display slog2 buffers;
+самих логов нет. /mnt/userdata/DLT недоступен; QNX /userdata/DLT не проверен.
+libdalconfig.so.1 SONAME совпадает с наблюдаемым runtime library name;
+libplanedef относится к format/stride/buffer layout, не найденным крыльям.
+Recovery log побайтно равен историческому, новых событий не даёт.
+Gate структуры исправлен в SOURCE, причина пропусков OPEN; FIELD и
+независимое скрытие крыльев не закрыты. Подробности:DUMP_319_RU.md в
+docs/geely-kx11/research-2026-10-14-dim/.
+
 ## 14.10.2026 — SOURCE расширенного сбора3.1.9
 
 Разделены exefile inventory и mappings; cap256KiB сохраняет префикс с явным

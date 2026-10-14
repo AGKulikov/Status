@@ -229,7 +229,7 @@
           "level": "STATIC",
           "finding": "Сопоставлены transparency0x772e/global alpha0x772f и их чтение GetDisplayCompositionInfo вместе с rectangles/input sources. Единый слой обоих крыльев с прозрачным центром не исключён. Renderer и независимый hide flag не найдены; runtime запросы не выполнялись.",
           "source": "research-2026-10-14-dim/OPENWFD_COMPOSITION_RU.md",
-          "next_step": "Composition query требует type2/locked driver: не внедрять как пассивный сбор. STATIC blending до QDI9/DS; точных сообщений в1051 текстовых entries12 ZIP нет. Подготовлен SOURCE3.1.9: inventory-first, truncated mappings prefix,22 fixed QNX targets, Android graphics context, bounded existing DLT ranges. CI/APK/FIELD отражать отдельно; внешний DIM/renderer крыльев остаются OPEN."
+          "next_step": "Composition query требует type2/locked driver: не внедрять как пассивный сбор. Дамп3.1.9:22/22 QNX,92 PID,6 mappings с повреждениями. SOURCE gate read_content_invalid проверен replay и6 реальными payloads; первопричина OPEN. Найдены конкретные slog2 buffer paths, содержимого нет; подготовить bounded read и decoder без logger start/verbosity/driver lock. /mnt/userdata/DLT недоступен; runtime /userdata/DLT не проверен. См.DUMP_319_RU.md. Renderer/hide крыльев OPEN."
         }
       ],
       "coverage_ids": [

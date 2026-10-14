@@ -4,6 +4,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.ZipFile;
 public class QnxFileReaderReplay {
+    static final String MAP_HEADER="mi_vaddr,ri_flags,mi_flags,mi_pte_prot,mi_prot,ri_prot,ri_maxprot,mi_paddr,mi_hwattr,mi_pgsize,mi_sharecnt,dev,ino,ri_offset,object_name\n";
+    static final String MAP_ROW="0x1000,0x1,0x14,0x3,0x3,0x3,0xf,0xffffffffffffffff,0x0,0x1000,00000001,0x1,0x3,0x0,/lib/libopenwfd_qnx.so\n";
     static class Peer implements QnxFileReader.Wire {
         ByteArrayOutputStream queue=new ByteArrayOutputStream();
         byte[] body=new byte[4101]; int reads, mode; List<String> frames=new ArrayList<>();
@@ -62,7 +64,7 @@ public class QnxFileReaderReplay {
                     add("o:0:"+Integer.toHexString(raw.length)+":0\r\n");queue.write(raw);return;
                 }
                 if(!f[4].equals("0"))throw new AssertionError();
-                byte[] raw=(current.endsWith("/mappings")?"1000 2000 /lib/libopenwfd_qnx.so\n":
+                byte[] raw=(current.endsWith("/mappings")?MAP_HEADER+MAP_ROW:
                         current.contains("/12/")?"/bin/screen\n":scenario>=6?"/bin/wfd_be\n":"/bin/unrelated\n").getBytes(StandardCharsets.US_ASCII);
                 if(scenario==5)raw=new byte[4097];
                 if((scenario==6||scenario==9)&&current.equals("/proc/12/mappings")) {
@@ -89,7 +91,7 @@ public class QnxFileReaderReplay {
             try {new QnxFileReader(peer).collectProcesses(new QnxFileReader.Receiver(){
                 public void file(String p,String s,byte[] b){throw new AssertionError();}
                 public void snapshot(String n,String s,byte[] b){
-                    boolean complete=scenario==0||scenario==9||scenario==10||(scenario>=6&&n.equals("processes.tsv"));
+                    boolean complete=scenario==0||(scenario>=6&&n.equals("processes.tsv"));
                     if(!s.equals(complete?"collected_snapshot":"partial_or_unavailable"))throw new AssertionError(n+" "+s);
                     payloads.put(n,new String(b,StandardCharsets.UTF_8));
                 }
@@ -111,11 +113,15 @@ public class QnxFileReaderReplay {
                 if(mode==7&&(!payloads.get("graphics-mappings.txt").contains("status=read_or_protocol_failed bytes=2048")
                         ||!payloads.get("graphics-mappings.txt").contains("pid=34 status=not_attempted_after_failure")))throw new AssertionError();
                 if(mode==9&&payloads.get("graphics-mappings.txt").contains("truncated_size_limit"))throw new AssertionError("exact limit is not truncated");
-                if(mode==10&&!payloads.get("graphics-mappings.txt").contains("status=read bytes=65537"))throw new AssertionError("field-size regression");
+                if((mode==9||mode==10)&&!payloads.get("graphics-mappings.txt").contains("status=read_content_invalid bytes="+(mode==9?262144:65537)))throw new AssertionError("invalid full payload must be preserved and marked");
             }
         }
     }
     public static void main(String[] args)throws Exception {
+        for(String valid:new String[]{MAP_HEADER,MAP_HEADER+MAP_ROW,MAP_HEADER+MAP_ROW.replace(".so",",extra.so")})
+            if(!QnxFileReader.validMappings(valid.getBytes(StandardCharsets.UTF_8)))throw new AssertionError("valid mapping rejected");
+        for(String invalid:new String[]{"",MAP_ROW,MAP_HEADER+MAP_ROW.trim(),MAP_HEADER+MAP_ROW.replace("0x14,", ""),MAP_HEADER+MAP_ROW.replace("0x14", "0x140x1000"),MAP_HEADER+MAP_ROW.replace(".so", "\u0000.so")})
+            if(QnxFileReader.validMappings(invalid.getBytes(StandardCharsets.UTF_8)))throw new AssertionError("corrupt mapping accepted");
         processTests();
         for(String stat:new String[]{"o:1:800001:0:0:0:0:1:1:1:81a4:1:0:0:0:0\r\n",
                 "o:1:0:0:0:0:0:1:1:1:41a4:1:0:0:0:0\r\n"}) {
