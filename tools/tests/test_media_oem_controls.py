@@ -76,7 +76,10 @@ public class ControlsReplay {
     check(InstrumentOemPolicy.suppressWhiteBar(true,3));
     for(int mode:new int[]{-1,0,1,2,4,255})check(!InstrumentOemPolicy.suppressWhiteBar(true,mode));
     check(!InstrumentOemPolicy.suppressWhiteBar(false,3));
-    check(InstrumentOemPolicy.appOpMatches("SYSTEM_ALERT_WINDOW: deny; time=+1m",true));
+    check(InstrumentOemPolicy.appOpMatches("SYSTEM_ALERT_WINDOW: ignore; time=+1m",true));
+    check(!InstrumentOemPolicy.appOpMatches("SYSTEM_ALERT_WINDOW: deny; time=+1m",true));
+    check(InstrumentOemPolicy.whiteBarAppOp(true).equals("ignore"));
+    check(InstrumentOemPolicy.whiteBarAppOp(false).equals("allow"));
     check(InstrumentOemPolicy.appOpMatches("  SYSTEM_ALERT_WINDOW: allow\n",false));
     for(String output:new String[]{null,"No operations.","permission denied", "SYSTEM_ALERT_WINDOW: ignore", "other: allow"})
       check(!InstrumentOemPolicy.appOpMatches(output,false));

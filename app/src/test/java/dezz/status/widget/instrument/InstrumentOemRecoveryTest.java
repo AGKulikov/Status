@@ -10,4 +10,12 @@ public class InstrumentOemRecoveryTest {
  @Test public void stockOverlayIsStillReleasedOutsideVerifiedNavigation(){
   for(int mode:new int[]{-1,0,1,2,3,4}){assertEquals(mode==3,InstrumentOemPolicy.suppressWhiteBar(true,mode));assertFalse(InstrumentOemPolicy.suppressWhiteBar(false,mode));}
  }
+ @Test public void softSuppressionRejectsLegacyDenyAndRequiresExactReadback(){
+  assertEquals("ignore",InstrumentOemPolicy.whiteBarAppOp(true));
+  assertEquals("allow",InstrumentOemPolicy.whiteBarAppOp(false));
+  assertTrue(InstrumentOemPolicy.appOpMatches("SYSTEM_ALERT_WINDOW: ignore; time=+1s",true));
+  for(String invalid:new String[]{"SYSTEM_ALERT_WINDOW: deny","SYSTEM_ALERT_WINDOW: allow",
+    "SYSTEM_ALERT_WINDOW: default","other: ignore","permission denied",null})
+    assertFalse(InstrumentOemPolicy.appOpMatches(invalid,true));
+ }
 }

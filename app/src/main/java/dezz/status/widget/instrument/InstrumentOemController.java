@@ -227,13 +227,13 @@ public final class InstrumentOemController {
             boolean deny = InstrumentOemPolicy.suppressWhiteBar(whiteBarEnabled, modes[1]);
             trace.stage("mode_resolved", "global_mode=" + modes[0] + ", sdk_mode=" + actual
                     + ", selected_mode=" + modes[1] + ", source=" + (sdkAvailable[0]?"SDK":"Global_fallback")
-                    + ", expected_appop=" + (deny?"deny":"allow"));
+                    + ", expected_appop=" + InstrumentOemPolicy.whiteBarAppOp(deny));
             requested[0] = deny;
             wrote[0] = forceWhiteApply || lastWhiteDeny == null || lastWhiteDeny != deny;
             trace.stage("appop_submitted", "write=" + wrote[0]);
             String read = "appops get com.ecarx.dimmenu SYSTEM_ALERT_WINDOW";
             return wrote[0] ? "appops set com.ecarx.dimmenu SYSTEM_ALERT_WINDOW "
-                    + (deny ? "deny" : "allow") + " && " + read : read;
+                    + InstrumentOemPolicy.whiteBarAppOp(deny) + " && " + read : read;
         }, (output, error) -> {
             shellBusy = false;
             boolean deny = requested[0];
@@ -241,7 +241,8 @@ public final class InstrumentOemController {
             trace.finish(success ? "readback_matched" : "readback_failed", "generation=" + owner
                     + ", current_generation=" + whiteGeneration + ", global_mode=" + modes[0]
                     + ", selected_mode=" + modes[1] + ", sdk_available=" + sdkAvailable[0]
-                    + ", expected=" + (deny?"deny":"allow") + ", readback=" + InstrumentOemPolicy.appOpState(output)
+                    + ", expected=" + InstrumentOemPolicy.whiteBarAppOp(deny)
+                    + ", readback=" + InstrumentOemPolicy.appOpState(output)
                     + ", transport_error=" + (error!=null) + ", wrote=" + wrote[0]
                     + ", window=" + InstrumentPanelActivity.windowState() + ", physical_pixels=unobserved");
             if (!success) CausalDiagnostics.capture("white_bar_readback_failed",false);
@@ -269,7 +270,7 @@ public final class InstrumentOemController {
             }
             if (success) maybeRestoreNavigation(modes[1]);
             if (!success && whiteAttempt < 3) { whiteScheduled = true; main.postDelayed(applyWhiteBar, 100); return; }
-            whiteStatus = success ? (deny ? "Запрет штатного наложения подтверждён"
+            whiteStatus = success ? (deny ? "Скрытие штатного наложения подтверждено"
                     : whiteBarEnabled ? "Ожидание режима навигации приборки" : "Штатные наложения восстановлены")
                     : "Не удалось подтвердить настройку полосы через встроенный ADB";
             if (wrote[0] || !success) DiagnosticJournal.infoAsync("instrument-oem", "white_bar navi_mode=" + modes[1]

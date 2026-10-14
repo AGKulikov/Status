@@ -39,7 +39,7 @@ public class ColdStartReplay {
   static PrivilegedShell instance=new PrivilegedShell();static ArrayDeque<Command> pending=new ArrayDeque<>();static List<String> executed=new ArrayList<>();
   static PrivilegedShell get(Context c){return instance;}
   void runCommand(Supplier<String> c,Callback r){pending.add(new Command(c,r));}
-  static void complete(){Command q=pending.remove();String c=q.command.get();executed.add(c);if(c.startsWith("appops set"))op=c.contains("WINDOW deny")?"deny":"allow";String result="SYSTEM_ALERT_WINDOW: "+op;new Handler().post(()->q.callback.accept(result,null));}
+  static void complete(){Command q=pending.remove();String c=q.command.get();executed.add(c);if(c.startsWith("appops set"))op=c.contains("WINDOW ignore")?"ignore":c.contains("WINDOW deny")?"deny":"allow";String result="SYSTEM_ALERT_WINDOW: "+op;new Handler().post(()->q.callback.accept(result,null));}
  }
  static class White {
   static class Monitor {int refreshes;void navigationModeLost(){refreshes++;}}
@@ -67,11 +67,11 @@ public class ColdStartReplay {
   case "mode_changes_in_queue":{
    White w=new White();Settings.Global.mode=1;InstrumentDisplayLauncher.actual=1;w.scheduleWhiteBar();advance(1500);
    Settings.Global.mode=3;InstrumentDisplayLauncher.actual=3;w.scheduleWhiteBar();PrivilegedShell.complete();
-   check(op.equals("deny"),"queued factory must read newest mode");break;
+   check(op.equals("ignore"),"queued factory must read newest mode");break;
   }
   case "native_mode_wins":{
    White w=new White();Settings.Global.mode=1;InstrumentDisplayLauncher.actual=3;w.scheduleWhiteBar();advance(1500);PrivilegedShell.complete();advance(now);
-   check(op.equals("deny"),"stale global mode must not undo native mode3");
+   check(op.equals("ignore"),"stale global mode must not undo native mode3");
    Settings.Global.mode=3;InstrumentDisplayLauncher.actual=1;w.scheduleWhiteBar();advance(now+1500);PrivilegedShell.complete();advance(now);
    check(op.equals("allow"),"real native exit must restore overlays");
    check(w.priorityMonitor.refreshes==1,"one subscription refresh on confirmed mode3 to mode1");
@@ -79,15 +79,22 @@ public class ColdStartReplay {
    check(w.priorityMonitor.refreshes==1,"unchanged mode1 must not repeatedly register callbacks");break;
   }
   case "external_appop_reset":{
-   White w=new White();w.scheduleWhiteBar();advance(1500);PrivilegedShell.complete();advance(now);check(op.equals("deny"),"initial state");
+   White w=new White();w.scheduleWhiteBar();advance(1500);PrivilegedShell.complete();advance(now);check(op.equals("ignore"),"initial state");
    op="allow";advance(6500);PrivilegedShell.complete();advance(now);advance(6600);PrivilegedShell.complete();advance(now);
-   check(op.equals("deny"),"periodic readback must repair external reset");
+   check(op.equals("ignore"),"periodic readback must repair external reset");
    check(PrivilegedShell.executed.get(1).equals("appops get com.ecarx.dimmenu SYSTEM_ALERT_WINDOW"),"healthy verification must not rewrite appop");break;
   }
   case "off_while_queued":{
    White w=new White();w.scheduleWhiteBar();advance(1500);w.whiteBarEnabled=false;w.scheduleWhiteBar();PrivilegedShell.complete();advance(now);
    check(op.equals("allow"),"OFF supersedes queued ON");
    check(w.priorityMonitor.refreshes==0,"disabled setting cannot refresh subscription");break;
+  }
+  case "legacy_deny_migrates":{
+   op="deny";White w=new White();w.whiteOwned=true;w.scheduleWhiteBar();advance(1500);PrivilegedShell.complete();advance(now);
+   check(op.equals("ignore"),"old deny must migrate even when saved ownership is already true");
+   check(w.whiteOwned,"soft suppression remains owned for later restore");
+   w.whiteBarEnabled=false;w.scheduleWhiteBar();advance(now);PrivilegedShell.complete();advance(now);
+   check(op.equals("allow")&&!w.whiteOwned,"OFF restores the OEM overlay after migration");break;
   }
   case "expired_selector":{
    Context c=new Context();DriveSelectorController.request(c,1);android.os.SystemClock.now=7510;now=7510;
@@ -140,7 +147,7 @@ public class ColdStartReplay {
 
     def test_runtime_scenarios(self):
         for name in ['notification_burst', 'mode_changes_in_queue', 'native_mode_wins',
-                     'external_appop_reset', 'off_while_queued', 'expired_selector',
+                     'external_appop_reset', 'off_while_queued', 'legacy_deny_migrates', 'expired_selector',
                      'deadline_preserved', 'fresh_selector', 'partial_restore_batch']:
             with self.subTest(name=name):
                 r = subprocess.run(['java', '-cp', str(self.out), 'ColdStartReplay', name], capture_output=True, text=True, timeout=8)

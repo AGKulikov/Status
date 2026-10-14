@@ -7,6 +7,10 @@ public final class InstrumentOemPolicy {
     public static boolean suppressWhiteBar(boolean enabled, int naviMode) {
         return enabled && naviMode == 3;
     }
+    /** Android 9 hides MODE_IGNORED windows without rejecting addWindow as MODE_ERRORED can. */
+    public static String whiteBarAppOp(boolean suppressed) {
+        return suppressed ? "ignore" : "allow";
+    }
     public static boolean restoreNavigation(boolean enabled, int naviMode,
             boolean panelReady, boolean ownForeground, boolean navigationIdle) {
         return enabled && naviMode == 1 && panelReady && ownForeground && navigationIdle;
@@ -21,6 +25,6 @@ public final class InstrumentOemPolicy {
     public static boolean appOpMatches(String output, boolean denied) {
         if (output == null) return false;
         return java.util.regex.Pattern.compile("(?m)^\\s*SYSTEM_ALERT_WINDOW:\\s*"
-                + (denied ? "deny" : "allow") + "(?:;|\\s|$)").matcher(output).find();
+                + whiteBarAppOp(denied) + "(?:;|\\s|$)").matcher(output).find();
     }
 }

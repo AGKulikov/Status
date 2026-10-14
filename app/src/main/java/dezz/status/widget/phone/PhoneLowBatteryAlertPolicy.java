@@ -17,6 +17,17 @@ public final class PhoneLowBatteryAlertPolicy {
     private PhoneLowBatteryAlertPolicy() {
     }
 
+    /** Coarse Helper/HFP values are useful for display, never for threshold alarms. */
+    @Nullable
+    public static Integer exactPercentage(@Nullable Object level, @Nullable String source) {
+        if (!("ble_bas".equals(source) || "android_broadcast".equals(source)
+                || "hfp_ecarx_percent".equals(source)) || !(level instanceof Number)) return null;
+        double number = ((Number) level).doubleValue();
+        if (Double.isNaN(number) || Double.isInfinite(number)
+                || number < 0 || number > 100 || number != Math.rint(number)) return null;
+        return (int) number;
+    }
+
     public static int boundedThreshold(int threshold) {
         return Math.max(MIN_THRESHOLD, Math.min(MAX_THRESHOLD, threshold));
     }

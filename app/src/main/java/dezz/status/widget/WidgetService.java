@@ -481,6 +481,7 @@ public class WidgetService extends Service {
     /** A warning remains pending until at least one configured destination really presents it. */
     private boolean phoneLowBatteryAlertPending;
     private boolean phoneLowBatteryAlertPending2;
+    private String lastPhoneBatteryAlertEvidence = "";
     /** Confirmed ECARX 360°-camera / parktronic ownership of the vehicle display. */
     private boolean phoneExternalOverlayActive;
     private boolean phoneVehicleOverlayActive;
@@ -4104,6 +4105,9 @@ public class WidgetService extends Service {
                 batteryLevel = value;
             } else if ("device.locked".equals(value.resourceId)) {
                 phonePresentationGateChanged = true;
+            } else if ("battery.level_source".equals(value.resourceId)) {
+                // The percentage may stay unchanged when a coarse sample is replaced by BAS.
+                phonePresentationGateChanged = true;
             }
         }
         if (!phoneValueChanged) return;
@@ -4535,7 +4539,11 @@ public class WidgetService extends Service {
         if (prefs == null || !phoneNotificationAllowedByLockState()) return false;
         if (delivery.lowBatteryLevel != null) {
             if (!isPhoneLowBatteryAlertPending(delivery.lowBatteryStage)) return false;
-            int level = delivery.lowBatteryLevel;
+            Integer currentLevel = exactPhoneBatteryPercentage(phoneStatusValues.get("battery.level"));
+            int threshold = PhoneLowBatteryAlertPolicy.boundedThreshold(delivery.lowBatteryStage == 1
+                    ? prefs.phoneLowBatteryAlertThreshold.get() : prefs.phoneLowBatteryAlertThreshold2.get());
+            if (currentLevel == null || currentLevel > threshold) return false;
+            int level = currentLevel;
             boolean presentedInStatusRow = prefs.phoneStatusBarNotificationsEnabled.get()
                     && showPhoneLowBatteryStatus(level, delivery.lowBatteryColor);
             boolean presentedInPopup = prefs.phonePopupNotificationsEnabled.get()
@@ -4546,7 +4554,13 @@ public class WidgetService extends Service {
             }
             schedulePopupRefresh();
             boolean presented = presentedInStatusRow || presentedInPopup;
-            if (presented) markPhoneLowBatteryAlertPresented(delivery.lowBatteryStage);
+            if (presented) {
+                markPhoneLowBatteryAlertPresented(delivery.lowBatteryStage);
+                DiagnosticJournal.infoAsync("phone-battery", "warning_presented stage="
+                        + delivery.lowBatteryStage + ", level=" + level
+                        + ", route=local_exact, status=" + presentedInStatusRow
+                        + ", popup=" + presentedInPopup);
+            }
             return presented;
         }
         updatePhoneNotificationFieldStates(delivery.presentation, delivery.selectedFields);
@@ -5982,16 +5996,40 @@ public class WidgetService extends Service {
     }
 
     private void handlePhoneLowBatteryAlert(@NonNull ConnectorValue value) {
-        if (prefs == null || !value.fresh || !value.available || !value.readable
-                || !(value.rawValue instanceof Number)) return;
-        int level = ((Number) value.rawValue).intValue();
-        if (level < 0 || level > 100) return;
+        if (prefs == null) return;
+        Integer level = exactPhoneBatteryPercentage(value);
+        ConnectorValue source = phoneStatusValues.get("battery.level_source");
+        String sourceName = source != null && source.rawValue instanceof String
+                ? (String) source.rawValue : "unavailable";
+        // Sources are connector-owned constants; never log a notification's text or identifier.
+        if (!("ble_bas".equals(sourceName) || "android_broadcast".equals(sourceName)
+                || "hfp_ecarx_percent".equals(sourceName) || "iphone_helper_coarse".equals(sourceName)
+                || "hfp_ecarx_coarse".equals(sourceName))) sourceName = "unavailable";
+        String evidence = "source=" + sourceName + ", exact=" + (level != null)
+                + ", level=" + (level == null ? "unknown" : level);
+        if (!evidence.equals(lastPhoneBatteryAlertEvidence)) {
+            lastPhoneBatteryAlertEvidence = evidence;
+            DiagnosticJournal.infoAsync("phone-battery", evidence);
+        }
+        if (level == null) return;
         reconcilePhoneLowBatteryAlertStage(level, 1,
                 prefs.phoneLowBatteryAlertThreshold.get(),
                 prefs.phoneLowBatteryAlertColor.get());
         reconcilePhoneLowBatteryAlertStage(level, 2,
                 prefs.phoneLowBatteryAlertThreshold2.get(),
                 prefs.phoneLowBatteryAlertColor2.get());
+    }
+
+    @Nullable
+    private Integer exactPhoneBatteryPercentage(@Nullable ConnectorValue value) {
+        ConnectorValue source = phoneStatusValues.get("battery.level_source");
+        if (value == null || source == null || !value.fresh || !value.available || !value.readable
+                || !source.fresh || !source.available || !source.readable
+                || !"battery.level".equals(value.resourceId)
+                || value.connectorType != ConnectorType.PHONE || source.connectorType != ConnectorType.PHONE
+                || !value.connectorId.equals(source.connectorId) || value.updatedAt != source.updatedAt
+                || !(source.rawValue instanceof String)) return null;
+        return PhoneLowBatteryAlertPolicy.exactPercentage(value.rawValue, (String) source.rawValue);
     }
 
     private void reconcilePhoneLowBatteryAlertStage(int level, int stage, int threshold,

@@ -340,7 +340,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "8a3c3c7e61eea3b2bd26db204a2ef644f0f7c496f3cf81f89922d884bfd9ff56",
+      "sha256": "336c8301f8dfa0a85e852989aaf04ee3709d072219224d055e3536035b110fa5",
       "access_kinds": [
         "files"
       ]
@@ -474,7 +474,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/instrument/InstrumentOemController.java": {
-      "sha256": "eabe5d18bee808c494c9b01a44b14ba81df9432a2455f3aa7890bc79cb83e959",
+      "sha256": "d13012abc3aa2fb3c07e3d438c6d0b33552a35c6bdbadd0d4c99901492032455",
       "access_kinds": [
         "preferences"
       ]

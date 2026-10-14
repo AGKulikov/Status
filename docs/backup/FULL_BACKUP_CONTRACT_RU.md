@@ -1,5 +1,22 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review 3.1.7 — источник заряда и мягкое скрытие OEM overlay
+
+WidgetService сохраняет прежние два persistent low-battery latch и их правила
+backup. Добавлена только RAM-строка диагностического последнего источника;
+новых ключей/файлов/defaults нет. Точный источник влияет на срабатывание и
+перевооружение предупреждения, а не на формат или перенос состояния.
+InstrumentOemController сохраняет hide_oem_white_bar/oem_white_bar_owned и
+прежнюю политику локального владения; AppOp ignore — внешний runtime effect,
+не новое переносимое поле. Начальная запись заменяет старый deny, при выходе
+по-прежнему allow. Изменений адаптеров/roots/секретов нет.
+BackupDefaultsMigration явно добавляет рассмотренный источник349 и цель350;
+335…349→350 сохраняет effective defaults и explicit values, неизвестная334 и
+будущая351 отвергаются. Same-schema350 принимается как прежде. Fingerprints
+обновлены у двух обнаруживаемых storage owners (controller/migration); WidgetService
+дополнительно проверен как пользователь существующих preferences. Runtime backup/
+restore на KX11 этим не сертифицируется.
+
 ### Review 3.1.6 — диагностика отказа QNX и настройки
 
 BackupDefaultsMigration:335…348→349 допускаются явно, неизвестные334/350
