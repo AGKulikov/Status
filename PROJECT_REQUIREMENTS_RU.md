@@ -1,5 +1,19 @@
 # Единый реестр требований Natro
 
+## 14.10.2026 —3.1.8 собран, подписан и сохранён; FIELD OPEN
+
+Source18520800dd0a91e10c2daa2e2aaf9778e24948a9,
+tree88ad65bb156372654bc44793d2d81a6e018e1be5, CI38533352012 SUCCESS.
+2141 Android tests/422 suites,246 tool tests,108 Java policy/source cases;
+0 failures/errors/skips. ZIP digests и XML totals сверены независимо.
+APK3.1.8/code208021351 SHA256
+d8936d3329b3bba15aac44a4c2feceb1370be4c48fd3d9d008ed20f43d2794e6.
+Stable cert/v2/v3/zipalign16KiB/+1 поверх3.1.7 проверены,1516 payload entries
+после подписи неизменны. Navigator patch совпадает с3.1.7; Helper не менялся.
+Результат metadata участвует в UI complete, частичный этап не скрывается.
+Новый QNX process path и11 файлов требуют пользовательского системного ZIP;
+OEM-крылья не объявляются исправленными. Протокол:docs/releases/3.1.8/README_RU.md.
+
 ## 14.10.2026 08:55 МСК — расширенный QNX-сбор и APK3.1.8
 
 Пользователь одобрил «Ну давай, собирай» после предложения собрать graphics
