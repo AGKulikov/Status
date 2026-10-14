@@ -3646,3 +3646,15 @@ payload и отдельно с реальным38529-byte payload из прив�
 заголовки/хеши, закрытый firmware payload не публикуется. Проверены bounded noise,
 отмена, allowlist, manifest failed/not-attempted, сохранение Android и готового QNX
 payload при последующем отказе; общий QNX error содержит suppressed deadline.
+
+## 2026-10-14 — выпуск 3.1.6 собран и подписан
+
+Закрыт SOURCE/CI этап предыдущих записей: commit7c0fb5877c927024b324ff2373dd9ef67e762b11,
+treea7f7e291182228591523a90c052799967ed57e89; CI38506959645/38506959513 success.
+2135 Android tests/422 suites без ошибок/пропусков;245 tool/replay tests OK.
+Подписанный APK SHA256d3a1f6f6a31503980efbc1c5206d7d4d39baabaee6d32d08dbfee55bb8c69e27,
+прежний сертификат, v2/v3, code208021349=предыдущий+1,1516 payload entries неизменны.
+APK сохранён для выдачи пользователю. Source/tests не закрывают FIELD:
+проверка чтения QNX, UI и фактического сохранения на KX11 остаются OPEN.
+Navigator patch совпал с3.1.5, новая переустановка Navigator/helper не требуется.
+Подробный протокол:docs/releases/3.1.6/README_RU.md.
