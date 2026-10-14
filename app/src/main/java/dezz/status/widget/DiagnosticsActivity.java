@@ -586,7 +586,14 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
         session.submitSystemDump(adb -> {
             adb.connect();
             result.set(dezz.status.widget.diagnostics.SystemFileDump.collect(
-                    new File(getCacheDir(), "exports"), adb::command, text -> runOnUiThread(() -> {
+                    new File(getCacheDir(), "exports"), new dezz.status.widget.diagnostics.SystemFileDump.Shell() {
+                        public dezz.status.widget.adb.AdbShellResult.Result command(String command) throws Exception {
+                            return adb.command(command);
+                        }
+                        public dezz.status.widget.adb.AdbShellResult.Result commandBounded(String command, int limit) throws Exception {
+                            return adb.commandBounded(command, limit);
+                        }
+                    }, text -> runOnUiThread(() -> {
                         if (!isDestroyed() && systemDumpSession == session) systemDumpState.setText(text);
                     }), BuildConfig.VERSION_NAME, adb::collectQnx,captureState));
         }, error -> {

@@ -64,10 +64,13 @@ public final class GraphicsEvidence {
                 +" skip="+(offset/SystemFileDump.CHUNK)+" count=1 2>/dev/null | head -c "+length+" | base64";
     }
     private AdbShellResult.Result command(String script) throws Exception {
+        return command(script, AdbShellResult.OUTPUT_LIMIT);
+    }
+    private AdbShellResult.Result command(String script, int limit) throws Exception {
         if(System.nanoTime()-started>120_000_000_000L){broken=true;throw new IOException("graphics_stage_time_limit");}
         if(broken||Thread.currentThread().isInterrupted())throw new InterruptedIOException("evidence_session_stopped");
         try {
-            AdbShellResult.Result r=shell.command(SystemFileDump.privileged(script,su));
+            AdbShellResult.Result r=shell.commandBounded(SystemFileDump.privileged(script,su), limit);
             if(r.exitCode==null)broken=true;
             return r;
         } catch(Exception error){broken=true;throw error;}
@@ -145,13 +148,15 @@ public final class GraphicsEvidence {
         for(String[] item:new String[][]{
                 {"clock","date +%s; cat /proc/uptime"},
                 {"display","dumpsys display"},
-                {"layers","dumpsys SurfaceFlinger --list"}}) {
+                {"layers","dumpsys SurfaceFlinger --list"},
+                {"composition","dumpsys SurfaceFlinger"},
+                {"windows","dumpsys window windows"}}) {
             String status="collected_snapshot";byte[] bytes=new byte[0];
             try {
-                AdbShellResult.Result r=command(item[1]);bytes=r.output.getBytes(StandardCharsets.UTF_8);
+                AdbShellResult.Result r=command(item[1], 1024*1024);bytes=r.output.getBytes(StandardCharsets.UTF_8);
                 if(!r.success())status="command_failed";
-                else if(r.truncated||bytes.length>65536)status="truncated_snapshot";
-                if(bytes.length>65536)bytes=Arrays.copyOf(bytes,65536);
+                else if(r.truncated||bytes.length>1024*1024)status="truncated_snapshot";
+                if(bytes.length>1024*1024)bytes=Arrays.copyOf(bytes,1024*1024);
             } catch(Exception unavailable){status=broken?"not_collected_transport_failed":"not_collected";}
             if(!status.equals("collected_snapshot"))complete=false;
             sink.save("android/"+phase+"-"+item[0]+".txt",status,bytes);

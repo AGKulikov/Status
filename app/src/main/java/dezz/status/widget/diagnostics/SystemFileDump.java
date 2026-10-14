@@ -13,7 +13,10 @@ import java.util.zip.ZipOutputStream;
 
 /** Explicit, bounded firmware evidence export; never a backup or a system writer. */
 public final class SystemFileDump {
-    public interface Shell { AdbShellResult.Result command(String command) throws Exception; }
+    public interface Shell {
+        AdbShellResult.Result command(String command) throws Exception;
+        default AdbShellResult.Result commandBounded(String command, int limit) throws Exception { return command(command); }
+    }
     public interface Progress { void update(String text); }
     public interface Qnx { void collect(QnxFileReader.Receiver receiver) throws Exception; }
     public static final AtomicBoolean RUNNING = new AtomicBoolean();
@@ -193,7 +196,7 @@ public final class SystemFileDump {
                     boolean graphicsComplete;
                     try {
                         graphicsComplete=GraphicsEvidence.collect(shell,su,(name,status,bytes)-> {
-                            if(!name.matches("android/(before|after)-(clock|display|layers)\\.txt|dlt/inventory\\.tsv|dlt/files/[A-Za-z0-9][A-Za-z0-9._/-]{0,260}\\.range")
+                            if(!name.matches("android/(before|after)-(clock|display|layers|composition|windows)\\.txt|dlt/inventory\\.tsv|dlt/files/[A-Za-z0-9][A-Za-z0-9._/-]{0,260}\\.range")
                                     || name.contains("..") || !graphicsNames.add(name) || !status.matches("[a-z_]+"))
                                 throw new IOException("invalid_graphics_snapshot");
                             if(bytes.length>GraphicsEvidence.RANGE_LIMIT || qtotal[0]+bytes.length>MAX_TOTAL) {
@@ -214,6 +217,19 @@ public final class SystemFileDump {
                     try {
                         progress.update("Чтение QNX через ADB/qconn…");
                         qnx.collect(new QnxFileReader.Receiver() {
+                            private final java.util.Set<String> logs=new java.util.HashSet<>();
+                            private int logBytes;
+                            public void log(String name,String status,byte[] bytes) throws Exception {
+                                if(!QnxFileReader.allowedLog(name)||!status.matches("collected_live_file|changed_during_read|truncated_size_limit|partial_read_failed")
+                                        ||bytes==null||bytes.length>1024*1024||logs.size()>=12||!logs.add(name)
+                                        ||logBytes+bytes.length>8*1024*1024||qtotal[0]+bytes.length>MAX_TOTAL)
+                                    throw new IOException("invalid_qnx_log");
+                                logBytes+=bytes.length;qtotal[0]+=bytes.length;
+                                if(!status.equals("collected_live_file"))snapshotPartial[0]=true;
+                                put(zip,"qnx/slog2/"+name,bytes);
+                                manifest.append("qnx-slog2:").append(name).append('\t').append(status).append('\t')
+                                        .append(bytes.length).append('\t').append(digest(bytes)).append('\n');
+                            }
                             public void snapshot(String name,String status,byte[] bytes) throws Exception {
                                 if(!java.util.Arrays.asList(QnxFileReader.SNAPSHOTS).contains(name)
                                         || !status.matches("collected_snapshot|partial_or_unavailable")

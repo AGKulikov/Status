@@ -1,0 +1,115 @@
+{
+  "scope": "static configuration, not runtime composition",
+  "source_sha256": "dcf30e51241bb57086c4f814bc8f7c17e96e91f90d19d796b68ae9acbd0a6b1e",
+  "ports": [
+    {
+      "client_id": "0x78FF",
+      "client_type": "0x1",
+      "port": 1,
+      "qdi_display": 3,
+      "pipelines": [
+        {
+          "eQDILayerID": "5",
+          "eZOrder": "2"
+        }
+      ]
+    },
+    {
+      "client_id": "0x78FF",
+      "client_type": "0x1",
+      "port": 2,
+      "qdi_display": 3,
+      "pipelines": [
+        {
+          "eQDILayerID": "6",
+          "eZOrder": "3"
+        }
+      ]
+    },
+    {
+      "client_id": "0x78FF",
+      "client_type": "0x1",
+      "port": 3,
+      "qdi_display": 3,
+      "pipelines": [
+        {
+          "eQDILayerID": "7",
+          "eZOrder": "5"
+        }
+      ]
+    },
+    {
+      "client_id": "0x78FF",
+      "client_type": "0x1",
+      "port": 4,
+      "qdi_display": 2,
+      "pipelines": [
+        {
+          "eQDILayerID": "8",
+          "eZOrder": "8"
+        }
+      ]
+    },
+    {
+      "client_id": "0x7815",
+      "client_type": "0x5",
+      "port": 1,
+      "qdi_display": 3,
+      "pipelines": [
+        {
+          "eQDILayerID": "14",
+          "eZOrder": "1"
+        }
+      ]
+    },
+    {
+      "client_id": "0x7815",
+      "client_type": "0x5",
+      "port": 2,
+      "qdi_display": 3,
+      "pipelines": [
+        {
+          "eQDILayerID": "15",
+          "eZOrder": "4"
+        }
+      ]
+    },
+    {
+      "client_id": "0x7815",
+      "client_type": "0x5",
+      "port": 3,
+      "qdi_display": 1,
+      "pipelines": [
+        {
+          "eQDILayerID": "16",
+          "eZOrder": "6"
+        }
+      ]
+    },
+    {
+      "client_id": "0x7815",
+      "client_type": "0x5",
+      "port": 4,
+      "qdi_display": 2,
+      "pipelines": [
+        {
+          "eQDILayerID": "17",
+          "eZOrder": "7"
+        }
+      ]
+    },
+    {
+      "client_id": "0x7816",
+      "client_type": "0x6",
+      "port": 1,
+      "qdi_display": 3,
+      "pipelines": [
+        {
+          "eQDILayerID": "10",
+          "eZOrder": "0"
+        }
+      ]
+    }
+  ],
+  "display1_timing_hz": 30.0
+}

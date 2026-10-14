@@ -12,12 +12,18 @@ public final class AdbShellResult {
     public static final int OUTPUT_LIMIT = 128 * 1024;
     private static final int TAIL_LIMIT = 512;
     private final String token;
+    private final int outputLimit;
     private final ByteArrayOutputStream head = new ByteArrayOutputStream();
     private byte[] tail = new byte[0];
     private long total;
 
     public AdbShellResult() { this("NATRO_EXIT_" + UUID.randomUUID().toString().replace("-", "")); }
-    AdbShellResult(String token) { this.token = token; }
+    public AdbShellResult(int limit) { this("NATRO_EXIT_" + UUID.randomUUID().toString().replace("-", ""), limit); }
+    AdbShellResult(String token) { this(token, OUTPUT_LIMIT); }
+    private AdbShellResult(String token, int limit) {
+        if (limit < OUTPUT_LIMIT || limit > 1024 * 1024) throw new IllegalArgumentException("output_limit");
+        this.token = token; this.outputLimit = limit;
+    }
     public static String quote(String text) { return "'" + text.replace("'", "'\"'\"'") + "'"; }
     public String wrap(String command) {
         // Inner sh prevents exit, trailing comments, and compound commands from eating framing.
@@ -25,7 +31,7 @@ public final class AdbShellResult {
                 + quote(command)) + "; printf '\\n" + token + ":%s\\n' \"$?\"";
     }
     public void accept(byte[] chunk) {
-        int keep = Math.min(chunk.length, OUTPUT_LIMIT - head.size());
+        int keep = Math.min(chunk.length, outputLimit - head.size());
         if (keep > 0) head.write(chunk, 0, keep);
         int count = Math.min(TAIL_LIMIT, tail.length + chunk.length);
         byte[] next = new byte[count];
@@ -45,9 +51,9 @@ public final class AdbShellResult {
         Matcher begin = Pattern.compile("\\r?\\n" + Pattern.quote(token)
                 + "_BEGIN\\r?\\n").matcher(output);
         if (begin.find()) output = output.substring(begin.end());
-        if (total <= OUTPUT_LIMIT) output = output.replaceFirst("\\r?\\n" + token + ":[0-9]{1,3}\\r?\\n?$", "");
-        else output += "\n… Вывод ограничен 128 КиБ; команда дочитана до завершения.";
-        return new Result(output, code, total > OUTPUT_LIMIT);
+        if (total <= outputLimit) output = output.replaceFirst("\\r?\\n" + token + ":[0-9]{1,3}\\r?\\n?$", "");
+        else output += "\n… Вывод ограничен " + (outputLimit / 1024) + " КиБ; команда дочитана до завершения.";
+        return new Result(output, code, total > outputLimit);
     }
     public static final class Result {
         public final String output;

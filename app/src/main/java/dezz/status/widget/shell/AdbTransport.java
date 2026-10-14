@@ -266,6 +266,17 @@ public class AdbTransport implements ShellTransport {
                 } finally { try { stream.close(); } catch (Exception ignored) {} }
             }
         }
+        try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 60_000L, "qnx-existing-slog2")) {
+            if (Thread.currentThread().isInterrupted() || socket.isClosed())
+                throw new IOException("QNX collection cancelled or ADB disconnected");
+            AdbStream stream = openBounded("shell:toybox nc -w 30 198.18.34.2 8000");
+            try {
+                new dezz.status.widget.diagnostics.QnxFileReader(new dezz.status.widget.diagnostics.QnxFileReader.Wire() {
+                    public byte[] read() throws Exception { return stream.read(); }
+                    public void write(byte[] bytes) throws Exception { stream.write(bytes); }
+                }).collectLogs(receiver);
+            } finally { try { stream.close(); } catch (Exception ignored) {} }
+        }
         try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 60_000L, "qnx-process-metadata")) {
             if (Thread.currentThread().isInterrupted() || socket.isClosed())
                 throw new IOException("QNX collection cancelled or ADB disconnected");

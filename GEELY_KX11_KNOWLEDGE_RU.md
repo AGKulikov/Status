@@ -2340,3 +2340,99 @@ telnet_reply empty, prompt_mode none, read_request_variant with_type_zero.
 на файл,60с/file и180с/dump, отчёт qnx-diagnostics.txt. No-service/no-route не лечить
 запуском демонов или firewall; сохранить ошибку. Это не новое доказательство
 способа отключения OEM крыльев или их QNX receiving handler.
+
+
+## 2026-10-14 — поправка пользователя: DIM и HUD составляют общий экран
+
+USER: «В натро тоже дисплей такого размера… худ тоже составная часть этого экрана».
+Учитывать общий Android display 1920×1080; область приборки 1920×720 и HUD ниже
+не являются двумя независимыми полными дисплеями. SOURCE: InstrumentPanelConfig
+по умолчанию выбирает displayId=2; HudViewportPolicy задаёт displayId/layerStack=2,
+полный размер1920×1080 и HUD [0,720]–[728,910].
+Перепроверенный исторический surfaceflinger.txt из ecarx-hud-dump.tar подтверждает
+HWC display2/layerStack2 1920×1080 с HUD при y=720. Display Root#1 имеет layerStack2:
+суффикс имени Root нельзя использовать как displayId. Прежний вывод в обсуждении
+о несовпадении размеров Natro и QNX отозван; это не найденное преобразование изображения.
+Размеры сами по себе не доказывают связь Android display2 с QNX display1 или владельца
+крыльев. Исторический OverlayDisplay#2 находится на HWC display1/layerStack1 1920×720,
+поэтому нельзя объявлять его слоем крыльев только по имени. FIELD отключения крыльев OPEN.
+
+
+## 2026-10-14 — разбор libslog2parse и повторная проверка владельцев
+
+SOURCE: добавлен офлайн inspect_kx11_slog2 для конкретного архивного ABI: header,
+ring bounds, type0 text, raw type1/2, переход записи через конец кольца. TEST:
+4 синтетических регрессии проходят. Настоящих slog2 payloads нет; тип1 не
+декодирован, хронология не восстановлена, FIELD OPEN. Это не готовый live decoder.
+Исторический OverlayDisplay#2 принадлежит другому stack; категоричный комментарий
+HudSurfaceBridgeMain исправлен без изменения поведения. Multidisplay APK проверен
+до пассажирского power API; HUD JNI зависит от libkx11_lib.so, которой нет в
+проверенном июльском ZIP. Renderer/hide крыльев пока не установлен.
+Подробности и адреса: docs/geely-kx11/research-2026-10-14-dim/SLOG2_FORMAT_RU.md.
+
+Дополнение SOURCE/TEST: для type1 выделены format_template и отдельно encoded arguments;
+подстановки значений ещё нет. Пятый синтетический тест проверяет это различие.
+
+
+## 2026-10-14 — восстановлены libkx11_lib и qnxslogadapter
+
+STATIC: августовский HU-Route ZIP проверен по отдельному SHA256 и CRC397 entries.
+libkx11_lib.so — реальный ELF,285256байт, SHA778a86916dceb94f79b47c939539a13053f9f58dd4c7a5bff5f5a1df5a60138f.
+Get_NAVI → JNI NAVIInfoBean → ARHUDFragment → RelativeLayout/rotation прослежен
+как расчёт геометрии HUD; это не установленный слой крыльев.
+qnxslogadapter содержит подтверждённые system calls umount/fsck/mount и SOME-IP
+stop/start logging; не использовать этот export как пассивное чтение.
+Недоступность /mnt/userdata/DLT может зависеть от передачи раздела между QNX
+и Android; причина именно октябрьского отказа не установлена. FIELD OPEN.
+Отчёт: docs/geely-kx11/research-2026-10-14-dim/HUD_NATIVE_AND_LOG_ADAPTER_RU.md.
+
+
+## 2026-10-14 — WFD guest boundary и частота общего экрана
+
+STATIC: QDI display1 по активному XML1920×1080@30Hz, единственное назначение
+LA_GVM0x7815/port3/layer16/Z6. Screen ports в этом XML на display1 не направлены.
+Размер/частота совпадают с Android display2; это не самостоятельное доказательство
+междоменного route. graphics.conf использует свой display3 для1920×1080@30.
+Свежий wfd_be разобран до HAB dispatcher и selected WFD wrappers; handler44/45
+пустые, не возвращают composition. Не переносить capability прямого server API
+на guest bridge. Get_ADAS_Obj/LD libkx11_lib также возвращают числовые данные.
+Независимый renderer/hide крыльев OPEN; alpha layer16 не менять наугад.
+Отчёт: docs/geely-kx11/research-2026-10-14-dim/GUEST_DISPLAY_BOUNDARY_RU.md.
+
+
+## 2026-10-14 — безымянные Android слои и повторный тест I
+
+ARCHIVE: в полном старом SF stack2 полноэкранные #11/#3 имеют родителей
+ack48.monjarodev.mhud и plus.monjaro; ещё два слоя принадлежат MDrive.
+Это не доказательство, что они рисуют крылья; суффиксы между snapshots не ID.
+Повторно прочитан оригинал теста I: метка крыльев после восстановления,
+поэтому DimMenu не исключён. STATIC: FullContainerView — контейнер media/call/
+WeChat popups с full_pop_bg; custom onDraw у него нет. Пиксельного владельца
+эта ветвь не устанавливает. См.HISTORICAL_LAYER_OWNERS_RU.md в research-2026-10-14-dim.
+FIELD OPEN; нужен синхронный Android frame/физический DIM/полный composition.
+
+
+## 2026-10-14 — расширение сборщика для проверки контейнера навигации
+
+USER: доработать сборщик дампа. Уточнение пользователя: перезапуск магнитолы
+выводит приборку из навигации в штатный режим. Прежнее утверждение о сохранении
+крыльев при перезапуске отозвано; не использовать его как доказательство.
+Независимая работа скорости/оборотов и гипотеза виртуального контейнера сами
+по себе не устанавливают renderer крыльев.
+
+SOURCE/TEST: добавлены before/after полные dumpsys SurfaceFlinger и window windows,
+предел shell capture до 1 МиБ с явным статусом усечения; обычный console limit
+остаётся 128 КиБ. QNX GET читает только существующие allowlisted slogger2-файлы:
+динамические PID, до 12 файлов, 1 МиБ/файл, 8 МиБ суммарно, отдельное соединение
+и deadline 60с. Сохраняются частичные данные, stat до/после и причины отказа;
+это не атомарный снимок, совпадение stat не доказывает неизменность содержимого.
+Для proc exefile/mappings сохранены offset/requested/received/SHA256/control reply
+каждого блока, bounded trace до 2 МиБ. Смещения в дополнительных полях ответа
+не интерпретируются без подтверждения протокола. Некорректные mappings остаются
+read_content_invalid, первопричина НЕ исправлена и НЕ установлена.
+
+Проверено локально: 12 host tests с production Java replay, включая большие
+выводы, отказ доступа, изменяющийся slog2, размерный предел и сохранение prefix
+при разрыве; backup inventory после review трёх изменённых owners, новых owners нет. Android build и FIELD нового
+сборщика ещё не выполнены. Пиксельный владелец крыльев OPEN. Сборщик не вызывает
+qnxslogadapter, mount/umount, запуск slogger, devctl или изменение автомобильных API.

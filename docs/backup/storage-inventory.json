@@ -340,7 +340,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "f19b49da04f30aa5812652beb384cb1108f8e7313321e4dcf6d1ae44f2f2284e",
+      "sha256": "648b5bdcfd2eed3efde4346443ca3869dfefd51ab077206ca40eeba6e4fcb185",
       "access_kinds": [
         "files"
       ]
@@ -426,13 +426,13 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/DiagnosticsActivity.java": {
-      "sha256": "f65818ddc0db690ee2996d694282a61a235ccb1101963a025fbcafb4a3e8d4e4",
+      "sha256": "36abeebb525bdc9cdc98b0d099f745e041d2978629e0f7bcc2fa79374e815fc4",
       "access_kinds": [
         "files"
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/SystemFileDump.java": {
-      "sha256": "4b4e10fc1999e8d606769023dd292fd1b32036e409fcd7ff7ab41b7ec64864c9",
+      "sha256": "5e052e2a798933306fbda2c03c9cfaebdd278cf7a5ff3447a4bb9b41d8ae862e",
       "access_kinds": [
         "files"
       ]
@@ -676,7 +676,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/shell/AdbTransport.java": {
-      "sha256": "7ecf8e437b4bde40f85edb17b892509fc196d3a5b7e33c1a831efadcd644b2c6",
+      "sha256": "493a7e1ce8cf0331f8ea842938b79d9d96e0fcffc675ea7aa43bff1c5a97cd8f",
       "access_kinds": [
         "files"
       ]

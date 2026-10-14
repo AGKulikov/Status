@@ -15,6 +15,13 @@ public final class GraphicsEvidenceReplay {
         int ranges,afterStats;boolean disconnected;
         final List<String> commands=new ArrayList<>();
         Peer(int mode){this.mode=mode;for(int n=0;n<large.length;n++)large[n]=(byte)n;}
+        public AdbShellResult.Result commandBounded(String command,int limit)throws Exception {
+            if(command.equals("dumpsys SurfaceFlinger")) {
+                check(limit==1024*1024,"full composition capture limit");
+                if(!disconnected)return result("X".repeat(218124));
+            }
+            return command(command);
+        }
         public AdbShellResult.Result command(String command)throws Exception {
             check(!disconnected,"command after broken stream");commands.add(command);
             check(!command.contains("su ")&&!command.contains("chmod")&&!command.contains("slog2info")
@@ -50,6 +57,20 @@ public final class GraphicsEvidenceReplay {
         }
     }
     public static void main(String[] args)throws Exception {
+        for(int size:new int[]{218124,1024*1024+100}) {
+            AdbShellResult capture=new AdbShellResult(1024*1024);
+            Matcher token=Pattern.compile("NATRO_EXIT_[a-f0-9]+").matcher(capture.wrap("true"));
+            check(token.find(),"framing token");
+            capture.accept(("\n"+token.group()+"_BEGIN\n").getBytes(StandardCharsets.UTF_8));
+            byte[] body=new byte[size];Arrays.fill(body,(byte)'X');capture.accept(body);
+            capture.accept(("\n"+token.group()+":0\n").getBytes(StandardCharsets.UTF_8));
+            AdbShellResult.Result framed=capture.finish();
+            check(framed.success(),"large result exit lost");
+            check(framed.truncated==(size>1024*1024),"large result truncation flag");
+            if(size<1024*1024)check(framed.output.length()==size,"large result payload cut");
+        }
+        try {new AdbShellResult(1024*1024+1);throw new AssertionError("unbounded capture");}
+        catch(IllegalArgumentException expected){}
         for(String path:new String[]{"/mnt/userdata/DLT/../secrets","/mnt/userdata/DLT/-x","/mnt/userdata/DLT/a/b/c",
                 "/mnt/userdata/DLT/a;id","/mnt/userdata/DLT/.hidden","/etc/shadow","/mnt/userdata/DLT/a//b"}) {
             check(!GraphicsEvidence.allowed(path),path);
@@ -61,6 +82,8 @@ public final class GraphicsEvidenceReplay {
                 check(!saved.containsKey(name),"duplicate output");saved.put(name,bytes);statuses.put(name,status);
             },s->{});
             check(!complete,"coverage exclusions must remain visible");
+            check(saved.get("android/before-composition.txt").length==218124,"composition cut at old limit");
+            check(saved.containsKey("android/before-windows.txt"),"window owners missing");
             String index=new String(saved.get("dlt/inventory.tsv"),StandardCharsets.UTF_8);
             if(mode==1) {
                 check(index.contains("inventory_unavailable")&&!saved.containsKey("dlt/files/fresh.dlt.range"),"denial");continue;

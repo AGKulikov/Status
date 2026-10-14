@@ -190,7 +190,7 @@
       "status": "OPEN",
       "known": "Прежний тест I имеет метку после восстановления. Новый runtime подтверждает четыре логических дисплея и ecarx_daemon_OverlayDisplay#0…4; размеры 1920×1080 и имена слоёв не идентифицируют физические пиксели крыльев.",
       "missing_evidence": "Синхронная привязка к владельцу surface и физическим пикселям",
-      "next_step": "Сначала свести сохранённые layer/window snapshots с parent, layerStack, процессами и временем теста; отдельно разобрать QNX/display конфигурацию. Если останется пробел, потребуется один синхронный опыт с меткой до восстановления.",
+      "next_step": "Собрать новым сборщиком full SF/window before/after, существующие slog2 и proc block trace; сопоставить с физическим DIM в навигации. Проверка на машине и Android build остаются открыты.",
       "sources": [
         "display/report.md",
         "research-2026-09-05/android_platform/systems.json",
@@ -230,6 +230,42 @@
           "finding": "Сопоставлены transparency0x772e/global alpha0x772f и их чтение GetDisplayCompositionInfo вместе с rectangles/input sources. Единый слой обоих крыльев с прозрачным центром не исключён. Renderer и независимый hide flag не найдены; runtime запросы не выполнялись.",
           "source": "research-2026-10-14-dim/OPENWFD_COMPOSITION_RU.md",
           "next_step": "Composition query требует type2/locked driver: не внедрять как пассивный сбор. Дамп3.1.9:22/22 QNX,92 PID,6 mappings с повреждениями. SOURCE gate read_content_invalid проверен replay и6 реальными payloads; первопричина OPEN. Найдены конкретные slog2 buffer paths, содержимого нет; подготовить bounded read и decoder без logger start/verbosity/driver lock. /mnt/userdata/DLT недоступен; runtime /userdata/DLT не проверен. См.DUMP_319_RU.md. Renderer/hide крыльев OPEN."
+        },
+        {
+          "date": "2026-10-14",
+          "level": "USER_CORRECTION_AND_ARCHIVED_COMPOSITION",
+          "finding": "DIM и HUD используют общий экран1920×1080: InstrumentPanelConfig default display2, HudViewportPolicy display2/stack2 и HUD y720. Исторический полный SurfaceFlinger: Root#1 относится к stack2, HWC display2=1920×1080 с HUD y720; OverlayDisplay#2 относится к display1/stack1=1920×720. Суффикс Root не displayId. Прежний вывод о несовпадении размеров отозван. Это не доказательство владельца крыльев или междоменного соответствия QNX.",
+          "next_step": "Продолжить проверку существующих полных snapshots, геометрии и владельцев. Не смешивать размер области приборки с размером общего DIM+HUD display; не идентифицировать крылья по имени OverlayDisplay."
+        },
+        {
+          "date": "2026-10-14",
+          "level": "STATIC_SOURCE_SYNTHETIC_TEST",
+          "finding": "libslog2parse: header/ring bounds и packet magic0xbdcf, длина17..528, type0/1/2. Офлайн candidate extractor и4 синтетических теста; type1 и хронология не восстановлены, настоящие payloads отсутствуют. Multidisplay APK: пассажирский power API. HUD JNI импортирует libkx11_lib.so; это не установленный renderer крыльев. Дополнение: type1 format_template и encoded arguments выделены раздельно;5 синтетических тестов, подстановки значений нет.",
+          "source": "research-2026-10-14-dim/SLOG2_FORMAT_RU.md"
+        },
+        {
+          "date": "2026-10-14",
+          "level": "STATIC_ARCHIVE_VERIFIED",
+          "finding": "Восстановлен реальный libkx11_lib ELF из HU-Route, SHA/CRC совпали. Get_NAVI возвращает геометрию → JNI NAVIInfoBean → ARHUDFragment → Android view layout/rotation. Самостоятельный renderer крыльев не установлен. qnxslogadapter экспортирует через stop logging/umount/fsck/mount: не пассивный reader; не включать в bounded сбор.",
+          "source": "research-2026-10-14-dim/HUD_NATIVE_AND_LOG_ADAPTER_RU.md"
+        },
+        {
+          "date": "2026-10-14",
+          "level": "STATIC_CURRENT_ELF_AND_CONFIG",
+          "finding": "QDI display1 timing=1920×1080@30Hz; только LA_GVM port3/layer16 в активном XML, нет Screen port на этом выходе. Совпадение с Android display2 не доказывает route. wfd_be HAB dispatcher разобран; handlers44/45 пустые, capability прямого OpenWFD server нельзя переносить на guest bridge. Get_ADAS_Obj/LD также числовые выходы. Renderer/hide OPEN.",
+          "source": "research-2026-10-14-dim/GUEST_DISPLAY_BOUNDARY_RU.md"
+        },
+        {
+          "date": "2026-10-14",
+          "level": "ARCHIVE_AND_STATIC",
+          "finding": "Безымянные full-screen layers старого stack2 атрибутированы mHUD/plus.monjaro через parent; пиксели крыльев этим не установлены. Оригинал теста I подтверждает позднюю метку после restore. FullContainerView — media/call/WeChat popups, не установленный renderer крыльев. Следующий пробел: синхронные Android frame/физический DIM/composition.",
+          "source": "research-2026-10-14-dim/HISTORICAL_LAYER_OWNERS_RU.md"
+        },
+        {
+          "date": "2026-10-14",
+          "level": "USER_CORRECTION_AND_SOURCE_TEST",
+          "finding": "Пользователь отозвал сохранение крыльев при reboot: приборка возвращается из навигации в штатный режим. Гипотеза контейнера не доказана. Сборщик расширен full SurfaceFlinger/window capture до1МиБ, bounded QNX slog2 GET, per-block proc SHA/reply trace. Host replay12 tests прошли; новый Android build/FIELD ещё не выполнены. Причина порчи mappings не устранена.",
+          "source": "../../PROJECT_REQUIREMENTS_RU.md"
         }
       ],
       "coverage_ids": [

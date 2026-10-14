@@ -83,6 +83,57 @@ public class QnxFileReaderReplay {
             throw new AssertionError("Unexpected process frame "+s);
         }
     }
+    static class LogPeer extends Peer {
+        String current="";final int scenario;int stats;
+        LogPeer(int scenario)throws Exception{super(0);this.scenario=scenario;}
+        public void write(byte[] bytes)throws Exception {
+            String s=new String(bytes,StandardCharsets.US_ASCII);frames.add(s);
+            if(s.equals("service file\r\n")){add("OK\r\n");return;}
+            if(s.startsWith("o:")){
+                current=s.split("\"")[1];
+                if(!current.equals("/dev/shmem/slogger2")&&!current.equals("/dev/shmem/slogger2/display.123..0"))throw new AssertionError(current);
+                add(scenario==1?"e:permission\r\n":"o:0\r\n");return;
+            }
+            if(s.equals("s:0\r\n")) {
+                stats++;int size=scenario==2?1024*1024+1:4101;
+                add("o:1:"+Integer.toHexString(size)+":0:0:0:0:"+(scenario==3&&stats>1?"2":"1")+":1:1:81a4:1:0:0:0:0\r\n");return;
+            }
+            if(s.startsWith("r:0:")) {
+                String[] f=s.trim().split(":");int off=Integer.parseInt(f[2],16),count=Integer.parseInt(f[3],16);
+                if(current.equals("/dev/shmem/slogger2")) {
+                    String list=off==0?"display.123..0\r\ndisplay.123..0\r\n../display.123\r\nother.1\r\n":"";
+                    add("o:0:"+Integer.toHexString(list.length())+":0\r\n");add(list);return;
+                }
+                if(scenario==4&&off>=2048)throw new IOException("disconnected");
+                if(scenario==5){add("o:ffff\r\n");return;}
+                add("o:"+Integer.toHexString(count)+"\r\n");queue.write(new byte[count]);return;
+            }
+            if(s.equals("c:0\r\n")){add("o\r\n");return;}
+            throw new AssertionError(s);
+        }
+    }
+    static void logTests()throws Exception {
+        for(String name:new String[]{"../display.12","display.0","display.12/x","display.12;id","screen.1..1234"})
+            if(QnxFileReader.allowedLog(name))throw new AssertionError(name);
+        for(int mode=0;mode<=5;mode++) {
+            final int scenario=mode;Map<String,byte[]> logs=new HashMap<>();String[] inventory={null};boolean failed=false;
+            try {new QnxFileReader(new LogPeer(mode)).collectLogs(new QnxFileReader.Receiver(){
+                public void file(String p,String s,byte[] b){throw new AssertionError();}
+                public void log(String n,String s,byte[] b){
+                    if(logs.put(n,b)!=null)throw new AssertionError("duplicate");
+                    String expected=scenario==0?"collected_live_file":scenario==2?"truncated_size_limit":scenario==3?"changed_during_read":"partial_read_failed";
+                    if(!s.equals(expected))throw new AssertionError(s);
+                }
+                public void snapshot(String n,String s,byte[] b){
+                    if(!n.equals("slog2-inventory.tsv")||!s.equals(scenario==0?"collected_snapshot":"partial_or_unavailable"))throw new AssertionError(s);
+                    inventory[0]=new String(b,StandardCharsets.UTF_8);
+                }
+            });}catch(QnxFileReader.Failure expected){failed=true;}
+            if(failed!=(mode>=4)||inventory[0]==null||logs.size()!=(mode==1?0:1))throw new AssertionError("log mode "+mode);
+            if(mode!=1&&logs.values().iterator().next().length!=(mode==2?1024*1024:mode==4?2048:mode==5?0:4101))throw new AssertionError("prefix "+mode);
+        }
+    }
+
     static void processTests()throws Exception {
         for(int mode=0;mode<=10;mode++) {
             ProcPeer peer=new ProcPeer(mode);Map<String,String> payloads=new HashMap<>();
@@ -96,7 +147,7 @@ public class QnxFileReaderReplay {
                     payloads.put(n,new String(b,StandardCharsets.UTF_8));
                 }
             });}catch(QnxFileReader.Failure expected){failed=true;}
-            if(failed!=(mode==1||mode==3||mode==4||mode==7)||payloads.size()!=2)throw new AssertionError("mode "+mode);
+            if(failed!=(mode==1||mode==3||mode==4||mode==7)||payloads.size()!=3)throw new AssertionError("mode "+mode);
             if(mode==0) {
                 if(!payloads.get("processes.tsv").contains("12\tread\t/bin/screen"))throw new AssertionError();
                 if(!payloads.get("graphics-mappings.txt").contains("libopenwfd_qnx.so"))throw new AssertionError();
@@ -123,6 +174,7 @@ public class QnxFileReaderReplay {
         for(String invalid:new String[]{"",MAP_ROW,MAP_HEADER+MAP_ROW.trim(),MAP_HEADER+MAP_ROW.replace("0x14,", ""),MAP_HEADER+MAP_ROW.replace("0x14", "0x140x1000"),MAP_HEADER+MAP_ROW.replace(".so", "\u0000.so")})
             if(QnxFileReader.validMappings(invalid.getBytes(StandardCharsets.UTF_8)))throw new AssertionError("corrupt mapping accepted");
         processTests();
+        logTests();
         for(String stat:new String[]{"o:1:800001:0:0:0:0:1:1:1:81a4:1:0:0:0:0\r\n",
                 "o:1:0:0:0:0:0:1:1:1:41a4:1:0:0:0:0\r\n"}) {
             Peer rejected=new Peer(0){public void write(byte[] bytes)throws Exception {

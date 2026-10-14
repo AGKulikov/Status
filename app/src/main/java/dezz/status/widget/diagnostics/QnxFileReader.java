@@ -12,6 +12,7 @@ public final class QnxFileReader {
         void file(String path, String status, byte[] bytes) throws Exception;
         default void diagnostic(String path, String details) throws Exception {}
         default void snapshot(String name, String status, byte[] bytes) throws Exception {}
+        default void log(String name, String status, byte[] bytes) throws Exception {}
     }
     public static final String[] TARGETS = {
         "/etc/system/config/variant.cfg", "/bin/openwfd_server", "/bin/openwfd_telltale",
@@ -25,13 +26,24 @@ public final class QnxFileReader {
         "/lib/graphics.conf", "/etc/dlt.conf",
         "/var/log/display_recovery_info.txt", "/var/log/la_gvm.txt"
     };
-    public static final String[] SNAPSHOTS = {"processes.tsv", "graphics-mappings.txt"};
+    public static final String[] SNAPSHOTS = {"processes.tsv", "graphics-mappings.txt", "proc-read-trace.tsv", "slog2-inventory.tsv"};
     public static final int MAPPING_LIMIT = 256 * 1024, GRAPHICS_LIMIT = 8;
     private final Wire wire;
     private byte[] pending = new byte[0];
     private int cursor;
     private String stage="greeting", path="-", lastReply="-";
     private long offset, rx, tx;
+    private final StringBuilder trace=new StringBuilder("path\toffset\trequested\treceived\tsha256\tcontrol_reply\n");
+    private boolean traceTruncated;
+    private String fullReply="-";
+    private void traceRead(String target,int count,byte[] part) throws Exception {
+        if(trace.length()>2*1024*1024){traceTruncated=true;return;}
+        StringBuilder hash=new StringBuilder();
+        for(byte b:java.security.MessageDigest.getInstance("SHA-256").digest(part))hash.append(String.format(java.util.Locale.ROOT,"%02x",b&255));
+        trace.append(target).append('\t').append(offset).append('\t').append(count).append('\t')
+                .append(part.length).append('\t').append(hash).append('\t')
+                .append(fullReply.replaceAll("[\\p{Cntrl}]"," ")).append('\n');
+    }
     private final long started=System.nanoTime();
     public static final class Failure extends IOException {
         public final String report;
@@ -73,7 +85,7 @@ public final class QnxFileReader {
                 byte[] value=bytes.toByteArray();
                 if(value.length<2 || value[value.length-2]!=13) throw new IOException("qnx_bad_line");
                 String reply=new String(value,0,value.length-2,StandardCharsets.US_ASCII);
-                lastReply=safe(reply);return reply;
+                lastReply=safe(reply);fullReply=reply;return reply;
             }
         }
         throw new IOException("qnx_line_limit");
@@ -268,6 +280,9 @@ public final class QnxFileReader {
         } finally {
             receiver.snapshot(SNAPSHOTS[0],indexStatus,index.toString().getBytes(StandardCharsets.UTF_8));
             receiver.snapshot(SNAPSHOTS[1],mapsStatus,maps.toString().getBytes(StandardCharsets.UTF_8));
+            if(traceTruncated)trace.append("# trace_size_limit\n");
+            receiver.snapshot("proc-read-trace.tsv",traceTruncated||!mapsStatus.equals("collected_snapshot")?
+                    "partial_or_unavailable":"collected_snapshot",trace.toString().getBytes(StandardCharsets.UTF_8));
         }
     }
     /** Format gate only: valid rows do not prove an atomic or complete live snapshot. */
@@ -292,6 +307,86 @@ public final class QnxFileReader {
         out.append("status=").append(status).append(" bytes=").append(bytes.length).append('\n')
                 .append(new String(bytes,StandardCharsets.UTF_8).replace('\ufffd','?')).append('\n');
     }
+    public static boolean allowedLog(String name) {
+        return name.matches("(display|wfd_be|screen|screen_QC|openwfd_server|openwfd_server_QC|cluster_controller)\\.[1-9][0-9]{0,9}(?:\\.\\.[0-9]{1,3})?");
+    }
+    /** Existing shared-memory files only. Never invokes slog2info or a logging daemon. */
+    public void collectLogs(Receiver receiver) throws Exception {
+        StringBuilder inventory=new StringBuilder("name\tstatus\tbytes\n# live, non-atomic; local SHA only\n");
+        String status="collected_snapshot";
+        try {
+            path="/dev/shmem/slogger2";handshake();stage="slog_directory";
+            send("o:\"/dev/shmem/slogger2\":0:4000\r\n");String opened=reply();
+            if(opened.startsWith("e:")) {
+                status="partial_or_unavailable";inventory.append("-\tdenied_or_unavailable\t0\n");return;
+            }
+            long directory=descriptor(opened);int total=0;boolean eof=false;
+            java.util.Set<String> names=new java.util.TreeSet<>();
+            for(int page=0;page<64;page++) {
+                send("r:"+directory+":"+Integer.toHexString(page)+":400:1\r\n");
+                String[] f=fields();if(f.length<4)throw new IOException("qnx_bad_directory_reply");
+                long length=number(f[2],16);
+                if(length>65536||total+length>65536)throw new IOException("qnx_log_inventory_limit");
+                if(length==0){eof=true;break;}
+                total+=(int)length;ByteArrayOutputStream pageData=new ByteArrayOutputStream();
+                for(int n=0;n<length;n+=2048)pageData.write(exact((int)Math.min(2048,length-n)));
+                for(String name:new String(pageData.toByteArray(),StandardCharsets.US_ASCII).split("\r\n")) {
+                    if(allowedLog(name)) {
+                        names.add(name);if(names.size()>128)throw new IOException("qnx_log_name_limit");
+                    }
+                }
+            }
+            send("c:"+directory+"\r\n");fields();
+            if(!eof){status="partial_or_unavailable";inventory.append("-\tdirectory_page_limit\t0\n");}
+            int selected=0, bytesTotal=0;
+            if(names.isEmpty()){status="partial_or_unavailable";inventory.append("-\tno_matching_logs\t0\n");}
+            for(String name:names) {
+                if(selected>=12||bytesTotal>=8*1024*1024) {
+                    status="partial_or_unavailable";inventory.append(name).append("\tnot_selected_limit\t0\n");continue;
+                }
+                selected++;path="/dev/shmem/slogger2/"+name;stage="slog_open";
+                send("o:\""+path+"\":0\r\n");opened=reply();
+                if(opened.startsWith("e:")) {
+                    status="partial_or_unavailable";inventory.append(name).append("\tdenied_or_exited\t0\n");continue;
+                }
+                long fd=descriptor(opened);stage="slog_stat";long[] before=stat(fd);
+                if((before[9]&0xf000)!=0x8000) {
+                    send("c:"+fd+"\r\n");fields();status="partial_or_unavailable";
+                    inventory.append(name).append("\tnot_regular\t0\n");continue;
+                }
+                int limit=(int)Math.min(before[1],Math.min(1024*1024,8*1024*1024-bytesTotal));
+                ByteArrayOutputStream data=new ByteArrayOutputStream();String fileStatus="collected_live_file";
+                try {
+                    stage="slog_read";
+                    while(data.size()<limit) {
+                        offset=data.size();int count=Math.min(2048,limit-data.size());
+                        send("r:"+fd+":"+Integer.toHexString(data.size())+":"+Integer.toHexString(count)+":0\r\n");
+                        String[] f=fields();if(f.length<2)throw new IOException("qnx_bad_log_reply");
+                        long got=number(f[1],16);if(got<1||got>count)throw new IOException("qnx_short_log_read");
+                        data.write(exact((int)got));
+                    }
+                    stage="slog_stat_after";long[] after=stat(fd);
+                    inventory.append("# ").append(name).append(" before=").append(Arrays.toString(before))
+                            .append(" after=").append(Arrays.toString(after)).append('\n');
+                    if(before[1]>limit)fileStatus="truncated_size_limit";
+                    else if(before[0]!=after[0]||before[1]!=after[1]||before[6]!=after[6]||before[8]!=after[8])fileStatus="changed_during_read";
+                    send("c:"+fd+"\r\n");fields();
+                } catch(Exception error) {
+                    receiver.log(name,"partial_read_failed",data.toByteArray());
+                    inventory.append(name).append("\tpartial_read_failed\t").append(data.size()).append('\n');throw error;
+                }
+                if(!fileStatus.equals("collected_live_file"))status="partial_or_unavailable";
+                receiver.log(name,fileStatus,data.toByteArray());bytesTotal+=data.size();
+                inventory.append(name).append('\t').append(fileStatus).append('\t').append(data.size()).append('\n');
+            }
+        } catch(Exception error) {
+            status="partial_or_unavailable";inventory.append("# ").append(safe(report(error))).append('\n');
+            throw new Failure(path,report(error),error);
+        } finally {
+            receiver.snapshot("slog2-inventory.tsv",status,inventory.toString().getBytes(StandardCharsets.UTF_8));
+        }
+    }
+
     private static final class ProcRead {
         final byte[] bytes;final String status;
         ProcRead(byte[] bytes,String status){this.bytes=bytes;this.status=status;}
@@ -312,13 +407,16 @@ public final class QnxFileReader {
                 send("r:"+fd+":"+Integer.toHexString(data.size())+":"+Integer.toHexString(count)+":0\r\n");
                 String[] f=fields();if(f.length<2)throw new IOException("qnx_bad_proc_reply");
                 long got=number(f[1],16);if(got>count)throw new IOException("qnx_bad_proc_count");
-                if(got==0)break;
-                byte[] part=exact((int)got);
+                if(got==0){traceRead(target,count,new byte[0]);break;}
+                byte[] part=exact((int)got);traceRead(target,count,part);
                 int keep=Math.min(part.length,limit-data.size());data.write(part,0,keep);
                 if(keep<part.length){status="truncated_size_limit";break;}
             }
             send("c:"+fd+"\r\n");fields();return new ProcRead(data.toByteArray(),status);
         } catch(Exception error) {
+            if(trace.length()<2*1024*1024)trace.append("# failed path=").append(target)
+                    .append(" offset=").append(offset).append(" reply=").append(safe(lastReply))
+                    .append(" error=").append(safe(error.getMessage())).append('\n');
             // Preserve validated payload chunks; never resume a desynchronised stream.
             throw new ProcFailure(data.toByteArray(),error);
         }

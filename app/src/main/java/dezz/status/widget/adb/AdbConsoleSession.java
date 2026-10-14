@@ -91,9 +91,15 @@ public final class AdbConsoleSession implements AutoCloseable {
     }
     /** Optional read-only observer sees chunks before a timeout can discard partial output. */
     public AdbShellResult.Result command(String command, java.util.function.Consumer<byte[]> observer) throws Exception {
+        return captureCommand(command, observer, AdbShellResult.OUTPUT_LIMIT);
+    }
+    public AdbShellResult.Result commandBounded(String command, int limit) throws Exception {
+        return captureCommand(command, null, limit);
+    }
+    private AdbShellResult.Result captureCommand(String command, java.util.function.Consumer<byte[]> observer, int limit) throws Exception {
         checkCancelled();
         if (transport == null) throw new IOException("no devices/emulators found — выполните Connect");
-        AdbShellResult capture = new AdbShellResult();
+        AdbShellResult capture = new AdbShellResult(limit);
         try { transport.execRaw(capture.wrap(command), chunk -> {
             capture.accept(chunk);
             if (observer != null) observer.accept(chunk);

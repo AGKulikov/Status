@@ -626,3 +626,23 @@ BackupDefaultsMigration принимает рассмотренные335…341�
 и формате; новые/будущие схемы запрещены. Пользовательские иконки/каталоги не
 меняются: renderer только читает их в фоне. Пересмотрены fingerprints именно
 этих трёх storage owners; это не доказательство полного runtime restore.
+
+
+## Review 2026-10-14 — full composition, slog2 и proc trace
+
+Пересмотрены DiagnosticsActivity, SystemFileDump и AdbTransport по diff.
+DiagnosticsActivity передаёт лимит вывода через новый Shell adapter; preference,
+defaults и места сохранения не меняются. SystemFileDump добавляет bounded entries
+в тот же cache/exports ZIP (retention2); исходные системные файлы и восстановление
+не затрагиваются. AdbTransport добавляет одно GET-соединение для существующих
+slog2; RSA adb_key/adb_key.pub и endpoint прежние. Новых storage owners, managed
+roots, persistent settings, секретов и defaults migration нет. Fingerprints
+обновлены только у этих трёх рассмотренных owners. Runtime restore gate OPEN.
+
+
+### Review 3.1.10 — версия defaults
+
+BackupDefaultsMigration явно допускает335…352→353 с прежними keys/types/defaults.
+Неизвестная334 и будущая354 отвергаются; тест проверяет перенос explicit values.
+Новых settings и storage roots нет; fingerprint migration пересмотрен.
+Аппаратная приёмка restore остаётся OPEN.
