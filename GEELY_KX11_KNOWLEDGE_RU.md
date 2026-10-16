@@ -1,5 +1,23 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 16.10.2026 — FIELD3.2.0 и кандидат исправления чтения
+
+Дамп dad3c5be:22/22 QNX целей, все44 manifest payloads проходят SHA/size,
+CRC корректен.6 mappings read_content_invalid; блочные SHA совпадают с
+сохранёнными bytes. У двух wfd_be и cluster_controller первый разрыв на
+границе137+2048=2185, offsets/counts ответов согласованы. Точная реализация
+причины в procfs/qconn не доказана. SOURCE-кандидат читает с перекрытием
+хвоста строки и проверкой его совпадения; валидатор сохранён, FIELD OPEN.
+
+Slogger inventory содержит13 разрешённых объектов:12 not_regular,
+wfd_be not_selected_limit. QNX headers определяют S_IFNAM0x5000; официальная
+документация описывает /dev/shmem как name-special. Исходный mode в дампе
+не сохранён. Кандидат принимает regular/name-special только для slog allowlist,
+сохраняет исходный stat, устраняет расход file-limit отказами и приоритизирует
+process-specific имена перед display. Настоящие slog2 bytes ещё не получены.
+Не объявлять определённым renderer крыльев. Подробности/источники:
+docs/geely-kx11/research-2026-10-16-qnx/README_RU.md.
+
 ## 14.10.2026 — FIELD дампа3.1.9 и повреждённые mappings
 
 22/22 QNX файла,92 PID,6 mappings; все6 содержат нарушения структуры.

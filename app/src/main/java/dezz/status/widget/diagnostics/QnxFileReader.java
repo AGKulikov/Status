@@ -310,6 +310,11 @@ public final class QnxFileReader {
     public static boolean allowedLog(String name) {
         return name.matches("(display|wfd_be|screen|screen_QC|openwfd_server|openwfd_server_QC|cluster_controller)\\.[1-9][0-9]{0,9}(?:\\.\\.[0-9]{1,3})?");
     }
+    private static int logPriority(String name) {
+        String family=name.substring(0,name.indexOf('.'));
+        return Arrays.asList("cluster_controller","wfd_be","openwfd_server",
+                "openwfd_server_QC","screen","screen_QC","display").indexOf(family);
+    }
     /** Existing shared-memory files only. Never invokes slog2info or a logging daemon. */
     public void collectLogs(Receiver receiver) throws Exception {
         StringBuilder inventory=new StringBuilder("name\tstatus\tbytes\n# live, non-atomic; local SHA only\n");
@@ -321,7 +326,10 @@ public final class QnxFileReader {
                 status="partial_or_unavailable";inventory.append("-\tdenied_or_unavailable\t0\n");return;
             }
             long directory=descriptor(opened);int total=0;boolean eof=false;
-            java.util.Set<String> names=new java.util.TreeSet<>();
+            java.util.Set<String> names=new java.util.TreeSet<>((a,b)-> {
+                int priority=Integer.compare(logPriority(a),logPriority(b));
+                return priority!=0?priority:a.compareTo(b);
+            });
             for(int page=0;page<64;page++) {
                 send("r:"+directory+":"+Integer.toHexString(page)+":400:1\r\n");
                 String[] f=fields();if(f.length<4)throw new IOException("qnx_bad_directory_reply");
@@ -344,16 +352,23 @@ public final class QnxFileReader {
                 if(selected>=12||bytesTotal>=8*1024*1024) {
                     status="partial_or_unavailable";inventory.append(name).append("\tnot_selected_limit\t0\n");continue;
                 }
-                selected++;path="/dev/shmem/slogger2/"+name;stage="slog_open";
+                path="/dev/shmem/slogger2/"+name;stage="slog_open";
                 send("o:\""+path+"\":0\r\n");opened=reply();
                 if(opened.startsWith("e:")) {
                     status="partial_or_unavailable";inventory.append(name).append("\tdenied_or_exited\t0\n");continue;
                 }
                 long fd=descriptor(opened);stage="slog_stat";long[] before=stat(fd);
-                if((before[9]&0xf000)!=0x8000) {
+                // QNX /dev/shmem objects use S_IFNAM, not necessarily S_IFREG.
+                // This exception is scoped to the basename allowlist above; ordinary
+                // firmware collection retains its regular-file-only check.
+                inventory.append("# ").append(name).append(" before=").append(Arrays.toString(before))
+                        .append(" mode=0x").append(Long.toHexString(before[9])).append('\n');
+                long type=before[9]&0xf000;
+                if(type!=0x8000 && type!=0x5000) {
                     send("c:"+fd+"\r\n");fields();status="partial_or_unavailable";
-                    inventory.append(name).append("\tnot_regular\t0\n");continue;
+                    inventory.append(name).append("\tunsupported_file_type\t0\n");continue;
                 }
+                selected++;
                 int limit=(int)Math.min(before[1],Math.min(1024*1024,8*1024*1024-bytesTotal));
                 ByteArrayOutputStream data=new ByteArrayOutputStream();String fileStatus="collected_live_file";
                 try {
@@ -369,7 +384,7 @@ public final class QnxFileReader {
                     inventory.append("# ").append(name).append(" before=").append(Arrays.toString(before))
                             .append(" after=").append(Arrays.toString(after)).append('\n');
                     if(before[1]>limit)fileStatus="truncated_size_limit";
-                    else if(before[0]!=after[0]||before[1]!=after[1]||before[6]!=after[6]||before[8]!=after[8])fileStatus="changed_during_read";
+                    else if(before[0]!=after[0]||before[1]!=after[1]||before[6]!=after[6]||before[8]!=after[8]||before[9]!=after[9])fileStatus="changed_during_read";
                     send("c:"+fd+"\r\n");fields();
                 } catch(Exception error) {
                     receiver.log(name,"partial_read_failed",data.toByteArray());
@@ -398,6 +413,7 @@ public final class QnxFileReader {
     private ProcRead procText(String target,int limit) throws Exception {
         if(!target.matches("/proc/[1-9][0-9]{0,9}/(exefile|mappings)"))throw new IOException("qnx_proc_target_not_allowed");
         ByteArrayOutputStream data=new ByteArrayOutputStream();
+        byte[] uncommitted=new byte[0];
         try {
             offset=0;send("o:\""+target+"\":0\r\n");String opened=reply();
             if(opened.startsWith("e:"))return new ProcRead(new byte[0],"denied_or_exited");
@@ -407,10 +423,36 @@ public final class QnxFileReader {
                 send("r:"+fd+":"+Integer.toHexString(data.size())+":"+Integer.toHexString(count)+":0\r\n");
                 String[] f=fields();if(f.length<2)throw new IOException("qnx_bad_proc_reply");
                 long got=number(f[1],16);if(got>count)throw new IOException("qnx_bad_proc_count");
-                if(got==0){traceRead(target,count,new byte[0]);break;}
+                if(got==0){
+                    traceRead(target,count,new byte[0]);
+                    // An overlapping retry may see a shorter live snapshot. Do not
+                    // silently turn a previously received partial row into success.
+                    if(uncommitted.length>0){
+                        data.write(uncommitted);uncommitted=new byte[0];status="read_content_invalid";
+                    }
+                    break;
+                }
                 byte[] part=exact((int)got);traceRead(target,count,part);
-                int keep=Math.min(part.length,limit-data.size());data.write(part,0,keep);
-                if(keep<part.length){status="truncated_size_limit";break;}
+                boolean overlapChanged=part.length<uncommitted.length;
+                for(int i=0;i<Math.min(uncommitted.length,part.length);i++)
+                    if(uncommitted[i]!=part[i]){overlapChanged=true;break;}
+                int keep=Math.min(part.length,limit-data.size());
+                uncommitted=new byte[0];
+                if(keep<part.length){data.write(part,0,keep);status="truncated_size_limit";break;}
+                if(overlapChanged){data.write(part,0,keep);status="changed_during_read";break;}
+                if(target.endsWith("/mappings") && got==2048 && count==2048) {
+                    // Candidate for observed QNX pseudo-file loss at chunk boundaries:
+                    // re-read the trailing row from its start using the same proven
+                    // offset/count GET dialect. Device validation remains necessary.
+                    // Trace offsets deliberately overlap; never synthesize fields.
+                    int lastLf=-1;
+                    for(int i=part.length-1;i>=0;i--)if(part[i]=='\n'){lastLf=i;break;}
+                    if(lastLf>=0 && lastLf<part.length-1) {
+                        uncommitted=Arrays.copyOfRange(part,lastLf+1,part.length);
+                        keep=lastLf+1;
+                    }
+                }
+                data.write(part,0,keep);
             }
             send("c:"+fd+"\r\n");fields();return new ProcRead(data.toByteArray(),status);
         } catch(Exception error) {
@@ -418,6 +460,7 @@ public final class QnxFileReader {
                     .append(" offset=").append(offset).append(" reply=").append(safe(lastReply))
                     .append(" error=").append(safe(error.getMessage())).append('\n');
             // Preserve validated payload chunks; never resume a desynchronised stream.
+            data.write(uncommitted);
             throw new ProcFailure(data.toByteArray(),error);
         }
     }

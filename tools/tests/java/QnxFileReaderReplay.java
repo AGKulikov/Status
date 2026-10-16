@@ -77,6 +77,22 @@ public class QnxFileReaderReplay {
                     if(off>=2048)throw new IOException("synthetic socket closed");
                     raw=new byte[4096];Arrays.fill(raw,(byte)'P');
                 }
+                if(scenario>=11 && current.endsWith("/mappings")) {
+                    raw=(MAP_HEADER+MAP_ROW.repeat(100)).getBytes(StandardCharsets.US_ASCII);
+                    if(off==0){add("o:89\r\n");queue.write(raw,0,137);return;}
+                    if(off>137 && current.equals("/proc/12/mappings")) {
+                        if(scenario==12)raw[off]='X';
+                        if(scenario==13)throw new IOException("socket closed on overlap");
+                        if(scenario==14){add("o:0\r\n");return;}
+                    }
+                    // A generated procfs row may not support continuation within it.
+                    // Model the observed loss, rather than repairing corrupt text.
+                    if(raw[off-1]!='\n') {
+                        int end=off;while(end<raw.length && raw[end]!='\n')end++;
+                        int n=Math.min(count,raw.length-end);
+                        add("o:"+Integer.toHexString(n)+"\r\n");queue.write(raw,end,n);return;
+                    }
+                }
                 int n=Math.min(count,Math.max(0,raw.length-off));
                 add("o:"+Integer.toHexString(n)+"\r\n");queue.write(raw,off,n);return;
             }
@@ -96,7 +112,8 @@ public class QnxFileReaderReplay {
             }
             if(s.equals("s:0\r\n")) {
                 stats++;int size=scenario==2?1024*1024+1:4101;
-                add("o:1:"+Integer.toHexString(size)+":0:0:0:0:"+(scenario==3&&stats>1?"2":"1")+":1:1:81a4:1:0:0:0:0\r\n");return;
+                String fileMode=scenario==6?"51a4":scenario==7?"21a4":scenario==8&&stats>1?"51a4":"81a4";
+                add("o:1:"+Integer.toHexString(size)+":0:0:0:0:"+(scenario==3&&stats>1?"2":"1")+":1:1:"+fileMode+":1:0:0:0:0\r\n");return;
             }
             if(s.startsWith("r:0:")) {
                 String[] f=s.trim().split(":");int off=Integer.parseInt(f[2],16),count=Integer.parseInt(f[3],16);
@@ -115,39 +132,75 @@ public class QnxFileReaderReplay {
     static void logTests()throws Exception {
         for(String name:new String[]{"../display.12","display.0","display.12/x","display.12;id","screen.1..1234"})
             if(QnxFileReader.allowedLog(name))throw new AssertionError(name);
-        for(int mode=0;mode<=5;mode++) {
+        for(int mode=0;mode<=8;mode++) {
             final int scenario=mode;Map<String,byte[]> logs=new HashMap<>();String[] inventory={null};boolean failed=false;
             try {new QnxFileReader(new LogPeer(mode)).collectLogs(new QnxFileReader.Receiver(){
                 public void file(String p,String s,byte[] b){throw new AssertionError();}
                 public void log(String n,String s,byte[] b){
                     if(logs.put(n,b)!=null)throw new AssertionError("duplicate");
-                    String expected=scenario==0?"collected_live_file":scenario==2?"truncated_size_limit":scenario==3?"changed_during_read":"partial_read_failed";
+                    String expected=scenario==0||scenario==6?"collected_live_file":scenario==2?"truncated_size_limit":scenario==3||scenario==8?"changed_during_read":"partial_read_failed";
                     if(!s.equals(expected))throw new AssertionError(s);
                 }
                 public void snapshot(String n,String s,byte[] b){
-                    if(!n.equals("slog2-inventory.tsv")||!s.equals(scenario==0?"collected_snapshot":"partial_or_unavailable"))throw new AssertionError(s);
+                    if(!n.equals("slog2-inventory.tsv")||!s.equals(scenario==0||scenario==6?"collected_snapshot":"partial_or_unavailable"))throw new AssertionError(s);
                     inventory[0]=new String(b,StandardCharsets.UTF_8);
                 }
             });}catch(QnxFileReader.Failure expected){failed=true;}
-            if(failed!=(mode>=4)||inventory[0]==null||logs.size()!=(mode==1?0:1))throw new AssertionError("log mode "+mode);
-            if(mode!=1&&logs.values().iterator().next().length!=(mode==2?1024*1024:mode==4?2048:mode==5?0:4101))throw new AssertionError("prefix "+mode);
+            if(failed!=(mode==4||mode==5)||inventory[0]==null||logs.size()!=(mode==1||mode==7?0:1))throw new AssertionError("log mode "+mode);
+            if(mode==7&&!inventory[0].contains("mode=0x21a4"))throw new AssertionError("rejected stat missing");
+            if(mode!=1&&mode!=7&&logs.values().iterator().next().length!=(mode==2?1024*1024:mode==4?2048:mode==5?0:4101))throw new AssertionError("prefix "+mode);
+        }
+        for(boolean rejectedFirst:new boolean[]{true,false}) {
+            LogPeer peer=new LogPeer(0) {
+                public void write(byte[] bytes)throws Exception {
+                    String s=new String(bytes,StandardCharsets.US_ASCII);
+                    if(s.startsWith("o:")) {
+                        current=s.split("\"")[1];frames.add(s);add("o:0\r\n");return;
+                    }
+                    if(s.equals("s:0\r\n")) {
+                        frames.add(s);
+                        String mode=rejectedFirst && current.contains("cluster_controller")?"21a4":"51a4";
+                        add("o:1:1:0:0:0:0:1:1:1:"+mode+":1:0:0:0:0\r\n");return;
+                    }
+                    if(s.startsWith("r:0:")&&current.equals("/dev/shmem/slogger2")) {
+                        frames.add(s);StringBuilder listing=new StringBuilder();
+                        if(s.split(":")[2].equals("0")) {
+                            for(int i=1;i<=13;i++)listing.append(rejectedFirst?"cluster_controller.":"display.").append(i).append("\r\n");
+                            listing.append("wfd_be.99\r\n");
+                        }
+                        add("o:0:"+Integer.toHexString(listing.length())+":0\r\n");add(listing.toString());return;
+                    }
+                    super.write(bytes);
+                }
+            };
+            List<String> delivered=new ArrayList<>();
+            new QnxFileReader(peer).collectLogs(new QnxFileReader.Receiver(){
+                public void file(String p,String s,byte[] b){throw new AssertionError();}
+                public void log(String n,String s,byte[] b){
+                    if(!s.equals("collected_live_file")||b.length!=1)throw new AssertionError(s);
+                    delivered.add(n);
+                }
+            });
+            if(!delivered.contains("wfd_be.99")||delivered.size()!=(rejectedFirst?1:12))
+                throw new AssertionError("selection/starvation "+delivered);
+            if(!rejectedFirst&&!delivered.get(0).equals("wfd_be.99"))throw new AssertionError("priority");
         }
     }
 
     static void processTests()throws Exception {
-        for(int mode=0;mode<=10;mode++) {
+        for(int mode=0;mode<=14;mode++) {
             ProcPeer peer=new ProcPeer(mode);Map<String,String> payloads=new HashMap<>();
             final int scenario=mode;
             boolean failed=false;
             try {new QnxFileReader(peer).collectProcesses(new QnxFileReader.Receiver(){
                 public void file(String p,String s,byte[] b){throw new AssertionError();}
                 public void snapshot(String n,String s,byte[] b){
-                    boolean complete=scenario==0||(scenario>=6&&n.equals("processes.tsv"));
+                    boolean complete=scenario==0||scenario==11||(scenario>=6&&n.equals("processes.tsv"));
                     if(!s.equals(complete?"collected_snapshot":"partial_or_unavailable"))throw new AssertionError(n+" "+s);
                     payloads.put(n,new String(b,StandardCharsets.UTF_8));
                 }
             });}catch(QnxFileReader.Failure expected){failed=true;}
-            if(failed!=(mode==1||mode==3||mode==4||mode==7)||payloads.size()!=3)throw new AssertionError("mode "+mode);
+            if(failed!=(mode==1||mode==3||mode==4||mode==7||mode==13)||payloads.size()!=3)throw new AssertionError("mode "+mode);
             if(mode==0) {
                 if(!payloads.get("processes.tsv").contains("12\tread\t/bin/screen"))throw new AssertionError();
                 if(!payloads.get("graphics-mappings.txt").contains("libopenwfd_qnx.so"))throw new AssertionError();
@@ -155,11 +208,20 @@ public class QnxFileReaderReplay {
                 if(peer.frames.stream().anyMatch(s->s.contains("/34/mappings")))throw new AssertionError();
             }
             if(mode==2&&!payloads.get("processes.tsv").contains("denied_or_exited"))throw new AssertionError();
+            if(mode==11) {
+                String maps=payloads.get("graphics-mappings.txt");
+                if(maps.contains("invalid")||!maps.contains(MAP_HEADER+MAP_ROW.repeat(100)))
+                    throw new AssertionError("row-boundary read did not preserve exact mappings");
+                if(peer.frames.contains("r:0:889:800:0\r\n"))throw new AssertionError("continued in partial row");
+            }
+            if(mode==12&&!payloads.get("graphics-mappings.txt").contains("status=changed_during_read"))throw new AssertionError("changed overlap accepted");
+            if(mode==13&&!payloads.get("graphics-mappings.txt").contains("status=read_or_protocol_failed bytes=2185"))throw new AssertionError("overlap prefix lost");
+            if(mode==14&&!payloads.get("graphics-mappings.txt").contains("status=read_content_invalid bytes=2185"))throw new AssertionError("EOF partial row lost");
             if(mode>=6) {
                 if(!payloads.get("processes.tsv").contains("34\tread\t/bin/wfd_be"))throw new AssertionError();
                 if(peer.frames.indexOf("o:\"/proc/34/exefile\":0\r\n")>
                         peer.frames.indexOf("o:\"/proc/12/mappings\":0\r\n"))throw new AssertionError("inventory must finish first");
-                if(mode!=7&&!peer.frames.contains("o:\"/proc/34/mappings\":0\r\n"))throw new AssertionError("later mapping lost");
+                if(mode!=7&&mode!=13&&!peer.frames.contains("o:\"/proc/34/mappings\":0\r\n"))throw new AssertionError("later mapping lost");
                 if(mode==6&&!payloads.get("graphics-mappings.txt").contains("status=truncated_size_limit bytes=262144"))throw new AssertionError();
                 if(mode==7&&(!payloads.get("graphics-mappings.txt").contains("status=read_or_protocol_failed bytes=2048")
                         ||!payloads.get("graphics-mappings.txt").contains("pid=34 status=not_attempted_after_failure")))throw new AssertionError();
