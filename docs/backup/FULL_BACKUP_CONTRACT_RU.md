@@ -1,5 +1,14 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review3.2.1 — QNX reader,16.10.2026
+
+QnxFileReader не вводит persistent storage, preferences, секретов или adapters;
+вывод остаётся в прежнем приватном диагностическом ZIP. BackupDefaultsMigration
+явно добавляет353 как источник и354 как цель:335…353→354, same-schema354;
+334/355 отвергаются. Defaults, ключи, типы, explicit/unknown значения сохраняются.
+Пересмотрен fingerprint единственного изменённого storage-owner после проверки
+контракта; runtime backup/restore на KX11 этим не сертифицируется.
+
 ### Review 3.1.9 — expanded graphics evidence
 
 SystemFileDump сохраняет прежний cache/exports ZIP и retention2. GraphicsEvidence
