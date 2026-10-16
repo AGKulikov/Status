@@ -223,6 +223,18 @@ public class BackupDefaultsMigrationTest {
             try { BackupDefaultsMigration.validate(metadata, 208021341); fail(); } catch (IOException expected) {}
         }
     }
+    @Test public void wideMappingsReleaseAcceptsReviewedSchemas()throws Exception{
+        for(int source=208021335;source<=208021355;source++){
+            JSONObject metadata=new JSONObject().put("sourceVersionCode",source).put("defaultsSchema",source)
+                    .put("declaredMainDefaults",BackupPreferencesXml.encode(Collections.emptyMap()));
+            BackupDefaultsMigration.validate(metadata,208021355);
+        }
+        for(int invalid:new int[]{208021334,208021356}){
+            JSONObject metadata=new JSONObject().put("sourceVersionCode",invalid).put("defaultsSchema",invalid)
+                    .put("declaredMainDefaults",BackupPreferencesXml.encode(Collections.emptyMap()));
+            try{BackupDefaultsMigration.validate(metadata,208021355);fail();}catch(IOException expected){}
+        }
+    }
     @Test public void declaredDefaultsUseRealGettersWithoutWritingOrProxyIdentityFailure()throws Exception{
         Map<String,Object> values=PortableBackupDefaults.capture(RuntimeEnvironment.getApplication());
         assertTrue(values.size()>100);assertTrue(values.containsKey("launcherLayoutJson"));

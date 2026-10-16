@@ -1,5 +1,12 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review3.2.2 — выпуск wide mappings
+
+Defaults/ключи/adapters не меняются. BackupDefaultsMigration явно разрешает
+354 как источник,355 как цель;335…354→355 и same-schema355 рассмотрены.
+Новый тест отвергает334/356. Fingerprint изменён после проверки совместимости;
+прежние проверки explicit values сохраняются, runtime restore FIELD OPEN.
+
 ### Review16.10.2026 — lib64 и независимая попытка mappings
 
 SystemFileDump меняет только README внутри существующего приватного ZIP.
