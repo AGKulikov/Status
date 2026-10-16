@@ -1,5 +1,23 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 16.10.2026 — FIELD3.2.1, slog2 и уточнение путей
+
+ZIP88d3c827 (SHA256d5c726626c5e9e004e76fbeef282c4e2486700861003e7ef7775a8ae8166f0a8):
+12 slog2 buffers реально получены, mode0x51b0; wfd_be включён, display.40986
+пропущен по cap12.6 mappings всё ещё неполны. Видимость крыльев подтверждена
+пользователем, Sys2038 скрыт.56 manifest SHA/size и CRC успешны.
+screen пишет Configuration file:/lib64/graphics.conf; PanelLibrary XML также
+указывает /lib64/. Собранные /lib копии не считать тождественными без проверки.
+STATIC openwfd_server SHA50f52f0714d828ead04227686ea916d488c79562f313c87146ff991e1f3e086c:
+ClientMgr_Init0x559d4–0x559ec добавляет1 к layer ID для pipeline ID.
+Slog display.40985: pipelines15/16/17/18 связаны с ports1/2/3/4;
+соответствующие QDI layers14/15/16/17. В XML слой16→display1/Z6/1920x1080.
+106 warning candidates (95 layer16) не доказывают106 сбоев:0x64c44–0x64ccc
+сравнивает working/commit buffer addresses и допускает повторную проверку.
+Хронология кольца не восстановлена; отдельный renderer крыльев не установлен.
+Новый сбор сохраняет исходный prefix при несовпадении и отдельную широкую
+попытку mappings; это SOURCE-кандидат, работоспособность на QNX ещё OPEN.
+
 ## 16.10.2026 — кандидат QNX включён в APK3.2.1
 
 Сборщик из исследования16октября собран и подписан прежним сертификатом.

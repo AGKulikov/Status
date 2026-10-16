@@ -1,5 +1,15 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review16.10.2026 — lib64 и независимая попытка mappings
+
+SystemFileDump меняет только README внутри существующего приватного ZIP.
+Пути хранения, retention2, backup roots, defaults и адаптеры не изменяются.
+QnxFileReader добавляет4 allowlisted файла и вторую ограниченную попытку
+mappings в тот же экспорт; ожидаемый хвост и спорный ответ сохраняются как
+hex в существующей trace. Эти данные остаются диагностикой, не настройками
+и не источником восстановления firmware. Fingerprint SystemFileDump пересмотрен
+после проверки diff; runtime backup/restore этим не сертифицируется.
+
 ### Review3.2.1 — QNX reader,16.10.2026
 
 QnxFileReader не вводит persistent storage, preferences, секретов или adapters;

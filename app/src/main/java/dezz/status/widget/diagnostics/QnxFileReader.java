@@ -24,7 +24,11 @@ public final class QnxFileReader {
         "/lib/libdalconfig.so.1", "/lib/libhalmdputil_s8155.so",
         "/etc/dlt_logadapter.conf", "/etc/dlt_usbdatalogger.conf",
         "/lib/graphics.conf", "/etc/dlt.conf",
-        "/var/log/display_recovery_info.txt", "/var/log/la_gvm.txt"
+        "/var/log/display_recovery_info.txt", "/var/log/la_gvm.txt",
+        // Exact paths observed in screen's startup log and PanelLibrary config.
+        // Keep /lib copies for comparison; do not assume a /lib64 alias.
+        "/lib64/graphics.conf", "/lib64/libMAX96755_QC_0_UART.so",
+        "/lib64/libMAX96755_QC_1_UART.so", "/lib64/libDP_COMMON_QC_UART.so"
     };
     public static final String[] SNAPSHOTS = {"processes.tsv", "graphics-mappings.txt", "proc-read-trace.tsv", "slog2-inventory.tsv"};
     public static final int MAPPING_LIMIT = 256 * 1024, GRAPHICS_LIMIT = 8;
@@ -35,6 +39,14 @@ public final class QnxFileReader {
     private long offset, rx, tx;
     private final StringBuilder trace=new StringBuilder("path\toffset\trequested\treceived\tsha256\tcontrol_reply\n");
     private boolean traceTruncated;
+    private static String hex(byte[] bytes) {
+        char[] digits="0123456789abcdef".toCharArray();
+        char[] result=new char[bytes.length*2];
+        for(int i=0;i<bytes.length;i++) {
+            result[i*2]=digits[(bytes[i]&255)>>>4];result[i*2+1]=digits[bytes[i]&15];
+        }
+        return new String(result);
+    }
     private String fullReply="-";
     private void traceRead(String target,int count,byte[] part) throws Exception {
         if(trace.length()>2*1024*1024){traceTruncated=true;return;}
@@ -263,6 +275,19 @@ public final class QnxFileReader {
                     mapping=new ProcRead(mapping.bytes,"read_content_invalid");
                 if(!mapping.status.equals("read"))mapsStatus="partial_or_unavailable";
                 appendMapping(maps,mapping.status,mapping.bytes);
+                if(mapping.status.equals("changed_during_read") || mapping.status.equals("read_content_invalid")) {
+                    // A separate bounded attempt, never splice two live snapshots.
+                    maps.append("--- pid=").append(pid).append(" attempt=wide_sequential\n");
+                    stage="proc_mappings_wide";
+                    try {
+                        ProcRead wide=procText(path,MAPPING_LIMIT,true);
+                        if(wide.status.equals("read") && !validMappings(wide.bytes))
+                            wide=new ProcRead(wide.bytes,"read_content_invalid");
+                        appendMapping(maps,wide.status,wide.bytes);
+                    } catch(ProcFailure error) {
+                        appendMapping(maps,"read_or_protocol_failed",error.prefix);throw error;
+                    }
+                }
             }
             maps.append("graphics_processes_found=").append(graphics.size())
                     .append("\ngraphics_processes_attempted=").append(mapped.size()).append('\n');
@@ -411,15 +436,23 @@ public final class QnxFileReader {
         ProcFailure(byte[] prefix,Exception cause){super(cause.getMessage(),cause);this.prefix=prefix;}
     }
     private ProcRead procText(String target,int limit) throws Exception {
+        return procText(target,limit,false);
+    }
+    private ProcRead procText(String target,int limit,boolean wide) throws Exception {
         if(!target.matches("/proc/[1-9][0-9]{0,9}/(exefile|mappings)"))throw new IOException("qnx_proc_target_not_allowed");
+        if(wide && (!target.endsWith("/mappings") || limit!=MAPPING_LIMIT))
+            throw new IOException("qnx_wide_target_not_allowed");
         ByteArrayOutputStream data=new ByteArrayOutputStream();
         byte[] uncommitted=new byte[0];
         try {
             offset=0;send("o:\""+target+"\":0\r\n");String opened=reply();
             if(opened.startsWith("e:"))return new ProcRead(new byte[0],"denied_or_exited");
             long fd=descriptor(opened);String status="read";
+            if(trace.length()<2*1024*1024-512)
+                trace.append("# attempt path=").append(target).append(" strategy=")
+                    .append(wide?"wide_sequential":"bounded_overlap").append('\n');
             while(true) {
-                offset=data.size();int count=Math.min(2048,limit+1-data.size());
+                offset=data.size();int count=Math.min(wide?MAPPING_LIMIT+1:2048,limit+1-data.size());
                 send("r:"+fd+":"+Integer.toHexString(data.size())+":"+Integer.toHexString(count)+":0\r\n");
                 String[] f=fields();if(f.length<2)throw new IOException("qnx_bad_proc_reply");
                 long got=number(f[1],16);if(got>count)throw new IOException("qnx_bad_proc_count");
@@ -432,15 +465,37 @@ public final class QnxFileReader {
                     }
                     break;
                 }
-                byte[] part=exact((int)got);traceRead(target,count,part);
+                ByteArrayOutputStream block=new ByteArrayOutputStream();
+                try {
+                    for(int n=0;n<got;n+=2048)block.write(exact((int)Math.min(2048,got-n)));
+                } catch(Exception error) {
+                    // Keep complete transport pieces received before disconnect.
+                    if(wide) {
+                        byte[] prefix=block.toByteArray();
+                        data.write(prefix,0,Math.min(prefix.length,limit-data.size()));
+                    }
+                    throw error;
+                }
+                byte[] part=block.toByteArray();traceRead(target,count,part);
                 boolean overlapChanged=part.length<uncommitted.length;
                 for(int i=0;i<Math.min(uncommitted.length,part.length);i++)
                     if(uncommitted[i]!=part[i]){overlapChanged=true;break;}
+                if(overlapChanged) {
+                    // Preserve the original received prefix. A contradictory retry
+                    // is evidence, not a replacement for the previously received tail.
+                    if(trace.length()<2*1024*1024-16384) {
+                        trace.append("# overlap_mismatch path=").append(target)
+                            .append(" offset=").append(offset)
+                            .append(" expected_tail_hex=").append(hex(uncommitted))
+                            .append(" reply_hex=").append(hex(part)).append('\n');
+                    } else traceTruncated=true;
+                    data.write(uncommitted);uncommitted=new byte[0];
+                    status="changed_during_read";break;
+                }
                 int keep=Math.min(part.length,limit-data.size());
                 uncommitted=new byte[0];
                 if(keep<part.length){data.write(part,0,keep);status="truncated_size_limit";break;}
-                if(overlapChanged){data.write(part,0,keep);status="changed_during_read";break;}
-                if(target.endsWith("/mappings") && got==2048 && count==2048) {
+                if(!wide && target.endsWith("/mappings") && got==2048 && count==2048) {
                     // Candidate for observed QNX pseudo-file loss at chunk boundaries:
                     // re-read the trailing row from its start using the same proven
                     // offset/count GET dialect. Device validation remains necessary.

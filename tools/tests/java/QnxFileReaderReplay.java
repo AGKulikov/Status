@@ -42,6 +42,12 @@ public class QnxFileReaderReplay {
     static class ProcPeer extends Peer {
         final int scenario;String current="";
         ProcPeer(int scenario)throws Exception{super(0);this.scenario=scenario;}
+        public byte[] read() {
+            byte[] all=queue.toByteArray();queue.reset();
+            if(all.length==0)return null;
+            int n=Math.min(997,all.length);queue.write(all,n,all.length-n);
+            return Arrays.copyOf(all,n);
+        }
         public void write(byte[] bytes)throws Exception {
             String s=new String(bytes,StandardCharsets.US_ASCII);frames.add(s);
             if(s.equals("service file\r\n")){add("OK\r\n");return;}
@@ -80,7 +86,7 @@ public class QnxFileReaderReplay {
                 if(scenario>=11 && current.endsWith("/mappings")) {
                     raw=(MAP_HEADER+MAP_ROW.repeat(100)).getBytes(StandardCharsets.US_ASCII);
                     if(off==0){add("o:89\r\n");queue.write(raw,0,137);return;}
-                    if(off>137 && current.equals("/proc/12/mappings")) {
+                    if(off>137 && off<raw.length && current.equals("/proc/12/mappings")) {
                         if(scenario==12)raw[off]='X';
                         if(scenario==13)throw new IOException("socket closed on overlap");
                         if(scenario==14){add("o:0\r\n");return;}
@@ -214,7 +220,20 @@ public class QnxFileReaderReplay {
                     throw new AssertionError("row-boundary read did not preserve exact mappings");
                 if(peer.frames.contains("r:0:889:800:0\r\n"))throw new AssertionError("continued in partial row");
             }
-            if(mode==12&&!payloads.get("graphics-mappings.txt").contains("status=changed_during_read"))throw new AssertionError("changed overlap accepted");
+            if(mode==12) {
+                String maps=payloads.get("graphics-mappings.txt");
+                String original=(MAP_HEADER+MAP_ROW.repeat(100)).substring(0,2185);
+                if(!maps.contains("status=changed_during_read bytes=2185\n"+original))
+                    throw new AssertionError("mismatch replaced original prefix");
+                String trace=payloads.get("proc-read-trace.tsv");
+                if(!trace.contains("# overlap_mismatch path=/proc/12/mappings")
+                        ||!trace.contains(" expected_tail_hex=")||!trace.contains(" reply_hex=58"))
+                    throw new AssertionError("conflicting reply evidence lost");
+                if(!maps.contains("attempt=wide_sequential\nstatus=read bytes="+(MAP_HEADER+MAP_ROW.repeat(100)).length()
+                        +"\n"+MAP_HEADER+MAP_ROW.repeat(100)))
+                    throw new AssertionError("wide attempt failed to preserve complete independent snapshot");
+                if(!peer.frames.contains("r:0:0:40001:0\r\n"))throw new AssertionError("wide request missing");
+            }
             if(mode==13&&!payloads.get("graphics-mappings.txt").contains("status=read_or_protocol_failed bytes=2185"))throw new AssertionError("overlap prefix lost");
             if(mode==14&&!payloads.get("graphics-mappings.txt").contains("status=read_content_invalid bytes=2185"))throw new AssertionError("EOF partial row lost");
             if(mode>=6) {
@@ -236,6 +255,29 @@ public class QnxFileReaderReplay {
         for(String invalid:new String[]{"",MAP_ROW,MAP_HEADER+MAP_ROW.trim(),MAP_HEADER+MAP_ROW.replace("0x14,", ""),MAP_HEADER+MAP_ROW.replace("0x14", "0x140x1000"),MAP_HEADER+MAP_ROW.replace(".so", "\u0000.so")})
             if(QnxFileReader.validMappings(invalid.getBytes(StandardCharsets.UTF_8)))throw new AssertionError("corrupt mapping accepted");
         processTests();
+        for(boolean oversized:new boolean[]{false,true}) {
+            ProcPeer peer=new ProcPeer(12) {
+                public void write(byte[] bytes)throws Exception {
+                    String s=new String(bytes,StandardCharsets.US_ASCII);
+                    if(s.equals("r:0:0:40001:0\r\n")) {
+                        frames.add(s);add(oversized?"o:40002\r\n":"e:unsupported\r\n");return;
+                    }
+                    super.write(bytes);
+                }
+            };
+            Map<String,String> outputs=new HashMap<>();boolean rejected=false;
+            try {new QnxFileReader(peer).collectProcesses(new QnxFileReader.Receiver(){
+                public void file(String p,String s,byte[] b){throw new AssertionError();}
+                public void snapshot(String n,String s,byte[] b){outputs.put(n,new String(b,StandardCharsets.UTF_8));}
+            });}catch(QnxFileReader.Failure expected){rejected=true;}
+            if(!rejected||!outputs.get("graphics-mappings.txt").contains("status=changed_during_read bytes=2185")
+                    ||!outputs.get("graphics-mappings.txt").contains("status=read_or_protocol_failed bytes=0")
+                    ||!outputs.get("graphics-mappings.txt").contains("pid=34 status=not_attempted_after_failure"))
+                throw new AssertionError("wide rejection/oversized reply must preserve evidence and stop stream");
+        }
+        for(String target:new String[]{"/lib64/graphics.conf","/lib64/libMAX96755_QC_0_UART.so",
+                "/lib64/libMAX96755_QC_1_UART.so","/lib64/libDP_COMMON_QC_UART.so"})
+            if(!Arrays.asList(QnxFileReader.TARGETS).contains(target))throw new AssertionError("observed path missing");
         logTests();
         for(String stat:new String[]{"o:1:800001:0:0:0:0:1:1:1:81a4:1:0:0:0:0\r\n",
                 "o:1:0:0:0:0:0:1:1:1:41a4:1:0:0:0:0\r\n"}) {

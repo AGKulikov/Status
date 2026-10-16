@@ -1,5 +1,27 @@
 # Единый реестр требований Natro
 
+## 16.10.2026 18:35–18:36 МСК — исправить сбор, включая mappings
+
+USER: «Давай и справляй прошлый сбор», «И не забудь про Mappings».
+FIELD3.2.1: ZIP88d3c827, SHA256d5c726626c5e9e004e76fbeef282c4e2486700861003e7ef7775a8ae8166f0a8;
+56 manifest payloads/CRC проверены,22 QNX files и12 slog2 buffers получены.
+Пользователь подтвердил видимые крылья; Sys2038 скрыт в обоих Android snapshots.
+Все6 mappings changed_during_read: предыдущий кандидат проблему не устранил.
+
+SOURCE следующий кандидат:26 фиксированных путей, включая наблюдённые
+/lib64/graphics.conf и3 PanelLibrary drivers; /lib копии сохраняются отдельно.
+При overlap mismatch не заменять полученный хвост спорным ответом: сохранить
+исходный prefix, expected/reply hex отдельно в trace. После content-invalid или
+overlap mismatch — один независимый wide sequential read, до256KiB+1 sentinel,
+без rewind/склейки snapshots, только прежний mappings allowlist. Оба результата
+и причины сохранить; структурный валидатор обязателен. Denial/protocol failure
+не обходить; общий60с stage/8 процессов/256KiB на попытку/64MiB ZIP неизменны.
+FIELD для wide чтения OPEN, больший запрос сервером ещё не проверен.
+TEST:7 system-file-dump tests прошли; production Java replay проверяет исходный
+prefix при mismatch, отдельный полный wide snapshot, отказ/oversized reply
+без продолжения повреждённого stream, прежние limits/denial/invalid cases.
+APK3.2.1 остаётся прежним; следующий выпуск при сборке3.2.2, не повторная3.2.1.
+
 ## 16.10.2026 — выпуск3.2.1: SOURCE/TEST/APK; FIELD OPEN
 
 CI38911412256 SUCCESS, source0208e154dd4892c0ead471b7339bf058b13a3278,
