@@ -1,5 +1,17 @@
 # Единый реестр требований Natro
 
+## Выпуск3.2.2 — SOURCE/TEST/APK; FIELD OPEN
+
+CI38926871638 SUCCESS; source3af18fca8b5dc8be2c81fc86eec04c2f9fbd20ab,
+tree5ca6f5f36e1dbe2dbc02126b42baa83eb43551b7.2145 Android-тестов/422 suites,
+252 tool tests/108 Java cases успешны,0 errors/failures/skips. APK29592088байт,
+SHA2560a679034e829368ae6d4bb131859b8b0618460bd7ae28228235bc8e4fa5ca4f8.
+Прежний cert/v2/v3/API28/zipalign16KiB/install-over metadata3.2.1 проверены,
+1516 payload entries неизменны; новые collector markers присутствуют в DEX.
+Navigator patch совпал с3.2.1, Helper не менялся. APK сохранён для выдачи.
+Предыдущие записи «нового APK нет» заменены этим результатом. Физическая
+проверка wide mappings/lib64 и крылья OPEN. Отчёт docs/releases/3.2.2/.
+
 ## 16.10.2026 18:46 МСК — собрать3.2.2
 
 USER: «Ну так собирай новый апк». Цель3.2.2/code208021355, install-over3.2.1,
