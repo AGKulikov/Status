@@ -1,0 +1,43 @@
+{
+  "date": "2026-10-17",
+  "archive": "Natro-vehicle-280555787612266509.zip",
+  "size": 6915227,
+  "sha256": "640b43db4dbd7d145277ac8f987327c268a5a008d2b9ba764920a81c20931d44",
+  "version": "3.2.9",
+  "startedMoscow": "2026-10-17T20:47:08.877+03:00",
+  "finishedMoscow": "2026-10-17T20:52:29.609+03:00",
+  "zipEntries": 53,
+  "manifestPayloadsVerified": 52,
+  "crcPassed": true,
+  "priorArchiveLibrariesReverified": [
+    {
+      "path": "/lib64/libfastrpc_pmem.so.1",
+      "size": 238640,
+      "sha256": "22e0fcf615cf9ce57a2d40bc976ca4f319cc9ee1bee47f0806f4bd7828de7274",
+      "archive": "Natro-vehicle-5783067647247932076.zip",
+      "status": "collected_double_read"
+    },
+    {
+      "path": "/lib64/libkeymaster_lib.so.1",
+      "size": 579616,
+      "sha256": "5f8f2cafb6de29cc646d46734cc920cc3b2c169dc411e2608445c095ffd2929d",
+      "archive": "Natro-vehicle-5783067647247932076.zip",
+      "status": "collected_double_read"
+    },
+    {
+      "path": "/lib64/libclock_asic_8150.so",
+      "size": 319024,
+      "sha256": "d468350dcde15bd79bd4b7e14baf64d700d45b2dc3a8b7d3a67104f8720cd9b0",
+      "archive": "Natro-vehicle-5783067647247932076.zip",
+      "status": "collected_double_read"
+    },
+    {
+      "path": "/lib64/libpng16.so.0",
+      "size": 197211,
+      "sha256": "387e004a57cd6394607a575adeec8278494b329a8058e834c7073254fc9626db",
+      "archive": "Natro-vehicle-5783067647247932076.zip",
+      "status": "collected_double_read"
+    }
+  ],
+  "rawPayloadPublished": false
+}

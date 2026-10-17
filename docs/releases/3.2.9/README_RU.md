@@ -1,6 +1,6 @@
 # Natro 3.2.9 / 208021362
 
-SOURCE, TEST и APK проверены. Публикация stable выполняется; аппаратная приёмка FIELD открыта.
+SOURCE, TEST и APK проверены. Stable/latest опубликован 17.10.2026 19:59:12 МСК; все 7 файлов сверены. [Протокол публикации](publication-verification.json). Аппаратная приёмка media/title/белой полосы остаётся открытой.
 Действующая ветка: `fix/media-touch-329`.
 
 ## Изменения
@@ -41,3 +41,11 @@ Navigator classes19 побайтно равен 3.2.8, SHA `710af1b6fa476a5e78c3
 Архив 3.2.8 vehicle372877 подтвердил завершённый обход 1080 путей, 966 исключений, 26 разрешённых ссылок, 8 stable + 2 changed files, 3 недоступных пути, 13 slog2 и 10 mappings; 50 payload SHA проверены. QNX сохранён при timeout Android logcat. Это подтверждает изоляцию сборщика 3.2.8, но не полноту всех файлов и не поведение 3.2.9.
 
 В system/diagnostics 3.2.7 повтор белой полосы совпал с ANR/restart MConfig, restart dimmenu и NaviMode1 до записи allow Natro. STATIC MConfigInitService может писать1 и перезапускать dimmenu; конкретный writer и пиксельный владелец пока не установлены. OEM-priority/owner/tab gates сохранены. Белая полоса, крылья, реальные касания и все экраны с очищенным title остаются FIELD OPEN.
+
+### Дополнение FIELD 20:53 МСК
+
+Новый vehicle280555 уже от 3.2.9:52manifest SHA PASS, обход1079 завершён,
+965исключений,11payloads (9stable+2changed),4problem paths. Kernel/logcat
+завершились с exit0; timeout не повторился. Bus-devices partial только из-за
+отсутствующих путей. Это подтверждает новый collector в данном сеансе,
+не абсолютную полноту всего namespace. [Четыре пути и причины статусов](../../geely-kx11/research-2026-10-17-white-bar/FIELD_2053_RU.md).

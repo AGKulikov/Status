@@ -1,5 +1,19 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 17.10.2026 20:53 МСК — FIELD3.2.9: передача завершена, остаточные имена
+
+Vehicle280555 SHA640b43db,52payload size/SHA PASS.1079examined/965exclusions,
+9stable+2changed,4problem paths,13slog2/10mappings. Kernel/logcat exit0;
+предыдущий logcat timeout в этом сеансе не повторился. Две ссылки указывают в
+недоступный aarch64le/lib; sibling .so.1 уже получены. libpng.so ENOENT;
+libclock.so.1 не прошёл consistency gate, его ранее разрешённая цель уже есть
+в полном архиве. Новый дефект протокола/чтения содержимого не установлен.
+DIM_Slog prefix сохранён, рост5365636→5893358; procnto bytes меняются между
+чтениями. Bus-devices partial из-за отсутствующих путей не равен потере QNX.
+[Причины/повторная проверка старых bytes/границы](docs/geely-kx11/research-2026-10-17-white-bar/FIELD_2053_RU.md).
+Runtime не изменён; wings/white-bar/физические media/title OPEN.
+
+
 ## 17.10.2026 19:11/19:15МСК — новые FIELD3.2.7/3.2.8
 
 System688852/diagnostics674546: ANR/restart plus.monjaro18:48:11, dimmenu

@@ -1,5 +1,7 @@
 # Natro — карта требований, исследований и открытых вопросов
 
+- [17.10 20:53: FIELD3.2.9, завершённый сбор, четыре проблемных пути и растущий DIM-журнал](geely-kx11/research-2026-10-17-white-bar/FIELD_2053_RU.md).
+
 - [17.10 19:11/19:15: MConfig/dimmenu restart, белая полоса, касания и результат докачки3.2.8](geely-kx11/research-2026-10-17-white-bar/FIELD_1911_1915_RU.md). [Исправления3.2.9](releases/3.2.9/README_RU.md).
 
 - [Исправление досборщика3.2.8: QNX первым, изоляция optional snapshots](releases/3.2.8/README_RU.md).

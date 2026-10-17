@@ -1,5 +1,33 @@
 # Единый реестр требований Natro
 
+## 17.10.2026 20:53 МСК — FIELD3.2.9, повторная жалоба на неполный архив
+
+USER: «Опять не все файлы скачались!», vehicle280555. CRC53/52manifest SHA PASS,
+3.2.9,20:47:08–20:52:29. QNX traversal_finished=true/1079examined;965exclusions,
+11payloads=9stable+2changed;4problem paths,25resolvedlinks,13slog2/10mappings.
+Оба Android logs exit0:kernel2798ms/logcat1827ms; прежний timeout не повторился.
+Partial bus-devices — отсутствующие remoteproc/can/rpmsg paths, вывод сохранён.
+Changed procnto сохранён; DIM_Slog prefix совпал дважды, файл вырос5365636→5893358.
+Две относительные library links упираются в ENOENT; их sibling .so.1 уже есть
+в полном архиве. libpng.so ENOENT. Новый libclock link_changed_or_truncated
+не определяет конкретную ветку проверки; предыдущая цель и её bytes уже есть.
+Четыре прежних library payloads заново проверены по SHA/size в ZIP578306.
+Это не все файлы и не повтор общего срыва; не ослаблять consistency/NOFOLLOW
+и не требовать ещё один полный сбор ради тех же имён. Runtime не менялся:
+новый дефект чтения содержимого данным архивом не доказан.
+[Подробности/границы](docs/geely-kx11/research-2026-10-17-white-bar/FIELD_2053_RU.md).
+FIELD QNX-RESULT-329 finite logcat/сохранение/сводка подтверждены в этом сеансе;
+all-files/links, wings/white-bar и MEDIA-TOUCH/MUSIC-INFO FIELD остаются OPEN.
+
+## 17.10.2026 19:59:12 МСК — 3.2.9 stable опубликована
+
+Release415942351/natro-v3.2.9/latest подтверждены. Publisher39051732655,
+job117451540256 SUCCESS восстановил exact APK без private key и скачал/сверил
+все7assets. Tag→030cfecf377d1b0858a59eacffa2ef6aa0fa5b34. Историческое
+«публикация выполняется» ниже заменено этим итогом. APK SHA d4235965c6af6910014acf40071c44691932dd8606617a2abbca83a6f2d84f2f.
+[Протокол readback](docs/releases/3.2.9/publication-verification.json).
+
+
 ## 17.10.2026 — 3.2.9 SOURCE / TEST / APK приняты
 
 SOURCE `030cfecf377d1b0858a59eacffa2ef6aa0fa5b34` / tree `68e6203b11c54d63ce91321fd348d913f2a9c913` опубликован и сверён.
