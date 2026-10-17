@@ -1,5 +1,21 @@
 # Единый реестр требований Natro
 
+## 17.10.2026 18:18:44 МСК — Natro3.2.7 опубликована stable/latest
+
+Release415876139/tag natro-v3.2.7 опубликован. Publisher39044443773/job117430265859
+SUCCESS восстановил exact APK из проверенного CI-кандидата без private key,
+повторил подпись/API28/payload/manifest checks, скачал и побайтно сравнил7assets
+до публикации. После публикации прочитаны latest/tag/digests; tag→SOURCE74058cc3,
+APK29760096bytes/SHA8b8828c85542f9a126b959e77a1146d520c8cc0a395fc7f9643edcacc63c9434.
+2174 Android/265tool/108Java без ошибок и пропусков, source/tree проверены.
+Собственные исходники, исследования, README, release notes и протоколы в Git;
+подписанный APK и source.tar.gz доступны в Release. Предыдущие записи BLOCKED
+и «публикация выполняется» сохранены как история и заменены этим результатом.
+QNX-DOWNLOAD-327 SOURCE/TEST/APK приняты, FIELD докачки/native link dialect и
+реальная установка поверх OPEN. Полоса/крылья/OEM burst/listener остаются OPEN.
+[Итог](docs/releases/3.2.7/README_RU.md),
+[readback](docs/releases/3.2.7/publication-verification.json).
+
 ## 17.10.2026 — Natro3.2.7: SOURCE/TEST/APK проверены, stable publication выполняется
 
 После явного подтверждения18:06МСК опубликован SOURCE74058cc3c3ebe6c3ae7d1d6b0f52f7ff6388081e,

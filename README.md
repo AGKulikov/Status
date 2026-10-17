@@ -1,8 +1,8 @@
 # Natro
 
-**Собрана 3.2.7 / 208021360:** докачка QNX с977исключениями из двух архивов, native link targets и исправления каталогов/диагностики. 2174 Android tests,265 tool tests и108 Java cases PASS; прежняя подпись, exactAPI28/install-over metadata проверены. [Статус и протокол](docs/releases/3.2.7/README_RU.md). Stable-публикация выполняется; FIELD и крылья OPEN.
+**Выпущена [3.2.7 / 208021360](https://github.com/AGKulikov/Status/releases/tag/natro-v3.2.7):** докачка QNX с977исключениями из полного и частичного дампов, чтение целей ссылок и исправления каталогов/диагностики. 2174 Android tests,265 tool tests и108 Java cases PASS; прежняя подпись и exactAPI28/install-over metadata проверены. [Протокол выпуска](docs/releases/3.2.7/README_RU.md). Stable/latest и все7assets проверены; FIELD докачки и крылья OPEN.
 
-**Выпущена [3.2.5 / 208021358](https://github.com/AGKulikov/Status/releases/tag/natro-v3.2.5):**
+**Предыдущая [3.2.5 / 208021358](https://github.com/AGKulikov/Status/releases/tag/natro-v3.2.5):**
 уведомление режима вождения на HUD как в MConfig48 — белая плашка, чёрное
 название,3секунды; событие от прежнего встроенного селектора. Полный архив
 обычных файлов выбранных QNX каталогов и сведений о каналах связи, кнопки на

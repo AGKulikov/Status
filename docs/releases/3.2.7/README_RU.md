@@ -1,7 +1,12 @@
 # Natro 3.2.7 / 208021360
 
-Подписанный APK подготовлен и проверен. Stable-публикация выполняется отдельным
-workflow с повторной проверкой и побайтным чтением всех опубликованных assets.
+[Stable/latest natro-v3.2.7](https://github.com/AGKulikov/Status/releases/tag/natro-v3.2.7)
+опубликован17.10.2026 в18:18:44МСК, release415876139. Publisher
+[39044443773](https://github.com/AGKulikov/Status/actions/runs/39044443773),
+job117430265859 SUCCESS: exact signed APK восстановлен из CI-кандидата и публичной
+подписи без private key, повторно проверен; все7assets draft скачаны обратно
+и побайтно сравнены до stable. GitHub latest/tag и digests сверены после публикации.
+Tag указывает на точный SOURCE ниже. [Протокол публикации](publication-verification.json).
 
 Докачка QNX включает исключения 977 проверенных файлов из полного и частичного
 дампов, native lstat/readlink для целей ссылок, исправление ложной дедупликации
