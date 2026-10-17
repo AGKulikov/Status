@@ -1,0 +1,124 @@
+{
+  "versionName": "3.2.4",
+  "versionCode": 208021357,
+  "package": "ru.natro.statuswidget",
+  "sourceCommit": "4db858f7337d13e917b90f2faf97787631f3a79e",
+  "sourceTree": "6bcd0323a53d69293d75f50c92269bd733cef18d",
+  "ciRunId": "39026892021",
+  "unitTests": {
+    "tests": 2147,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "unsignedSha256": "3223253c908fab0b8e995c430b08df8e0aab4ae7a806f124d783ba33df008683",
+  "navigator": {
+    "pairRequired": true,
+    "compatiblePair": null,
+    "patch": "classes19.dex",
+    "patchSha256": "710af1b6fa476a5e78c3e19809a59a89de70a698135f4b296c45df98962b0f96",
+    "baselineVersion": "30.3.0-Natro-2.9.8",
+    "baselineSha256": "b224bed5268469f620ab4bff3fec382aece868b9372450ff05f1f9176631280a",
+    "allowedPayloadChanges": [
+      "classes19.dex"
+    ]
+  },
+  "helperChanged": false,
+  "physicalKx11Verification": "pending",
+  "browserVisualVerification": "pending",
+  "signedApk": "Natro-3.2.4-signed.apk",
+  "signedSha256": "295d2f09ce2d50fb3fa6eb5a956fe132eb6b2f1bb229ec90d44875d26429618c",
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "signatureV2": true,
+  "signatureV3": true,
+  "signerCount": 1,
+  "zipalign16KiB": true,
+  "payloadEntriesUnchanged": 1516,
+  "previous": {
+    "package": "ru.natro.statuswidget",
+    "versionCode": 208021356,
+    "versionName": "3.2.3",
+    "sha256": "f3b8b227911d391db175bac1106fd8279c94b23c791950ffd9c4514595a8585c"
+  },
+  "installOverMetadataVerified": true,
+  "navigatorPairRequired": false,
+  "signingScriptSha256": "800c5cab0538269877be31aff9e17ceab9dfa33b703de161d4cf6bf8d651f4d6",
+  "toolSha256": {
+    "aapt": "c076aeeee8bd3ce58395a093747202265ab80c6c12e59358f598a30a81fde13b",
+    "apksigner": "b47549e373b895ce6ca620d0c7887e674d9615ffa837a86ac601dcfd04adb0f0",
+    "dexdump": "0944161e1e453ac40a16362ab42f4b1ee5e60eccf503cd87f4a6040c78247d02",
+    "lib/apksigner.jar": "3716d9311e55d2b0918a2fd9d54ba9e406c5f6abeea700b287f11259bc163dec",
+    "lib64/libLLVM_android.so": "f35907663f0069916f86aaafceadc55698f02a8f8cfc21bcd91833f849b2dc09",
+    "lib64/libbcc.so": "f69fd124a305f6d9774e62759e21f6aeea7f12745189d9d4b4ae99977761d83b",
+    "lib64/libbcinfo.so": "ff584620b65dfee59bcb5050c692398cf03fe9326b1e6daf1a92f1f30ac24cc6",
+    "lib64/libc++.so": "96a19cd2154a4423a61f8444e5d3148a608fa3033bc1a22285d19855a950d05a",
+    "lib64/libc++.so.1": "7eb2812ec39ab5c31f2fc9f906f412c713e76e0d07d6a6911108c7f886e24945",
+    "lib64/libclang_android.so": "f18899cc604a3a1a9b836804cdfeb1ff96b25faff2b75f5ff451037a4308660f",
+    "zipalign": "c5f559e946de5a9e7d58792181db20383b228877812136bc469d97ae00a43b0a"
+  },
+  "api28ExactVerificationPassed": true,
+  "apkSizeBytes": 29645336,
+  "ci": {
+    "runId": 39026892021,
+    "jobId": 117379546496,
+    "conclusion": "success",
+    "headSha": "4db858f7337d13e917b90f2faf97787631f3a79e",
+    "candidateArtifact": {
+      "id": 12099076717,
+      "name": "Natro-3.2.4-offline-signing-5",
+      "sizeBytes": 13031654,
+      "sha256": "cff7d6c89aa61ac8d4887d6a20ca0005e08c10a19b0fa68be1a5b4b92fd2a99c",
+      "downloadDigestMatched": true,
+      "zipCrcPassed": true
+    },
+    "toolsArtifact": {
+      "id": 12099295611,
+      "name": "Natro-3.2.4-signing-tools-5",
+      "sizeBytes": 23987605,
+      "sha256": "ebfdb4aaac09a8cce998edbd412bcedeb7808d7cdd56b0efc67adbcd79e1c933",
+      "downloadDigestMatched": true,
+      "zipCrcPassed": true
+    },
+    "toolReplayTests": {
+      "tests": 260,
+      "errors": 0,
+      "failures": 0
+    },
+    "javaPolicySourceCases": 108
+  },
+  "navigatorEvaluation": {
+    "previousRelease": "3.2.3",
+    "previousPatchSha256": "710af1b6fa476a5e78c3e19809a59a89de70a698135f4b296c45df98962b0f96",
+    "exactCompiledPatchUnchanged": true,
+    "newNavigatorRequired": false,
+    "note": "Generic candidate pairRequired metadata preserved above; exact patch comparison supersedes it for this release."
+  },
+  "stableKeyRecovery": {
+    "requirement": "REL-015",
+    "existingBackupRestored": true,
+    "certificateMatched": true,
+    "newKeyCreated": false,
+    "temporaryKeyCopiesRemoved": true
+  },
+  "acceptance": {
+    "source": "published",
+    "test": "full CI PASS; additional release handoff checks local",
+    "apk": "verified",
+    "field": "OPEN"
+  },
+  "openGates": [
+    "KX11 install-over and actual data preservation",
+    "LAN autostart, Safari persistence and ADB availability after real reboot",
+    "TXT/ZIP exports and dump download/cancel on iPhone",
+    "Actual updater network/install roundtrip on KX11",
+    "White stripe root cause and low iPhone battery warning",
+    "Live complete QNX collection and mappings"
+  ],
+  "limits": [
+    "Installer metadata is not a physical installation test",
+    "ADB permission persistence does not enable adbd disabled by firmware",
+    "No claim of iOS background clipboard sync",
+    "No independent reproducible build"
+  ]
+}
+
