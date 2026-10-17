@@ -2,11 +2,11 @@
 package dezz.status.widget.launcher;
 
 import android.app.Application;
+import android.app.Activity;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Looper;
-import android.view.ContextThemeWrapper;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -18,8 +18,12 @@ import dezz.status.widget.Preferences;
 import dezz.status.widget.R;
 import dezz.status.widget.launcher.media.*;
 import org.junit.Test;
+import org.junit.Before;
+import org.junit.After;
 import org.junit.runner.RunWith;
 import org.robolectric.RobolectricTestRunner;
+import org.robolectric.Robolectric;
+import org.robolectric.android.controller.ActivityController;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.Shadows;
 import org.robolectric.annotation.Config;
@@ -28,8 +32,26 @@ import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=28, application=Application.class, qualifiers="mdpi")
 public class MediaTouchRoutingTest {
-    private final Context context = new ContextThemeWrapper(RuntimeEnvironment.getApplication(), R.style.Theme_StatusWidget);
+    private Context context;
+    private ActivityController<Activity> host;
+    private FrameLayout sources;
     private long clock = 1000;
+    @Before public void attachRealSourceHierarchy() {
+        host=Robolectric.buildActivity(Activity.class);
+        host.get().setTheme(R.style.Theme_StatusWidget);
+        host.create().start().resume().visible();
+        context=host.get(); sources=new FrameLayout(context);
+        host.get().setContentView(sources);
+    }
+    @After public void closeHost() { if(host!=null)host.pause().stop().destroy(); }
+    private void attachSource(View view,int width,int height) {
+        if(view.getParent() instanceof ViewGroup)((ViewGroup)view.getParent()).removeView(view);
+        sources.addView(view,new FrameLayout.LayoutParams(width,height));
+        size(view,width,height);
+        // View.post(click) on an unattached source waits for attachment; real HOME keeps its
+        // invisible source panels attached. The test must exercise that same lifecycle.
+        assertTrue(view.isAttachedToWindow());
+    }
     private void size(View view, int width, int height) {
         view.measure(View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY));
@@ -51,7 +73,7 @@ public class MediaTouchRoutingTest {
         button.setPadding(20,20,20,20); button.setBackgroundColor(Color.TRANSPARENT);
         button.setOnClickListener(v -> calls[index]++);
         LauncherGlobalElementTag.attach(button, LauncherLayoutStore.MEDIA, id, id);
-        size(button, 200, 80);
+        attachSource(button, 200, 80);
         return button;
     }
     private LauncherElementFrame frame(View source, LauncherGlobalElementLayoutStore.Appearance appearance) {
@@ -96,7 +118,7 @@ public class MediaTouchRoutingTest {
         TextView title=new TextView(context); title.setText("Заходит Луна"); title.setSingleLine(true);
         title.setTextSize(16); title.setGravity(Gravity.BOTTOM|Gravity.CENTER_HORIZONTAL);
         LauncherGlobalElementTag.attach(title,LauncherLayoutStore.MEDIA,MediaPanelConfig.TITLE,"title");
-        size(title,200,100); place(root,frame(title,appearance),0,0,200,100);
+        attachSource(title,200,100); place(root,frame(title,appearance),0,0,200,100);
         size(root,250,150); tap(root,100,40); assertEquals(1,calls[0]);
         root.removeViewAt(1);
         place(root,frame(button(MediaPanelConfig.NEXT,calls,1),appearance),0,0,200,150);
@@ -119,7 +141,7 @@ public class MediaTouchRoutingTest {
         panel.setSnapshot(new LauncherMediaController.Snapshot("ⓘ Song","Artist","","Music",null,100000,0,true,true,true,false,40));
         size(panel,800,600);
         View progress=find(panel,LauncherLayoutStore.MEDIA+"/"+MediaPanelConfig.PROGRESS);
-        assertNotNull(progress); size(progress,240,80);
+        assertNotNull(progress); attachSource(progress,240,80);
         LauncherElementFrame frame=frame(progress,new LauncherGlobalElementLayoutStore.Appearance()); size(frame,240,80);
         assertFalse(event(frame,MotionEvent.ACTION_DOWN,120,4)); assertEquals(0,calls[0]);
         tap(frame,120,70); assertTrue(calls[0]>0); assertEquals(1,calls[1]);
