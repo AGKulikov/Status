@@ -1,7 +1,29 @@
 # Natro 3.2.3 / 208021356
 
 Полный доступный каталог QNX по запросу пользователя16.10.2026 22:39 МСК.
-Пока SOURCE/локальный TEST; полный CI, подпись и APK — в подготовке.
+Исходники опубликованы; полный CI завершился успешно; APK передан пользователю.
+
+## Подтверждённые сведения на 17.10.2026
+
+- Исходный коммит: [`40524437fe8136b04d1404c14bcb411545bd2315`](https://github.com/AGKulikov/Status/commit/40524437fe8136b04d1404c14bcb411545bd2315).
+- Дерево исходников: `62e708214e72fef058e3fb9029fc31bdfb0e457b`.
+- Рабочая ветка: [`fix/qnx-reader-20261016`](https://github.com/AGKulikov/Status/tree/fix/qnx-reader-20261016);
+  `main` остаётся историческим состоянием.
+- [CI39005817352](https://github.com/AGKulikov/Status/actions/runs/39005817352) — SUCCESS. Успешны Android build/unit tests,
+  settings/backup inventory, JavaScript syntax, Navigator patch и tool/replay tests.
+  CI формирует unsigned candidate для отдельной подписи.
+- Выданный файл: `Natro-3.2.3-signed.apk`, 29608472 bytes.
+- SHA-256 APK: `f3b8b227911d391db175bac1106fd8279c94b23c791950ffd9c4514595a8585c`.
+- Повторная проверка выданного файла: ZIP CRC OK, package `ru.natro.statuswidget`,
+  versionName `3.2.3`, versionCode `208021356`.
+- В этом аудите публикации подпись/zipalign/install-over повторно не проверялись;
+  успешный CI и проверка manifest не заменяют эти отдельные проверки REL-006.
+
+Машиночитаемые факты: [publication-audit.json](publication-audit.json).
+Ранее приведённый статус «CI, подпись и APK — в подготовке» относился к исходному
+кандидату до завершения CI и выдачи APK. Проверка на автомобиле остаётся открытой.
+
+## Изменения
 
 - Обход от / с файлами, папками и скрытыми именами; два новых отчёта:
   qnx/metadata/filesystem-paths.txt и filesystem-inventory.tsv.

@@ -25,3 +25,9 @@ storage changes. New/changed/removed owners require review of
 fingerprints merely to silence the check or describe this static check as proof
 of full runtime backup/restore. New settings must be included automatically by
 the future storage adapters; changing a schema/default requires migration review.
+
+Release publication: after every issued APK, publish all project-owned source changes,
+update README.md, docs/releases/<version>/README_RU.md and PROJECT_REQUIREMENTS_RU.md,
+and verify the remote branch/commit. State the source commit and CI evidence; distinguish
+APK checks from field acceptance. A local commit or a planned push is not publication.
+Keep the current development branch visible in README when the default branch is historical.

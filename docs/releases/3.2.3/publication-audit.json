@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "audit_date": "2026-10-17",
+  "repository": "AGKulikov/Status",
+  "branch": "fix/qnx-reader-20261016",
+  "source_commit": "40524437fe8136b04d1404c14bcb411545bd2315",
+  "source_tree": "62e708214e72fef058e3fb9029fc31bdfb0e457b",
+  "ci": {
+    "run_id": 39005817352,
+    "url": "https://github.com/AGKulikov/Status/actions/runs/39005817352",
+    "status": "completed",
+    "conclusion": "success",
+    "output": "unsigned candidate; signing is separate"
+  },
+  "delivered_apk": {
+    "apk": "Natro-3.2.3-signed.apk",
+    "size_bytes": 29608472,
+    "sha256": "f3b8b227911d391db175bac1106fd8279c94b23c791950ffd9c4514595a8585c",
+    "metadata_candidates": [],
+    "package": "ru.natro.statuswidget",
+    "versionName": "3.2.3",
+    "versionCode": 208021356,
+    "zip_crc": "passed"
+  },
+  "checked_in_this_audit": [
+    "remote source commit and tree",
+    "CI status and successful steps",
+    "delivered APK SHA-256 and size",
+    "APK manifest identity",
+    "ZIP entry CRC"
+  ],
+  "not_rechecked_in_this_audit": [
+    "APK cryptographic signature",
+    "zipalign",
+    "install-over compatibility",
+    "physical KX11 acceptance"
+  ],
+  "field_acceptance": "OPEN",
+  "prior_documentation_gap": "README showed 3.2.2; 3.2.3 release page still described CI/APK as pending."
+}
