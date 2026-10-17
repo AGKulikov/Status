@@ -188,9 +188,9 @@
       "priority": "P1",
       "function": "Владелец крыльев и штатной машинки",
       "status": "OPEN",
-      "known": "После reboot ZIP833791 дал33QNXfiles,13slog2,3193examined,6wide mappings доEOF. CRC81/76manifest SHA PASS. OA_Payload общий у двух процессов: runtime-подтверждение уже изученного SPI-маршрута, не новый renderer. Фактическая libopenwfd.so содержит mask stubs; hide крыльев не найден. В повторном fault552935 QNX33/33files и76manifest hashes PASS. Inventory содержит /userdata/DLT/DIM_Slog.log и DIM_Slog_Boot ZIPs, /persist/dim_config; ранее их байты не собирались.",
+      "known": "974stable QNX files и DLT получены; UDS DIM handlers частично заглушки, встроенные PNG не совпали с крыльями. UART381frames CRC PASS, только opcode31/HUD. Renderer/hide и источник HUD callback burst не установлены.",
       "missing_evidence": "Синхронные пиксели Android display2/физического DIM; независимый hide и принимающий dispatcher. Содержимое новых полных QNX деревьев и корреляция каналов с физическим DIM.",
-      "next_step": "Выпустить SOURCE3.2.5 с отдельным полным архивом QNX/каналов; получить новый FIELD архив, проверить hashes/coverage и исследовать DIM logs/configs/libraries. Это не повтор прежнего целевого дампа. Крылья/hide и владельцы peer остаются OPEN.",
+      "next_step": "Проверить докачку3.2.7: skipped/link/EOF, новые mappings и свежие канальные снимки; для крыльев нужны синхронные Android pixels/физический DIM. Подробности QCONN_LINKS_RU.md.",
       "sources": [
         "display/report.md",
         "research-2026-09-05/android_platform/systems.json",
@@ -203,7 +203,9 @@
         "research-2026-10-16-qnx/DUMP_323_DD605_RU.md",
         "research-2026-10-16-qnx/QNX_TERMINAL_20261017_RU.md",
         "research-2026-10-16-qnx/DUMP_324_833791_RU.md",
-        "research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md"
+        "research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md",
+        "research-2026-10-17-white-bar/VEHICLE_578306_RU.md",
+        "research-2026-10-17-white-bar/QCONN_LINKS_RU.md"
       ],
       "evidence_updates": [
         {
@@ -338,6 +340,12 @@
           "level": "FIELD_INVENTORY_SOURCE_COLLECTOR",
           "finding": "Full contents авторизованы для выбранных roots. SOURCE streaming/manifest/partial ZIP и passive channel snapshots реализован; новые байты машины не получены.",
           "source": "research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md"
+        },
+        {
+          "date": "2026-10-17",
+          "level": "FIELD_ARCHIVE_STATIC_AND_SOURCE_TEST",
+          "source": "research-2026-10-17-white-bar/VEHICLE_578306_RU.md",
+          "finding": "Полный578306 проверен:974stable/29open_failed_or_link/2changing,61DLT ZIP; renderer/hide не найден. Native qconn lstat/readlink найден статически. SOURCE3.2.7 докачивает selected targets, исключает977файлов двух архивов и добавляет UDS/Screen-client mappings. Новое FIELD OPEN."
         }
       ],
       "coverage_ids": [
@@ -1393,14 +1401,16 @@
       "status": "PARTLY_RESOLVED",
       "known": "FIELD3.2.4 ZIP833791:6wide attempts status=read/EOF/отдельные SHA; все CSV проверены. Stat /proc пройден. Начальные changed_during_read probes сохранены отдельно.",
       "missing_evidence": "Живые mappings не атомарны. Inventory завершён, но10directory_open_failed ограничивают namespace.",
-      "next_step": "Использовать шесть полученных wide mappings; не склеивать snapshots и не запрашивать повтор только из-за исторического metadata partial.",
+      "next_step": "Проверить докачку3.2.7: skipped/link/EOF, новые mappings и свежие канальные снимки; для крыльев нужны синхронные Android pixels/физический DIM. Подробности QCONN_LINKS_RU.md.",
       "sources": [
         "research-2026-10-16-qnx/DUMP_322_RU.md",
         "research-2026-10-16-qnx/FULL_INVENTORY_RU.md",
         "research-2026-10-16-qnx/DUMP_323_8283_RU.md",
         "research-2026-10-16-qnx/DUMP_323_DD605_RU.md",
         "research-2026-10-16-qnx/QNX_TERMINAL_20261017_RU.md",
-        "research-2026-10-16-qnx/DUMP_324_833791_RU.md"
+        "research-2026-10-16-qnx/DUMP_324_833791_RU.md",
+        "research-2026-10-17-white-bar/VEHICLE_578306_RU.md",
+        "research-2026-10-17-white-bar/QCONN_LINKS_RU.md"
       ],
       "coverage_ids": [
         "BASE-DIM",
@@ -1493,6 +1503,12 @@
           "level": "FIELD_STATIC_USER_CORRECTION",
           "finding": "FIELD3.2.4 ZIP833791:6wide attempts status=read/EOF/отдельные SHA; все CSV проверены. Stat /proc пройден. Начальные changed_during_read probes сохранены отдельно.",
           "source": "research-2026-10-16-qnx/DUMP_324_833791_RU.md"
+        },
+        {
+          "date": "2026-10-17",
+          "level": "FIELD_ARCHIVE_STATIC_AND_SOURCE_TEST",
+          "source": "research-2026-10-17-white-bar/VEHICLE_578306_RU.md",
+          "finding": "Полный578306 проверен:974stable/29open_failed_or_link/2changing,61DLT ZIP; renderer/hide не найден. Native qconn lstat/readlink найден статически. SOURCE3.2.7 докачивает selected targets, исключает977файлов двух архивов и добавляет UDS/Screen-client mappings. Новое FIELD OPEN."
         }
       ]
     },
@@ -1503,7 +1519,7 @@
       "status": "OPEN",
       "known": "FIELD3.2.4 ZIP833791:13matching slog2, включая display.40986, получены. SPI ошибки и DISPLAY warnings не привязаны к полосе; DLT absent_or_inaccessible. В повторном fault552935 QNX33/33files и76manifest hashes PASS. Inventory содержит /userdata/DLT/DIM_Slog.log и DIM_Slog_Boot ZIPs, /persist/dim_config; ранее их байты не собирались.",
       "missing_evidence": "Штатная хронология/актуальность slog2 и синхронные пиксели. Содержимое новых полных QNX деревьев и корреляция каналов с физическим DIM.",
-      "next_step": "Выпустить SOURCE3.2.5 с отдельным полным архивом QNX/каналов; получить новый FIELD архив, проверить hashes/coverage и исследовать DIM logs/configs/libraries. Это не повтор прежнего целевого дампа. Крылья/hide и владельцы peer остаются OPEN.",
+      "next_step": "Проверить докачку3.2.7: skipped/link/EOF, новые mappings и свежие канальные снимки; для крыльев нужны синхронные Android pixels/физический DIM. Подробности QCONN_LINKS_RU.md.",
       "sources": [
         "research-2026-10-16-qnx/DUMP_322_RU.md",
         "research-2026-10-16-qnx/FULL_INVENTORY_RU.md",
@@ -1513,7 +1529,9 @@
         "research-2026-10-16-qnx/DUMP_323_DD605_RU.md",
         "research-2026-10-16-qnx/QNX_TERMINAL_20261017_RU.md",
         "research-2026-10-16-qnx/DUMP_324_833791_RU.md",
-        "research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md"
+        "research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md",
+        "research-2026-10-17-white-bar/VEHICLE_578306_RU.md",
+        "research-2026-10-17-white-bar/QCONN_LINKS_RU.md"
       ],
       "coverage_ids": [
         "PLAT_DISPLAY"
@@ -1618,6 +1636,12 @@
           "level": "FIELD_INVENTORY_SOURCE_COLLECTOR",
           "finding": "Full contents авторизованы для выбранных roots. SOURCE streaming/manifest/partial ZIP и passive channel snapshots реализован; новые байты машины не получены.",
           "source": "research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md"
+        },
+        {
+          "date": "2026-10-17",
+          "level": "FIELD_ARCHIVE_STATIC_AND_SOURCE_TEST",
+          "source": "research-2026-10-17-white-bar/VEHICLE_578306_RU.md",
+          "finding": "Полный578306 проверен:974stable/29open_failed_or_link/2changing,61DLT ZIP; renderer/hide не найден. Native qconn lstat/readlink найден статически. SOURCE3.2.7 докачивает selected targets, исключает977файлов двух архивов и добавляет UDS/Screen-client mappings. Новое FIELD OPEN."
         }
       ]
     },

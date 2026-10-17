@@ -1,5 +1,20 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review3.2.7 — докачка QNX
+
+Пересмотрены DiagnosticsActivity, LanTransferService, QnxFileReader,
+VehicleEvidenceArchive, BackupDefaultsMigration. Прежний cache/exports,
+retention2/явный Download, mutex/remote_commands/pairing сохранены. QnxExclusions
+читает неизменяемый packaged resource (977fingerprints), не пишет настройки,
+новый persistent cache/resume index не вводится. Режим полного повторения только
+RAM. Пропуски с историческим SHA записываются в существующий TSV и не становятся
+restore payload. Старые пользовательские архивы не удаляются. Native lstat/
+readlink не пишет QNX. Новые metadata/logs остаются приватной диагностикой.
+Defaults335…359→360 и same360 рассмотрены явно, keys/effective/explicit/unknown
+сохраняются;334/361 отвергаются тестом. Settings/defaults/migrations форматов
+не меняются. Fingerprints пересмотрены только после этого diff review.
+Runtime backup/restore и новая докачка на машине FIELD OPEN.
+
 ### Review 3.2.6 / 208021359 — Android9 updater
 
 Пересмотрен NatroUpdater: прежний cache/updates, временный APK удаляется при

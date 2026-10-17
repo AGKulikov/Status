@@ -18,7 +18,7 @@ public final class QnxTreeReplay {
             check(pos==queued.length,"unconsumed reply");String frame=new String(bytes,StandardCharsets.UTF_8);
             if(frame.equals("service file\r\n")){reply("OK\r\n");return;}
             if(frame.startsWith("o:")) {
-                check(frame.matches("o:\"[^\"]+\":9880(?::4000)?\\r\\n"),"unsafe open "+frame);
+                check(frame.matches("o:\"[^\"]+\":9880(?::(?:4000|a000))?\\r\\n"),"unsafe open "+frame);
                 current=frame.substring(3,frame.indexOf('"',3));directory=frame.contains(":4000");statPass=0;opens++;
                 if(current.equals("/bin")||current.equals("/lib")||current.equals("/lib64")||current.startsWith("/bin/")){
                     if(current.endsWith("link")){reply("e:Too many levels of symbolic links\r\n");return;}
@@ -67,7 +67,7 @@ public final class QnxTreeReplay {
                 String coverage=new String(zip.getInputStream(zip.getEntry("qnx/metadata/full-tree.tsv")).readAllBytes(),StandardCharsets.UTF_8);
                 if(fail){check(coverage.contains("traversal_finished=false"),"interruption visibility");check(zip.getEntry("qnx/tree/bin/large").getSize()==4096,"keep validated partial bytes");}
                 else {
-                    check(coverage.contains("traversal_finished=true")&&coverage.contains("excluded_special")&&coverage.contains("alias_already_enumerated"),"coverage records");
+                    check(coverage.contains("traversal_finished=true")&&coverage.contains("excluded_special")&&coverage.contains("\t/lib64\t"),"coverage records");
                     check(zip.getEntry("qnx/tree/bin/large").getSize()==20L*1024*1024,"full file");
                     check(zip.getEntry("qnx/tree/bin/empty").getSize()==0,"empty regular file");
                     check(manifest.contains("changed_during_read"),"changed file preserved");

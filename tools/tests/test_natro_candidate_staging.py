@@ -32,6 +32,9 @@ class CandidateStagingTest(unittest.TestCase):
         self.addCleanup(self.environment.stop)
         self.apk = self.root / "app/build/outputs/apk/geely/release/app-unsigned.apk"
         self.apk.parent.mkdir(parents=True)
+        self.index = self.root / "app/src/main/resources/qnx-collected-20261017.tsv"
+        self.index.parent.mkdir(parents=True)
+        self.index.write_bytes(b"# inert exclusion fixture\n")
         self.write_apk()
         self.report = self.root / "app/build/test-results/testGeelyDebugUnitTest/TEST-example.xml"
         self.report.parent.mkdir(parents=True)
@@ -48,6 +51,7 @@ class CandidateStagingTest(unittest.TestCase):
 
     def write_apk(self, missing=None):
         with zipfile.ZipFile(self.apk, "w") as apk:
+            apk.writestr(self.index.name, self.index.read_bytes())
             for asset in ("lan/index.html", "lan/client.js", "lan/client.css", "natro-wechat-compat.apk"):
                 if asset != missing:
                     apk.writestr("assets/" + asset, "test fixture")
@@ -77,6 +81,12 @@ class CandidateStagingTest(unittest.TestCase):
     def test_failed_tests_stop_publication(self):
         self.report.write_text('<testsuite tests="1906" failures="1" errors="0"/>')
         with self.assertRaisesRegex(ValueError, "Full test suite must pass"):
+            self.stage()
+        self.assertFalse((self.out / "candidate.json").exists())
+
+    def test_wrong_packaged_exclusions_stop_publication(self):
+        self.index.write_bytes(b"# changed source\n")
+        with self.assertRaisesRegex(ValueError, "exclusion index differs"):
             self.stage()
         self.assertFalse((self.out / "candidate.json").exists())
 

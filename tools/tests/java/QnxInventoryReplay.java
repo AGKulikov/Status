@@ -36,8 +36,8 @@ public final class QnxInventoryReplay {
                 }
                 if(current.equals("/opaque")){reply("e:20\r\n");return;}
                 boolean directory=current.equals("/")||current.equals("/alias")||current.equals("/.hidden")||current.equals("/русский")
-                        ||current.equals("/repeated")||current.equals("/statdenied")||current.startsWith("/zero")
-                        ||current.equals("/proc")||current.equals("/proc-other")
+                        ||current.equals("/dev")||current.equals("/repeated")||current.equals("/statdenied")||current.startsWith("/zero")
+                        ||current.equals("/proc")||current.equals("/proc-other")||current.equals("/dev/shmem")||current.equals("/dev/tymem")
                         ||current.equals("/deep")||current.startsWith("/deep/d");
                 if(current.endsWith("/leaf")||current.endsWith("/bottom"))directory=false;
                 reply(directory?"o:0\r\n":"e:ENOTDIR\r\n");return;
@@ -47,7 +47,7 @@ public final class QnxInventoryReplay {
                 if(current.equals("/proc")||current.equals("/proc-other")) {
                     reply("o:ffffffffffffffff:44ab5000:800:0:0:0:6ad37485:6ad37485:6ad37485:416d:2:0:0:0:0\r\n");return;
                 }
-                int inode=current.equals("/")||current.equals("/alias")?1:current.startsWith("/zero")?0:100+paths.size();
+                int inode=current.startsWith("/dev/")?777:current.equals("/")||current.equals("/alias")?1:current.startsWith("/zero")?0:100+paths.size();
                 reply("o:"+Integer.toHexString(inode)+":0:9:0:0:0:0:0:0:41ed:1:0:0:0:0\r\n");return;
             }
             if(frame.equals("c:0\r\n")){reply("o\r\n");return;}
@@ -56,12 +56,15 @@ public final class QnxInventoryReplay {
                 int page=Integer.parseInt(fields[2],16);String listing="";
                 if(badFrame&&current.equals("/")&&page==1){reply("o:0:1000000:0\r\n");return;}
                 if(current.equals("/")) {
-                    if(page==0)listing=".\r\n..\r\n.hidden\r\nрусский\r\nalias\r\ndenied\r\nopaque\r\ndeep\r\nrepeated\r\nzero\r\nstatdenied\r\nquote\"name\r\nback\\name\r\ntab\tname\r\n.hidden\r\n../escape\r\n";
+                    if(page==0)listing="dev\r\n.\r\n..\r\n.hidden\r\nрусский\r\nalias\r\ndenied\r\nopaque\r\ndeep\r\nrepeated\r\nzero\r\nstatdenied\r\nquote\"name\r\nback\\name\r\ntab\tname\r\n.hidden\r\n../escape\r\n";
                     else if(page<=300)listing="file"+page+"\r\n";
                     else if(page==301)listing="proc\r\nproc-other\r\n";
                 } else if(current.equals("/repeated"))listing="leaf\r\n";
                 else if(page==0) {
-                    if(current.equals("/.hidden")||current.equals("/русский"))listing="leaf\r\n";
+                    if(current.equals("/dev"))listing="shmem\r\ntymem\r\n";
+                    else if(current.equals("/dev/shmem"))listing="slogger2\r\n";
+                    else if(current.equals("/dev/tymem"))listing="ram\r\n";
+                    else if(current.equals("/.hidden")||current.equals("/русский"))listing="leaf\r\n";
                     else if(current.equals("/statdenied"))listing="available-name\r\n";
                     else if(current.startsWith("/zero"))listing="again\r\n";
                     else if(current.equals("/proc"))listing="first-pid\r\n";
@@ -100,7 +103,8 @@ public final class QnxInventoryReplay {
                 check(listed.size()==list.split("\n").length,"no duplicate paths");
                 check(listed.contains("/file300")&&listed.contains("/.hidden/leaf")&&listed.contains("/русский/leaf"),"broad, hidden, UTF-8");
                 check(listed.stream().anyMatch(p->p.endsWith("/bottom")&&p.length()>300),"deep tree reached");
-                check(report.contains("alias_already_enumerated\t/"),"cycle identity");
+                check(report.contains("identity_collision_reenumerated\t/"),"identity alone cannot suppress a directory");
+                check(listed.contains("/dev/shmem/slogger2")&&listed.contains("/dev/tymem/ram"),"same pseudo inode, distinct namespace");
                 check(report.contains("possible_cycle_identity_unknown"),"unknown inode cycle");
                 check(listed.contains("/statdenied/available-name"),"stat denial must not suppress directory names");
                 check(listed.contains("/proc/first-pid")&&listed.contains("/proc-other/second-pid"),"all-ones inode must not abort or alias unrelated directories");

@@ -58,7 +58,7 @@ async function exportLogs(format){
 }
 action('logsTxt',()=>exportLogs('txt'));action('logsZip',()=>exportLogs('zip'));action('logsResume',()=>exportLogs());
 action('systemDump',async()=>{if(confirm('Снять Android/QNX дамп без перезагрузки? Только чтение; сбор может занять длительное время. Выполняйте на стоянке.'))await exportLogs('dump');});
-action('vehicleDump',async()=>{if(confirm('Собрать все обычные файлы выбранных каталогов QNX и сведения о каналах связи? Android целиком не копируется. Понадобятся время и свободное место. Выполняйте на стоянке.'))await exportLogs('vehicle');});
+action('vehicleDump',async()=>{if(confirm('Доскачать пропуски QNX? Файлы из полного и частичного дампов 17 октября исключены при совпадении размера; свежие логи включены. Android целиком не копируется. Понадобятся время и свободное место. Выполняйте на стоянке.'))await exportLogs('vehicle');});
 action('cancelDump',async()=>tell((await api('/api/logs/cancel',{})).message));
 async function updateState(action){
  const value=await api('/api/update',action?{action}:undefined);
@@ -77,3 +77,5 @@ let checkingStatus=false;
 setInterval(async()=>{if(document.hidden||!token||checkingStatus)return;checkingStatus=true;try{await status();await updateState();}catch(error){$('connection').textContent='Нет подтверждения связи · '+location.host;}finally{checkingStatus=false;}},5000);
 $('resumeJob').hidden=!sessionStorage.getItem('natroJob');
 if(token)status().then(files).catch(error=>tell(error.message));else showPaired(false);
+
+action('vehicleDumpAll',async()=>{if(confirm('Повторно скачать все выбранные файлы QNX, включая уже полученные? Понадобятся время и свободное место.'))await exportLogs('vehicle_all');});

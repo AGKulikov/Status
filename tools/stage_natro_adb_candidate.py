@@ -45,6 +45,10 @@ def main():
         for asset in ("assets/lan/index.html", "assets/lan/client.js", "assets/lan/client.css", "assets/natro-wechat-compat.apk"):
             if not apk.read(asset):
                 raise ValueError("Required asset is empty: " + asset)
+    with zipfile.ZipFile(unsigned) as apk:
+        index = Path("app/src/main/resources/qnx-collected-20261017.tsv")
+        if apk.read(index.name) != index.read_bytes():
+            raise ValueError("Packaged QNX exclusion index differs from source")
     sdk = Path(os.environ["ANDROID_HOME"]) / "build-tools/36.0.0"
     (out / "tools/lib").mkdir(parents=True)
     for name in ("aapt", "apksigner", "zipalign", "dexdump"):

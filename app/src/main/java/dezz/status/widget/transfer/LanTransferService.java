@@ -163,9 +163,9 @@ public final class LanTransferService extends Service {
                     if(!post(request,output))return;
                     JSONObject logRequest=new JSONObject(request.text(1024));
                     String exportId=logRequest.getString("id"), format=logRequest.getString("format");
-                    if(!exportId.matches("[0-9a-f-]{36}")||!(format.equals("txt")||format.equals("zip")||format.equals("dump")||format.equals("vehicle")))
+                    if(!exportId.matches("[0-9a-f-]{36}")||!(format.equals("txt")||format.equals("zip")||format.equals("dump")||format.equals("vehicle")||format.equals("vehicle_all")))
                         throw new IOException("Некорректный формат экспорта");
-                    if((format.equals("dump")||format.equals("vehicle"))&&!remoteCommands)throw new IOException("Разрешите удалённые команды на магнитоле");
+                    if((format.equals("dump")||format.equals("vehicle")||format.equals("vehicle_all"))&&!remoteCommands)throw new IOException("Разрешите удалённые команды на магнитоле");
                     synchronized(exportWorker) {
                         Export current=export;
                         if(current!=null&&current.id.equals(exportId)) {
@@ -178,7 +178,7 @@ public final class LanTransferService extends Service {
                         exportWorker.execute(()->{
                             try {
                                 if(next.cancelled||destroyed||!pairing.authorized(next.token,SystemClock.elapsedRealtime()))throw new IOException("Экспорт отменён или доступ отозван");
-                                File result=(next.format.equals("dump")||next.format.equals("vehicle"))? collectDump(next):next.format.equals("txt")
+                                File result=(next.format.equals("dump")||(next.format.equals("vehicle")||next.format.equals("vehicle_all")))? collectDump(next):next.format.equals("txt")
                                         ? dezz.status.widget.diagnostics.DiagnosticJournal.copyForExport(this)
                                         : dezz.status.widget.diagnostics.DiagnosticBundle.create(this);
                                 if(result==null||!result.isFile())throw new IOException("Не удалось сохранить логи");
@@ -191,7 +191,7 @@ public final class LanTransferService extends Service {
                 case "/api/logs/cancel":
                     if(!post(request,output))return;
                     Export cancel=export;
-                    if(cancel!=null&&cancel.token.equals(request.token())&&(cancel.format.equals("dump")||cancel.format.equals("vehicle"))&&!cancel.done){
+                    if(cancel!=null&&cancel.token.equals(request.token())&&(cancel.format.equals("dump")||(cancel.format.equals("vehicle")||cancel.format.equals("vehicle_all")))&&!cancel.done){
                         cancel.cancelled=true;
                         if(dumpSession!=null)dumpSession.cancel("Сбор отменён с телефона");
                     }
@@ -369,15 +369,15 @@ public final class LanTransferService extends Service {
                             public AdbShellResult.Result command(String value)throws Exception{return connection.command(value);}
                             public AdbShellResult.Result commandBounded(String value,int limit)throws Exception{return connection.commandBounded(value,limit);}
                         };
-                report.set(job.format.equals("vehicle")
+                report.set((job.format.equals("vehicle")||job.format.equals("vehicle_all"))
                         ?dezz.status.widget.diagnostics.VehicleEvidenceArchive.collect(new File(getCacheDir(),"exports"),shell,text->job.progress=text,
-                                dezz.status.widget.BuildConfig.VERSION_NAME,connection::collectQnxFull)
+                                dezz.status.widget.BuildConfig.VERSION_NAME,connection::collectQnxFull,job.format.equals("vehicle_all")?null:dezz.status.widget.diagnostics.QnxExclusions.load())
                         :dezz.status.widget.diagnostics.SystemFileDump.collect(new File(getCacheDir(),"exports"),shell,text->job.progress=text,
                                 dezz.status.widget.BuildConfig.VERSION_NAME,connection::collectQnx,"unspecified"));
             },error->{
                 dezz.status.widget.diagnostics.SystemFileDump.Report result=report.get();
                 job.progress=result==null?"Дамп не создан":(error==null&&result.complete?"Сбор завершён":"Частичный дамп")+" · "+result.collected
-                        +(job.format.equals("vehicle")?"":"/"+result.requested)+" файлов; подробности в manifest.tsv и каталоге QNX";
+                        +((job.format.equals("vehicle")||job.format.equals("vehicle_all"))?"":"/"+result.requested)+" файлов; подробности в manifest.tsv и каталоге QNX";
                 session.close();dezz.status.widget.diagnostics.SystemFileDump.RUNNING.set(false);done.countDown();
             });
             if(!accepted){dezz.status.widget.diagnostics.SystemFileDump.RUNNING.set(false);throw new IOException("Сбор не принят");}

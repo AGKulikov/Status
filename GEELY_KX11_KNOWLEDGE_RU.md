@@ -1,5 +1,19 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 17.10.2026 — полный QNX578306 и новый путь ссылок
+
+Получены974double-read файла,29open_failed_or_link и2changing; full ZIP CRC и
+1011manifest hashes проверены. Пропуски —28ELOOP/1ENOENT, не29отсутствующих
+библиотек. В конкретном qconn найден metadata-only lstat/readlink (typea000),
+SOURCE3.2.7 получает canonical target без снятия NOFOLLOW и исключает977ранее
+проверенных файлов из двух дампов. Это ещё не FIELD нового протокола.
+Исправляется ложная дедупликация /dev/shmem и /dev/tymem по одному inode.
+Подробности и точные SHA: [докачка](docs/geely-kx11/research-2026-10-17-white-bar/QCONN_LINKS_RU.md).
+[Исследование крыльев](docs/geely-kx11/research-2026-10-17-white-bar/VEHICLE_578306_RU.md):
+UDS DIM handlers частично заглушки; PNG/DLT не дали renderer; UART толькоHUD31
+с валиднымCRC. Screen screenshot IDs не равны QDI/Android.195HUD callbacks/8HAL
+receives не доказывают причину. Renderer/hide, синхронные пиксели и FIELD OPEN.
+
 ## 17.10.2026 16:22:38 — QNX снова активно отклоняет TCP8000
 
 Фото IMG_8800.jpeg: ADB Connected127.0.0.1:5555, Android198.18.34.15:35586

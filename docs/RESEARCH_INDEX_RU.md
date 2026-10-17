@@ -1,5 +1,7 @@
 # Natro — карта требований, исследований и открытых вопросов
 
+- [17.10: полный архив578306, крылья и отрицательные результаты](geely-kx11/research-2026-10-17-white-bar/VEHICLE_578306_RU.md). [Native qconn links и докачка с977исключениями](geely-kx11/research-2026-10-17-white-bar/QCONN_LINKS_RU.md). FIELD новых путей OPEN.
+
 - [17.10 16:15: updater Android9 — неверный certificate flag](releases/3.2.6/UPDATER_ANDROID9_RU.md): SOURCE3.2.6; реальный APK/API28 regression, CI/APK/FIELD OPEN. QNX16:22 снова RST/ACK до greeting, причина listener/reject OPEN.
 
 - [3.2.5 опубликована stable/latest17.10 16:08МСК](releases/3.2.5/PUBLICATION_RU.md):2157 Android/264 tool/108 Java cases PASS, прежняя подпись; HUD уведомление, полный QNX/каналы и streaming download. FIELD OPEN.

@@ -22,6 +22,8 @@ public final class QnxFileReader {
             throw new IOException("qnx_streaming_receiver_required");
         }
         default void progress(String text) {}
+        /** Explicit user exclusions. A match is archived evidence, not a fresh hash. */
+        default String previousFile(String path,long size) { return null; }
     }
     public static final String[] TARGETS = {
         "/etc/system/config/variant.cfg", "/bin/openwfd_server", "/bin/openwfd_telltale",
@@ -264,7 +266,20 @@ public final class QnxFileReader {
         return fd;
     }
     private void handshake() throws Exception {
-        if(!line().equals("QCONN"))throw new IOException("qnx_greeting_mismatch");
+        String greeting;
+        try { greeting=line(); }
+        catch(IOException error) {
+            String lower=lastReply.toLowerCase(java.util.Locale.ROOT);
+            if(lower.contains("connection refused")||lower.contains("network is unreachable")
+                    ||lower.contains("no route to host"))throw new IOException("qnx_transport_unavailable",error);
+            throw error;
+        }
+        if(!greeting.equals("QCONN")) {
+            String lower=greeting.toLowerCase(java.util.Locale.ROOT);
+            if(lower.contains("connection refused")||lower.contains("network is unreachable")
+                    ||lower.contains("no route to host"))throw new IOException("qnx_transport_unavailable");
+            throw new IOException("qnx_greeting_mismatch");
+        }
         stage="negotiation";
         if(!Arrays.equals(exact(3),new byte[]{(byte)255,(byte)253,34}))
             throw new IOException("qnx_handshake_mismatch");
@@ -340,11 +355,11 @@ public final class QnxFileReader {
             Artifact paths=new Artifact(receiver,"metadata/filesystem-paths.txt");
             RandomAccessFile queue=new RandomAccessFile(queueFile,"rw")) {
             inventory.append("event\tpath_tsv_escaped\ttype\tsize\tdevice\tinode\tmode_hex\tstatus\tdetail_tsv_escaped\n")
-                    .append("# Live namespace, not atomic. Directory opens follow aliases; dev/inode identifies visited targets.\n")
+                    .append("# Live namespace, not atomic. Shared dev/inode alone never proves an alias.\n")
                     .append("# Unknown file types/sizes stay unknown. ENOTDIR is not proof of a regular file.\n");
             final long[] discovered={1}, examined={0};
             java.util.Map<String,String> visited=new java.util.HashMap<>();
-            java.util.Map<String,String> uncertainIdentities=new java.util.HashMap<>();
+            java.util.Map<String,String> directorySignatures=new java.util.HashMap<>();
             queue.setLength(0);enqueue(queue,"/");paths.append("/\n");
             inventoryRow(inventory,"discovered","/","unknown",null,"queued","root");
             long cursor=0;
@@ -378,8 +393,7 @@ public final class QnxFileReader {
                     String previous=reliableIdentity?visited.putIfAbsent(attributes[2]+":"+attributes[0],path):null;
                     if(previous!=null) {
                         inventoryRow(inventory,"probe",path,"directory",attributes,
-                                "alias_already_enumerated",previous);
-                        send("c:"+fd+"\r\n");fields();continue;
+                                "identity_collision_reenumerated",previous);
                     }
                     if(!reliableIdentity) {
                         status="partial_or_unavailable";
@@ -412,14 +426,20 @@ public final class QnxFileReader {
                         });
                         if(nameFailure[0])status="partial_or_unavailable";
                         inventoryRow(inventory,"enumeration",path,"directory",attributes,"eof","directory page EOF observed");
-                        if(!reliableIdentity) {
+                        {
                             java.security.MessageDigest signature=java.security.MessageDigest.getInstance("SHA-256");
                             for(String name:names) { signature.update(name.getBytes(StandardCharsets.UTF_8));signature.update((byte)0); }
-                            String equivalent=uncertainIdentities.putIfAbsent((attributes==null?"unknown":attributes[2])+":"+hex(signature.digest()),path);
+                            String key=(attributes==null?"unknown":attributes[2]+":"+attributes[0])+":"+hex(signature.digest());
+                            String equivalent=null;
+                            for(String ancestor=parentPath(path);ancestor!=null;ancestor=parentPath(ancestor))
+                                if(key.equals(directorySignatures.get(ancestor))){equivalent=ancestor;break;}
+                            directorySignatures.put(path,key);
                             if(equivalent!=null && queue.length()>childrenStart) {
                                 // All names have already been recorded. Do not claim a
                                 // real alias: identical lists are only a cycle candidate.
-                                inventoryRow(inventory,"enumeration",path,"directory_open",attributes,"possible_cycle_identity_unknown",equivalent);
+                                status="partial_or_unavailable";
+                                inventoryRow(inventory,"enumeration",path,"directory_open",attributes,
+                                        reliableIdentity?"possible_cycle_identity_and_names":"possible_cycle_identity_unknown",equivalent);
                                 long tail=childrenStart;
                                 while(tail<queue.length()) {
                                     queue.seek(tail);byte[] rawChild=new byte[queue.readInt()];queue.readFully(rawChild);tail=queue.getFilePointer();
@@ -453,9 +473,83 @@ public final class QnxFileReader {
     private static void enqueue(RandomAccessFile queue,String path) throws IOException {
         byte[] bytes=path.getBytes(StandardCharsets.UTF_8);queue.seek(queue.length());queue.writeInt(bytes.length);queue.write(bytes);
     }
+    private static String parentPath(String value) {
+        if(value.equals("/"))return null;
+        int slash=value.lastIndexOf('/');return slash==0?"/":value.substring(0,slash);
+    }
+    private static boolean sameFile(long[] a,long[] b) {
+        return a[0]==b[0]&&a[1]==b[1]&&a[2]==b[2]&&a[6]==b[6]&&a[8]==b[8]&&a[9]==b[9];
+    }
+    private static boolean linkError(String reply) {
+        return reply.toLowerCase(java.util.Locale.ROOT).contains("too many levels of symbolic links")
+                ||reply.equalsIgnoreCase("e:ELOOP");
+    }
+    /** Native KX11 qconn file_open(a000) uses lstat, never open(2).
+     * file_read on that handle uses readlink. See QCONN_LINKS_RU.md and its ELF hash.
+     * An unknown dialect/short response fails closed; never retry by dropping NOFOLLOW. */
+    private String linkValue(long fd,long[] before) throws Exception {
+        if((before[9]&0xf000)!=0xa000||before[1]<1||before[1]>=2048)
+            throw new IOException("qnx_link_unrepresentable");
+        byte[][] values=new byte[2][];
+        for(int pass=0;pass<2;pass++) {
+            send("r:"+fd+":0:800:0\r\n");String[] f=fields();
+            if(f.length!=4)throw new IOException("qnx_bad_link_reply");
+            long count=number(f[1],16);
+            if(count>2048)throw new IOException("qnx_bad_link_count");
+            values[pass]=exact((int)count);
+            if(count!=before[1])throw new IOException("qnx_link_changed_or_truncated");
+        }
+        if(!Arrays.equals(values[0],values[1])||!sameFile(before,stat(fd)))
+            throw new IOException("qnx_link_changed_or_truncated");
+        return utf8(values[0]);
+    }
+    private static boolean selectedOrParent(String target) {
+        if(fullPath(target))return true;
+        for(String root:FULL_ROOTS)if(root.startsWith(target+"/"))return true;
+        return false;
+    }
+    /** Resolve each component before '..'; metadata handles cannot open a device. */
+    private String resolveTreeLink(String original,Artifact inventory) throws Exception {
+        java.util.ArrayDeque<String> pending=new java.util.ArrayDeque<>(Arrays.asList(original.substring(1).split("/")));
+        java.util.Set<String> seen=new java.util.HashSet<>();
+        String resolved="/";
+        while(!pending.isEmpty()) {
+            String name=pending.removeFirst();
+            if(name.isEmpty()||name.equals("."))continue;
+            if(name.equals("..")){resolved=parentPath(resolved);if(resolved==null)resolved="/";continue;}
+            String candidate=resolved.equals("/")?"/"+name:resolved+"/"+name;
+            if(!directoryPath(candidate)||!selectedOrParent(candidate))throw new IOException("qnx_link_outside_selected_roots");
+            send("o:\""+candidate+"\":9880:a000\r\n");String opened=reply();
+            if(opened.startsWith("e:"))throw new IOException("qnx_link_metadata_unavailable");
+            long fd=descriptor(opened);long[] info=stat(fd);String target=null;boolean aligned=true;
+            try {
+                if((info[9]&0xf000)==0xa000) {
+                    if(!seen.add(candidate))throw new IOException("qnx_link_cycle");
+                    target=linkValue(fd,info);
+                    inventoryRow(inventory,"link",candidate,"symlink",info,"link_target_read",target);
+                } else if(!pending.isEmpty()&&(info[9]&0xf000)!=0x4000)
+                    throw new IOException("qnx_link_parent_not_directory");
+            } catch(Exception error) {
+                String reason=error.getMessage();
+                aligned=error instanceof IOException&&reason!=null
+                        &&(reason.startsWith("qnx_link_")||reason.equals("qnx_remote_error"));
+                throw error;
+            } finally {if(aligned){send("c:"+fd+"\r\n");fields();}}
+            if(target==null)resolved=candidate;
+            else {
+                if(target.startsWith("/"))resolved="/";
+                String[] parts=target.split("/",-1);
+                for(int i=parts.length-1;i>=0;i--)pending.addFirst(parts[i]);
+            }
+        }
+        if(seen.isEmpty())throw new IOException("qnx_link_changed_or_not_link");
+        if(!fullPath(resolved))throw new IOException("qnx_link_outside_selected_roots");
+        return resolved;
+    }
     /** Full ordinary files, bounded RAM and no content/depth/count quota. New flags are QNX,
      * not Linux: RDONLY|NONBLOCK|NOCTTY|NOFOLLOW|LARGEFILE = 0x9880 (libc/nto).
-     * Symlinks are reported, never followed. Qconn has no validated readlink/lstat operation.
+     * Symlinks are resolved with metadata-only native lstat/readlink handles, then
+     * their selected canonical target is queued once. Ordinary opens keep NOFOLLOW.
      * Each discovered directory is opened without following its final component. This is a
      * live, non-atomic namespace: parent substitution between requests cannot be excluded. */
     public void collectTree(Receiver receiver) throws Exception {
@@ -465,8 +559,9 @@ public final class QnxFileReader {
         try(Artifact inventory=new Artifact(receiver,"metadata/full-tree.tsv");
             RandomAccessFile queue=new RandomAccessFile(queueFile,"rw")) {
             inventory.append("event\tpath_tsv_escaped\ttype\tsize\tdevice\tinode\tmode_hex\tstatus\tdetail_tsv_escaped\n");
-            inventory.append("# Non-atomic ordinary-file copy. Symlinks are not followed; special files have metadata only.\n");
-            java.util.Map<String,String> visited=new java.util.HashMap<>();
+            inventory.append("# Non-atomic copy. Native lstat/readlink resolves selected targets; NOFOLLOW content opens.\n")
+                    .append("# excluded_previous_dump means prior verified bytes with matching path/size, NOT a fresh content hash.\n");
+            java.util.Set<String> visited=new java.util.HashSet<>();
             long cursor=0,examined=0;
             for(String root:FULL_ROOTS)enqueue(queue,root);
             try {
@@ -474,6 +569,9 @@ public final class QnxFileReader {
                 while(cursor<queue.length()) {
                     queue.seek(cursor);byte[] raw=new byte[queue.readInt()];queue.readFully(raw);
                     cursor=queue.getFilePointer();path=utf8(raw);offset=0;examined++;
+                    if(!visited.add(path)) {
+                        inventoryRow(inventory,"probe",path,"unknown",null,"path_already_attempted","exact canonical path");continue;
+                    }
                     receiver.progress("Полный сбор QNX: "+examined+" · "+path);
                     if(!fullPath(path)) {
                         outcome="partial_or_unavailable";
@@ -497,6 +595,20 @@ public final class QnxFileReader {
                     if(!parentsOk){outcome="partial_or_unavailable";continue;}
                     stage="tree_open_nofollow";send("o:\""+path+"\":9880\r\n");String opened=reply();
                     if(opened.startsWith("e:")) {
+                        if(linkError(opened)) {
+                            stage="tree_resolve_link";
+                            try {
+                                String target=resolveTreeLink(path,inventory);
+                                inventoryRow(inventory,"probe",path,"symlink",null,"link_resolved",target);
+                                enqueue(queue,target);continue;
+                            } catch(IOException linkFailure) {
+                                String reason=linkFailure.getMessage();
+                                // Only semantic failures and framed denials keep the stream aligned.
+                                if(reason==null||!(reason.startsWith("qnx_link_")||reason.equals("qnx_remote_error")))throw linkFailure;
+                                outcome="partial_or_unavailable";
+                                inventoryRow(inventory,"probe",path,"unknown",null,"link_unavailable",reason+"; "+lastReply);continue;
+                            }
+                        }
                         outcome="partial_or_unavailable";
                         inventoryRow(inventory,"probe",path,"unknown",null,"open_failed_or_link",opened);continue;
                     }
@@ -508,14 +620,7 @@ public final class QnxFileReader {
                     }
                     int type=(int)(before[9]&0xf000);
                     if(type==0x4000) {
-                        // An identity is required to avoid alias cycles and recursive IPC trees.
-                        String previous=reliableIdentity(before)?visited.putIfAbsent(before[2]+":"+before[0],path):null;
-                        if(!reliableIdentity(before)) {
-                            outcome="partial_or_unavailable";
-                            inventoryRow(inventory,"probe",path,"directory",before,"identity_unavailable","subtree not read");
-                        } else if(previous!=null) {
-                            inventoryRow(inventory,"probe",path,"directory",before,"alias_already_enumerated",previous);
-                        } else {
+                        {
                             // Directory pages use qconn's directory handle, not an open(2)
                             // file descriptor. Verify the reopened directory is the same object.
                             send("c:"+fd+"\r\n");fields();
@@ -545,14 +650,18 @@ public final class QnxFileReader {
                             inventoryRow(inventory,"probe",path,"directory",before,invalid[0]?"partial_enumeration":"enumerated",invalid[0]?"see errors":"EOF");
                         }
                     } else if(type==0x8000) {
+                        String previous=receiver.previousFile(path,before[1]);
+                        if(previous!=null) {
+                            inventoryRow(inventory,"file",path,"regular",before,"excluded_previous_dump",previous);
+                            send("c:"+fd+"\r\n");fields();continue;
+                        }
                         String result="partial_read_failed";
                         try(Artifact data=new Artifact(receiver,"tree"+path)) {
                             try {
                                 stage="tree_read_first";byte[] first=readFile(fd,before[1],data.out);
                                 stage="tree_read_second";byte[] second=readFile(fd,before[1],null);
                                 stage="tree_stat_after";long[] after=stat(fd);
-                                boolean same=Arrays.equals(first,second)&&before[0]==after[0]&&before[1]==after[1]
-                                        &&before[2]==after[2]&&before[6]==after[6]&&before[8]==after[8]&&before[9]==after[9];
+                                boolean same=Arrays.equals(first,second)&&sameFile(before,after);
                                 result=same?"collected_double_read":"changed_during_read";
                                 inventoryRow(inventory,"file",path,"regular",before,result,"first_sha256="+hex(first)+" second_sha256="+hex(second));
                             } catch(IOException unavailable) {
@@ -621,7 +730,8 @@ public final class QnxFileReader {
                 index.append(pid).append("\tread\t").append(safe(exe)).append('\n');
                 String name=exe.substring(exe.lastIndexOf('/')+1);
                 if(Arrays.asList("openwfd_server","openwfd_telltale","wfd_be","screen",
-                        "screen-pwrmgr","cluster_controller","sc_qnx_vip_proxy").contains(name))
+                        "screen-pwrmgr","cluster_controller","sc_qnx_vip_proxy",
+                        "UDS_SOMEIP_Gateway","life_cycle_man_demo","mtouch").contains(name))
                     graphics.put(pid,exe);
             }
             inventoryDone=true;

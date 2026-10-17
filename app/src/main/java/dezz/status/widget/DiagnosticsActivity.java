@@ -229,18 +229,19 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
         systemDumpSave.setOnClickListener(view -> confirmDumpToDownloads());
         dumpActions.addView(systemDumpSave, weightedWithMargin(8));
         page.addView(dumpActions, topMargin(8));
-        Button vehicleArchive = button("Архив QNX и каналов связи");
+        Button vehicleArchive = button("Доскачать QNX и каналы связи");
         vehicleArchive.setOnClickListener(view -> {
             if(systemDumpSession!=null) {
                 systemDumpState.setText("Сбор уже идёт. Для отмены нажмите «Отменить сбор».");return;
             }
-            new AlertDialog.Builder(this).setTitle("Собрать полный архив?")
-                    .setMessage("Все обычные файлы выбранных каталогов QNX: программы, библиотеки, настройки, ресурсы и журналы. "
+            new AlertDialog.Builder(this).setTitle("Доскачать QNX?")
+                    .setMessage("Пропуски и новые файлы QNX. Уже полученные файлы из полного и частичного дампов 17 октября исключены при совпадении размера. Логи обновляются. "
                             + "Дополнительно — сведения о каналах связи между блоками. Android целиком не копируется. "
                             + "Сбор может быть долгим и потребовать много свободного места. Выполняйте на стоянке. "
                             + "Можно отменить с сохранением полученных данных. Готовый архив передавайте лично.")
                     .setNegativeButton("Отмена",null)
-                    .setPositiveButton("Собрать",(dialog,which)->startSystemDump("full_vehicle")).show();
+                    .setNeutralButton("Повторить всё",(dialog,which)->startSystemDump("full_vehicle_all"))
+                    .setPositiveButton("Доскачать",(dialog,which)->startSystemDump("full_vehicle")).show();
         });
         page.addView(vehicleArchive, topMargin(8));
         systemDumpState = label("Отдельный сбор DIM/UART через ADB: системные файлы, не полный образ прошивки.");
@@ -587,7 +588,7 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
     }
 
     private void startSystemDump(String captureState) {
-        final boolean fullVehicle=captureState.equals("full_vehicle");
+        final boolean fullVehicle=captureState.equals("full_vehicle")||captureState.equals("full_vehicle_all");
         if (!dezz.status.widget.diagnostics.SystemFileDump.RUNNING.compareAndSet(false, true)) {
             systemDumpState.setText("Другой сбор ещё выполняется. Дождитесь завершения.");
             return;
@@ -616,7 +617,7 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
                         if (!isDestroyed() && systemDumpSession == session) systemDumpState.setText(text);
                     });
             result.set(fullVehicle
-                    ?dezz.status.widget.diagnostics.VehicleEvidenceArchive.collect(new File(getCacheDir(),"exports"),shell,progress,BuildConfig.VERSION_NAME,adb::collectQnxFull)
+                    ?dezz.status.widget.diagnostics.VehicleEvidenceArchive.collect(new File(getCacheDir(),"exports"),shell,progress,BuildConfig.VERSION_NAME,adb::collectQnxFull, captureState.equals("full_vehicle_all")?null:dezz.status.widget.diagnostics.QnxExclusions.load())
                     :dezz.status.widget.diagnostics.SystemFileDump.collect(new File(getCacheDir(),"exports"),shell,progress,BuildConfig.VERSION_NAME,adb::collectQnx,captureState));
         }, error -> {
             session.close();

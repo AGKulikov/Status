@@ -1,0 +1,38 @@
+{
+  "versionName": "3.2.7",
+  "versionCode": 208021360,
+  "sourceCommit": "419d8a3554b3022240482be277a2e0cb706aa21b",
+  "sourceTree": "41a42968233093705594009e39f83b358a33606c",
+  "sourceStatus": "LOCAL_COMMIT_READY_REMOTE_PUBLICATION_BLOCKED",
+  "toolTests": {
+    "skipped": 4,
+    "failures": 0,
+    "errors": 0,
+    "seconds": 60.968,
+    "command": "python3 -m unittest discover -s tools/tests -q",
+    "environment": "local; JSON_JAR/NATRO_ANDROID_JSON_JAR not configured",
+    "testsRun": 260,
+    "skipDetail": "Three individual tests and the StockManeuverCommandsTest class setup are skipped; unittest testsRun does not count class-setup skips."
+  },
+  "javaPolicySourceCases": {
+    "passed": 108,
+    "failed": 0
+  },
+  "qnxCollectorReplayTests": {
+    "passed": 9,
+    "failed": 0
+  },
+  "candidateStagingTests": {
+    "passed": 10,
+    "failed": 0
+  },
+  "exclusions": {
+    "records": 977,
+    "comparison": "SHA256(UTF8 path) and size; remote contents not rehashed",
+    "resourceSha256": "0a47ab239353aa1f81fddff042e350322ab7c55a18ef169be571ff32b1db78b4"
+  },
+  "ciStatus": "NOT_STARTED_PUBLICATION_BLOCKED",
+  "apkStatus": "NOT_BUILT",
+  "physicalKx11Verification": "OPEN",
+  "publicationBlock": "Automatic approval review rejected git push twice; second attempt followed verification of prior user publication instructions and review of source/document-only changes. No alternate publication route attempted."
+}
