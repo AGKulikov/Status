@@ -638,7 +638,7 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
                     systemDumpShare.setEnabled(true);
                     systemDumpSave.setEnabled(true);
                     systemDumpState.setText((report.complete && error == null ? "Сбор завершён. " : "Частичный дамп. ")
-                            + "Получено " + report.collected + (fullVehicle?"":"/"+report.requested) + " файлов. "
+                            + (fullVehicle?report.summary+" ":"Получено "+report.collected+"/"+report.requested+" файлов. ")
                             + (fullVehicle?"Охват и пропуски — в qnx/metadata/full-tree.tsv; контрольные суммы — в manifest.tsv. "
                             :"Причины пропусков — в manifest.tsv, QNX — в qnx-diagnostics.txt. ")+"Нажмите «Отправить дамп ZIP».");
                 }

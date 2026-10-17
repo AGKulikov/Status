@@ -1,5 +1,50 @@
 # Единый реестр требований Natro
 
+## 17.10.2026 19:11–19:15МСК — MEDIA-TOUCH-329 / MUSIC-INFO-329 / QNX-RESULT-329
+
+USER: повтор белой полосы, проверить перехват нажатий плеера по фото/видео;
+принудительно убрать начальный «i в круге» из всех названий песен. Затем передан
+архив докачки372877 с вопросом о неполноте. Это продолжение исправлений.
+
+MUSIC-INFO-329: очищать только начальные ⓘ/ℹ, их variation selectors и отделяющие
+Unicode-пробелы, в том числе без пробела после символа. Общий display Snapshot
+покрывает HOME/медиапанель, шторку, статус/popup/водительскую панель, HUD/приборку.
+Обычная i, внутренний символ, предупреждение⚠, artist/album и raw identity не
+меняются. Требование MUSIC-027 «не меняя видимый текст» ЗАМЕНЕНО этим пунктом;
+его правила сопоставления session/notification/media ID продолжают действовать.
+
+MEDIA-TOUCH-329: пустая часть перекрывающегося контейнера не забирает DOWN
+соседней видимой кнопки. Hit area follows actual glyph and screen transform,
+48dp minimum/8dp margin; отпускание после ухода/отмена не запускает соседнюю
+команду. Progress starts only on track; full-frame scrub изHA1178 superseded.
+Сохранённые размеры/положение/редактор и назначения кнопок сохраняются. Runtime
+регрессии должны использовать настоящий MotionEvent через proxy+frame и прямую
+панель, а не только совпадения строк исходников. FIELD повтор видео OPEN.
+
+Белая полоса FIELD-002/CLUSTER-028/DIM-WHITE-317 OPEN. В3.2.7 зафиксированы
+ANR/restart plus.monjaro18:48:11, restart dimmenu18:48:15–16, Global/SDK1 и
+Natro allow18:48:16.765. Sys2038 dimmenu visible/shown на display2. Это усиливает
+кандидата MConfig-init, но не доказывает инициатора записи или пиксельный источник.
+Natro panel live/drawn, owner=false/2 overlapping stacks, свежих tab/center нет;
+автоматически обходить OEM-priority gates нельзя. Новый crash Natro не найден,
+сохранённый crash относится к3.1.3. Raw tap coordinates18:41 в журнале отсутствуют.
+
+QNX-RESULT-329: FIELD3.2.8 подтверждает QNX-first/сохранение ZIP при15s logcat
+failure. Обход1080paths завершён,966исключений,26resolved links/28readlinks,
+8stable+2changed files,3unavailable paths,13slog2/10mappings.50payload SHA PASS.
+Ошибки глобального inventory вне selected roots не считать недостающими regular
+files. Same-size baseline не пересчитывался. Logcat source теперь recent6000
+records перед allowlist, real exit/partial output; kernel snapshot идёт до него.
+Это заменяет прежнюю попытку фильтровать весь буфер до tail6000: она повторно
+не завершилась. Старые релевантные события за горизонтом могут отсутствовать.
+QNX quotas/NOFOLLOW/exclusions977/no replay сохраняются. HU/LAN/ZIP показывают
+отдельно retained files, exclusions, changed, unavailable и Android failures.
+
+SOURCE подготовлен3.2.9/code208021362;9локальных collector/parser replay tests
+PASS. Android CI/APK/FIELD ещё OPEN на момент записи. Новых settings нет;
+backup335…361→362 review. Исследование/точные SHA:
+[FIELD1911/1915](docs/geely-kx11/research-2026-10-17-white-bar/FIELD_1911_1915_RU.md).
+
 ## 17.10.2026 19:03:53МСК — Natro3.2.8 stable опубликована
 
 Release415910302/natro-v3.2.8/latest подтверждены readback. Publisher39047732914

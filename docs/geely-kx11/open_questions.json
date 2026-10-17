@@ -3,7 +3,7 @@
   "date": "2026-10-17",
   "note": "Рабочая очередь приоритетных вопросов, а не исчерпывающий перечень и не расписание автоматических действий. Подробные неизвестные, аппаратные ограничения, необходимые артефакты и следующие шаги остаются в 94 связанных карточках. Сначала используются уже собранные исходники и архивы; новые наблюдения запрашиваются только для конкретного остаточного пробела. Ревизия17.10.2026 переносит результаты сохранённого отчёта3.2.2 и статус SOURCE/CI3.2.3; новые первичные байты не проверялись. Верхняя дата относится к этому обновлению, не к повторной проверке всех вопросов. Дополнение по первичному ZIP8283 (3.2.3): CRC/SHA и Android metadata проверены; QNX FIELD blocked by TCP Connection refused. Это не повторная верификация остальных тем.",
   "coverage": {
-    "question_count": 54,
+    "question_count": 56,
     "system_card_count": 94,
     "system_card_sources": [
       "research-2026-09-05/architecture_domains/systems.json",
@@ -206,7 +206,8 @@
         "research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md",
         "research-2026-10-17-white-bar/VEHICLE_578306_RU.md",
         "research-2026-10-17-white-bar/QCONN_LINKS_RU.md",
-        "research-2026-10-17-white-bar/DUMPS_327_857396_663180_RU.md"
+        "research-2026-10-17-white-bar/DUMPS_327_857396_663180_RU.md",
+        "research-2026-10-17-white-bar/FIELD_1911_1915_RU.md"
       ],
       "evidence_updates": [
         {
@@ -353,6 +354,12 @@
           "level": "FIELD_COLLECTION_AND_STATIC_REVIEW",
           "finding": "UDS1175639 maps PA_Gauge; initializer старого ELF содержит speed/RPM/coolant/fuel структуры. Совпадение назначений с фото не определяет renderer.",
           "source": "research-2026-10-17-white-bar/DUMPS_327_857396_663180_RU.md"
+        },
+        {
+          "date": "2026-10-17",
+          "level": "FIELD_ARCHIVE_AND_SOURCE",
+          "finding": "FIELD3.2.7: MConfig ANR/restart→dimmenu restart→mode1/allow; Sys2038 visible. Writer and pixel ownership remain unproven, OEM gates blocked. New dump not exhaustive renderer audit.",
+          "source": "research-2026-10-17-white-bar/FIELD_1911_1915_RU.md"
         }
       ],
       "coverage_ids": [
@@ -468,7 +475,8 @@
       "sources": [
         "display/report.md",
         "research-2026-09-05/continuation/systems.json",
-        "research-2026-09-05/android_platform/systems.json"
+        "research-2026-09-05/android_platform/systems.json",
+        "research-2026-10-17-white-bar/FIELD_1911_1915_RU.md"
       ],
       "coverage_ids": [
         "BASE-MEDIAKEY",
@@ -481,7 +489,16 @@
           "missing_evidence": "Нажатие → callback → dispatch → player → audio на общей временной шкале",
           "next_step": "Разобрать уже собранные input/media traces и места блокировки UI; восстановить eventTime/downTime/callback/dispatch/audio timeline, повторы и long-press. Отдельно отметить отсутствующую аппаратную метку нажатия."
         }
-      ]
+      ],
+      "evidence_updates": [
+        {
+          "date": "2026-10-17",
+          "level": "FIELD_ARCHIVE_AND_SOURCE",
+          "finding": "User IMG_8804/8805 shows overlapping HOME media frames. SOURCE defect: blank proxy FIT area consumed DOWN; whole-cell buttons/progress interception.3.2.9 admits visible content, preserves gesture owner and editor geometry. Not attributed to steering latency; FIELD repeat pending.",
+          "source": "research-2026-10-17-white-bar/FIELD_1911_1915_RU.md"
+        }
+      ],
+      "last_reviewed": "2026-10-17"
     },
     {
       "id": "SHADE_OWNER",
@@ -1424,7 +1441,8 @@
         "research-2026-10-16-qnx/DUMP_324_833791_RU.md",
         "research-2026-10-17-white-bar/VEHICLE_578306_RU.md",
         "research-2026-10-17-white-bar/QCONN_LINKS_RU.md",
-        "research-2026-10-17-white-bar/DUMPS_327_857396_663180_RU.md"
+        "research-2026-10-17-white-bar/DUMPS_327_857396_663180_RU.md",
+        "research-2026-10-17-white-bar/FIELD_1911_1915_RU.md"
       ],
       "coverage_ids": [
         "BASE-DIM",
@@ -1535,6 +1553,12 @@
           "level": "FIELD_COLLECTION_AND_STATIC_REVIEW",
           "finding": "FIELD3.2.7 system857396:10wide mappings EOF/SHA,4772paths/552EOF/13directory failures; /dev/shmem identity collision перечислен.",
           "source": "research-2026-10-17-white-bar/DUMPS_327_857396_663180_RU.md"
+        },
+        {
+          "date": "2026-10-17",
+          "level": "FIELD_ARCHIVE_AND_SOURCE",
+          "finding": "FIELD3.2.8 vehicle372877:10wide mappings and selected traversal_finished=true1080paths;966exclusions/26resolved links,3unavailable paths. Full inventory4790paths/554EOF includes15failures outside/inside roots.",
+          "source": "research-2026-10-17-white-bar/FIELD_1911_1915_RU.md"
         }
       ]
     },
@@ -1558,7 +1582,8 @@
         "research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md",
         "research-2026-10-17-white-bar/VEHICLE_578306_RU.md",
         "research-2026-10-17-white-bar/QCONN_LINKS_RU.md",
-        "research-2026-10-17-white-bar/DUMPS_327_857396_663180_RU.md"
+        "research-2026-10-17-white-bar/DUMPS_327_857396_663180_RU.md",
+        "research-2026-10-17-white-bar/FIELD_1911_1915_RU.md"
       ],
       "coverage_ids": [
         "PLAT_DISPLAY"
@@ -1681,6 +1706,12 @@
           "level": "FIELD_COLLECTION_AND_STATIC_REVIEW",
           "finding": "System857396 содержит13slog2 и changing DIM_Slog10591112bytes; recovery log равен прежнему. Vehicle663180 потерял ADB на channel-log до QNX.",
           "source": "research-2026-10-17-white-bar/DUMPS_327_857396_663180_RU.md"
+        },
+        {
+          "date": "2026-10-17",
+          "level": "FIELD_ARCHIVE_AND_SOURCE",
+          "finding": "FIELD3.2.8:13slog2, DIM_Slog50971022bytes with equal content hashes/different metadata;8stable tree files/2changed. Post-QNX Android logcat timeout15005ms preserved ZIP. SOURCE3.2.9 finite logcat recent6000 and split summary.",
+          "source": "research-2026-10-17-white-bar/FIELD_1911_1915_RU.md"
         }
       ]
     },
@@ -1790,6 +1821,25 @@
           "source": "research-2026-10-16-qnx/DUMP_324_833791_RU.md"
         }
       ]
+    },
+    {
+      "id": "DIM_WHITE_BAR_RESET",
+      "priority": "P1",
+      "function": "Почему NaviMode сбрасывается после OEM lifecycle и появляется белая полоса?",
+      "status": "OPEN",
+      "known": "FIELD3.2.7: plus.monjaro ANR/restart18:48:11, dimmenu restart18:48:15–16, Global/SDK1 до Natro allow; Sys2038 visible на display2. Статически MConfigInitService пишет1, выполнение этого callsite в данном эпизоде не записано. Natro panel жив/нарисован, owner/tab/center gates не разрешают repair.",
+      "missing_evidence": "Инициатор конкретной записи NaviMode1, причина dimmenu restart и привязка surface к белым пикселям; свежие DIM priority signals.",
+      "next_step": "Сопоставить пассивную трассу lifecycle MConfigInitService/записи Global с текущей DIM-вкладкой. Не менять mode/AppOp вслепую, не требовать очередной одинаковый полный QNX архив.",
+      "sources": [
+        "research-2026-10-17-white-bar/FIELD_1911_1915_RU.md",
+        "research-2026-10-17-white-bar/MCONFIG_48_COMPARISON_RU.md"
+      ],
+      "coverage_ids": [
+        "BASE-DIM",
+        "PLAT_DISPLAY",
+        "PLAT_UI"
+      ],
+      "last_reviewed": "2026-10-17"
     }
   ],
   "revision_history": [
@@ -1840,6 +1890,11 @@
       "date": "2026-10-17",
       "scope": "4 questions updated with post-reboot FIELD3.2.4; all IDs/history retained",
       "source": "research-2026-10-16-qnx/DUMP_324_833791_RU.md"
+    },
+    {
+      "date": "2026-10-17",
+      "scope": "4 existing questions receive FIELD1911/1915 evidence; added separate DIM_WHITE_BAR_RESET; prior IDs/history and OPEN gates retained",
+      "source": "research-2026-10-17-white-bar/FIELD_1911_1915_RU.md"
     }
   ]
 }

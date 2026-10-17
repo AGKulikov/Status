@@ -663,7 +663,9 @@ public final class QnxFileReader {
                                 stage="tree_stat_after";long[] after=stat(fd);
                                 boolean same=Arrays.equals(first,second)&&sameFile(before,after);
                                 result=same?"collected_double_read":"changed_during_read";
-                                inventoryRow(inventory,"file",path,"regular",before,result,"first_sha256="+hex(first)+" second_sha256="+hex(second));
+                                inventoryRow(inventory,"file",path,"regular",before,result,"first_sha256="+hex(first)+" second_sha256="+hex(second)
+                                        +" content_match="+Arrays.equals(first,second)+" metadata_match="+sameFile(before,after)
+                                        +" before_size="+before[1]+" after_size="+after[1]);
                             } catch(IOException unavailable) {
                                 if(!"qnx_remote_error".equals(unavailable.getMessage())&&!"qnx_short_read".equals(unavailable.getMessage()))throw unavailable;
                                 inventoryRow(inventory,"file",path,"regular",before,result,lastReply);

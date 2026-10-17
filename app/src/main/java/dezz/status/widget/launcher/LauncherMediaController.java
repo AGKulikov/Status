@@ -153,7 +153,7 @@ public final class LauncherMediaController {
                  @NonNull String application, @Nullable Bitmap artwork, long durationMs,
                  long positionMs, boolean playing, boolean available, boolean likeAvailable,
                  @Nullable Boolean liked, int volumePercent, int volumeSteps, int volumeMaximum) {
-            this.title = title;
+            this.title = MediaTitleDisplay.clean(title);
             this.artist = artist;
             this.album = album;
             this.application = application;

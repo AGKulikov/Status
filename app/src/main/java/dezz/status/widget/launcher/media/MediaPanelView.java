@@ -371,14 +371,8 @@ public final class MediaPanelView extends FrameLayout {
         progress.setMinimumHeight(dp(Math.max(2, Math.min(40, progressBarHeightDp))));
         root.addView(progress, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f));
-        if (controls != null && layoutEditor == null) {
-            // The complete widget frame is a scrub surface. This keeps a tall resized element
-            // easy to operate even when its visual track or timeline text occupies only part of
-            // the frame; the progress track itself remains thumb-free.
-            root.setOnTouchListener((view, event) -> progress != null
-                    && progress.handleUserTouch(event.getActionMasked(), event.getX(),
-                    Math.max(1f, view.getWidth())));
-        }
+        // Only the visible track starts seeking. Text and empty frame space must not steal
+        // a neighbouring button's DOWN when independently placed HOME elements overlap.
         return root;
     }
 
@@ -480,11 +474,11 @@ public final class MediaPanelView extends FrameLayout {
     @NonNull
     private ImageButton button(int icon, @NonNull String description,
                                @Nullable OnClickListener listener, int scalePercent) {
-        ImageButton value = new ImageButton(getContext());
+        ImageButton value = new MediaControlButton(getContext());
         value.setImageResource(icon);
         value.setScaleType(ImageView.ScaleType.FIT_CENTER);
         value.setColorFilter(color(config.controlColor, Color.WHITE));
-        // The whole grid cell remains the touch target; only the glyph is drawn.
+        // Runtime hit testing follows the glyph; editor geometry remains unchanged.
         value.setBackgroundColor(Color.TRANSPARENT);
         value.setContentDescription(description);
         // A larger content scale must make the glyph larger, not add more padding around it.

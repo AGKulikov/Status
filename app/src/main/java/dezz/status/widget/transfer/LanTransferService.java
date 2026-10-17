@@ -377,8 +377,9 @@ public final class LanTransferService extends Service {
                                 dezz.status.widget.BuildConfig.VERSION_NAME,connection::collectQnx,"unspecified"));
             },error->{
                 dezz.status.widget.diagnostics.SystemFileDump.Report result=report.get();
-                job.progress=result==null?"Дамп не создан":(error==null&&result.complete?"Сбор завершён":"Частичный дамп")+" · "+result.collected
-                        +((job.format.equals("vehicle")||job.format.equals("vehicle_all"))?"":"/"+result.requested)+" файлов; подробности в manifest.tsv и каталоге QNX";
+                job.progress=result==null?"Дамп не создан":(error==null&&result.complete?"Сбор завершён":"Частичный дамп")+" · "
+                        +((job.format.equals("vehicle")||job.format.equals("vehicle_all"))?result.summary
+                        :result.collected+"/"+result.requested+" файлов; подробности в manifest.tsv и каталоге QNX");
                 session.close();dezz.status.widget.diagnostics.SystemFileDump.RUNNING.set(false);done.countDown();
             });
             if(!accepted){dezz.status.widget.diagnostics.SystemFileDump.RUNNING.set(false);throw new IOException("Сбор не принят");}

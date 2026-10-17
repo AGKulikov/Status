@@ -50,8 +50,13 @@ public final class SystemFileDump {
         public final File file;
         public final int collected, requested;
         public final boolean complete;
+        public final String summary;
         Report(File file, int collected, int requested, boolean complete) {
+            this(file,collected,requested,complete,"");
+        }
+        Report(File file, int collected, int requested, boolean complete,String summary) {
             this.file=file; this.collected=collected; this.requested=requested;this.complete=complete;
+            this.summary=summary;
         }
     }
     static String output(AdbShellResult.Result result) throws IOException {

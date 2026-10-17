@@ -1,5 +1,7 @@
 # Natro
 
+**В работе3.2.9 /208021362:** касания плеера, очистка начальногоⓘ и понятный итог докачки. CI/APK/FIELD пока OPEN. [Подробности](docs/releases/3.2.9/README_RU.md).
+
 **Выпущена [3.2.8 /208021361](https://github.com/AGKulikov/Status/releases/tag/natro-v3.2.8):** QNX первым, необязательные журналы после него с15s deadline; сохранение частичного архива и причины отказа.2175Android/265tool/108Java checks PASS, прежняя подпись/API28 проверены. [Статус](docs/releases/3.2.8/README_RU.md).
 
 **Предыдущая [3.2.7 / 208021360](https://github.com/AGKulikov/Status/releases/tag/natro-v3.2.7):** докачка QNX с977исключениями из полного и частичного дампов, чтение целей ссылок и исправления каталогов/диагностики. 2174 Android tests,265 tool tests и108 Java cases PASS; прежняя подпись и exactAPI28/install-over metadata проверены. [Протокол выпуска](docs/releases/3.2.7/README_RU.md). Stable/latest и все7assets проверены; FIELD докачки и крылья OPEN.
@@ -39,7 +41,7 @@ APK `Natro-3.2.3-signed.apk` передан отдельно. Navigator/Helper �
 Первый [дамп3.2.3](docs/geely-kx11/research-2026-10-16-qnx/DUMP_323_8283_RU.md): Android собран;
 QNX Connection refused до первого запроса. Ожидание после старта не помогло; маршрут проверен. В контроле13:07 получено QCONN, затем системный сбор дошёл до812 путей и выявил stat-parser defect на `/proc`. Повтор старого APK не нужен; дальнейшая проверка после выпуска исправления. [История соединения](docs/geely-kx11/research-2026-10-16-qnx/QNX_TERMINAL_20261017_RU.md).
 
-Актуальное дерево разработки: [`fix/qnx-missing-20261017`](https://github.com/AGKulikov/Status/tree/fix/qnx-missing-20261017).
+Актуальное дерево разработки: [`fix/media-touch-329`](https://github.com/AGKulikov/Status/tree/fix/media-touch-329).
 Ветка `main` содержит историческое состояние и не представляет текущую версию Natro.
 После каждого выпуска публикуются соответствующие исходники, README, описание
 выпуска и обновлённый реестр требований; ссылки на коммит и сборку фиксируются в описании.

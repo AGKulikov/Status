@@ -13,7 +13,7 @@ import org.junit.Test;
 
 /** Regression contract for user-tunable media controls and the safety-gated KX11 trunk. */
 public final class Ha1178MediaTuningAndTrunkContractTest {
-    @Test public void progressHasGapSettingWholeFrameGestureAndCommitOnlySeek() throws Exception {
+    @Test public void progressHasGapSettingAndCommitOnlySeek() throws Exception {
         String config = source("launcher/media/MediaPanelConfig.java");
         String store = source("launcher/media/MediaPanelConfigStore.java");
         String settings = source("MediaPanelSettingsActivity.java");
@@ -23,7 +23,8 @@ public final class Ha1178MediaTuningAndTrunkContractTest {
         assertTrue(config.contains("progressTimeGapDp"));
         assertTrue(store.contains("put(\"progressTimeGapDp\""));
         assertTrue(settings.contains("Отступ времени от полосы"));
-        assertTrue(panel.contains("root.setOnTouchListener"));
+        // Whole-frame scrubbing superseded by MEDIA-TOUCH-329; real dispatch is covered
+        // by MediaTouchRoutingTest so blank space cannot consume another control.
         assertTrue(panel.contains("setOnProgressCommitted"));
         String changed = between(panel, "progress.setOnProgressChanged(",
                 "progress.setOnProgressCommitted(");

@@ -1,5 +1,18 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review3.2.9 — касания, текст музыки и отчёт докачки
+
+По diff рассмотрены DiagnosticsActivity, LanTransferService, SystemFileDump,
+VehicleEvidenceArchive, QnxFileReader и BackupDefaultsMigration. Новый summary.txt
+лежит в прежнем cache/exports ZIP, retention2 и явное сохранение прежние. В UI и
+LAN добавлен transient summary; QNX detail добавляет поля в TSV. 6000 последних
+logcat records фильтруются в RAM до записи; полный raw log не сохраняется.
+Новых storage roots, настроек, ключей и defaults нет. Геометрия виджетов/JSON
+не переписывается; очистка title относится лишь к display Snapshot. Raw media
+identity и cache не меняются. Рассмотрен переход335…361→362 с сохранением
+explicit/unknown keys и отклонением будущих схем; добавлена регрессия. Fingerprints
+этих6owners обновлены после review. Это не FIELD полной резервной копии/restore.
+
 ### Review3.2.8 — изоляция необязательных каналов
 
 Пересмотрены DiagnosticsActivity, LanTransferService, SystemFileDump,

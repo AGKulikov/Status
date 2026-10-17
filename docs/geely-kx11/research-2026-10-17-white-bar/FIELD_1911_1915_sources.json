@@ -1,0 +1,49 @@
+{
+  "date": "2026-10-17",
+  "sources": [
+    {
+      "name": "Natro-system-6888521053323400158(1).zip",
+      "bytes": 5688959,
+      "sha256": "f28c1cf7835ac5d2269aa77a67a1af5e97a26f1e3a94568bb03d5c449d5851a8"
+    },
+    {
+      "name": "Natro-diagnostics-6745464794276639182(1).zip",
+      "bytes": 199692,
+      "sha256": "d5d8f39db3ab3ec64cc2217819e6f801aadf829634c69e3b644f3482201792d1"
+    },
+    {
+      "name": "Natro-vehicle-3728779933394344044.zip",
+      "bytes": 5845706,
+      "sha256": "d4551d9fff5fcbf330a8e5e12c7d0eb9b1a7ae1eb9f5703cd5433626735397fe"
+    },
+    {
+      "name": "IMG_8803.jpeg",
+      "bytes": 436837,
+      "sha256": "8c5bcb4491b065f6e12d748e38091782fbd5f0cdfcd53bcaad7116942381dc1d"
+    },
+    {
+      "name": "IMG_8804.mp4",
+      "bytes": 15980536,
+      "sha256": "a7f8d764c8ac76c6016861ed4f25c4e9923408f0f1894467949aaf1593d746d3"
+    },
+    {
+      "name": "IMG_8805.jpeg",
+      "bytes": 525224,
+      "sha256": "1b2b2975c323fbec143f574bd998e461fe2771c8f977b504d097728c9dbc2848"
+    }
+  ],
+  "checks": {
+    "zip_crc_entries": [
+      94,
+      9,
+      51
+    ],
+    "manifest_payloads_checked": [
+      89,
+      8,
+      50
+    ],
+    "all_sizes_sha256_match": true
+  },
+  "scope": "Private primary attachments stay outside public Git; hashes and derived technical evidence only."
+}

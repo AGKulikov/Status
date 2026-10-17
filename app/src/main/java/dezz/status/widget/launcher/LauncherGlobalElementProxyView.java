@@ -28,6 +28,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewParent;
+import android.view.ViewConfiguration;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -43,6 +44,7 @@ import dezz.status.widget.Fonts;
 import dezz.status.widget.MarqueeOutlineTextView;
 import dezz.status.widget.OutlineTextView;
 import dezz.status.widget.launcher.media.MediaPanelConfig;
+import dezz.status.widget.launcher.media.MediaControlButton;
 
 /**
  * Draws one live launcher widget in screen coordinates without changing its native proportions.
@@ -50,7 +52,7 @@ import dezz.status.widget.launcher.media.MediaPanelConfig;
  * <p>The hidden panel hierarchy remains the data/action source. This view supplies a separate
  * viewport, padding, typography and action policy for each atomic widget. FIT is deliberately the
  * default for bitmap-like content; the media progress and volume controls are responsive and
- * always consume the complete independently resized frame.</p>
+ * render within the independently resized frame; only their live controls accept gestures.</p>
  */
 public final class LauncherGlobalElementProxyView extends View {
     public interface Source {
@@ -161,6 +163,10 @@ public final class LauncherGlobalElementProxyView extends View {
     public boolean onTouchEvent(@NonNull MotionEvent event) {
         int action = event.getActionMasked();
         View actionSource = action == MotionEvent.ACTION_DOWN ? sourceView() : gestureSource;
+        if (action == MotionEvent.ACTION_DOWN && actionSource != null) {
+            ensureSourceAppearance(actionSource);
+            if (!acceptsMediaDown(actionSource, event.getX(), event.getY())) return false;
+        }
         LauncherGlobalElementLayoutStore.TapAction tapAction = appearance.tapAction;
         // These two elements are controls, even if an older saved layout still contains a
         // custom tap action from before direct manipulation was introduced.
@@ -209,12 +215,23 @@ public final class LauncherGlobalElementProxyView extends View {
         float mappedY = transform.sourceTop
                 + (event.getY() - transform.offsetY) / transform.scaleY;
         if (action == MotionEvent.ACTION_DOWN
+                && !isPlainText(value)
                 && appearance.scaleMode == LauncherGlobalElementLayoutStore.ScaleMode.FIT
                 && (mappedX < transform.sourceLeft
                 || mappedX > transform.sourceRight
                 || mappedY < transform.sourceTop
                 || mappedY > transform.sourceBottom)) {
-            ignoreGestureUntilUp = true;
+            // Returning true here swallowed taps intended for a lower overlapping widget.
+            return false;
+        }
+
+        if (action != MotionEvent.ACTION_DOWN && value instanceof MediaControlButton
+                && (action == MotionEvent.ACTION_MOVE || action == MotionEvent.ACTION_UP)
+                && !((MediaControlButton) value).containsTouch(mappedX, mappedY,
+                transform.scaleX, transform.scaleY,
+                ViewConfiguration.get(getContext()).getScaledTouchSlop())) {
+            cancelForwardedGesture();
+            ignoreGestureUntilUp = action != MotionEvent.ACTION_UP;
             return true;
         }
 
@@ -230,17 +247,65 @@ public final class LauncherGlobalElementProxyView extends View {
                 clamp(mappedY, 0f, value.getHeight()));
         boolean handled;
         try {
-            handled = value.dispatchTouchEvent(forwarded);
+            handled = value instanceof MediaControlButton
+                    ? ((MediaControlButton) value).dispatchProjectedTouchEvent(forwarded)
+                    : value.dispatchTouchEvent(forwarded);
         } finally {
             forwarded.recycle();
         }
-        if (!handled && action == MotionEvent.ACTION_UP) {
+        if (!handled && action == MotionEvent.ACTION_DOWN && isResponsiveMediaControl(value)) {
+            finishForwardedGesture();
+            return false;
+        }
+        if (!handled && action == MotionEvent.ACTION_UP && !isResponsiveMediaControl(value)) {
             performClickableAncestor(value);
         }
         if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
             finishForwardedGesture();
         }
         invalidate();
+        return true;
+    }
+
+    /** Screen-space admission only. Android retains the accepted owner until UP/CANCEL. */
+    private boolean acceptsMediaDown(@NonNull View value, float x, float y) {
+        LauncherGlobalElementTag tag = LauncherGlobalElementTag.from(value);
+        if (tag == null || !tag.id.startsWith(LauncherLayoutStore.MEDIA + "/")) return true;
+        if (isPlainText(value)) {
+            TextView text = (TextView) value;
+            CharSequence content = text instanceof MarqueeOutlineTextView
+                    ? ((MarqueeOutlineTextView) text).getMarqueeSourceText() : text.getText();
+            if (TextUtils.isEmpty(content)) return false;
+            float left = Math.min(getWidth(), Math.max(0, appearance.paddingLeftPx));
+            float top = Math.min(getHeight(), Math.max(0, appearance.paddingTopPx));
+            int width = Math.max(0, getWidth() - Math.round(left) - appearance.paddingRightPx);
+            int height = Math.max(0, getHeight() - Math.round(top) - appearance.paddingBottomPx);
+            if (width == 0 || height == 0) return false;
+            boolean singleLine = text.getMaxLines() == 1 || text instanceof MarqueeOutlineTextView;
+            StaticLayout layout = textLayout(text, content, text.getPaint(), width,
+                    singleLine ? 1 : Math.max(1, text.getMaxLines()), textAlignment(text.getGravity()));
+            float textTop = verticalTextOffset(text, top, height, layout.getHeight());
+            // A scrolling title can occupy every x, but never the blank height above/below it.
+            return x >= left && x < left + width && y >= Math.max(top, textTop)
+                    && y < Math.min(top + height, textTop + layout.getHeight());
+        }
+        DrawTransform t = transform(value);
+        if (!t.drawable()) return false;
+        float sourceX = t.sourceLeft + (x - t.offsetX) / t.scaleX;
+        float sourceY = t.sourceTop + (y - t.offsetY) / t.scaleY;
+        if (value instanceof MediaControlButton) {
+            return ((MediaControlButton) value).containsTouch(sourceX, sourceY,
+                    t.scaleX, t.scaleY, 0f);
+        }
+        if (value instanceof ImageView) {
+            ImageView image = (ImageView) value;
+            Drawable drawable = image.getDrawable();
+            if (drawable == null) return false;
+            RectF bounds = new RectF(drawable.getBounds());
+            image.getImageMatrix().mapRect(bounds);
+            bounds.offset(image.getPaddingLeft(), image.getPaddingTop());
+            return bounds.contains(sourceX, sourceY);
+        }
         return true;
     }
 

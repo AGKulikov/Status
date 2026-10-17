@@ -1,5 +1,17 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 17.10.2026 19:11/19:15МСК — новые FIELD3.2.7/3.2.8
+
+System688852/diagnostics674546: ANR/restart plus.monjaro18:48:11, dimmenu
+PID4570→9287, затем Global/SDK1 и allow Natro; Sys2038 shown/display2.
+Кандидат MConfigInitService усилен временной связью, writer/pixel owner не
+доказан. Owner=false/2 overlapping stacks и stale tab/center блокируют repair.
+Vehicle3728773.2.8:1080examined/обходзавершён,966exclusions,26resolvedlinks,
+8stable+2changedfiles,3ENOENT paths,13slog2/10mappings.50manifest SHA PASS.
+Logcat timeout15005ms после QNX не потерял его bytes. Новая сводка3.2.9 и
+finite logcat horizon подготовлены; исправление полосы/крыльев FIELD OPEN.
+[Разбор и границы](docs/geely-kx11/research-2026-10-17-white-bar/FIELD_1911_1915_RU.md).
+
 3.2.8 опубликована19:03:53МСК: SOURCE5e4f40ce,CI39046959187,
 2175Android/265tool/108Java cases PASS; прежний cert/API28/1517payload PASS.
 [Выпуск и readback](docs/releases/3.2.8/README_RU.md). FIELD докачки остаётся OPEN.
