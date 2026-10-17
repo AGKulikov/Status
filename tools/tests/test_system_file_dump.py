@@ -12,6 +12,17 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'app/src/main/java/dezz/status/widget'
 
 class SystemDumpTest(unittest.TestCase):
+    def test_full_vehicle_archive_and_download(self):
+        with tempfile.TemporaryDirectory() as work:
+            files=[SOURCE/'diagnostics/SystemFileDump.java',SOURCE/'diagnostics/QnxFileReader.java',
+                   SOURCE/'diagnostics/GraphicsEvidence.java',SOURCE/'diagnostics/VehicleEvidenceArchive.java',
+                   SOURCE/'adb/AdbShellResult.java',SOURCE/'transfer/LanDownloadGrant.java',
+                   ROOT/'tools/tests/java/QnxTreeReplay.java',ROOT/'tools/tests/java/LanDownloadReplay.java']
+            run=subprocess.run(['java','com.sun.tools.javac.Main','-d',work,*map(str,files)],capture_output=True,text=True)
+            self.assertEqual(run.returncode,0,run.stderr)
+            for cls in ['diagnostics.QnxTreeReplay','transfer.LanDownloadReplay']:
+                run=subprocess.run(['java','-Xmx64m','-cp',work,'dezz.status.widget.'+cls,work],capture_output=True,text=True,timeout=90)
+                self.assertEqual(run.returncode,0,run.stdout+run.stderr)
     def test_graphics_evidence_replay(self):
         with tempfile.TemporaryDirectory() as work:
             files=[SOURCE/'diagnostics/SystemFileDump.java',SOURCE/'diagnostics/QnxFileReader.java',
@@ -77,7 +88,7 @@ class SystemDumpTest(unittest.TestCase):
             return status.value
         source=(SOURCE/'instrument/InstrumentDisplayOwner.java').read_text()
         literals=re.findall(r'Pattern.compile\(("(?:\\.|[^"\\])*")\)',source)
-        self.assertEqual(len(literals),2)
+        self.assertEqual(len(literals),3)
         patterns=[json.loads(literal) for literal in literals]
         for pattern in patterns: self.assertEqual(compile_pattern(pattern),0,pattern)
         old=patterns[1].removesuffix(r'\}')+'}'

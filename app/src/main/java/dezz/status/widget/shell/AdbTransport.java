@@ -259,6 +259,12 @@ public class AdbTransport implements ShellTransport {
         qnxStage(reader -> reader.collectLogs(receiver));
         qnxStage(reader -> reader.collectProcesses(receiver));
     }
+    public void collectQnxFull(dezz.status.widget.diagnostics.QnxFileReader.Receiver receiver) throws Exception {
+        qnxStage(reader -> reader.collectInventory(receiver));
+        qnxStage(reader -> reader.collectTree(receiver));
+        qnxStage(reader -> reader.collectLogs(receiver));
+        qnxStage(reader -> reader.collectProcesses(receiver));
+    }
     private interface QnxStep { void run(dezz.status.widget.diagnostics.QnxFileReader reader) throws Exception; }
     private void qnxStage(QnxStep step) throws Exception {
         if (Thread.currentThread().isInterrupted() || socket.isClosed())

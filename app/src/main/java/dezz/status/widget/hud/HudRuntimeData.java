@@ -38,6 +38,9 @@ import dezz.status.widget.automation.AutomationState;
 import dezz.status.widget.automation.AutomationStateStore;
 import dezz.status.widget.car.CarIntegration;
 import dezz.status.widget.car.CarIntegrations;
+import dezz.status.widget.drivemode.car.DriveModeCatalog;
+import dezz.status.widget.drivemode.car.DriveModeDescriptor;
+import dezz.status.widget.diagnostics.DiagnosticJournal;
 import dezz.status.widget.car.CurrentTripMetrics;
 import dezz.status.widget.integration.ConnectorValue;
 import dezz.status.widget.integration.ConnectorValueRegistry;
@@ -82,6 +85,10 @@ public final class HudRuntimeData {
     @Nullable private LauncherMediaController.Snapshot media;
     private final HudVolumeVisibility volumeVisibility = new HudVolumeVisibility();
     private final Runnable volumeExpiry = this::notifyChanged;
+    private final HudDriveModeNotification driveModeNotification = new HudDriveModeNotification();
+    private final Runnable driveModeExpiry = () -> { if (this.started) notifyChanged(); };
+    @Nullable private CarIntegration.ControlStateListener driveModeListener;
+    private long driveModeGeneration;
     private boolean started;
     /** All three fields originate in one paired Trip 2 CarSignal sample and expire together. */
     private final Runnable currentTripExpiry = () -> {
@@ -222,6 +229,7 @@ public final class HudRuntimeData {
         }
         if (navigationDataNeeded) refreshNavigation();
         reconfigureVehicleSubscription();
+        reconcileDriveModeSubscription();
         WidgetServiceStarter.startIfNeeded(context);
         if (!isolatedHudProcess) {
             attachIntegrationHost();
@@ -235,6 +243,7 @@ public final class HudRuntimeData {
     public void stop() {
         if (!started) return;
         started = false;
+        stopDriveModeSubscription();
         main.removeCallbacks(volumeExpiry);
         main.removeCallbacks(currentTripExpiry);
         volumeVisibility.reset();
@@ -283,9 +292,51 @@ public final class HudRuntimeData {
             reconcileMediaController();
             if (navigationDataNeeded) refreshNavigation();
             reconfigureVehicleSubscription();
+            reconcileDriveModeSubscription();
             scheduleClockTick();
         }
         notifyChanged();
+    }
+
+    /** Same confirmed state channel as the built-in drive-mode selector; never writes a mode. */
+    private void reconcileDriveModeSubscription() {
+        if (!started || !config.showDriveModeNotification) {
+            stopDriveModeSubscription();
+            return;
+        }
+        if (driveModeListener != null) return;
+        final long generation = ++driveModeGeneration;
+        driveModeNotification.reset();
+        driveModeListener = state -> runOnMain(() -> {
+            if (!started || !config.showDriveModeNotification
+                    || generation != driveModeGeneration) return;
+            long now = SystemClock.elapsedRealtime();
+            if (!driveModeNotification.accept(state, now)) return;
+            main.removeCallbacks(driveModeExpiry);
+            if (driveModeNotification.visibleCode(now) >= 0) {
+                main.postDelayed(driveModeExpiry, driveModeNotification.remainingMillis(now));
+                DiagnosticJournal.infoAsync("hud-drive-mode", "confirmed mode="
+                        + driveModeNotification.visibleCode(now) + ", display_ms=3000");
+            }
+            notifyChanged();
+        });
+        carIntegration.subscribeControlStates(
+                Collections.singleton(HudDriveModeNotification.CONTROL_ID), driveModeListener);
+    }
+
+    private void stopDriveModeSubscription() {
+        ++driveModeGeneration;
+        if (driveModeListener != null) carIntegration.unsubscribeControlStates(driveModeListener);
+        driveModeListener = null;
+        main.removeCallbacks(driveModeExpiry);
+        driveModeNotification.reset();
+    }
+
+    @NonNull public String driveModeNotificationText() {
+        if (!started || !config.showDriveModeNotification) return "";
+        DriveModeDescriptor mode = DriveModeCatalog.byCode(
+                driveModeNotification.visibleCode(SystemClock.elapsedRealtime()));
+        return mode == null ? "" : context.getString(mode.labelRes);
     }
 
     /** Do not query the OEM MediaSession service when this HUD layout renders no media data. */

@@ -2156,6 +2156,8 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         Switch showGrid = switchView("Показывать сетку в редакторе", config.showGrid);
         Switch free = switchView("Свободное перемещение между линиями", config.freeMovement);
         Switch snow = switchView("Снежный режим", config.snowMode);
+        Switch driveModeNotice = switchView("Уведомление о режиме вождения",
+                config.showDriveModeNotification);
         Switch sync = switchView("Один цвет для всех элементов", config.syncElementColors);
         Switch autostart = switchView("Запускать HUD после перезагрузки",
                 preferences.hudPanelAutostart.get());
@@ -2165,6 +2167,9 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         stockHud.setOnClickListener(view -> editStockHudControls());
         form.addView(stockHud, marginTop(10));
         form.addView(snow);
+        form.addView(driveModeNotice);
+        form.addView(text("Название нового режима на белой плашке сверху HUD на 3 секунды.",
+                12, 0xFFB8C0CC));
         form.addView(sync);
         form.addView(autostart);
         Button chooseFont = button("Выбрать файл шрифта");
@@ -2210,6 +2215,7 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
                     config.showGrid = showGrid.isChecked();
                     config.freeMovement = free.isChecked();
                     config.snowMode = snow.isChecked();
+                    config.showDriveModeNotification = driveModeNotice.isChecked();
                     config.syncElementColors = sync.isChecked();
                     if (fuelChanged) config.fuelSettings = fuelDraft;
                     preferences.hudPanelAutostart.set(autostart.isChecked());

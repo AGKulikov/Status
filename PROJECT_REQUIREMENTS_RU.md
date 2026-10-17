@@ -1,5 +1,92 @@
 # Единый реестр требований Natro
 
+## 17.10.2026 15:39–15:40 — вид уведомления MConfig о режиме вождения на HUD
+
+Пользователь попросил уведомление как в MConfig и уточнил: событие брать как
+у встроенного переключателя Natro, главное внешний вид. SOURCE3.2.5: белая
+скруглённая плашка сверху по центру HUD, чёрное жирное название, без иконки,
+показ3секунды. Параметры подтверждены layout/drawable/DEX предоставленного
+MConfig48; собственная отрисовка, ресурсы APK не распространяются.
+Прежний confirmed `vehicle.drive_mode`/DriveModeCatalog, новых vehicle IDs и
+команд нет. Первый sample молчит, дубли не продлевают показ, следующая смена
+заменяет текст и перезапускает срок. Stop/disable/unavailable убирают уведомление.
+Настройка HUD `showDriveModeNotification` default=true, additive schema6 JSON;
+явный opt-out сохраняется в backup. HUD должен быть включён.
+Добавлены unit/runtime/native-render проверки; CI/APK/FIELD ещё не приняты
+на момент этой записи. [Разбор, реализация и критерии](docs/geely-kx11/research-2026-10-17-white-bar/HUD_DRIVE_MODE_RU.md).
+
+## 17.10.2026 15:21–15:25 — полный QNX архив и другие каналы связи
+
+Пользователь: «скачаем всё что есть в этих каталогах (не андроид)» для будущих
+разработок; затем расширил запрос на другие каналы. Требование заменяет прежний
+запрет автоматического чтения найденных файлов только внутри выбранных QNX
+roots, перечисленных в FULL_VEHICLE_ARCHIVE_RU.md. Прежние общие inventory и
+целевой дамп остаются доступными. Android disk image/VM disks не включаются.
+
+SOURCE3.2.5: отдельные кнопки на HU/LAN, streaming полного содержимого обычных
+файлов QNX, дисковый manifest с SHA/size/ошибками, double read/stat, partial ZIP,
+отмена, две временные копии. Без общего таймера/квот QNX file count/depth/size.
+Другие каналы: read-only интерфейсы/VLAN/routes/neighbours/sockets/services,
+списки tty/SPI/I2C/rpmsg/remoteproc и текущие журналы. `.1` AP/VP peer не объявлять
+QNX `.2`; наличие канала не является доступом к файлам/исполнительной командой.
+Содержимое устройств, /proc/PID, команды блокам, новые logger/службы не входят.
+
+Большой архив экспортируется на телефон native HTTP download с короткой
+cookie вместо Blob256MiB, long ranges и контролем отзыва сопряжения. Постоянный
+ключ телефона не попадает в URL; server update и ADB trust не переопределяются.
+Новые settings/defaults не вводятся, migration335…357→358 проходит review.
+
+TEST: синтетический production Java wire/ZIP20MiB подheap64MiB, manifest SHA,
+обрыв/partial, changed/empty/special/alias/path cases и download grant/ranges PASS.
+Android CI/APK/FIELD ещё не приняты в этой записи. Полноту архива автомобиля,
+доступ к другим ECU, исправление крыльев/полосы или Safari download не объявлять
+подтверждёнными до соответствующего gate.
+[Контракт и ограничения](docs/geely-kx11/research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md).
+
+## 17.10.2026 — полоса повторилась; сравнение MConfig48 и новые QNX цели
+
+FIELD-002/CLUSTER-028/DIM-WHITE-317 остаются OPEN: пользователь снова поймал
+полосу на3.2.4 и передал system552935 + diagnostics235597. QNX33/33files и
+76/76manifest SHA PASS при присутствующей полосе; этот эпизод не связан
+с обязательным отказом qconn. В14:58:03 Global/SDK3→1, Natro записал allow.
+PID4586/token dimmenu не изменились относительно здорового post-reboot дампа;
+plus.monjaro сменился3515→11031. Инициатор сброса режима пока не наблюдён.
+
+По запросу пользователя сравнили приложенный MConfig+48 с сохранённым46.1:
+ключевой путь whiteBar/Global mode3/deny, иначеallow,1500мс/3прохода/100мс
+сохранился. Отдельный MConfigInitService в обеих версиях записывает NaviMode1
+независимо от whiteBar; его запускает в том числе Accessibility connect.
+Это кандидат источника сброса, не доказательство выполнения в14:58 и не
+подтверждение установки48 в машине. Чужие APK/DEX не публикуются.
+
+SOURCE: исправлена проверка владельца области приборки: непересекающиеся
+нижние HUD stacks больше не считаются потерей области InstrumentPanelActivity.
+Точные Activity/display, неизвестная геометрия, пересечение/неоднозначность,
+свежие tab/control-center и OEM приоритет остаются обязательны. Это уточнение
+прежнего all-display owner gate, не whitelist OEM и не снятие остальных gates.
+В текущем эпизоде tab/center после refresh неизвестны — восстановление всё
+ещё запрещено; физическое исправление полосы не заявляется. Пассивный lifecycle
+allowlist дополнен plus.monjaro, без управления MConfig/новых разрешений.
+
+Пользователь предложил скачать всё QNX. Уточнение: inventory3193paths уже
+получен, содержимое всех путей — нет. Нужны обычные evidence files, а не
+бесконтрольные reads устройств/процессов. SOURCE collector сохраняет прежние33
+цели и добавляет9 наблюдённых путей: DIM config, core/screen libraries, display
+tools, PSD boot resource/config и QNX /userdata/DLT/DIM_Slog.log. Раньше DLT
+искался со стороны Android; QNX DIM_Slog_Boot ZIP также обнаружены, но ещё
+не получены. Это42targets, НЕ готовая полная копия QNX. Full regular-file
+archive и отдельное скрытие OEM-крыльев остаются OPEN; команды/firmware writes
+не добавлены. Разбор содержимого новых файлов потребует нового расширенного сбора.
+
+TEST:8collector/parser/native-ICU replay tests и8 Java owner/lifecycle methods
+PASS; storage review/88owner inventory PASS. Новый Android CI/APK/FIELD ещё
+не выполнены. Старые requirements/acceptance gates не удалены.
+Battery20%:14:56:12 warning_presented/accepted/presentation_confirmed по BAS;
+это программный UI ack, не подтверждение пользователя, что он видел предупреждение.
+
+Отчёты:docs/geely-kx11/research-2026-10-17-white-bar/WHITE_BAR_552935_RU.md
+и MCONFIG_48_COMPARISON_RU.md в той же папке.
+
 ## 17.10.2026 — FIELD3.2.4 после перезагрузки, mappings получены; крылья OPEN
 
 Пользователь уточнил в14:51–14:52МСК: перезагрузка была ДО успешной tcpdump

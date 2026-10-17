@@ -55,6 +55,7 @@ public final class HudCanvasView extends View {
             Paint.ANTI_ALIAS_FLAG | Paint.SUBPIXEL_TEXT_FLAG);
     @NonNull private final Paint.FontMetrics textFontMetrics = new Paint.FontMetrics();
     @NonNull private final Path path = new Path();
+    private final HudDriveModeBanner driveModeBanner = new HudDriveModeBanner();
     private final dezz.status.widget.navigation.MapEdgeFade editorMapEdgeFade =
             new dezz.status.widget.navigation.MapEdgeFade();
     @NonNull private HudPanelConfig config;
@@ -336,6 +337,11 @@ public final class HudCanvasView extends View {
                     item.options.optBoolean("arrowAnimation", false))) {
                 animated = true;
             }
+        }
+        if (!editor && config.showDriveModeNotification) {
+            android.util.DisplayMetrics metrics = getResources().getDisplayMetrics();
+            driveModeBanner.draw(canvas, geometry.safeClip, data.driveModeNotificationText(),
+                    metrics.density, metrics.scaledDensity);
         }
         if (layer >= 0) canvas.restoreToCount(layer);
         if (editor && config.showGrid) drawGrid(canvas, geometry);

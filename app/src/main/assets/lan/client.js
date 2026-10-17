@@ -40,7 +40,12 @@ async function exportLogs(format){
    if(!result.id){$('logsState').textContent='Нет экспорта в этом сеансе сервера.';return;}
    if(!result.done){$('logsState').textContent=result.progress+' · Можно вернуться к проверке экспорта позже.';await new Promise(resolve=>setTimeout(resolve,1000));continue;}
    if(result.error)throw Error(result.error);
-   if(result.size>256*1024*1024)throw Error('Архив больше 256 МиБ; скачивание через память браузера недоступно.');
+   if(result.size>256*1024*1024){
+    const ticket=await api('/api/logs/download-ticket',{id:result.id});
+    const link=document.createElement('a');link.href=ticket.url;link.download=result.name;link.textContent='Скачать '+result.name;
+    $('logsState').replaceChildren(document.createTextNode((result.progress||'')+' · Архив готов. '),link);
+    link.click();return;
+   }
    $('logsState').textContent='Скачивание '+result.name+'…';
    const response=await fetch('/api/logs/download',{headers:{Authorization:'Bearer '+token,'X-Natro-Export':result.id},cache:'no-store'});
    if(!response.ok)throw Error('Экспорт недоступен. Проверьте результат ещё раз.');
@@ -53,6 +58,7 @@ async function exportLogs(format){
 }
 action('logsTxt',()=>exportLogs('txt'));action('logsZip',()=>exportLogs('zip'));action('logsResume',()=>exportLogs());
 action('systemDump',async()=>{if(confirm('Снять Android/QNX дамп без перезагрузки? Только чтение; сбор может занять длительное время. Выполняйте на стоянке.'))await exportLogs('dump');});
+action('vehicleDump',async()=>{if(confirm('Собрать все обычные файлы выбранных каталогов QNX и сведения о каналах связи? Android целиком не копируется. Понадобятся время и свободное место. Выполняйте на стоянке.'))await exportLogs('vehicle');});
 action('cancelDump',async()=>tell((await api('/api/logs/cancel',{})).message));
 async function updateState(action){
  const value=await api('/api/update',action?{action}:undefined);

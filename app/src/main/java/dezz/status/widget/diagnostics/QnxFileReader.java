@@ -43,10 +43,25 @@ public final class QnxFileReader {
         "/lib64/libopenwfd.so", "/lib64/libdisplay_shim_util.so",
         "/lib64/libuhab-qvmhost.so", "/lib64/libbridgechip_client.so",
         "/lib64/libdalconfig-sa8155_adp_star_v1.0.0.so",
-        "/usr/bin/cluster_controller", "/bin/sc_qnx_vip_proxy"
+        "/usr/bin/cluster_controller", "/bin/sc_qnx_vip_proxy",
+        // Observed in the complete 17 October QNX namespace inventory. These are
+        // GET-only evidence files; executable names do not authorize execution.
+        "/persist/dim_config", "/persist/system/config/cartype.cfg",
+        "/lib64/libopenwfd_core.so", "/lib64/libscreen.so.1",
+        "/bin/uart-display-config", "/usr/bin/swdl_display",
+        "/proc/boot/static_UI_PSD.png", "/proc/boot/img_splash.conf",
+        "/userdata/DLT/DIM_Slog.log"
     };
     public static final String[] SNAPSHOTS = {"processes.tsv", "graphics-mappings.txt", "proc-read-trace.tsv", "slog2-inventory.tsv",
             "filesystem-inventory.tsv", "filesystem-paths.txt"};
+    /** Explicit user-selected QNX content scope; never VM disks, devices or process memory. */
+    public static final String[] FULL_ROOTS = {"/bin", "/sbin", "/usr", "/lib", "/lib64", "/etc",
+            "/scripts", "/persist", "/proc/boot", "/userdata/DLT", "/var/log", "/ramdisk/linux.config"};
+    public static boolean fullPath(String value) {
+        if(!directoryPath(value)||value.endsWith("/")||value.contains("//"))return false;
+        for(String root:FULL_ROOTS)if(value.equals(root)||value.startsWith(root+"/"))return true;
+        return false;
+    }
     // First diagnostic attempt / proven maximum wire request, NOT a full-file budget.
     public static final int MAPPING_LIMIT = 256 * 1024;
     private final Wire wire;
@@ -55,6 +70,8 @@ public final class QnxFileReader {
     private String stage="greeting", path="-", lastReply="-";
     private long offset, rx, tx;
     private Artifact trace;
+    private Receiver ioProgress;
+    private long ioProgressAt;
     /** Disk-backed output: neither the catalog nor full mappings accumulate in Java strings. */
     private static final class Artifact implements Closeable {
         final Receiver receiver; final String name; final File file;
@@ -187,6 +204,10 @@ public final class QnxFileReader {
             long got=number(f[1],16);
             if(got<1 || got>count) throw new IOException("qnx_short_read");
             byte[] bytes=exact((int)got);hash.update(bytes);if(out!=null)out.write(bytes);offset+=got;
+            if(ioProgress!=null&&System.nanoTime()-ioProgressAt>=1_000_000_000L) {
+                ioProgressAt=System.nanoTime();ioProgress.progress("QNX "+path+" · "+offset+"/"+size+" байт"
+                        +(out==null?" · проверка":""));
+            }
         }
         return hash.digest();
     }
@@ -431,6 +452,132 @@ public final class QnxFileReader {
     }
     private static void enqueue(RandomAccessFile queue,String path) throws IOException {
         byte[] bytes=path.getBytes(StandardCharsets.UTF_8);queue.seek(queue.length());queue.writeInt(bytes.length);queue.write(bytes);
+    }
+    /** Full ordinary files, bounded RAM and no content/depth/count quota. New flags are QNX,
+     * not Linux: RDONLY|NONBLOCK|NOCTTY|NOFOLLOW|LARGEFILE = 0x9880 (libc/nto).
+     * Symlinks are reported, never followed. Qconn has no validated readlink/lstat operation.
+     * Each discovered directory is opened without following its final component. This is a
+     * live, non-atomic namespace: parent substitution between requests cannot be excluded. */
+    public void collectTree(Receiver receiver) throws Exception {
+        ioProgress=receiver;
+        File queueFile=receiver.temporaryFile();
+        String outcome="collected_snapshot";
+        try(Artifact inventory=new Artifact(receiver,"metadata/full-tree.tsv");
+            RandomAccessFile queue=new RandomAccessFile(queueFile,"rw")) {
+            inventory.append("event\tpath_tsv_escaped\ttype\tsize\tdevice\tinode\tmode_hex\tstatus\tdetail_tsv_escaped\n");
+            inventory.append("# Non-atomic ordinary-file copy. Symlinks are not followed; special files have metadata only.\n");
+            java.util.Map<String,String> visited=new java.util.HashMap<>();
+            long cursor=0,examined=0;
+            for(String root:FULL_ROOTS)enqueue(queue,root);
+            try {
+                handshake();
+                while(cursor<queue.length()) {
+                    queue.seek(cursor);byte[] raw=new byte[queue.readInt()];queue.readFully(raw);
+                    cursor=queue.getFilePointer();path=utf8(raw);offset=0;examined++;
+                    receiver.progress("Полный сбор QNX: "+examined+" · "+path);
+                    if(!fullPath(path)) {
+                        outcome="partial_or_unavailable";
+                        inventoryRow(inventory,"probe",path,"unknown",null,"path_rejected","not opened");continue;
+                    }
+                    boolean parentsOk=true;
+                    if(Arrays.asList(FULL_ROOTS).contains(path)) {
+                        for(int slash=path.indexOf('/',1);slash>0;slash=path.indexOf('/',slash+1)) {
+                            String ancestor=path.substring(0,slash);
+                            send("o:\""+ancestor+"\":9880\r\n");String parentReply=reply();
+                            if(parentReply.startsWith("e:")) {
+                                parentsOk=false;inventoryRow(inventory,"probe",path,"unknown",null,"parent_unavailable_or_link",ancestor+"; "+parentReply);break;
+                            }
+                            long parentFd=descriptor(parentReply);long[] parentStat=stat(parentFd);
+                            send("c:"+parentFd+"\r\n");fields();
+                            if((parentStat[9]&0xf000)!=0x4000) {
+                                parentsOk=false;inventoryRow(inventory,"probe",path,"unknown",null,"parent_not_directory",ancestor);break;
+                            }
+                        }
+                    }
+                    if(!parentsOk){outcome="partial_or_unavailable";continue;}
+                    stage="tree_open_nofollow";send("o:\""+path+"\":9880\r\n");String opened=reply();
+                    if(opened.startsWith("e:")) {
+                        outcome="partial_or_unavailable";
+                        inventoryRow(inventory,"probe",path,"unknown",null,"open_failed_or_link",opened);continue;
+                    }
+                    long fd=descriptor(opened);stage="tree_stat";long[] before;
+                    try{before=stat(fd);}catch(IOException unavailable) {
+                        if(!"qnx_remote_error".equals(unavailable.getMessage()))throw unavailable;
+                        outcome="partial_or_unavailable";inventoryRow(inventory,"probe",path,"unknown",null,"stat_unavailable",lastReply);
+                        send("c:"+fd+"\r\n");fields();continue;
+                    }
+                    int type=(int)(before[9]&0xf000);
+                    if(type==0x4000) {
+                        // An identity is required to avoid alias cycles and recursive IPC trees.
+                        String previous=reliableIdentity(before)?visited.putIfAbsent(before[2]+":"+before[0],path):null;
+                        if(!reliableIdentity(before)) {
+                            outcome="partial_or_unavailable";
+                            inventoryRow(inventory,"probe",path,"directory",before,"identity_unavailable","subtree not read");
+                        } else if(previous!=null) {
+                            inventoryRow(inventory,"probe",path,"directory",before,"alias_already_enumerated",previous);
+                        } else {
+                            // Directory pages use qconn's directory handle, not an open(2)
+                            // file descriptor. Verify the reopened directory is the same object.
+                            send("c:"+fd+"\r\n");fields();
+                            send("o:\""+path+"\":9880:4000\r\n");fd=descriptor(reply());
+                            long[] directoryStat=stat(fd);
+                            if(directoryStat[0]!=before[0]||directoryStat[2]!=before[2]
+                                    ||(directoryStat[9]&0xf000)!=0x4000)throw new IOException("qnx_directory_changed");
+                            final String parent=path;
+                            final java.util.Set<String> names=new java.util.HashSet<>();
+                            final boolean[] invalid={false};stage="tree_directory_read";
+                            try { directory(fd,bytes->{
+                                String name;
+                                try { name=utf8(bytes); }
+                                catch(java.nio.charset.CharacterCodingException bad) {
+                                    invalid[0]=true;inventoryRow(inventory,"name",parent,"unknown",null,"invalid_utf8",hex(bytes));return;
+                                }
+                                if(name.equals(".")||name.equals("..")||!names.add(name))return;
+                                if(name.indexOf('/')>=0||!fullPath(parent+"/"+name)) {
+                                    invalid[0]=true;inventoryRow(inventory,"name",parent,"unknown",null,"invalid_name",hex(bytes));return;
+                                }
+                                enqueue(queue,parent+"/"+name);
+                            }); }catch(IOException unavailable) {
+                                if(!"qnx_remote_error".equals(unavailable.getMessage())&&!"qnx_directory_repeated_page".equals(unavailable.getMessage()))throw unavailable;
+                                invalid[0]=true;inventoryRow(inventory,"enumeration",path,"directory",before,"incomplete",lastReply);
+                            }
+                            if(invalid[0])outcome="partial_or_unavailable";
+                            inventoryRow(inventory,"probe",path,"directory",before,invalid[0]?"partial_enumeration":"enumerated",invalid[0]?"see errors":"EOF");
+                        }
+                    } else if(type==0x8000) {
+                        String result="partial_read_failed";
+                        try(Artifact data=new Artifact(receiver,"tree"+path)) {
+                            try {
+                                stage="tree_read_first";byte[] first=readFile(fd,before[1],data.out);
+                                stage="tree_read_second";byte[] second=readFile(fd,before[1],null);
+                                stage="tree_stat_after";long[] after=stat(fd);
+                                boolean same=Arrays.equals(first,second)&&before[0]==after[0]&&before[1]==after[1]
+                                        &&before[2]==after[2]&&before[6]==after[6]&&before[8]==after[8]&&before[9]==after[9];
+                                result=same?"collected_double_read":"changed_during_read";
+                                inventoryRow(inventory,"file",path,"regular",before,result,"first_sha256="+hex(first)+" second_sha256="+hex(second));
+                            } catch(IOException unavailable) {
+                                if(!"qnx_remote_error".equals(unavailable.getMessage())&&!"qnx_short_read".equals(unavailable.getMessage()))throw unavailable;
+                                inventoryRow(inventory,"file",path,"regular",before,result,lastReply);
+                            } finally { data.finish(result); }
+                        }
+                        if(!result.equals("collected_double_read"))outcome="partial_or_unavailable";
+                    } else {
+                        inventoryRow(inventory,"probe",path,"special",before,"excluded_special","no content read");
+                    }
+                    stage="tree_close";send("c:"+fd+"\r\n");fields();
+                }
+                inventory.append("# traversal_finished=true examined=").append(examined).append('\n');
+            } catch(Exception error) {
+                outcome="partial_or_unavailable";
+                inventoryRow(inventory,"failure",path,"unknown",null,"read_or_protocol_failed",report(error));
+                while(cursor<queue.length()) {
+                    queue.seek(cursor);byte[] raw=new byte[queue.readInt()];queue.readFully(raw);cursor=queue.getFilePointer();
+                    inventoryRow(inventory,"probe",utf8(raw),"unknown",null,"not_attempted_after_failure","previously discovered");
+                }
+                inventory.append("# traversal_finished=false examined=").append(examined).append('\n');
+                throw new Failure(path,report(error),error);
+            } finally { inventory.finish(outcome); }
+        } finally { ioProgress=null;queueFile.delete(); }
     }
     /** No cmdline, environment, address-space reads, devctl, launcher or process control. */
     public void collectProcesses(Receiver receiver) throws Exception {

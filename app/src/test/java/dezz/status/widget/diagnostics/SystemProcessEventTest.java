@@ -18,8 +18,16 @@ public class SystemProcessEventTest {
         assertTrue(SystemProcessEvent.parse("ANR in com.ecarx.hud (secret detail)").contains("event=anr"));
     }
     @Test public void unrelatedProcessesAndPackagePrefixCollisionsAreIgnored() {
+        assertNull(SystemProcessEvent.parse("Start proc 123:plus.monjaro.fake/u0a1"));
         assertNull(SystemProcessEvent.parse("Start proc 123:com.ecarx.hud.fake/u0a1"));
         assertNull(SystemProcessEvent.parse("Process another.app (pid 123) has died"));
         assertNull(SystemProcessEvent.parse("START u0 Intent { cmp=com.ecarx.hud/.Main text=private }"));
+    }
+    @Test public void mconfigRestartsAreRecordedWithoutSettingsOrIntentData() {
+        assertEquals("event=process_start, package=plus.monjaro, pid=11031",
+                SystemProcessEvent.parse("Start proc 11031:plus.monjaro/u0a73 for service private=value"));
+        assertEquals("event=process_died, package=plus.monjaro, pid=3515",
+                SystemProcessEvent.parse("Process plus.monjaro (pid 3515) has died: private"));
+        assertNull(SystemProcessEvent.parse("Start proc 12:plus.monjaro2/u0a73"));
     }
 }

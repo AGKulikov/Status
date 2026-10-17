@@ -47,6 +47,8 @@ public final class HudPanelConfig {
     @NonNull public String backgroundMode = "TRANSPARENT";
     public boolean snowMode;
     public int globalBrightness = 100;
+    /** Additive schema-6 setting, carried by the existing HUD JSON/backup adapter. */
+    public boolean showDriveModeNotification = true;
     @NonNull public String globalTextColor = "#FFFFFFFF";
     @NonNull public String globalUnitColor = "#CCFFFFFF";
     public boolean syncElementColors;
@@ -226,6 +228,7 @@ public final class HudPanelConfig {
         out.put("backgroundMode", backgroundMode);
         out.put("snowMode", snowMode);
         out.put("globalBrightness", globalBrightness);
+        out.put("showDriveModeNotification", showDriveModeNotification);
         out.put("globalTextColor", globalTextColor).put("globalUnitColor", globalUnitColor);
         out.put("syncElementColors", syncElementColors);
         out.put("customFontUri", customFontUri).put("globalFontWeight", globalFontWeight);
@@ -271,6 +274,7 @@ public final class HudPanelConfig {
             out.backgroundMode = source.optString("backgroundMode", "TRANSPARENT");
             out.snowMode = source.optBoolean("snowMode", false);
             out.globalBrightness = source.optInt("globalBrightness", 100);
+            out.showDriveModeNotification = source.optBoolean("showDriveModeNotification", true);
             out.globalTextColor = source.optString("globalTextColor", "#FFFFFFFF");
             out.globalUnitColor = source.optString("globalUnitColor", "#CCFFFFFF");
             out.syncElementColors = source.optBoolean("syncElementColors", false);

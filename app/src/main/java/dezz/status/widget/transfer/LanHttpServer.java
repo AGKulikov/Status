@@ -62,8 +62,15 @@ public final class LanHttpServer implements AutoCloseable {
         ScheduledFuture<?> deadline = null;
         try (Socket owned = socket) {
             if (closed) return;
-            deadline = deadlines.schedule(() -> { try { socket.close(); } catch (IOException ignored) {} }, 5, TimeUnit.MINUTES);
-            InputStream input = new BufferedInputStream(owned.getInputStream()); OutputStream output = owned.getOutputStream();
+            java.util.concurrent.atomic.AtomicLong activity=new java.util.concurrent.atomic.AtomicLong(System.nanoTime());
+            deadline = deadlines.scheduleWithFixedDelay(() -> {
+                if(System.nanoTime()-activity.get()>TimeUnit.MINUTES.toNanos(5))try { socket.close(); } catch (IOException ignored) {}
+            },30,30,TimeUnit.SECONDS);
+            InputStream input = new BufferedInputStream(owned.getInputStream());
+            OutputStream output = new FilterOutputStream(owned.getOutputStream()) {
+                @Override public void write(byte[] b,int off,int len)throws IOException{out.write(b,off,len);activity.set(System.nanoTime());}
+                @Override public void write(int b)throws IOException{out.write(b);activity.set(System.nanoTime());}
+            };
             String line = line(input, 4096); String[] start = line.split(" ", -1);
             if (start.length != 3 || !start[2].equals("HTTP/1.1") || !start[1].startsWith("/") || start[1].startsWith("//"))
                 throw new IOException("Некорректный HTTP запрос");
@@ -101,10 +108,13 @@ public final class LanHttpServer implements AutoCloseable {
         byte[] bytes = body.getBytes(StandardCharsets.UTF_8); header(output, status, type + "; charset=utf-8", bytes.length, null); output.write(bytes); output.flush();
     }
     public static void header(OutputStream output, int status, String type, long length, String disposition) throws IOException {
+        header(output,status,type,length,disposition,"");
+    }
+    static void header(OutputStream output,int status,String type,long length,String disposition,String extra)throws IOException {
         String headers = "HTTP/1.1 " + status + " " + (status == 200 ? "OK" : "Error") + "\r\nContent-Type: " + type
                 + "\r\nContent-Length: " + length + "\r\nConnection: close\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff"
                 + "\r\nX-Frame-Options: DENY\r\nReferrer-Policy: no-referrer\r\nContent-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'"
-                + (disposition == null ? "" : "\r\nContent-Disposition: " + disposition) + "\r\n\r\n";
+                + (disposition == null ? "" : "\r\nContent-Disposition: " + disposition) + extra + "\r\n\r\n";
         output.write(headers.getBytes(StandardCharsets.US_ASCII));
     }
     @Override public void close() {

@@ -22,6 +22,7 @@ public final class LanTransferService extends Service {
     private final Set<String> seenCommands = new HashSet<>();
     private final ExecutorService exportWorker = Executors.newSingleThreadExecutor();
     private volatile Export export;
+    private volatile LanDownloadGrant downloadGrant;
     private volatile AdbConsoleSession dumpSession;
     private static final class Export {
         final String token, id, format;
@@ -134,6 +135,7 @@ public final class LanTransferService extends Service {
                 if(token!=null&&remember)startService(new Intent(this,LanTransferService.class));
                 json(output, token == null ? 403 : 200, token == null ? new JSONObject().put("error", "Сопряжение не сохранено: проверьте код, лимит попыток/4 телефонов и хранилище") : new JSONObject().put("token", token).put("remembered",remember)); return;
             }
+            if(request.path.startsWith("/api/logs/file/")) { nativeDownload(request,output,now);return; }
             if (!pairing.authorized(request.token(), now)) { json(output, 401, new JSONObject().put("error", "Нужно сопряжение с магнитолой")); return; }
             switch (request.path) {
                 case "/api/update":
@@ -161,9 +163,9 @@ public final class LanTransferService extends Service {
                     if(!post(request,output))return;
                     JSONObject logRequest=new JSONObject(request.text(1024));
                     String exportId=logRequest.getString("id"), format=logRequest.getString("format");
-                    if(!exportId.matches("[0-9a-f-]{36}")||!(format.equals("txt")||format.equals("zip")||format.equals("dump")))
+                    if(!exportId.matches("[0-9a-f-]{36}")||!(format.equals("txt")||format.equals("zip")||format.equals("dump")||format.equals("vehicle")))
                         throw new IOException("Некорректный формат экспорта");
-                    if(format.equals("dump")&&!remoteCommands)throw new IOException("Разрешите удалённые команды на магнитоле");
+                    if((format.equals("dump")||format.equals("vehicle"))&&!remoteCommands)throw new IOException("Разрешите удалённые команды на магнитоле");
                     synchronized(exportWorker) {
                         Export current=export;
                         if(current!=null&&current.id.equals(exportId)) {
@@ -176,7 +178,7 @@ public final class LanTransferService extends Service {
                         exportWorker.execute(()->{
                             try {
                                 if(next.cancelled||destroyed||!pairing.authorized(next.token,SystemClock.elapsedRealtime()))throw new IOException("Экспорт отменён или доступ отозван");
-                                File result=next.format.equals("dump")? collectDump(next):next.format.equals("txt")
+                                File result=(next.format.equals("dump")||next.format.equals("vehicle"))? collectDump(next):next.format.equals("txt")
                                         ? dezz.status.widget.diagnostics.DiagnosticJournal.copyForExport(this)
                                         : dezz.status.widget.diagnostics.DiagnosticBundle.create(this);
                                 if(result==null||!result.isFile())throw new IOException("Не удалось сохранить логи");
@@ -189,11 +191,22 @@ public final class LanTransferService extends Service {
                 case "/api/logs/cancel":
                     if(!post(request,output))return;
                     Export cancel=export;
-                    if(cancel!=null&&cancel.token.equals(request.token())&&cancel.format.equals("dump")&&!cancel.done){
+                    if(cancel!=null&&cancel.token.equals(request.token())&&(cancel.format.equals("dump")||cancel.format.equals("vehicle"))&&!cancel.done){
                         cancel.cancelled=true;
                         if(dumpSession!=null)dumpSession.cancel("Сбор отменён с телефона");
                     }
                     json(output,200,new JSONObject().put("message","Отмена запрошена; проверьте результат, частичный архив может сохраниться"));return;
+                case "/api/logs/download-ticket":
+                    if(!post(request,output))return;
+                    Export ticketExport=export;
+                    String ticketId=new JSONObject(request.text(1024)).getString("id");
+                    if(ticketExport==null||!ticketExport.id.equals(ticketId)||!ticketExport.token.equals(request.token())
+                            ||!ticketExport.done||ticketExport.file==null)throw new IOException("Готовый экспорт не найден");
+                    LanDownloadGrant grant=new LanDownloadGrant(request.token(),ticketId,now);downloadGrant=grant;
+                    byte[] ticketBody=new JSONObject().put("url","/api/logs/file/"+ticketId).toString().getBytes(StandardCharsets.UTF_8);
+                    LanHttpServer.header(output,200,"application/json; charset=utf-8",ticketBody.length,null,
+                            "\r\nSet-Cookie: natroDownload="+grant.nonce+"; Path=/api/logs/file/; Max-Age=600; HttpOnly; SameSite=Strict");
+                    output.write(ticketBody);return;
                 case "/api/logs/download":
                     if(!get(request,output))return;
                     Export ready=export;
@@ -317,6 +330,31 @@ public final class LanTransferService extends Service {
             json(output, 200, new JSONObject().put("id", id));
         }
     }
+    private void nativeDownload(LanHttpServer.Request request,OutputStream output,long now)throws Exception {
+        if(!get(request,output))return;
+        LanDownloadGrant grant=downloadGrant;Export ready=export;
+        String id=request.path.substring("/api/logs/file/".length());
+        if(grant==null||ready==null||!grant.accepts(request.headers.get("cookie"),id,now)
+                ||!ready.id.equals(grant.id)||!ready.token.equals(grant.owner)||!ready.done||ready.file==null
+                ||!pairing.authorized(grant.owner,now)) {
+            json(output,403,new JSONObject().put("error","Ссылка истекла. Снова нажмите «Проверить экспорт / скачать»."));return;
+        }
+        try(RandomAccessFile input=new RandomAccessFile(ready.file,"r")) {
+            long total=input.length();long[] range;
+            try{range=LanDownloadGrant.range(request.headers.get("range"),total);}
+            catch(IOException bad){LanHttpServer.header(output,416,"text/plain",0,null,"\r\nContent-Range: bytes */"+total);return;}
+            input.seek(range[0]);boolean partial=request.headers.containsKey("range");
+            LanHttpServer.header(output,partial?206:200,ready.format.equals("txt")?"text/plain; charset=utf-8":"application/zip",
+                    range[1],"attachment; filename=\""+ready.file.getName()+"\"","\r\nAccept-Ranges: bytes"
+                            +(partial?"\r\nContent-Range: bytes "+range[0]+"-"+(range[0]+range[1]-1)+"/"+total:""));
+            byte[] block=new byte[65536];long remaining=range[1];
+            try {while(remaining>0) {
+                if(destroyed||!pairing.authorized(grant.owner,SystemClock.elapsedRealtime()))return;
+                int n=input.read(block,0,(int)Math.min(block.length,remaining));if(n<0)return;
+                output.write(block,0,n);remaining-=n;
+            }}catch(IOException disconnected){return;}
+        }
+    }
     private File collectDump(Export job)throws Exception {
         if(job.cancelled||!remoteCommands||destroyed)throw new IOException("Сбор отменён или доступ отозван");
         if(!dezz.status.widget.diagnostics.SystemFileDump.RUNNING.compareAndSet(false,true))throw new IOException("Системный дамп уже собирается");
@@ -327,14 +365,19 @@ public final class LanTransferService extends Service {
             boolean accepted=session.submitSystemDump(connection->{
                 if(job.cancelled||!remoteCommands||destroyed||!pairing.authorized(job.token,SystemClock.elapsedRealtime()))throw new IOException("Сбор отменён или доступ отозван");
                 connection.connect();
-                report.set(dezz.status.widget.diagnostics.SystemFileDump.collect(new File(getCacheDir(),"exports"),
-                        new dezz.status.widget.diagnostics.SystemFileDump.Shell(){
+                dezz.status.widget.diagnostics.SystemFileDump.Shell shell=new dezz.status.widget.diagnostics.SystemFileDump.Shell(){
                             public AdbShellResult.Result command(String value)throws Exception{return connection.command(value);}
                             public AdbShellResult.Result commandBounded(String value,int limit)throws Exception{return connection.commandBounded(value,limit);}
-                        },text->job.progress=text,dezz.status.widget.BuildConfig.VERSION_NAME,connection::collectQnx,"unspecified"));
+                        };
+                report.set(job.format.equals("vehicle")
+                        ?dezz.status.widget.diagnostics.VehicleEvidenceArchive.collect(new File(getCacheDir(),"exports"),shell,text->job.progress=text,
+                                dezz.status.widget.BuildConfig.VERSION_NAME,connection::collectQnxFull)
+                        :dezz.status.widget.diagnostics.SystemFileDump.collect(new File(getCacheDir(),"exports"),shell,text->job.progress=text,
+                                dezz.status.widget.BuildConfig.VERSION_NAME,connection::collectQnx,"unspecified"));
             },error->{
                 dezz.status.widget.diagnostics.SystemFileDump.Report result=report.get();
-                job.progress=result==null?"Дамп не создан":(error==null&&result.complete?"Полный сбор":"Частичный дамп")+" · "+result.collected+"/"+result.requested+" файлов; причины в manifest.tsv";
+                job.progress=result==null?"Дамп не создан":(error==null&&result.complete?"Сбор завершён":"Частичный дамп")+" · "+result.collected
+                        +(job.format.equals("vehicle")?"":"/"+result.requested)+" файлов; подробности в manifest.tsv и каталоге QNX";
                 session.close();dezz.status.widget.diagnostics.SystemFileDump.RUNNING.set(false);done.countDown();
             });
             if(!accepted){dezz.status.widget.diagnostics.SystemFileDump.RUNNING.set(false);throw new IOException("Сбор не принят");}

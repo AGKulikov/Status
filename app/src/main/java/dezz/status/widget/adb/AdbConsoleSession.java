@@ -31,6 +31,11 @@ public final class AdbConsoleSession implements AutoCloseable {
         if(transport==null)throw new IOException("ADB disconnected");
         transport.collectQnx(receiver);checkCancelled();
     }
+    public void collectQnxFull(dezz.status.widget.diagnostics.QnxFileReader.Receiver receiver) throws Exception {
+        checkCancelled();
+        if(transport==null)throw new IOException("ADB disconnected");
+        transport.collectQnxFull(receiver);checkCancelled();
+    }
     public boolean connected() { return transport != null; }
     public boolean busy() { return busy.get(); }
     public String stage() { return stage; }

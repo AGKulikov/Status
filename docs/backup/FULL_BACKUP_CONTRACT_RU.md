@@ -1,5 +1,61 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review3.2.5 — уведомление режима вождения HUD
+
+Новая пользовательская настройка `showDriveModeNotification` находится внутри
+прежнего `hudPanelConfigJson`, schema6 не повышается (NAV_MAP marker сохраняется).
+Существующий prefs adapter переносит весь JSON; explicit false round-trip
+сохраняется. Отсутствующее поле получает true по запросу новой возможности,
+HUD включается только прежним hudPanelEnabled. Остальные настройки/раскладка
+не пересоздаются. Смена режима/таймер/подписка только RAM, после восстановления
+первый sample молчит. Новых файлов/ключей/SDK identities нет.
+Пересмотрены HudPanelSettingsActivity (прежние prefs/SAF font), HudCanvasView
+(прежнее чтение внешнего шрифта); новый Canvas banner не читает ресурсов APK.
+Проверки JSON/реального runtime и native-render добавлены; runtime полного
+backup/restore на машине этим не сертифицирован.
+
+### Review 3.2.5 / 208021358 — полный архив QNX и каналы связи
+
+Требования17.10 15:21–15:25 заменяют прежний запрет массового download только
+для явно выбранных QNX roots. VehicleEvidenceArchive — новый владелец временных
+cache/exports Natro-vehicle-*.zip, manifest/queue/per-file spool; хранит два
+последних архива, .part удаляется после завершения/ошибки. Это не managed backup
+и не источник firmware restore. DiagnosticsActivity выбирает последний из двух
+видов ZIP. Кнопка Download/Natro создаёт отдельную пользовательскую копию без
+размерного лимита, не перезаписывает файлы и не очищает их автоматически.
+
+QnxFileReader читает только обычные файлы выбранных roots; symlinks отклоняются
+NOFOLLOW, special objects получают metadata, динамический /proc/PID не выбран.
+Scope и точные ограничения live snapshot описаны в FULL_VEHICLE_ARCHIVE_RU.md.
+LanTransferService использует прежние pairing/remote_commands и общий mutex.
+Новый download grant — только RAM: случайная cookie256bit, HttpOnly/SameSite,
+10min на начало HTTP-запроса, привязка к owner+export, отзыв pairing проверяется
+во время передачи. В URL нет bearer/nonce. Диапазоны long, архив не грузится
+в RAM Safari целиком. Grant не переносится/не восстанавливается из backup.
+LanHttpServer ограничивает бездействие, а не длительность активной выгрузки.
+
+Новых preferences/defaults/постоянных идентичностей нет. Явно разрешены
+schemas335…357 →358 и same-schema358; старые effective defaults, explicit values
+и неизвестные keys сохраняются. 334/359 отвергаются. Пересмотрены только владельцы
+DiagnosticsActivity, QnxFileReader, VehicleEvidenceArchive, LanTransferService,
+NatroSharedFolder, BackupDefaultsMigration и AdbTransport (новый GET-only entry
+использует прежние transport/key storage, без новых идентичностей). Статический inventory не является
+доказательством полного runtime restore на KX11.
+
+### Review 17.10.2026 — дополнительные DIM evidence files
+
+QnxFileReader добавляет девять точных путей из полученного namespace inventory:
+конфигурацию DIM, display libraries/tools, статический PSD resource и текущий
+QNX DIM_Slog.log. Чтение остаётся потоковым в прежний cache/exports spool/ZIP;
+S_IFREG, два чтения, stat и локальные SHA сохранены. Меняющийся журнал получает
+changed_during_read, сохранённые байты не объявляются атомарным снимком.
+Новых managed roots, preferences, defaults, адаптеров или firmware restore нет.
+Полный каталог не превращён в автоматический download произвольных /dev, /proc
+или найденных файлов. InstrumentDisplayOwner использует только RAM-разбор;
+SystemProcessEvent добавляет plus.monjaro в прежний allowlist журнала lifecycle.
+Контракт cache/exports и архивная политика диагностики проверены; fingerprint
+QnxFileReader обновлён после review этого diff. Runtime backup/restore не принят.
+
 ### Review 3.2.4 / 208021357
 
 Явно разрешена миграция defaults335…356 →357 и same-schema357. Основные

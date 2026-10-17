@@ -2,7 +2,7 @@
   "schema_version": 1,
   "status": "SOURCE_IMPLEMENTED_LOCAL_RUNTIME_TESTED_KX11_GATES_PENDING",
   "baseline_commit": "c4d3ffc121a0a69ba21094abe2987f889926505c",
-  "scope": "Production storage owners reviewed for 3.0.5 logging in FULL_BACKUP_CONTRACT_RU.md. Diagnostic process/incident archives retain existing archive policy; temporary export is not a backup; defaults 335/336/337 to 338 reviewed. Static fingerprints do not certify runtime/device completeness.",
+  "scope": "3.2.5 full QNX tree/channel archives and native LAN downloads reviewed in FULL_BACKUP_CONTRACT_RU.md; cache exports excluded from managed backup; Download/Natro is user-owned. No new settings; defaults335..357 to358 reviewed. Static fingerprints do not certify runtime/device restore.",
   "shared_preferences": [
     {
       "name": "natro_lan_trust_v1",
@@ -211,11 +211,15 @@
   "source_owners": {
     "app/src/main/java/dezz/status/widget/transfer/LanTrustStore.java": {
       "sha256": "32c456bac76f95aa46273fb3d878c8460c18d7c3cb4e725917c9f6865482d2be",
-      "access_kinds": ["preferences"]
+      "access_kinds": [
+        "preferences"
+      ]
     },
     "app/src/main/java/dezz/status/widget/update/NatroUpdater.java": {
       "sha256": "e36953d73acd71fdb7de8ebd658afe1e281303bc0e04420169a4d98b39c0975d",
-      "access_kinds": ["files"]
+      "access_kinds": [
+        "files"
+      ]
     },
     "app/src/geely/java/dezz/status/widget/car/HudModeFallbackBootReceiver.java": {
       "sha256": "7186f67ea218ef097769546681e0aed317095727202d5e577e0f45bb4dce03d2",
@@ -255,7 +259,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java": {
-      "sha256": "26a207613c3971ee0f82738af97af96a77545019caff12183a6e531580aa8e7a",
+      "sha256": "78f7b5173d8fdfd730af961964be5441aaba8a87723f6876972fcd1f9db401fd",
       "access_kinds": [
         "external_resource"
       ]
@@ -354,7 +358,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "ad52ee4a82eae6589f404972685a20b6d447a29c9ec1efadd5bdb6bc77fca6c6",
+      "sha256": "c2d2e98d639669f43d132dc6373b72169b7d776673ae07845366d5c764e2b9d4",
       "access_kinds": [
         "files"
       ]
@@ -440,7 +444,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/DiagnosticsActivity.java": {
-      "sha256": "58b7776b8f9e0b80119cb5969e95a00b878113b9cdd542ea5db000f2e7cfca7e",
+      "sha256": "424049887bbb215a54e46e9b6612e1c7f93fbeaadee890bb8d484fa1ed002514",
       "access_kinds": [
         "files"
       ]
@@ -476,7 +480,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/hud/HudCanvasView.java": {
-      "sha256": "206aceb3bef188c159b14ba420b630117eccdbf317f1f88056f0c22110d5f44b",
+      "sha256": "013b81c29aa05d61f38b7dff4dc2a21c6a8cd7080c4024e3d92a41003ead330c",
       "access_kinds": [
         "external_resource"
       ]
@@ -690,7 +694,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/shell/AdbTransport.java": {
-      "sha256": "0b4be83fe3eae503019512a35b86b79705817c5cbfb6240bbb9dbe61b1d7e7fb",
+      "sha256": "e3d80eb979dfbe81c2f4c2753fdf9e6dd194b2147b47e52aeef20deeba9fdd53",
       "access_kinds": [
         "files"
       ]
@@ -714,13 +718,13 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/transfer/NatroSharedFolder.java": {
-      "sha256": "285dc449d11866e9da5972f8fe93951f2fd2c2fe0ee22459add2a711ebf9b97f",
+      "sha256": "d9b8bb4dff933ccaa04a259fd75549a991c2313280ca5c8b49f6e2b21c479173",
       "access_kinds": [
         "files"
       ]
     },
     "app/src/main/java/dezz/status/widget/transfer/LanTransferService.java": {
-      "sha256": "4e57ec9988445ca227d8933f048aa061d002b088e183bd8e14ef5b9ac02de408",
+      "sha256": "3529abb82a417632e8b79f3cf17407ac3f5925eaf1e1ed73573bdd48c00b5701",
       "access_kinds": [
         "files"
       ]
@@ -739,7 +743,13 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/QnxFileReader.java": {
-      "sha256": "ac6e8a60c1037abc8a84b60ed10b6cefe9295c0f867a79983211a1efc4366d92",
+      "sha256": "13bbf282c10d9f9cebfa7739978af54c1fd1072e1545555b0e172f770cf27d32",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/diagnostics/VehicleEvidenceArchive.java": {
+      "sha256": "ebff152f717ef466fcd7a1985e58cc5e35e4d62798905302385c07aa0c42fa48",
       "access_kinds": [
         "files"
       ]

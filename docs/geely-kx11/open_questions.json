@@ -188,9 +188,9 @@
       "priority": "P1",
       "function": "Владелец крыльев и штатной машинки",
       "status": "OPEN",
-      "known": "После reboot ZIP833791 дал33QNXfiles,13slog2,3193examined,6wide mappings доEOF. CRC81/76manifest SHA PASS. OA_Payload общий у двух процессов: runtime-подтверждение уже изученного SPI-маршрута, не новый renderer. Фактическая libopenwfd.so содержит mask stubs; hide крыльев не найден.",
-      "missing_evidence": "Синхронные пиксели Android display2/физического DIM; независимый hide и принимающий dispatcher.",
-      "next_step": "Использовать уже полученные ELF/mappings; не повторять исправный общий дамп и OA/SPI как новую зацепку. Дальнейшее FIELD различение — синхронный кадр источника и DIM; без blind alpha/mask.",
+      "known": "После reboot ZIP833791 дал33QNXfiles,13slog2,3193examined,6wide mappings доEOF. CRC81/76manifest SHA PASS. OA_Payload общий у двух процессов: runtime-подтверждение уже изученного SPI-маршрута, не новый renderer. Фактическая libopenwfd.so содержит mask stubs; hide крыльев не найден. В повторном fault552935 QNX33/33files и76manifest hashes PASS. Inventory содержит /userdata/DLT/DIM_Slog.log и DIM_Slog_Boot ZIPs, /persist/dim_config; ранее их байты не собирались.",
+      "missing_evidence": "Синхронные пиксели Android display2/физического DIM; независимый hide и принимающий dispatcher. Содержимое новых полных QNX деревьев и корреляция каналов с физическим DIM.",
+      "next_step": "Выпустить SOURCE3.2.5 с отдельным полным архивом QNX/каналов; получить новый FIELD архив, проверить hashes/coverage и исследовать DIM logs/configs/libraries. Это не повтор прежнего целевого дампа. Крылья/hide и владельцы peer остаются OPEN.",
       "sources": [
         "display/report.md",
         "research-2026-09-05/android_platform/systems.json",
@@ -202,7 +202,8 @@
         "research-2026-10-16-qnx/DUMP_323_8283_RU.md",
         "research-2026-10-16-qnx/DUMP_323_DD605_RU.md",
         "research-2026-10-16-qnx/QNX_TERMINAL_20261017_RU.md",
-        "research-2026-10-16-qnx/DUMP_324_833791_RU.md"
+        "research-2026-10-16-qnx/DUMP_324_833791_RU.md",
+        "research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md"
       ],
       "evidence_updates": [
         {
@@ -331,6 +332,12 @@
           "level": "FIELD_STATIC_USER_CORRECTION",
           "finding": "После reboot ZIP833791 дал33QNXfiles,13slog2,3193examined,6wide mappings доEOF. CRC81/76manifest SHA PASS. OA_Payload общий у двух процессов: runtime-подтверждение уже изученного SPI-маршрута, не новый renderer. Фактическая libopenwfd.so содержит mask stubs; hide крыльев не найден.",
           "source": "research-2026-10-16-qnx/DUMP_324_833791_RU.md"
+        },
+        {
+          "date": "2026-10-17",
+          "level": "FIELD_INVENTORY_SOURCE_COLLECTOR",
+          "finding": "Full contents авторизованы для выбранных roots. SOURCE streaming/manifest/partial ZIP и passive channel snapshots реализован; новые байты машины не получены.",
+          "source": "research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md"
         }
       ],
       "coverage_ids": [
@@ -392,6 +399,13 @@
           "known": "Сохранённый разбор дампа3.2.2 (ZIP SHA ac1bf086c34110f431acab4dd4f7382b375598b54208c8b575a770085add8f89) показывает два полных wfd_be mappings и четыре ограниченных256KiB префикса. Sys2038 скрыт в двух snapshots; dimmenu MainActivity и MConfig+ overlays остаются видимыми, пикселей нет. В конкретной libopenwfd_qnx.so mask create/bind/destroy — заглушки; это не распространяется на отсутствующую фактическую /lib64/libopenwfd.so. UART/QUP4 и init worker исследованы, постоянный nav receiver и renderer крыльев не установлены. SOURCE/CI3.2.3 с полным каталогом QNX опубликованы; APK передан.  Новый FIELD ZIP8283 SHA 5d07631b4c4de575375092749af37da84d986c886f457a04c4955f8a806edad2: Connection refused до первой QNX команды,tx=0,каталог только queued /; mappings/slog2/новые файлы не получены. Android uptime66.69/68.29с. Display2:6HWC layers,Sys2038 скрыт; пикселей и доказанного renderer нет. Фото IMG_8795.jpeg (SHA256 41fc7b831a6eb66162f369da6d349a9e11a1eb1523855dbaa2a06a7d41024f59): прежняя nc-команда в обычном терминале возвращает Connection refused, exit1; локальное ADB connected127.0.0.1:5555. Отказ воспроизводится вне collectInventory/qnxStage. Uptime, версия и непрерывность boot session на фото не установлены. IMG_8797: после Connect маршрут eth0/table ecarx_ap_vp_route/src198.18.34.15/uid2000 совпал с историческим, eth0 neighbor REACHABLE, обе команды exit0. IMG_8796 показывает таймаут терминала60с, не новый Connection refused; SOURCE Natro объясняет последующее отключение ADB и возможную потерю отображения частичного вывода. Текущий QCONN не подтверждён. FIELD 17.10.2026 13:07 МСК: QNX-check-20261017-130706-32456.tar.gz SHA256 8e11bed8e587ba66fbb0114f4db3a9ef24403f873085193c4c0ca72b79c67d1c содержит точные 10 байт 51 43 4f 4e 4e 0d 0a ff fd 22 — QCONN CRLF и начальную negotiation. Прямое подключение теперь удалось; service file/чтение файлов ещё не проверены. Android uptime2835.04с, shell UID2000, маршрут прежний eth0/src198.18.34.15. Причина прежних Connection refused не установлена.",
           "missing_evidence": "Синхронные пиксели Android display2 и физического DIM; полные mappings четырёх оставшихся процессов и байты семи реально наблюдаемых путей; подтверждённый renderer/принимающий dispatcher и независимый способ скрытия крыльев без потери карты. Метаданные слоёв/размеры/импорты не заменяют эти свидетельства.",
           "next_step": "Выпустить исправление stat parser с новой версией и release gates; затем проверить полный каталог, файлы/mappings/slog2. Не повторять старую3.2.3 ради уже локализованного stat-дефекта. Прежние транспортные отказы остаются отдельным открытым вопросом."
+        },
+        {
+          "date": "2026-10-17",
+          "reason": "Новый dump552935 и явный запрос полного содержимого/других каналов15:21–15:25",
+          "known": "После reboot ZIP833791 дал33QNXfiles,13slog2,3193examined,6wide mappings доEOF. CRC81/76manifest SHA PASS. OA_Payload общий у двух процессов: runtime-подтверждение уже изученного SPI-маршрута, не новый renderer. Фактическая libopenwfd.so содержит mask stubs; hide крыльев не найден.",
+          "missing_evidence": "Синхронные пиксели Android display2/физического DIM; независимый hide и принимающий dispatcher.",
+          "next_step": "Использовать уже полученные ELF/mappings; не повторять исправный общий дамп и OA/SPI как новую зацепку. Дальнейшее FIELD различение — синхронный кадр источника и DIM; без blind alpha/mask."
         }
       ],
       "last_reviewed": "2026-10-17"
@@ -1487,9 +1501,9 @@
       "priority": "P1",
       "function": "Полнота графических журналов и временная привязка наблюдений",
       "status": "OPEN",
-      "known": "FIELD3.2.4 ZIP833791:13matching slog2, включая display.40986, получены. SPI ошибки и DISPLAY warnings не привязаны к полосе; DLT absent_or_inaccessible.",
-      "missing_evidence": "Штатная хронология/актуальность slog2 и синхронные пиксели.",
-      "next_step": "Офлайн-разбор существующих буферов; без logger start/verbosity/driver lock. Errno2 при settime return0 не доказывает ошибку.",
+      "known": "FIELD3.2.4 ZIP833791:13matching slog2, включая display.40986, получены. SPI ошибки и DISPLAY warnings не привязаны к полосе; DLT absent_or_inaccessible. В повторном fault552935 QNX33/33files и76manifest hashes PASS. Inventory содержит /userdata/DLT/DIM_Slog.log и DIM_Slog_Boot ZIPs, /persist/dim_config; ранее их байты не собирались.",
+      "missing_evidence": "Штатная хронология/актуальность slog2 и синхронные пиксели. Содержимое новых полных QNX деревьев и корреляция каналов с физическим DIM.",
+      "next_step": "Выпустить SOURCE3.2.5 с отдельным полным архивом QNX/каналов; получить новый FIELD архив, проверить hashes/coverage и исследовать DIM logs/configs/libraries. Это не повтор прежнего целевого дампа. Крылья/hide и владельцы peer остаются OPEN.",
       "sources": [
         "research-2026-10-16-qnx/DUMP_322_RU.md",
         "research-2026-10-16-qnx/FULL_INVENTORY_RU.md",
@@ -1498,7 +1512,8 @@
         "research-2026-10-16-qnx/DUMP_323_8283_RU.md",
         "research-2026-10-16-qnx/DUMP_323_DD605_RU.md",
         "research-2026-10-16-qnx/QNX_TERMINAL_20261017_RU.md",
-        "research-2026-10-16-qnx/DUMP_324_833791_RU.md"
+        "research-2026-10-16-qnx/DUMP_324_833791_RU.md",
+        "research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md"
       ],
       "coverage_ids": [
         "PLAT_DISPLAY"
@@ -1550,6 +1565,13 @@
           "known": "В3.2.2 разобраны12slog2 buffers; display.40986 пропущен cap12. Type1 arguments в отчёте декодированы, хронология кольца не восстановлена.105warning candidates не равны105новым сбоям; recovery log прежний. Android DLT path недоступен, QNX /userdata/DLT известен только из конфигурации.3.2.3 снимает счётные/байтовые QNX квоты. Новый FIELD ZIP8283 SHA 5d07631b4c4de575375092749af37da84d986c886f457a04c4955f8a806edad2: Connection refused до первой QNX команды,tx=0,каталог только queued /; mappings/slog2/новые файлы не получены. Android uptime66.69/68.29с. Новый транспортный отказ не отменяет ранее полученные данные3.2.2. Фото IMG_8795.jpeg (SHA256 41fc7b831a6eb66162f369da6d349a9e11a1eb1523855dbaa2a06a7d41024f59): прежняя nc-команда в обычном терминале возвращает Connection refused, exit1; локальное ADB connected127.0.0.1:5555. Отказ воспроизводится вне collectInventory/qnxStage. Uptime, версия и непрерывность boot session на фото не установлены. IMG_8797: после Connect маршрут eth0/table ecarx_ap_vp_route/src198.18.34.15/uid2000 совпал с историческим, eth0 neighbor REACHABLE, обе команды exit0. IMG_8796 показывает таймаут терминала60с, не новый Connection refused; SOURCE Natro объясняет последующее отключение ADB и возможную потерю отображения частичного вывода. Текущий QCONN не подтверждён. FIELD 17.10.2026 13:07 МСК: QNX-check-20261017-130706-32456.tar.gz SHA256 8e11bed8e587ba66fbb0114f4db3a9ef24403f873085193c4c0ca72b79c67d1c содержит точные 10 байт 51 43 4f 4e 4e 0d 0a ff fd 22 — QCONN CRLF и начальную negotiation. Прямое подключение теперь удалось; service file/чтение файлов ещё не проверены. Android uptime2835.04с, shell UID2000, маршрут прежний eth0/src198.18.34.15. Причина прежних Connection refused не установлена.",
           "missing_evidence": "Содержимое display.40986 и остальных доступных matching buffers, достоверная временная привязка к состоянию DIM, наличие актуальных DLT в своей ОС; отсутствие повторно использованных старых записей.",
           "next_step": "Выпустить исправление stat parser с новой версией и release gates; затем проверить полный каталог, файлы/mappings/slog2. Не повторять старую3.2.3 ради уже локализованного stat-дефекта. Прежние транспортные отказы остаются отдельным открытым вопросом."
+        },
+        {
+          "date": "2026-10-17",
+          "reason": "Новый dump552935 и явный запрос полного содержимого/других каналов15:21–15:25",
+          "known": "FIELD3.2.4 ZIP833791:13matching slog2, включая display.40986, получены. SPI ошибки и DISPLAY warnings не привязаны к полосе; DLT absent_or_inaccessible.",
+          "missing_evidence": "Штатная хронология/актуальность slog2 и синхронные пиксели.",
+          "next_step": "Офлайн-разбор существующих буферов; без logger start/verbosity/driver lock. Errno2 при settime return0 не доказывает ошибку."
         }
       ],
       "evidence_updates": [
@@ -1590,6 +1612,12 @@
           "level": "FIELD_STATIC_USER_CORRECTION",
           "finding": "FIELD3.2.4 ZIP833791:13matching slog2, включая display.40986, получены. SPI ошибки и DISPLAY warnings не привязаны к полосе; DLT absent_or_inaccessible.",
           "source": "research-2026-10-16-qnx/DUMP_324_833791_RU.md"
+        },
+        {
+          "date": "2026-10-17",
+          "level": "FIELD_INVENTORY_SOURCE_COLLECTOR",
+          "finding": "Full contents авторизованы для выбранных roots. SOURCE streaming/manifest/partial ZIP и passive channel snapshots реализован; новые байты машины не получены.",
+          "source": "research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md"
         }
       ]
     },

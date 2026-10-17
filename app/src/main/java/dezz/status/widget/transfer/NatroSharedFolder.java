@@ -62,10 +62,9 @@ public final class NatroSharedFolder {
     }
     public File exportDump(File source) throws IOException {
         File root = root();
-        if (!Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS)
-                || source.length() > MAX_DOWNLOAD) throw new IOException("Дамп отсутствует или слишком велик");
+        if (!Files.isRegularFile(source.toPath(), LinkOption.NOFOLLOW_LINKS)) throw new IOException("Дамп отсутствует");
         Path partial = Files.createTempFile(root.toPath(), ".Natro-dump-", ".part");
-        Path target = root.toPath().resolve("Natro-system-" + UUID.randomUUID() + ".zip");
+        Path target = root.toPath().resolve((source.getName().startsWith("Natro-vehicle-")?"Natro-vehicle-":"Natro-system-") + UUID.randomUUID() + ".zip");
         try {
             long expected = source.length(), copied = 0;
             try (InputStream input = Files.newInputStream(source.toPath(), LinkOption.NOFOLLOW_LINKS);

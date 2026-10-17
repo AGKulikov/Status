@@ -1,5 +1,9 @@
 # Natro — карта требований, исследований и открытых вопросов
 
+- [17.10: HUD уведомление режима вождения — внешний вид MConfig48, прежний источник Natro](geely-kx11/research-2026-10-17-white-bar/HUD_DRIVE_MODE_RU.md): белая плашка/чёрный текст,3секунды; SOURCE, FIELD OPEN.
+- [Полный архив QNX и сведения о каналах связи](geely-kx11/research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md): отдельный сбор с HU/телефона, потоковый ZIP и large download; FIELD OPEN.
+
+- [17.10 повтор полосы: QNX доступен, mode3→1, regional owner correction и новые DIM targets](geely-kx11/research-2026-10-17-white-bar/WHITE_BAR_552935_RU.md). [MConfig48/46.1: прежнее скрытие и независимый стартовый сброс](geely-kx11/research-2026-10-17-white-bar/MCONFIG_48_COMPARISON_RU.md). Причинность/FIELD не закрыты; полный контент QNX ещё не снят.
 - [17.10 после reboot:3193пути,33QNXфайла,13slog2,6wide mappings; actual libopenwfd mask stubs](geely-kx11/research-2026-10-16-qnx/DUMP_324_833791_RU.md). Сбор3.2.4 FIELD подтверждён в этом сеансе; крылья/полоса/причина отказа QNX OPEN. Пользователь уточнил перезагрузку до успешной пробы; promisc-причина не доказана.
 - Stable [natro-v3.2.4](https://github.com/AGKulikov/Status/releases/tag/natro-v3.2.4) опубликован и проверен; прежние OPEN ниже — история этапов, не текущий статус публикации.
 
@@ -88,3 +92,5 @@ QNX отказал до handshake; каталог/mappings остаются BLOC
 ## FIELD QCONN, 17.10.2026 13:07 МСК
 
 [Первичный архив проверки подключения](geely-kx11/research-2026-10-16-qnx/QNX_TERMINAL_20261017_RU.md): QCONN и FF FD22 получены. Следующий шаг — полный штатный системный сбор; причина прежнего отказа пока неизвестна.
+
+- [17.10: полный QNX архив и другие каналы, SOURCE3.2.5](geely-kx11/research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md).

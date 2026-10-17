@@ -1,5 +1,24 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 17.10.2026 — MConfig48: уведомление режима вождения на HUD
+
+В предоставленном APK подтверждён TextView: верхний центр728×190 HUD,
+10sp bold black, белая плашка50dp radius, горизонтальные отступы10dp,
+без иконки; keyed3000ms с заменой предыдущего текста. Natro повторяет вид
+собственным Canvas и прежним confirmed `vehicle.drive_mode`, без новых ID,
+записи режима и независимого SDK owner. Поведение на реальном HUD FIELD OPEN.
+[Точный APK SHA, ресурсы/методы и acceptance](docs/geely-kx11/research-2026-10-17-white-bar/HUD_DRIVE_MODE_RU.md).
+
+## 17.10.2026 — расширение сбора на содержимое QNX и каналы
+
+По прямому запросу пользователя новый отдельный SOURCE3.2.5 собирает обычные
+файлы выбранных QNX roots целиком, включая /userdata/DLT/DIM_Slog* и /persist;
+также metadata интерфейсов/сервисов/маршрутов/сокетов и журналов каналов на шлюзе.
+AP/VP `.1`, QNX `.2`, SPI4 bridge, UART/display и SOME/IP/IPCP не смешиваются.
+Никакого нового renderer крыльев, remote filesystem другого ECU или физического
+hide этим не подтверждено. Full-tree FIELD/NOFOLLOW interoperability ещё OPEN.
+[Scope, протокол, тесты и ограничения](docs/geely-kx11/research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md).
+
 ## 17.10.2026 — FIELD после reboot и проверка фактической libopenwfd.so
 
 Пользователь подтвердил reboot ДО QCONN/tcpdump14:45; полоса исчезла после
@@ -2698,3 +2717,31 @@ read_content_invalid, первопричина НЕ исправлена и НЕ
 при разрыве; backup inventory после review трёх изменённых owners, новых owners нет. Android build и FIELD нового
 сборщика ещё не выполнены. Пиксельный владелец крыльев OPEN. Сборщик не вызывает
 qnxslogadapter, mount/umount, запуск slogger, devctl или изменение автомобильных API.
+## 17.10.2026 15:03–15:14 МСК — повтор полосы и MConfig48
+
+System552935 SHA40068fa49471f8b959681d4fbc83064e5ccb550ac6e8d5bff8d9a39fad8c9c5a:
+QNX33/33,76/76manifest hashes PASS при наблюдаемой пользователем полосе.
+Diagnostics235597 SHA819e3f114ac630681f6fd1e0a4fa1e30848b4c9430b91c1635a0fa6e42812e6d:
+14:58:03 Global/SDK3→1/allow. DIM overlay показан, но PID4586/token прежние;
+plus.monjaro3515→11031. Инициатор смены режима в журнале не собран.
+Основные методы whiteBar и стартового reset MConfig48/46.1 совпали после
+переименования обфусцированных symbols. MConfigInitService пишет Global1
+вне whiteBar gate и вызывается при Accessibility connect. Это STATIC-кандидат,
+не доказанная причина данного FIELD эпизода. Версия APK не равна installed version.
+
+Подтверждён SOURCE-дефект Natro: owner probe требовал единственного visible
+Activity на всём объединённом display2, включая нижний HUD. Исправленный parser
+сравнивает stack bounds и сохраняет отказ при пересечении/неизвестности;
+независимый DIM priority gate сохранён. Fresh tab/center после reset всё ещё
+отсутствуют, поэтому патч не объявляет текущую полосу исправленной.
+
+Inventory содержит QNX /userdata/DLT/DIM_Slog.log и DIM_Slog_Boot archives;
+это не Android /mnt/userdata/DLT. Также наблюдены dim_config, cartype.cfg,
+libopenwfd_core, libscreen, uart-display-config, swdl_display, static_UI_PSD.png,
+img_splash.conf. Девять точных путей добавлены в SOURCE collector (42targets),
+их содержимое ещё неизвестно. /proc/boot static resources нужно отличать от
+live/proc/PID; ENOTDIR не доказывает S_IFREG. Full-content QNX и wing hide OPEN.
+
+Подробности и границы: [новый FIELD и targets](docs/geely-kx11/research-2026-10-17-white-bar/WHITE_BAR_552935_RU.md),
+[MConfig48/46.1](docs/geely-kx11/research-2026-10-17-white-bar/MCONFIG_48_COMPARISON_RU.md).
+

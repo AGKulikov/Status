@@ -13,21 +13,21 @@ import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=28,application=Application.class)
 public class BackupDefaultsMigrationTest {
-    @Test public void lanUpdateReleasePreservesDefaultsAndRejectsFuture() throws Exception {
-        for(int source=208021335;source<=208021357;source++) {
+    @Test public void fullVehicleArchiveReleasePreservesDefaultsAndRejectsFuture() throws Exception {
+        for(int source=208021335;source<=208021358;source++) {
             JSONObject metadata=new JSONObject().put("sourceVersionCode",source).put("defaultsSchema",source)
                     .put("declaredMainDefaults",BackupPreferencesXml.encode(Collections.singletonMap("enabled",false)));
-            File snapshot=new File(RuntimeEnvironment.getApplication().getCacheDir(),"324-"+source);
+            File snapshot=new File(RuntimeEnvironment.getApplication().getCacheDir(),"325-"+source);
             File main=BackupFiles.child(snapshot,"de_prefs/example_preferences.xml");
             Map<String,Object> values=new LinkedHashMap<>();values.put("enabled",true);values.put("future-key","preserved");
             BackupPreferencesXml.write(main,values);
-            BackupDefaultsMigration.materialize(snapshot,"example",metadata,208021357);
+            BackupDefaultsMigration.materialize(snapshot,"example",metadata,208021358);
             assertEquals(values,BackupPreferencesXml.read(main));
         }
-        for(int invalid:new int[]{208021334,208021358}) {
+        for(int invalid:new int[]{208021334,208021359}) {
             JSONObject metadata=new JSONObject().put("sourceVersionCode",invalid).put("defaultsSchema",invalid)
                     .put("declaredMainDefaults",BackupPreferencesXml.encode(Collections.emptyMap()));
-            try {BackupDefaultsMigration.validate(metadata,208021357);fail();}catch(IOException expected){}
+            try {BackupDefaultsMigration.validate(metadata,208021358);fail();}catch(IOException expected){}
         }
     }
     @Test public void qnxReaderReleaseAcceptsReviewedSchemasOnly() throws Exception {
