@@ -96,5 +96,20 @@ public final class AdbSessionReplay {
         check(!f.getMessage().contains("дочитана до завершения"),"no false completion for truncated output");
         check(new AdbShellResult().failure(null,null).getMessage().contains("нет полученных данных"),"empty output explicit");
     }
-    public static void main(String[] args) throws Exception { root();cancellation();partialFailure();System.out.println("ADB session: PASS"); }
+    static void timedCapture() throws Exception {
+        AdbTransport.reset();
+        try(AdbConsoleSession session=new AdbConsoleSession(new Context())) {
+            session.connect();
+            check(session.commandTimed("id -u",128*1024,15_000L).success(),"timed shell result");
+            check(AdbTransport.lastTimeout==15_000L,"explicit deadline reaches transport");
+            try{session.commandTimed("id",128*1024,0);throw new AssertionError("unbounded allowed");}
+            catch(IllegalArgumentException expected){}
+        }
+        Throwable interrupted=new InterruptedException();
+        interrupted.addSuppressed(new java.io.IOException("ADB timeout at shell; command not repeated"));
+        java.lang.reflect.Method method=AdbConsoleSession.class.getDeclaredMethod("failureReason",Throwable.class);
+        method.setAccessible(true);String reason=(String)method.invoke(null,interrupted);
+        check(reason.contains("InterruptedException")&&reason.contains("ADB timeout at shell"),"suppressed timeout retained");
+    }
+    public static void main(String[] args) throws Exception { root();cancellation();partialFailure();timedCapture();System.out.println("ADB session: PASS"); }
 }

@@ -19,6 +19,10 @@ public class AdbTransport {
     public static void reset() { root=false;refuse=false;dropRootReply=false;services.clear();commands.clear(); partialOutput=null;afterOutput=null;failAfterOutput=false; }
     public static boolean probe(String host,int port,Consumer<Socket> sink) { sink.accept(new Socket());return true; }
     public static AdbTransport connect(Context c,String host,int port,Consumer<Socket> sink) { sink.accept(new Socket());return new AdbTransport(); }
+    public static long lastTimeout;
+    public void execRaw(String wrapped,Consumer<byte[]> output,long timeout) throws IOException {
+        lastTimeout=timeout;execRaw(wrapped,output);
+    }
     public void execRaw(String wrapped,Consumer<byte[]> output) throws IOException {
         commands.add(wrapped);
         java.util.regex.Matcher match = java.util.regex.Pattern.compile("NATRO_EXIT_[0-9a-f]{32}").matcher(wrapped);

@@ -16,6 +16,9 @@ public final class SystemFileDump {
     public interface Shell {
         AdbShellResult.Result command(String command) throws Exception;
         default AdbShellResult.Result commandBounded(String command, int limit) throws Exception { return command(command); }
+        default AdbShellResult.Result commandTimed(String command, int limit, long timeoutMs) throws Exception {
+            throw new IOException("timed_shell_not_supported");
+        }
     }
     public interface Progress { void update(String text); }
     public interface Qnx { void collect(QnxFileReader.Receiver receiver) throws Exception; }
@@ -328,7 +331,7 @@ public final class SystemFileDump {
                     +"Full accessible QNX namespace inventory from /, including hidden names; discovered file contents are not downloaded.\n"
                     +"filesystem-paths.txt is a path list with TSV-style backslash escapes. filesystem-inventory.tsv is an event journal: discovered, probe, enumeration, failure.\n"
                     +"Directory-only opens; explicit ENOTDIR means non-directory, not regular file. Opaque errors, unknown types/sizes and unavailable directory identity are explicit.\n"
-                    +"Aliases are listed but not recursively duplicated; dev/inode identity detects revisits. Per-directory EOF and traversal_finished report coverage, not an atomic snapshot.\n"
+                    +"Canonical aliases are listed; different paths sharing dev/inode are re-enumerated. Per-directory EOF and traversal_finished report coverage, not an atomic snapshot.\n"
                     +"Content collection uses the explicit allowlist only; not a complete firmware backup. Missing and inaccessible may be indistinguishable.\n"
                     +"Files are verified against remote SHA-256 before/after transfer, but not an atomic system snapshot.\n"
                     +"QNX exception: descriptor stat and equal SHA-256 of two independent reads; hashes are local, not remote authenticated hashes.\n"

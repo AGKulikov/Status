@@ -368,6 +368,7 @@ public final class LanTransferService extends Service {
                 dezz.status.widget.diagnostics.SystemFileDump.Shell shell=new dezz.status.widget.diagnostics.SystemFileDump.Shell(){
                             public AdbShellResult.Result command(String value)throws Exception{return connection.command(value);}
                             public AdbShellResult.Result commandBounded(String value,int limit)throws Exception{return connection.commandBounded(value,limit);}
+                            public AdbShellResult.Result commandTimed(String value,int limit,long timeoutMs)throws Exception{return connection.commandTimed(value,limit,timeoutMs);}
                         };
                 report.set((job.format.equals("vehicle")||job.format.equals("vehicle_all"))
                         ?dezz.status.widget.diagnostics.VehicleEvidenceArchive.collect(new File(getCacheDir(),"exports"),shell,text->job.progress=text,

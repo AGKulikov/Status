@@ -1,5 +1,16 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review3.2.8 — изоляция необязательных каналов
+
+Пересмотрены DiagnosticsActivity, LanTransferService, SystemFileDump,
+VehicleEvidenceArchive, BackupDefaultsMigration. Новых storage owners/настроек
+нет: прежний cache/exports, retention2, явный Download, partial manifest/ZIP.
+Порядок/таймер/тексты не меняют backup adapters/roots. Root-probe и skip reason
+пишутся только в приватную диагностику; никаких credentials/remote writes.
+Defaults335…360→361 и same361 рассмотрены; explicit/unknown/effective сохраняются,
+334/362 отклоняются. Runtime backup/restore FIELD OPEN, inventory лишь tripwire.
+
+
 ### Review3.2.7 — докачка QNX
 
 Пересмотрены DiagnosticsActivity, LanTransferService, QnxFileReader,

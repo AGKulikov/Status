@@ -1,4 +1,4 @@
-name: Build Natro 3.2.7 update candidate
+name: Build Natro 3.2.8 update candidate
 on:
   push:
     branches: ['fix/qnx-missing-20261017']
@@ -13,8 +13,8 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     env:
-      VERSION_NAME: '3.2.7'
-      VERSION_CODE: '208021360'
+      VERSION_NAME: '3.2.8'
+      VERSION_CODE: '208021361'
       ALLOW_UNSIGNED_RELEASE: 'true'
       HELPER_CHANGED: 'false'
     steps:
@@ -22,7 +22,7 @@ jobs:
       - name: Enforce REL-004 before build
         run: |
           python3 tools/check_release_version.py "$VERSION_NAME"
-          test "$VERSION_CODE" = 208021360
+          test "$VERSION_CODE" = 208021361
       - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
         with:
           distribution: temurin
@@ -64,17 +64,17 @@ jobs:
       - name: Upload verified unsigned candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Natro-3.2.7-offline-signing-${{ github.run_number }}
+          name: Natro-3.2.8-offline-signing-${{ github.run_number }}
           path: |
-            ${{ runner.temp }}/natro-3.2.7-candidate/*
-            !${{ runner.temp }}/natro-3.2.7-candidate/tools/**
+            ${{ runner.temp }}/natro-3.2.8-candidate/*
+            !${{ runner.temp }}/natro-3.2.8-candidate/tools/**
           if-no-files-found: error
           retention-days: 7
       - name: Upload signing tools separately
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Natro-3.2.7-signing-tools-${{ github.run_number }}
-          path: ${{ runner.temp }}/natro-3.2.7-candidate/tools/*
+          name: Natro-3.2.8-signing-tools-${{ github.run_number }}
+          path: ${{ runner.temp }}/natro-3.2.8-candidate/tools/*
           if-no-files-found: error
           retention-days: 7
       - name: Upload candidate and reports

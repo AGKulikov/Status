@@ -1,5 +1,22 @@
 # Единый реестр требований Natro
 
+## 17.10.2026 18:45 МСК — QNX-COLLECTOR-328
+
+USER: «Ну так исправляй досборщик». Продолжение QNX-DOWNLOAD-327.
+SOURCE: весь QNX этап выполняется до любых необязательных Android-команд,
+включая su probe. Каждый snapshot ограничен15s transport deadline/1MiB output.
+При exception/неподтверждённом exit остальные команды явно not_attempted;
+автоматического reconnect/replay нет. Полученные QNX bytes и частичный stdout
+остаются в завершённом ZIP. Stage/elapsed/deadline и suppressed timeout cause
+сохраняются. Порядок3.2.7 «журналы до/после» заменён одним post-QNX снимком;
+прежнее требование сохраняется здесь как история. 977exclusions, native links,
+uncapped QNX, no vehicle writes и full-repeat сохранены. README inode исправлен.
+TEST:12 focused production replay tests PASS, включая timeout/missing exit/root
+probe failure/QNX failure/исключения. Полный CI/APK/FIELD OPEN до итогового отчёта.
+Кандидат3.2.8/code208021361, прежние package/cert. Settings/defaults не меняются;
+review335…360→361, explicit/unknown сохранены. Подробности:docs/releases/3.2.8/README_RU.md.
+
+
 ## 17.10.2026 18:30–18:35 МСК — полнота исследования и FIELD3.2.7
 
 USER спросил, весь ли прежний архив разобран и все ли зацепки проверены; затем

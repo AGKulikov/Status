@@ -84,6 +84,10 @@ public final class VehicleEvidenceArchive {
             finally{zip.closeEntry();}
         }
     }
+    private static String snapshotHeader(String stage,long started) {
+        return "stage="+stage+" phase=after_qnx timeout_ms=15000 elapsed_ms="
+                +((System.nanoTime()-started)/1_000_000L)+"\n";
+    }
     public static SystemFileDump.Report collect(File directory,SystemFileDump.Shell shell,SystemFileDump.Progress progress,
                                                 String version,SystemFileDump.Qnx qnx)throws Exception {
         return collect(directory,shell,progress,version,qnx,QnxExclusions.load());
@@ -97,29 +101,45 @@ public final class VehicleEvidenceArchive {
         try {
             try(ZipOutputStream zip=new ZipOutputStream(new BufferedOutputStream(new FileOutputStream(part)));
                 Sink sink=new Sink(zip,directory,progress,exclusions)) {
-                boolean su=false;
-                try{AdbShellResult.Result r=shell.command("su 0 id -u");su=r.success()&&!r.truncated&&r.output.trim().equals("0");}
-                catch(Exception e){sink.complete=false;}
-                for(String[] channel:CHANNELS) {
-                    progress.update("Каналы связи: "+channel[0]);String state="collected_snapshot",text;
-                    try {
-                        AdbShellResult.Result r=shell.commandBounded(SystemFileDump.privileged(channel[1],su),1024*1024);
-                        text="exit="+r.exitCode+" truncated="+r.truncated+"\n"+r.output;
-                        if(!r.success()||r.truncated)state=r.truncated?"truncated_snapshot":
-                                (r.output.trim().isEmpty()?"command_failed_or_unavailable":"partial_snapshot");
-                    } catch(Exception e){state="unavailable";text=QnxFileReader.safe(e.toString());}
-                    sink.text("channels/"+channel[0]+".txt",state,text);
-                }
+                // Main payload first: optional Android commands must never consume its connection.
+                progress.update("Докачка QNX…");
+                long qnxStarted=System.nanoTime();
                 try{qnx.collect(sink);}
                 catch(Exception e){sink.complete=false;sink.text("qnx/failure.txt","partial_or_unavailable",
-                        e instanceof QnxFileReader.Failure?((QnxFileReader.Failure)e).report:QnxFileReader.safe(e.toString()));}
-                for(String[] channel:CHANNELS)if(channel[0].equals("channel-log")||channel[0].equals("kernel-channel-log")) {
-                    if(Thread.currentThread().isInterrupted())break;
+                        "stage=qnx elapsed_ms="+((System.nanoTime()-qnxStarted)/1_000_000L)+"\n"
+                        +(e instanceof QnxFileReader.Failure?((QnxFileReader.Failure)e).report:QnxFileReader.safe(e.toString())));}
+                boolean su=false, stopped=Thread.currentThread().isInterrupted();
+                String stopReason=stopped?"interrupted":"";
+                if(!stopped) {
+                    long probeStarted=System.nanoTime();
                     try {
-                        AdbShellResult.Result r=shell.commandBounded(SystemFileDump.privileged(channel[1],su),1024*1024);
-                        sink.text("channels/after-"+channel[0]+".txt",r.truncated?"truncated_snapshot":r.success()?"collected_snapshot":"partial_snapshot",
-                                "exit="+r.exitCode+" truncated="+r.truncated+"\n"+r.output);
-                    } catch(Exception e){sink.text("channels/after-"+channel[0]+".txt","unavailable",QnxFileReader.safe(e.toString()));}
+                        AdbShellResult.Result r=shell.commandTimed("su 0 id -u",128*1024,15_000L);
+                        su=r.success()&&!r.truncated&&r.output.trim().equals("0");
+                        stopped=r.exitCode==null;
+                        stopReason=stopped?"root_probe_missing_exit":"";
+                        sink.text("channels/root-probe.txt",stopped?"partial_snapshot":"collected_snapshot",
+                                snapshotHeader("root-probe",probeStarted)+"exit="+r.exitCode+" truncated="+r.truncated+"\n"+r.output);
+                    } catch(Exception e) {
+                        stopped=true;stopReason="root_probe_failed";
+                        sink.text("channels/root-probe.txt","unavailable",snapshotHeader("root-probe",probeStarted)+QnxFileReader.safe(e.toString()));
+                    }
+                }
+                for(String[] channel:CHANNELS) {
+                    if(stopped||Thread.currentThread().isInterrupted()) {
+                        sink.text("channels/"+channel[0]+".txt","not_attempted",
+                                "stage="+channel[0]+" phase=after_qnx reason="+stopReason+"; no automatic reconnect or command retry\n");
+                        continue;
+                    }
+                    progress.update("Каналы связи после QNX: "+channel[0]);
+                    long channelStarted=System.nanoTime();String state="collected_snapshot",text;
+                    try {
+                        AdbShellResult.Result r=shell.commandTimed(SystemFileDump.privileged(channel[1],su),1024*1024,15_000L);
+                        text=snapshotHeader(channel[0],channelStarted)+"exit="+r.exitCode+" truncated="+r.truncated+"\n"+r.output;
+                        if(!r.success()||r.truncated)state=r.truncated?"truncated_snapshot":
+                                (r.output.trim().isEmpty()?"command_failed_or_unavailable":"partial_snapshot");
+                        if(r.exitCode==null){stopped=true;stopReason=channel[0]+"_missing_exit";}
+                    } catch(Exception e){state="unavailable";text=snapshotHeader(channel[0],channelStarted)+QnxFileReader.safe(e.toString());stopped=true;stopReason=channel[0]+"_failed";}
+                    sink.text("channels/"+channel[0]+".txt",state,text);
                 }
                 sink.text("README.txt","collected_snapshot","Natro "+version+" · full selected QNX directories + passive channel evidence\n"
                         +"Started UTC millis="+started+"; finished="+System.currentTimeMillis()+"\n"
@@ -130,6 +150,7 @@ public final class VehicleEvidenceArchive {
                         +"Previous-dump exclusions="+(exclusions!=null)+"; verified full+partial archives dated 2026-10-17. Matching paths/sizes are skipped without rehashing remote content; same-size edits are not detected.\n"
                         +"Skipped files are listed in full-tree.tsv and remain in the previous archives; this ZIP alone is not a full copy. Live logs, mappings and channels are always refreshed.\n"
                         +"No Android image, VM disk, /dev payload, process memory, vehicle command, service restart or reboot.\n"
+                        +"QNX is collected before all optional Android snapshots. Snapshots have a 15000 ms transport deadline; failure/missing exit stops subsequent commands, never retries. No before-QNX log capture.\n"
                         +"Channel snapshots come from the Android gateway; command availability/permissions vary. No new logger or packet injection.\n"
                         +"198.18.34.1 AP/VP peer is not proven to be the QNX .2 host. A visible interface is not remote filesystem access.\n"
                         +"QNX programs/configs include potential cross-domain routes, not proof of physical effects.\n"

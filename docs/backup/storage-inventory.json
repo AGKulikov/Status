@@ -358,7 +358,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "68258777f08ad33051e97d0efafb256e27ac5694b3b8c6b08c5ae52cd65bf8fa",
+      "sha256": "fa054bb219c7140603ac9767c14bc7b0987e3f3bebc85cdb96ac6df6f08e7b84",
       "access_kinds": [
         "files"
       ]
@@ -444,13 +444,13 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/DiagnosticsActivity.java": {
-      "sha256": "dc90d38d5401fdc2250c7d8e7662329c6acf8e356069187a8159d3bcdfdba745",
+      "sha256": "e87deed2c29d04afeb87b1e3fcdd0c18606ee0251aa563d42cd6fcc084aded27",
       "access_kinds": [
         "files"
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/SystemFileDump.java": {
-      "sha256": "5d0e42a2c1abcb71d14a5798d31aecbfcb4f46de52a28b69b928189aae91b6b2",
+      "sha256": "5277d8c27550b8d9c06e1b9b0255944eb01ce47896440a81b1097284d8fbca00",
       "access_kinds": [
         "files"
       ]
@@ -724,7 +724,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/transfer/LanTransferService.java": {
-      "sha256": "fb7565e3d599399353359e78ea7f74e999400a3ad22486db8b35ba0fcaae958e",
+      "sha256": "70e2f77dfba7f6b3d0eadff4b7c9ea9f8f4ee3a04bc65a6c0e9b14dbc1b35b10",
       "access_kinds": [
         "files"
       ]
@@ -749,7 +749,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/VehicleEvidenceArchive.java": {
-      "sha256": "cf8294a01bc30eecf72331565fae4646138e3e15bb4f1cb738faddd7d2828cfa",
+      "sha256": "6e5f8cd4ca103393803ad31367759351aa05cac90fadd836c798ae9004e6d294",
       "access_kinds": [
         "files"
       ]

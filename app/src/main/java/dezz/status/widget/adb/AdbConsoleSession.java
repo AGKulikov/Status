@@ -101,23 +101,43 @@ public final class AdbConsoleSession implements AutoCloseable {
     public AdbShellResult.Result commandBounded(String command, int limit) throws Exception {
         return captureCommand(command, null, limit);
     }
+    public AdbShellResult.Result commandTimed(String command, int limit, long timeoutMs) throws Exception {
+        if(timeoutMs<=0||timeoutMs>60_000L)throw new IllegalArgumentException("shell_timeout");
+        return captureCommand(command, null, limit, timeoutMs);
+    }
     private AdbShellResult.Result captureCommand(String command, java.util.function.Consumer<byte[]> observer, int limit) throws Exception {
+        return captureCommand(command, observer, limit, 60_000L);
+    }
+    private AdbShellResult.Result captureCommand(String command, java.util.function.Consumer<byte[]> observer, int limit, long timeoutMs) throws Exception {
         checkCancelled();
         if (transport == null) throw new IOException("no devices/emulators found — выполните Connect");
         AdbShellResult capture = new AdbShellResult(limit);
         try { transport.execRaw(capture.wrap(command), chunk -> {
             capture.accept(chunk);
             if (observer != null) observer.accept(chunk);
-        });
+        }, timeoutMs);
             checkCancelled();
         }
         catch (Exception error) {
             disconnect();
-            throw capture.failure(cancelled.get() ? stopReason : error.getMessage(), error);
+            throw capture.failure(cancelled.get() ? stopReason : failureReason(error), error);
         }
         AdbShellResult.Result result = capture.finish();
         if (result.exitCode == null) disconnect();
         return result;
+    }
+    /** try-with-resources may attach the deadline as suppressed to an InterruptedException. */
+    static String failureReason(Throwable error) {
+        StringBuilder reason=new StringBuilder();
+        appendReason(reason,error,0);
+        return reason.toString();
+    }
+    private static void appendReason(StringBuilder reason,Throwable error,int depth) {
+        if(error==null||depth>3||reason.length()>4096)return;
+        if(reason.length()>0)reason.append("; ");
+        reason.append(error.getClass().getSimpleName()).append(": ").append(error.getMessage());
+        for(Throwable suppressed:error.getSuppressed())appendReason(reason,suppressed,depth+1);
+        appendReason(reason,error.getCause(),depth+1);
     }
     /** Send exactly one daemon privilege request; reconnect only, then verify the actual uid. */
     public String daemonRoot(boolean root) throws Exception {

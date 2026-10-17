@@ -1,5 +1,14 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 17.10.2026 — SOURCE исправления досборщика3.2.8
+
+Vehicle QNX перенесён перед всеми Android snapshots, чтобы их timeout не
+блокировал основную докачку.15s deadline/ограниченный stdout, остановка после
+неподтверждённого exit, stage/elapsed/suppressed cause в ZIP. Это устраняет
+доказанный дефект порядка3.2.7 на уровне SOURCE; первичная причина ADB сбоя
+и FIELD докачки остаются OPEN. PA_Gauge/renderer/hide крыльев без новых выводов.
+[Статус и проверки](docs/releases/3.2.8/README_RU.md).
+
 ## 17.10.2026 — FIELD3.2.7: обход подтверждён, докачка прервана ADB
 
 System857396:4772paths/552EOF/13directory failures,10wide mappings и13slog2;

@@ -17,10 +17,10 @@ class SystemDumpTest(unittest.TestCase):
             files=[SOURCE/'diagnostics/SystemFileDump.java',SOURCE/'diagnostics/QnxFileReader.java',
                    SOURCE/'diagnostics/GraphicsEvidence.java',SOURCE/'diagnostics/VehicleEvidenceArchive.java',SOURCE/'diagnostics/QnxExclusions.java',
                    SOURCE/'adb/AdbShellResult.java',SOURCE/'transfer/LanDownloadGrant.java',
-                   ROOT/'tools/tests/java/QnxTreeReplay.java',ROOT/'tools/tests/java/QnxDeltaReplay.java',ROOT/'tools/tests/java/LanDownloadReplay.java']
+                   ROOT/'tools/tests/java/VehicleFailureReplay.java',ROOT/'tools/tests/java/QnxTreeReplay.java',ROOT/'tools/tests/java/QnxDeltaReplay.java',ROOT/'tools/tests/java/LanDownloadReplay.java']
             run=subprocess.run(['java','com.sun.tools.javac.Main','-d',work,*map(str,files)],capture_output=True,text=True)
             self.assertEqual(run.returncode,0,run.stderr)
-            for cls in ['diagnostics.QnxTreeReplay','diagnostics.QnxDeltaReplay','transfer.LanDownloadReplay']:
+            for cls in ['diagnostics.VehicleFailureReplay','diagnostics.QnxTreeReplay','diagnostics.QnxDeltaReplay','transfer.LanDownloadReplay']:
                 run=subprocess.run(['java','-Xmx64m','-cp',work+':'+str(ROOT/'app/src/main/resources'),'dezz.status.widget.'+cls,work],capture_output=True,text=True,timeout=90)
                 self.assertEqual(run.returncode,0,run.stdout+run.stderr)
     def test_graphics_evidence_replay(self):

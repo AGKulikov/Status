@@ -612,6 +612,9 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
                         public dezz.status.widget.adb.AdbShellResult.Result commandBounded(String command, int limit) throws Exception {
                             return adb.commandBounded(command, limit);
                         }
+                        public dezz.status.widget.adb.AdbShellResult.Result commandTimed(String command,int limit,long timeoutMs)throws Exception {
+                            return adb.commandTimed(command,limit,timeoutMs);
+                        }
                     };
             dezz.status.widget.diagnostics.SystemFileDump.Progress progress=text -> runOnUiThread(() -> {
                         if (!isDestroyed() && systemDumpSession == session) systemDumpState.setText(text);
