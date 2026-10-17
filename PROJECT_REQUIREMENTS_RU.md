@@ -1,5 +1,33 @@
 # Единый реестр требований Natro
 
+## 17.10.2026 16:09 — 3.2.5 опубликована, SOURCE/TEST/APK закрыты; FIELD OPEN
+
+Stable/latest [natro-v3.2.5](https://github.com/AGKulikov/Status/releases/tag/natro-v3.2.5)
+опубликован16:08:49МСК, release415809635. SOURCE d7daff1b3807b1ba830f60f2dfd2174cec388bbb,
+tree032dae00dff3f831fe1a9bec1afc26714fd59eaa. CI39034294601/job117400902131 SUCCESS:
+2157 Android tests,264 tool tests,108 Java cases,0fail/skip. Native HUD preview
+осмотрен; реальная runtime-подписка/таймер с инертным источником PASS.
+
+APK3.2.5/code208021358,29678104байт, SHA256
+d3fed86ca73c76d1ff10eb3a89a22a731abc50df33ab1782e0986aa164a2daf6.
+Прежние package/certificate, exactAPI28/v2/v3/zipalign16KiB и1516 неизменных
+CI payload entries проверены. Временные ключ/пароль удалены; Navigator patch
+совпал с3.2.4, Helper не изменён. Install-over metadata не равна FIELD.
+
+Publisher39035318992/job117403837944 SUCCESS восстановил exact APK без private
+key, повторил проверки и скачал/побайтно сравнил все7assets draft до stable.
+GitHub latest/tag/размер/SHA прочитаны обратно; tag указывает на SOURCE.
+APK, exact source.tar.gz, README, update manifest и протоколы доступны в Release.
+Запросы15:21–15:40 реализованы. Записи ниже «CI/APK ещё не приняты» сохраняют
+историю и заменены этой записью для технических gate.
+
+FIELD OPEN: реальный HUD вид/3секунды/настройка после reboot; полный QNX archive,
+NOFOLLOW/полнота/свободное место; большой Safari download; настоящий install-over.
+Белая полоса/крылья и физический battery warning не объявлены исправленными.
+Сборщик не означает, что полный архив автомобиля уже снят.
+[Протокол](docs/releases/3.2.5/PUBLICATION_RU.md), [изменения](docs/releases/3.2.5/release-notes.md).
+
+
 ## 17.10.2026 15:39–15:40 — вид уведомления MConfig о режиме вождения на HUD
 
 Пользователь попросил уведомление как в MConfig и уточнил: событие брать как

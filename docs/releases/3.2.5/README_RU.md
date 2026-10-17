@@ -1,8 +1,8 @@
 # Natro3.2.5 — протокол выпуска
 
 SOURCE опубликован, полный CI PASS, APK подписан прежним ключом и проверен.
-Публикация stable на момент подготовки этого протокола ещё OPEN; окончательный
-результат фиксируется в PUBLICATION_RU.md после read-back GitHub Release.
+Публикация stable/latest подтверждена17.10 в16:08:49МСК; точный read-back
+GitHub Release и SHA всех7assets приведены в PUBLICATION_RU.md.
 [Изменения и приёмка](release-notes.md), [машинный отчёт](release-report.json).
 
 - Source `d7daff1b3807b1ba830f60f2dfd2174cec388bbb`,

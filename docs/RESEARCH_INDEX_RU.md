@@ -1,5 +1,7 @@
 # Natro — карта требований, исследований и открытых вопросов
 
+- [3.2.5 опубликована stable/latest17.10 16:08МСК](releases/3.2.5/PUBLICATION_RU.md):2157 Android/264 tool/108 Java cases PASS, прежняя подпись; HUD уведомление, полный QNX/каналы и streaming download. FIELD OPEN.
+
 - [17.10: HUD уведомление режима вождения — внешний вид MConfig48, прежний источник Natro](geely-kx11/research-2026-10-17-white-bar/HUD_DRIVE_MODE_RU.md): белая плашка/чёрный текст,3секунды; SOURCE, FIELD OPEN.
 - [Полный архив QNX и сведения о каналах связи](geely-kx11/research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md): отдельный сбор с HU/телефона, потоковый ZIP и large download; FIELD OPEN.
 
