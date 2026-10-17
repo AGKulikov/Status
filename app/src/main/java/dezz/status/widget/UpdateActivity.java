@@ -33,6 +33,7 @@ public final class UpdateActivity extends dezz.status.widget.settings.SettingsAc
                 })).show());content.addView(install);
         TextView help=new TextView(this);help.setText("Источник: GitHub Releases · AGKulikov/Status · stable. Только подписанные APK Natro с большим versionCode. Проверка и установка выполняются по вашей кнопке, не при загрузке магнитолы. Нужен интернет на магнитоле.");content.addView(help);
         ScrollView scroll=new ScrollView(this);scroll.addView(content);setContentView(scroll);
+        dezz.status.widget.settings.SettingsBackNavigation.applySafeTopInset(this, content);
     }
     private Button button(String title,Runnable action){Button button=new Button(this);button.setText(title);button.setAllCaps(false);button.setOnClickListener(v->action.run());return button;}
     private interface Task{void run()throws Exception;}

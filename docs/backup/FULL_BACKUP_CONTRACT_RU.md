@@ -1,5 +1,16 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review 3.2.4 / 208021357
+
+Явно разрешена миграция defaults335…356 →357 и same-schema357. Основные
+effective defaults/ключи/типы не изменены: новые LAN flags в отдельном CE
+namespace false/empty и installation-bound по review ниже. Материализация
+сохраняет старые effective defaults, explicit values и неизвестные keys.
+334/358 отклоняются; добавлен Robolectric-тест всех предшественников,
+same-schema и отказа будущей схемы. Результат этого теста ожидает полного CI,
+не объявляется проверкой KX11 restore. Fingerprint пересмотрен только для
+изменённого BackupDefaultsMigration; остальные policies не изменены.
+
 ### Review 17.10.2026 — LAN trust, экспорты и updater (SOURCE, без APK/FIELD)
 
 Проверены восемь изменённых/новых владельцев хранения. LanTrustStore открывает

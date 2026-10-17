@@ -30,6 +30,7 @@ public final class SettingsDestinationCatalogTest {
             "dezz.status.widget.FavoriteRoutesSettingsActivity",
             "dezz.status.widget.AdbSettingsActivity",
             "dezz.status.widget.LanTransferActivity",
+            "dezz.status.widget.UpdateActivity",
             "dezz.status.widget.drivemode.ui.MainActivity",
             "dezz.status.widget.servicemode.MainActivity",
             "dezz.status.widget.AutomationSettingsActivity",

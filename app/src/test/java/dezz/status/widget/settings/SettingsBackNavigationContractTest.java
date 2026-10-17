@@ -52,6 +52,7 @@ public final class SettingsBackNavigationContractTest {
     };
 
     private static final String[][] EXPLICIT_JAVA_DETAILS = {
+            {"UpdateActivity.java", "button(\"← Назад\",this::finish)", "content.addView(button(\"← Назад\",this::finish))"},
             {"PhoneAppIconsActivity.java", "Button back = button(\"‹ Назад\")", "back.setOnClickListener(v -> finish())"},
             {"AdbSettingsActivity.java", "button(\"← Назад\", this::finish)", "header.addView(back)"},
             {"LanTransferActivity.java", "button(\"← Назад\", this::finish)", "root.addView(button(\"← Назад\", this::finish))"},
@@ -101,6 +102,7 @@ public final class SettingsBackNavigationContractTest {
     };
 
     private static final String[] EXPLICIT_SAFE_INSET_DETAILS = {
+            "UpdateActivity.java",
             "AdbSettingsActivity.java",
             "LanTransferActivity.java",
             "AboutActivity.java",
