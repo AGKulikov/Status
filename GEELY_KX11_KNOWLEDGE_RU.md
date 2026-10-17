@@ -1,5 +1,32 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 16.10.2026 — каталог всего доступного QNX, кандидат3.2.3
+
+Требование22:39 заменяет прежние квоты QNX. Новый SOURCE выполняет обход от /
+через directory-only open o:"path":0:4000, stat дескриптора и page GET type1.
+Это не запуск find/shell на QNX и не чтение содержимого каждого найденного
+файла. Protocol frames/доступ/разрывы остаются наблюдаемыми ограничениями;
+число, глубина, общий объём/время каталога искусственно не ограничены.
+Пути/очередь/trace пишутся на диск. Unknown size/type остаются unknown;
+числовой e:... не трактуется как ENOTDIR без подтверждения кодировки errno.
+Известные dev/inode позволяют пометить повтор каталога. При неизвестной
+identity одинаковые списки — лишь возможный цикл, непройденная ветвь явно
+отмечена. traversal_finished/EOF не означают атомарный снимок всей машины.
+
+Полные sequential mappings сохраняются отдельными qnx/mappings/PID-wide.txt
+до EOF; размер wire request остаётся проверенным256KiB+1. Начальный bounded
+probe сохранён отдельно. Все matching процессы/slog2 без счётных/байтовых
+квот. Дополнительные exact targets: /lib64/libopenwfd.so,
+/lib64/libdisplay_shim_util.so, /lib64/libuhab-qvmhost.so,
+/lib64/libbridgechip_client.so, /lib64/libdalconfig-sa8155_adp_star_v1.0.0.so,
+/usr/bin/cluster_controller, /bin/sc_qnx_vip_proxy. Основание — реальные пути
+в ZIP423934bd3.2.2; byte identity с ранее собранными библиотеками не предполагается.
+
+Офлайн coverage см. docs/geely-kx11/research-2026-10-16-qnx/FULL_INVENTORY_RU.md.
+Реальный каталог ещё не получен, безопасность/полнота конкретного server
+dialect и identity проверяются по следующему дампу. FIELD крыльев OPEN.
+
+
 ## 16.10.2026 — FIELD3.2.1, slog2 и уточнение путей
 
 ZIP88d3c827 (SHA256d5c726626c5e9e004e76fbeef282c4e2486700861003e7ef7775a8ae8166f0a8):

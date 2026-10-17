@@ -39,9 +39,9 @@ public final class AdbConsoleSession implements AutoCloseable {
     public synchronized boolean submit(Operation operation, Listener listener) {
         return submitBounded(operation,listener,60);
     }
-    /** Only the fixed, read-only system dump receives a longer overall budget. */
+    /** Full QNX inventory has no total-time budget; transport I/O remains cancellable and timed. */
     public synchronized boolean submitSystemDump(Operation operation, Listener listener) {
-        return submitBounded(operation,listener,600);
+        return submitBounded(operation,listener,0);
     }
     private boolean submitBounded(Operation operation, Listener listener, int timeoutSeconds) {
         if (closed || !busy.compareAndSet(false, true)) return false;
@@ -51,7 +51,7 @@ public final class AdbConsoleSession implements AutoCloseable {
             Exception failure = null;
             try {
                 checkCancelled();
-                deadline = timer.schedule(() -> cancel("Таймаут " + timeoutSeconds + " секунд"), timeoutSeconds, TimeUnit.SECONDS);
+                if(timeoutSeconds>0)deadline = timer.schedule(() -> cancel("Таймаут " + timeoutSeconds + " секунд"), timeoutSeconds, TimeUnit.SECONDS);
                 checkCancelled(); operation.run(this); checkCancelled();
             }
             catch (Exception error) { failure = cancelled.get() ? new IOException(stopReason

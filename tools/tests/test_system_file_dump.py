@@ -27,7 +27,17 @@ class SystemDumpTest(unittest.TestCase):
             compiled=subprocess.run(['java','com.sun.tools.javac.Main','-d',work,
                 str(SOURCE/'diagnostics/QnxFileReader.java'),str(ROOT/'tools/tests/java/QnxFileReaderReplay.java')],capture_output=True,text=True)
             self.assertEqual(compiled.returncode,0,compiled.stderr)
-            run=subprocess.run(['java','-cp',work,'dezz.status.widget.diagnostics.QnxFileReaderReplay'],capture_output=True,text=True,timeout=15)
+            run=subprocess.run(['java','-cp',work,'dezz.status.widget.diagnostics.QnxFileReaderReplay'],capture_output=True,text=True,timeout=60)
+            self.assertEqual(run.returncode,0,run.stdout+run.stderr)
+
+    def test_full_qnx_inventory_and_streaming_mappings(self):
+        with tempfile.TemporaryDirectory() as work:
+            compiled=subprocess.run(['java','com.sun.tools.javac.Main','-d',work,
+                str(SOURCE/'diagnostics/QnxFileReader.java'),str(ROOT/'tools/tests/java/QnxFileReaderReplay.java'),
+                str(ROOT/'tools/tests/java/QnxInventoryReplay.java')],capture_output=True,text=True)
+            self.assertEqual(compiled.returncode,0,compiled.stderr)
+            run=subprocess.run(['java','-Xmx64m','-cp',work,'dezz.status.widget.diagnostics.QnxInventoryReplay',work],
+                capture_output=True,text=True,timeout=60)
             self.assertEqual(run.returncode,0,run.stdout+run.stderr)
 
     def test_production_owner_parser(self):
@@ -88,13 +98,15 @@ class SystemDumpTest(unittest.TestCase):
         transport=(SOURCE/'shell/AdbTransport.java').read_text()
         method=transport.split('public void collectQnx(',1)[1].split('public String execLongRunning',1)[0]
         self.assertIn('for (String path : dezz.status.widget.diagnostics.QnxFileReader.TARGETS)',method)
-        self.assertIn('.collectSingle(path, receiver)',method)
-        self.assertEqual(method.count('openBounded("shell:toybox nc -w 30 198.18.34.2 8000")'),3)
+        self.assertIn('reader.collectSingle(path, receiver)',method)
+        self.assertEqual(method.count('openBounded("shell:toybox nc -w 30 198.18.34.2 8000")'),1)
         self.assertIn('.collectProcesses(receiver)',method)
-        self.assertIn('60_000L',method)
+        self.assertIn('.collectInventory(receiver)',method)
+        self.assertIn('30_000L',method)
+        self.assertNotIn('60_000L',method)
         session=(SOURCE/'adb/AdbConsoleSession.java').read_text()
         self.assertIn('return submitBounded(operation,listener,60);',session)
-        self.assertIn('return submitBounded(operation,listener,600);',session)
+        self.assertIn('return submitBounded(operation,listener,0);',session)
         self.assertIn('session.submitSystemDump(', (SOURCE/'DiagnosticsActivity.java').read_text())
 
 if __name__ == '__main__': unittest.main()

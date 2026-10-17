@@ -250,44 +250,30 @@ public class AdbTransport implements ShellTransport {
 
     /** Exact existing QNX endpoint, GET-only protocol; shares cancellation with the ADB socket. */
     public void collectQnx(dezz.status.widget.diagnostics.QnxFileReader.Receiver receiver) throws Exception {
-        // Fixed binaries first: unsupported live metadata must not lose their evidence.
-        // Stop after transport/protocol failure; never retry a failed file.
+        // Catalog first: a later unsupported binary or procfs response cannot hide it.
+        qnxStage(reader -> reader.collectInventory(receiver));
         for (String path : dezz.status.widget.diagnostics.QnxFileReader.TARGETS) {
             receiver.diagnostic(path, "stage=connect\npath=" + path + "\n");
-            if (Thread.currentThread().isInterrupted() || socket.isClosed())
-                throw new IOException("QNX collection cancelled or ADB disconnected");
-            try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 60_000L, "qnx-file:" + path)) {
-                AdbStream stream = openBounded("shell:toybox nc -w 30 198.18.34.2 8000");
-                try {
-                    new dezz.status.widget.diagnostics.QnxFileReader(new dezz.status.widget.diagnostics.QnxFileReader.Wire() {
-                        public byte[] read() throws Exception { return stream.read(); }
-                        public void write(byte[] bytes) throws Exception { stream.write(bytes); }
-                    }).collectSingle(path, receiver);
-                } finally { try { stream.close(); } catch (Exception ignored) {} }
-            }
+            qnxStage(reader -> reader.collectSingle(path, receiver));
         }
-        try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 60_000L, "qnx-existing-slog2")) {
-            if (Thread.currentThread().isInterrupted() || socket.isClosed())
-                throw new IOException("QNX collection cancelled or ADB disconnected");
-            AdbStream stream = openBounded("shell:toybox nc -w 30 198.18.34.2 8000");
-            try {
-                new dezz.status.widget.diagnostics.QnxFileReader(new dezz.status.widget.diagnostics.QnxFileReader.Wire() {
-                    public byte[] read() throws Exception { return stream.read(); }
-                    public void write(byte[] bytes) throws Exception { stream.write(bytes); }
-                }).collectLogs(receiver);
-            } finally { try { stream.close(); } catch (Exception ignored) {} }
-        }
-        try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 60_000L, "qnx-process-metadata")) {
-            if (Thread.currentThread().isInterrupted() || socket.isClosed())
-                throw new IOException("QNX collection cancelled or ADB disconnected");
-            AdbStream stream = openBounded("shell:toybox nc -w 30 198.18.34.2 8000");
-            try {
-                new dezz.status.widget.diagnostics.QnxFileReader(new dezz.status.widget.diagnostics.QnxFileReader.Wire() {
-                    public byte[] read() throws Exception { return stream.read(); }
-                    public void write(byte[] bytes) throws Exception { stream.write(bytes); }
-                }).collectProcesses(receiver);
-            } finally { try { stream.close(); } catch (Exception ignored) {} }
-        }
+        qnxStage(reader -> reader.collectLogs(receiver));
+        qnxStage(reader -> reader.collectProcesses(receiver));
+    }
+    private interface QnxStep { void run(dezz.status.widget.diagnostics.QnxFileReader reader) throws Exception; }
+    private void qnxStage(QnxStep step) throws Exception {
+        if (Thread.currentThread().isInterrupted() || socket.isClosed())
+            throw new IOException("QNX collection cancelled or ADB disconnected");
+        AdbStream stream = openBounded("shell:toybox nc -w 30 198.18.34.2 8000");
+        try {
+            step.run(new dezz.status.widget.diagnostics.QnxFileReader(new dezz.status.widget.diagnostics.QnxFileReader.Wire() {
+                public byte[] read() throws Exception {
+                    try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 30_000L, "qnx-read")) { return stream.read(); }
+                }
+                public void write(byte[] bytes) throws Exception {
+                    try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 30_000L, "qnx-write")) { stream.write(bytes); }
+                }
+            }));
+        } finally { try { stream.close(); } catch (Exception ignored) {} }
     }
 
     public String execLongRunning(String command) throws Exception {

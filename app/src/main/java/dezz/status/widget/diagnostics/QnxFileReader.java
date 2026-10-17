@@ -13,6 +13,15 @@ public final class QnxFileReader {
         default void diagnostic(String path, String details) throws Exception {}
         default void snapshot(String name, String status, byte[] bytes) throws Exception {}
         default void log(String name, String status, byte[] bytes) throws Exception {}
+        default void mapping(String pid, String status, byte[] bytes) throws Exception {
+            throw new IOException("qnx_mapping_receiver_required");
+        }
+        /** Private scratch storage; contents are deleted after delivery, including failure. */
+        default File temporaryFile() throws IOException { return File.createTempFile("qnx-work-", ".part"); }
+        default void artifact(String name, String status, File file) throws Exception {
+            throw new IOException("qnx_streaming_receiver_required");
+        }
+        default void progress(String text) {}
     }
     public static final String[] TARGETS = {
         "/etc/system/config/variant.cfg", "/bin/openwfd_server", "/bin/openwfd_telltale",
@@ -28,17 +37,42 @@ public final class QnxFileReader {
         // Exact paths observed in screen's startup log and PanelLibrary config.
         // Keep /lib copies for comparison; do not assume a /lib64 alias.
         "/lib64/graphics.conf", "/lib64/libMAX96755_QC_0_UART.so",
-        "/lib64/libMAX96755_QC_1_UART.so", "/lib64/libDP_COMMON_QC_UART.so"
+        "/lib64/libMAX96755_QC_1_UART.so", "/lib64/libDP_COMMON_QC_UART.so",
+        // Observed in the 3.2.2 process inventory / mappings. These are explicit
+        // targets, never arbitrary paths downloaded from process output.
+        "/lib64/libopenwfd.so", "/lib64/libdisplay_shim_util.so",
+        "/lib64/libuhab-qvmhost.so", "/lib64/libbridgechip_client.so",
+        "/lib64/libdalconfig-sa8155_adp_star_v1.0.0.so",
+        "/usr/bin/cluster_controller", "/bin/sc_qnx_vip_proxy"
     };
-    public static final String[] SNAPSHOTS = {"processes.tsv", "graphics-mappings.txt", "proc-read-trace.tsv", "slog2-inventory.tsv"};
-    public static final int MAPPING_LIMIT = 256 * 1024, GRAPHICS_LIMIT = 8;
+    public static final String[] SNAPSHOTS = {"processes.tsv", "graphics-mappings.txt", "proc-read-trace.tsv", "slog2-inventory.tsv",
+            "filesystem-inventory.tsv", "filesystem-paths.txt"};
+    // First diagnostic attempt / proven maximum wire request, NOT a full-file budget.
+    public static final int MAPPING_LIMIT = 256 * 1024;
     private final Wire wire;
     private byte[] pending = new byte[0];
     private int cursor;
     private String stage="greeting", path="-", lastReply="-";
     private long offset, rx, tx;
-    private final StringBuilder trace=new StringBuilder("path\toffset\trequested\treceived\tsha256\tcontrol_reply\n");
-    private boolean traceTruncated;
+    private Artifact trace;
+    /** Disk-backed output: neither the catalog nor full mappings accumulate in Java strings. */
+    private static final class Artifact implements Closeable {
+        final Receiver receiver; final String name; final File file;
+        final OutputStream out; boolean ended;
+        Artifact(Receiver receiver, String name) throws IOException {
+            this.receiver=receiver;this.name=name;file=receiver.temporaryFile();
+            try { out=new BufferedOutputStream(new FileOutputStream(file)); }
+            catch(IOException error) { file.delete();throw error; }
+        }
+        Artifact append(Object text) throws IOException { out.write(String.valueOf(text).getBytes(StandardCharsets.UTF_8));return this; }
+        void flush() throws IOException { out.flush(); }
+        void finish(String status) throws Exception {
+            if(ended)return;ended=true;
+            try { out.close();receiver.artifact(name,status,file); }
+            finally { file.delete(); }
+        }
+        public void close() throws IOException { try { out.close(); } finally { file.delete(); } }
+    }
     private static String hex(byte[] bytes) {
         char[] digits="0123456789abcdef".toCharArray();
         char[] result=new char[bytes.length*2];
@@ -49,7 +83,6 @@ public final class QnxFileReader {
     }
     private String fullReply="-";
     private void traceRead(String target,int count,byte[] part) throws Exception {
-        if(trace.length()>2*1024*1024){traceTruncated=true;return;}
         StringBuilder hash=new StringBuilder();
         for(byte b:java.security.MessageDigest.getInstance("SHA-256").digest(part))hash.append(String.format(java.util.Locale.ROOT,"%02x",b&255));
         trace.append(target).append('\t').append(offset).append('\t').append(count).append('\t')
@@ -105,7 +138,10 @@ public final class QnxFileReader {
             lastReply=safe(new String(bytes.toByteArray(),StandardCharsets.US_ASCII));throw error;
         }
     }
-    private void send(String frame) throws Exception { byte[] bytes=frame.getBytes(StandardCharsets.US_ASCII);wire.write(bytes);tx+=bytes.length; }
+    private void send(String frame) throws Exception {
+        if(Thread.currentThread().isInterrupted())throw new InterruptedIOException();
+        byte[] bytes=frame.getBytes(StandardCharsets.UTF_8);wire.write(bytes);tx+=bytes.length;
+    }
     // Same non-payload line normalization as the previously successful Python reader.
     private String reply() throws Exception {
         for(int i=0;i<16;i++) {
@@ -131,18 +167,17 @@ public final class QnxFileReader {
         long[] s=new long[15];for(int i=0;i<15;i++)s[i]=number(f[i+1],16);
         return s;
     }
-    private byte[] readFile(long fd,int size) throws Exception {
-        ByteArrayOutputStream data=new ByteArrayOutputStream(size);
-        while(data.size()<size) {
-            offset=data.size();
-            int count=Math.min(2048,size-data.size());
-            send("r:"+fd+":"+Integer.toHexString(data.size())+":"+Integer.toHexString(count)+":0\r\n");
+    private byte[] readFile(long fd,long size,OutputStream out) throws Exception {
+        java.security.MessageDigest hash=java.security.MessageDigest.getInstance("SHA-256");
+        for(offset=0;offset<size;) {
+            int count=(int)Math.min(2048,size-offset);
+            send("r:"+fd+":"+Long.toHexString(offset)+":"+Integer.toHexString(count)+":0\r\n");
             String[] f=fields(); if(f.length<2) throw new IOException("qnx_bad_count");
             long got=number(f[1],16);
             if(got<1 || got>count) throw new IOException("qnx_short_read");
-            data.write(exact((int)got));
+            byte[] bytes=exact((int)got);hash.update(bytes);if(out!=null)out.write(bytes);offset+=got;
         }
-        return data.toByteArray();
+        return hash.digest();
     }
     public void collect(Receiver receiver) throws Exception {
         collectTargets(TARGETS,receiver);
@@ -168,20 +203,25 @@ public final class QnxFileReader {
             }
             long fd=descriptor(reply);
             stage="stat_before";long[] before=stat(fd);
-            if((before[9]&0xf000)!=0x8000 || before[1]>8*1024*1024) {
+            if((before[9]&0xf000)!=0x8000) {
                 stage="close";send("c:"+fd+"\r\n");fields();
-                receiver.file(path,(before[9]&0xf000)!=0x8000?"not_regular":"size_limit",null);
+                receiver.file(path,"not_regular",null);
                 receiver.diagnostic(path,report(null));continue;
             }
-            stage="read_first";byte[] bytes=readFile(fd,(int)before[1]);
-            // qconn has no remote SHA operation: independently reread the descriptor.
-            stage="read_second";byte[] second=readFile(fd,(int)before[1]);
-            stage="stat_after";long[] after=stat(fd);
-            boolean same=Arrays.equals(bytes,second) && before[0]==after[0]
-                    && before[1]==after[1] && before[6]==after[6] && before[8]==after[8] && before[9]==after[9];
-            stage="close";send("c:"+fd+"\r\n");fields();
+            try(Artifact data=new Artifact(receiver,"files"+path)) {
+                String status="partial_read_failed";
+                try {
+                    stage="read_first";byte[] first=readFile(fd,before[1],data.out);
+                    // qconn has no remote SHA operation: compare independent reads' hashes.
+                    stage="read_second";byte[] second=readFile(fd,before[1],null);
+                    stage="stat_after";long[] after=stat(fd);
+                    boolean same=Arrays.equals(first,second) && before[0]==after[0]
+                            && before[1]==after[1] && before[6]==after[6] && before[8]==after[8] && before[9]==after[9];
+                    stage="close";send("c:"+fd+"\r\n");fields();
+                    status=same?"collected_double_read":"changed_during_read";
+                } finally { data.finish(status); }
+            }
             stage="deliver";
-            receiver.file(path,same?"collected_double_read":"changed_during_read",same?bytes:null);
             receiver.diagnostic(path,report(null));
         }
     }
@@ -199,10 +239,198 @@ public final class QnxFileReader {
         stage="service_file";
         send("service file\r\n");if(!reply().equals("OK"))throw new IOException("qnx_service_failed");
     }
+    private interface NameConsumer { void accept(byte[] name) throws Exception; }
+    /** Page/frame bounds validate the protocol; there is no directory count or page budget. */
+    private void directory(long fd, NameConsumer consumer) throws Exception {
+        java.util.Set<String> pages=new java.util.HashSet<>();
+        for(long page=0;;page=Math.addExact(page,1)) {
+            offset=page;send("r:"+fd+":"+Long.toHexString(page)+":400:1\r\n");
+            String[] f=fields();if(f.length<4)throw new IOException("qnx_bad_directory_reply");
+            long length=number(f[2],16);
+            if(length>65536)throw new IOException("qnx_bad_directory_frame_length");
+            if(length==0)return;
+            ByteArrayOutputStream data=new ByteArrayOutputStream((int)length);
+            for(int n=0;n<length;n+=2048)data.write(exact((int)Math.min(2048,length-n)));
+            byte[] bytes=data.toByteArray();
+            String hash=hex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+            if(!pages.add(hash))throw new IOException("qnx_directory_repeated_page");
+            int begin=0;
+            for(int i=0;i+1<bytes.length;i++)if(bytes[i]==13&&bytes[i+1]==10) {
+                if(i>begin)consumer.accept(Arrays.copyOfRange(bytes,begin,i));
+                begin=i+2;i++;
+            }
+            if(begin!=bytes.length)throw new IOException("qnx_directory_incomplete_name");
+        }
+    }
+    private static String utf8(byte[] bytes) throws java.nio.charset.CharacterCodingException {
+        return StandardCharsets.UTF_8.newDecoder().onMalformedInput(java.nio.charset.CodingErrorAction.REPORT)
+                .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT).decode(java.nio.ByteBuffer.wrap(bytes)).toString();
+    }
+    static String tsv(String value) {
+        StringBuilder out=new StringBuilder();
+        for(int i=0;i<value.length();i++) {
+            char c=value.charAt(i);
+            if(c=='\\')out.append("\\\\");else if(c=='\t')out.append("\\t");
+            else if(c=='\n')out.append("\\n");else if(c=='\r')out.append("\\r");
+            else if(Character.isISOControl(c))out.append(String.format(java.util.Locale.ROOT,"\\u%04x",(int)c));
+            else out.append(c);
+        }
+        return out.toString();
+    }
+    private static boolean directoryPath(String path) {
+        if(!path.startsWith("/")||path.startsWith("//")||path.indexOf('"')>=0||path.indexOf('\\')>=0)return false;
+        for(String name:path.split("/",-1))if(name.equals(".")||name.equals(".."))return false;
+        for(int i=0;i<path.length();i++)if(Character.isISOControl(path.charAt(i)))return false;
+        // qconn control lines have a framing bound. Record longer discovered names,
+        // but never send a frame that cannot be represented by the validated dialect.
+        return path.getBytes(StandardCharsets.UTF_8).length+14<=4096;
+    }
+    private static boolean notDirectory(String reply) {
+        for(String field:reply.split(":")) {
+            String value=field.trim().toLowerCase(java.util.Locale.ROOT).replaceAll("\\s+"," ");
+            if(value.equals("enotdir")||value.equals("not a directory")
+                    ||value.matches("enotdir\\s*\\(\\s*(?:errno\\s*)?20\\s*\\)"))return true;
+        }
+        return false;
+    }
+    private static void inventoryRow(Artifact out,String event,String path,String type,long[] stat,String status,String detail) throws IOException {
+        out.append(event).append('\t').append(tsv(path)).append('\t').append(type).append('\t')
+                .append(stat==null?"unknown":stat[1]).append('\t').append(stat==null?"unknown":stat[2]).append('\t')
+                .append(stat==null?"unknown":stat[0]).append('\t').append(stat==null?"unknown":Long.toHexString(stat[9]))
+                .append('\t').append(status).append('\t').append(tsv(detail)).append('\n');
+    }
+    /** Full accessible namespace, DIRECTORY-ONLY opens. No discovered file is opened for content. */
+    public void collectInventory(Receiver receiver) throws Exception {
+        File queueFile=receiver.temporaryFile();
+        String status="collected_snapshot";
+        // Queue lives on disk: breadth and depth do not retain all discovered paths in heap.
+        try(Artifact inventory=new Artifact(receiver,"metadata/filesystem-inventory.tsv");
+            Artifact paths=new Artifact(receiver,"metadata/filesystem-paths.txt");
+            RandomAccessFile queue=new RandomAccessFile(queueFile,"rw")) {
+            inventory.append("event\tpath_tsv_escaped\ttype\tsize\tdevice\tinode\tmode_hex\tstatus\tdetail_tsv_escaped\n")
+                    .append("# Live namespace, not atomic. Directory opens follow aliases; dev/inode identifies visited targets.\n")
+                    .append("# Unknown file types/sizes stay unknown. ENOTDIR is not proof of a regular file.\n");
+            final long[] discovered={1}, examined={0};
+            java.util.Map<String,String> visited=new java.util.HashMap<>();
+            java.util.Map<String,String> uncertainIdentities=new java.util.HashMap<>();
+            queue.setLength(0);enqueue(queue,"/");paths.append("/\n");
+            inventoryRow(inventory,"discovered","/","unknown",null,"queued","root");
+            long cursor=0;
+            try {
+                path="/";handshake();
+                while(cursor<queue.length()) {
+                    queue.seek(cursor);int size=queue.readInt();byte[] raw=new byte[size];queue.readFully(raw);
+                    cursor=queue.getFilePointer();path=utf8(raw);examined[0]++;
+                    receiver.progress("Каталог QNX: найдено "+discovered[0]+", проверено "+examined[0]+" · "+path);
+                    if(!directoryPath(path)) {
+                        status="partial_or_unavailable";
+                        inventoryRow(inventory,"probe",path,"unknown",null,"unrepresentable_path","directory open not sent");continue;
+                    }
+                    stage="inventory_directory_open";offset=0;send("o:\""+path+"\":0:4000\r\n");String opened=reply();
+                    if(opened.startsWith("e:")) {
+                        boolean leaf=notDirectory(opened);
+                        if(!leaf)status="partial_or_unavailable";
+                        inventoryRow(inventory,"probe",path,leaf?"non_directory":"unknown",null,
+                                leaf?"not_directory":"directory_open_failed",opened);continue;
+                    }
+                    long fd=descriptor(opened);stage="inventory_directory_stat";
+                    long[] attributes;
+                    try { attributes=stat(fd); }
+                    catch(IOException error) {
+                        if(!"qnx_remote_error".equals(error.getMessage()))throw error;
+                        attributes=null;status="partial_or_unavailable";
+                        inventoryRow(inventory,"stat",path,"directory_open",null,"metadata_unavailable",lastReply);
+                    }
+                    if(attributes!=null&&(attributes[9]&0xf000)!=0x4000)throw new IOException("qnx_directory_only_open_returned_non_directory");
+                    boolean reliableIdentity=attributes!=null&&attributes[0]!=0;
+                    String previous=reliableIdentity?visited.putIfAbsent(attributes[2]+":"+attributes[0],path):null;
+                    if(previous!=null) {
+                        inventoryRow(inventory,"probe",path,"directory",attributes,
+                                "alias_already_enumerated",previous);
+                        send("c:"+fd+"\r\n");fields();continue;
+                    }
+                    if(!reliableIdentity) {
+                        status="partial_or_unavailable";
+                        inventoryRow(inventory,"identity",path,"directory_open",attributes,"identity_unavailable",
+                                "enumerate names; repeated unknown-identity listings cannot prove distinct subtrees");
+                    }
+                    inventoryRow(inventory,"probe",path,"directory",attributes,"opened",opened);
+                    final String parent=path;
+                    final java.util.Set<String> names=new java.util.TreeSet<>();
+                    final boolean[] nameFailure={false};
+                    long childrenStart=queue.length();
+                    stage="inventory_directory_read";
+                    try {
+                        directory(fd, nameBytes -> {
+                            String name;
+                            try { name=utf8(nameBytes); }
+                            catch(java.nio.charset.CharacterCodingException invalid) {
+                                nameFailure[0]=true;
+                                inventoryRow(inventory,"unrepresentable_name",parent,"unknown",null,"invalid_utf8","name_hex="+hex(nameBytes));return;
+                            }
+                            if(name.equals(".")||name.equals("..")||!names.add(name))return;
+                            if(name.indexOf('/')>=0) {
+                                nameFailure[0]=true;
+                                inventoryRow(inventory,"unrepresentable_name",parent,"unknown",null,"invalid_basename","name_hex="+hex(nameBytes));return;
+                            }
+                            String child=parent.equals("/")?"/"+name:parent+"/"+name;
+                            discovered[0]++;paths.append(tsv(child)).append('\n');
+                            inventoryRow(inventory,"discovered",child,"unknown",null,"queued","parent="+parent);
+                            enqueue(queue,child);
+                        });
+                        if(nameFailure[0])status="partial_or_unavailable";
+                        inventoryRow(inventory,"enumeration",path,"directory",attributes,"eof","directory page EOF observed");
+                        if(!reliableIdentity) {
+                            java.security.MessageDigest signature=java.security.MessageDigest.getInstance("SHA-256");
+                            for(String name:names) { signature.update(name.getBytes(StandardCharsets.UTF_8));signature.update((byte)0); }
+                            String equivalent=uncertainIdentities.putIfAbsent((attributes==null?"unknown":attributes[2])+":"+hex(signature.digest()),path);
+                            if(equivalent!=null && queue.length()>childrenStart) {
+                                // All names have already been recorded. Do not claim a
+                                // real alias: identical lists are only a cycle candidate.
+                                inventoryRow(inventory,"enumeration",path,"directory_open",attributes,"possible_cycle_identity_unknown",equivalent);
+                                long tail=childrenStart;
+                                while(tail<queue.length()) {
+                                    queue.seek(tail);byte[] rawChild=new byte[queue.readInt()];queue.readFully(rawChild);tail=queue.getFilePointer();
+                                    inventoryRow(inventory,"probe",utf8(rawChild),"unknown",null,"not_attempted_identity_ambiguous",equivalent);
+                                }
+                                queue.setLength(childrenStart);
+                            }
+                        }
+                    } catch(IOException error) {
+                        // A framed remote rejection or repeated page leaves the stream
+                        // aligned. Other errors must stop; never guess past lost payload.
+                        if(!"qnx_remote_error".equals(error.getMessage())&&!"qnx_directory_repeated_page".equals(error.getMessage()))throw error;
+                        status="partial_or_unavailable";
+                        inventoryRow(inventory,"enumeration",path,"directory",attributes,"incomplete",error.getMessage()+"; "+lastReply);
+                    }
+                    stage="inventory_directory_close";send("c:"+fd+"\r\n");fields();
+                }
+                inventory.append("# traversal_finished=true discovered=").append(discovered[0]).append(" examined=").append(examined[0]).append('\n');
+            } catch(Exception error) {
+                status="partial_or_unavailable";
+                inventoryRow(inventory,"failure",path,"unknown",null,"read_or_protocol_failed",report(error));
+                while(cursor<queue.length()) {
+                    queue.seek(cursor);byte[] raw=new byte[queue.readInt()];queue.readFully(raw);cursor=queue.getFilePointer();
+                    inventoryRow(inventory,"probe",utf8(raw),"unknown",null,"not_attempted_after_failure","previously discovered");
+                }
+                inventory.append("# traversal_finished=false discovered=").append(discovered[0]).append(" examined=").append(examined[0]).append('\n');
+                throw new Failure(path,report(error),error);
+            } finally { inventory.finish(status);paths.finish(status); }
+        } finally { queueFile.delete(); }
+    }
+    private static void enqueue(RandomAccessFile queue,String path) throws IOException {
+        byte[] bytes=path.getBytes(StandardCharsets.UTF_8);queue.seek(queue.length());queue.writeInt(bytes.length);queue.write(bytes);
+    }
     /** No cmdline, environment, address-space reads, devctl, launcher or process control. */
     public void collectProcesses(Receiver receiver) throws Exception {
-        StringBuilder index=new StringBuilder("pid\tstatus\texecutable\n");
-        StringBuilder maps=new StringBuilder("QNX mappings: metadata only; non-atomic live snapshot\n");
+        try(Artifact index=new Artifact(receiver,"metadata/processes.tsv");
+            Artifact maps=new Artifact(receiver,"metadata/graphics-mappings.txt");
+            Artifact procTrace=new Artifact(receiver,"metadata/proc-read-trace.tsv")) {
+        trace=procTrace;
+        trace.append("path\toffset\trequested\treceived\tsha256\tcontrol_reply\n");
+        index.append("pid\tstatus\texecutable\n");
+        maps.append("QNX mappings: format=3; non-atomic live snapshot\n"
+                +"Full sequential attempts are separate qnx/mappings/PID-wide.txt entries, read to EOF without a byte cap. Never concatenate attempts.\n");
         String indexStatus="collected_snapshot", mapsStatus="collected_snapshot";
         java.util.Set<String> pids=new java.util.LinkedHashSet<>();
         java.util.Set<String> indexed=new java.util.HashSet<>(), mapped=new java.util.HashSet<>();
@@ -213,26 +441,8 @@ public final class QnxFileReader {
             send("o:\"/proc\":0:4000\r\n");String opened=reply();
             if(opened.startsWith("e:"))throw new IOException("qnx_proc_open_denied_or_unavailable");
             long fd=descriptor(opened);
-            boolean eof=false;
-            int total=0;
-            for(int page=0;page<256;page++) {
-                send("r:"+fd+":"+Integer.toHexString(page)+":400:1\r\n");
-                String[] f=fields();if(f.length<4)throw new IOException("qnx_bad_directory_reply");
-                long length=number(f[2],16);
-                if(length>65536 || total+length>131072)throw new IOException("qnx_directory_size_limit");
-                int size=(int)length;
-                if(size==0){eof=true;break;}
-                total+=size;ByteArrayOutputStream data=new ByteArrayOutputStream(size);
-                for(int n=0;n<size;n+=2048)data.write(exact(Math.min(2048,size-n)));
-                for(String name:new String(data.toByteArray(),StandardCharsets.US_ASCII).split("\r\n",-1)) {
-                    if(name.matches("[1-9][0-9]{0,9}")) {
-                        if(!pids.contains(name) && pids.size()==256)throw new IOException("qnx_pid_limit");
-                        pids.add(name);
-                    }
-                }
-            }
+            directory(fd, raw -> { String name=utf8(raw);if(name.matches("[1-9][0-9]{0,9}"))pids.add(name); });
             send("c:"+fd+"\r\n");fields();
-            if(!eof)throw new IOException("qnx_directory_page_limit");
             // Inventory first. A large mappings file must never hide later process names.
             for(String pid:pids) {
                 path="/proc/"+pid+"/exefile";stage="proc_exefile";
@@ -262,9 +472,6 @@ public final class QnxFileReader {
             for(java.util.Map.Entry<String,String> process:graphics.entrySet()) {
                 String pid=process.getKey();
                 maps.append("--- pid=").append(pid).append(" executable=").append(safe(process.getValue())).append('\n');
-                if(mapped.size()>=GRAPHICS_LIMIT) {
-                    mapsStatus="partial_or_unavailable";maps.append("status=not_attempted_process_limit\n");continue;
-                }
                 path="/proc/"+pid+"/mappings";stage="proc_mappings";mapped.add(pid);
                 ProcRead mapping;
                 try { mapping=procText(path,MAPPING_LIMIT); }
@@ -275,18 +482,12 @@ public final class QnxFileReader {
                     mapping=new ProcRead(mapping.bytes,"read_content_invalid");
                 if(!mapping.status.equals("read"))mapsStatus="partial_or_unavailable";
                 appendMapping(maps,mapping.status,mapping.bytes);
-                if(mapping.status.equals("changed_during_read") || mapping.status.equals("read_content_invalid")) {
-                    // A separate bounded attempt, never splice two live snapshots.
+                if(mapping.status.equals("changed_during_read") || mapping.status.equals("read_content_invalid")
+                        || mapping.status.equals("truncated_size_limit")) {
+                    // Independent stream to EOF, never splice two live snapshots.
                     maps.append("--- pid=").append(pid).append(" attempt=wide_sequential\n");
                     stage="proc_mappings_wide";
-                    try {
-                        ProcRead wide=procText(path,MAPPING_LIMIT,true);
-                        if(wide.status.equals("read") && !validMappings(wide.bytes))
-                            wide=new ProcRead(wide.bytes,"read_content_invalid");
-                        appendMapping(maps,wide.status,wide.bytes);
-                    } catch(ProcFailure error) {
-                        appendMapping(maps,"read_or_protocol_failed",error.prefix);throw error;
-                    }
+                    fullMapping(receiver,maps,pid);
                 }
             }
             maps.append("graphics_processes_found=").append(graphics.size())
@@ -303,12 +504,9 @@ public final class QnxFileReader {
                     .append(" status=not_attempted_after_failure\n");
             throw new Failure(path,report(error),error);
         } finally {
-            receiver.snapshot(SNAPSHOTS[0],indexStatus,index.toString().getBytes(StandardCharsets.UTF_8));
-            receiver.snapshot(SNAPSHOTS[1],mapsStatus,maps.toString().getBytes(StandardCharsets.UTF_8));
-            if(traceTruncated)trace.append("# trace_size_limit\n");
-            receiver.snapshot("proc-read-trace.tsv",traceTruncated||!mapsStatus.equals("collected_snapshot")?
-                    "partial_or_unavailable":"collected_snapshot",trace.toString().getBytes(StandardCharsets.UTF_8));
+            index.finish(indexStatus);maps.finish(mapsStatus);trace.finish(mapsStatus);
         }
+        } finally { trace=null; }
     }
     /** Format gate only: valid rows do not prove an atomic or complete live snapshot. */
     static boolean validMappings(byte[] bytes) {
@@ -328,9 +526,79 @@ public final class QnxFileReader {
         }
         return true;
     }
-    private static void appendMapping(StringBuilder out,String status,byte[] bytes) {
+    private static void appendMapping(Artifact out,String status,byte[] bytes) throws IOException {
         out.append("status=").append(status).append(" bytes=").append(bytes.length).append('\n')
                 .append(new String(bytes,StandardCharsets.UTF_8).replace('\ufffd','?')).append('\n');
+    }
+    private void fullMapping(Receiver receiver,Artifact index,String pid) throws Exception {
+        String name="mappings/"+pid+"-wide.txt",status="read_or_protocol_failed";
+        try(Artifact data=new Artifact(receiver,name)) {
+            try {
+                path="/proc/"+pid+"/mappings";offset=0;
+                trace.append("# attempt path=").append(path).append(" strategy=wide_sequential_to_eof\n");
+                send("o:\""+path+"\":0\r\n");String opened=reply();
+                if(opened.startsWith("e:"))status="denied_or_exited";
+                else {
+                    long fd=descriptor(opened);
+                    while(true) {
+                        int count=MAPPING_LIMIT+1;
+                        send("r:"+fd+":"+Long.toHexString(offset)+":"+Integer.toHexString(count)+":0\r\n");
+                        String[] fields=fields();if(fields.length<2)throw new IOException("qnx_bad_proc_reply");
+                        long got=number(fields[1],16);if(got>count)throw new IOException("qnx_bad_proc_count");
+                        ByteArrayOutputStream block=new ByteArrayOutputStream((int)got);
+                        for(int n=0;n<got;n+=2048) {
+                            byte[] part=exact((int)Math.min(2048,got-n));data.out.write(part);block.write(part);
+                        }
+                        traceRead(path,count,block.toByteArray());
+                        if(got==0)break;
+                        offset=Math.addExact(offset,got);
+                        receiver.progress("Mappings QNX: PID "+pid+" · "+offset+" байт");
+                    }
+                    send("c:"+fd+"\r\n");fields();data.flush();
+                    status=validMappings(data.file)?"read":"read_content_invalid";
+                }
+            } catch(Exception error) {
+                trace.append("# failed path=").append(path).append(" offset=").append(offset)
+                        .append(" reply=").append(safe(lastReply)).append(" error=").append(safe(error.getMessage())).append('\n');
+                throw error;
+            } finally {
+                data.flush();index.append("status=").append(status).append(" file=qnx/").append(name)
+                        .append(" bytes=").append(data.file.length()).append(" sha256=").append(fileHash(data.file)).append('\n');
+                data.finish(status);
+            }
+        }
+    }
+    private static String fileHash(File file) throws Exception {
+        java.security.MessageDigest hash=java.security.MessageDigest.getInstance("SHA-256");
+        try(InputStream in=new FileInputStream(file)) { byte[] chunk=new byte[32768];int n;
+            while((n=in.read(chunk))!=-1)hash.update(chunk,0,n); }
+        return hex(hash.digest());
+    }
+    /** Validate arbitrarily large mappings with bounded parser memory; raw bytes remain intact. */
+    static boolean validMappings(File file) throws IOException {
+        String header="mi_vaddr,ri_flags,mi_flags,mi_pte_prot,mi_prot,ri_prot,ri_maxprot,mi_paddr,mi_hwattr,mi_pgsize,mi_sharecnt,dev,ino,ri_offset,object_name\n";
+        try(Reader in=new BufferedReader(new InputStreamReader(new FileInputStream(file),StandardCharsets.UTF_8.newDecoder()
+                .onMalformedInput(java.nio.charset.CodingErrorAction.REPORT).onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)))) {
+            for(int i=0;i<header.length();i++)if(in.read()!=header.charAt(i))return false;
+            int field=0,c;StringBuilder number=new StringBuilder();boolean rowStarted=false;
+            while((c=in.read())!=-1) {
+                rowStarted=true;
+                if(field<14) {
+                    if(c==',') { if(!mappingNumber(number))return false;number.setLength(0);field++; }
+                    else { if(number.length()>=18||c=='\n')return false;number.append((char)c); }
+                } else if(c=='\n') { field=0;rowStarted=false; }
+                else if(Character.isISOControl((char)c))return false;
+            }
+            return !rowStarted&&field==0;
+        } catch(java.nio.charset.CharacterCodingException invalid) { return false; }
+    }
+    private static boolean mappingNumber(CharSequence value) {
+        int start=value.length()>=2&&value.charAt(0)=='0'&&value.charAt(1)=='x'?2:0;
+        if(value.length()-start<1||value.length()-start>16)return false;
+        for(int i=start;i<value.length();i++) {
+            char c=value.charAt(i);if(!(c>='0'&&c<='9'||c>='a'&&c<='f'||c>='A'&&c<='F'))return false;
+        }
+        return true;
     }
     public static boolean allowedLog(String name) {
         return name.matches("(display|wfd_be|screen|screen_QC|openwfd_server|openwfd_server_QC|cluster_controller)\\.[1-9][0-9]{0,9}(?:\\.\\.[0-9]{1,3})?");
@@ -342,7 +610,8 @@ public final class QnxFileReader {
     }
     /** Existing shared-memory files only. Never invokes slog2info or a logging daemon. */
     public void collectLogs(Receiver receiver) throws Exception {
-        StringBuilder inventory=new StringBuilder("name\tstatus\tbytes\n# live, non-atomic; local SHA only\n");
+        try(Artifact inventory=new Artifact(receiver,"metadata/slog2-inventory.tsv")) {
+        inventory.append("name\tstatus\tbytes\n# live, non-atomic; local SHA only\n");
         String status="collected_snapshot";
         try {
             path="/dev/shmem/slogger2";handshake();stage="slog_directory";
@@ -350,33 +619,15 @@ public final class QnxFileReader {
             if(opened.startsWith("e:")) {
                 status="partial_or_unavailable";inventory.append("-\tdenied_or_unavailable\t0\n");return;
             }
-            long directory=descriptor(opened);int total=0;boolean eof=false;
+            long directory=descriptor(opened);
             java.util.Set<String> names=new java.util.TreeSet<>((a,b)-> {
                 int priority=Integer.compare(logPriority(a),logPriority(b));
                 return priority!=0?priority:a.compareTo(b);
             });
-            for(int page=0;page<64;page++) {
-                send("r:"+directory+":"+Integer.toHexString(page)+":400:1\r\n");
-                String[] f=fields();if(f.length<4)throw new IOException("qnx_bad_directory_reply");
-                long length=number(f[2],16);
-                if(length>65536||total+length>65536)throw new IOException("qnx_log_inventory_limit");
-                if(length==0){eof=true;break;}
-                total+=(int)length;ByteArrayOutputStream pageData=new ByteArrayOutputStream();
-                for(int n=0;n<length;n+=2048)pageData.write(exact((int)Math.min(2048,length-n)));
-                for(String name:new String(pageData.toByteArray(),StandardCharsets.US_ASCII).split("\r\n")) {
-                    if(allowedLog(name)) {
-                        names.add(name);if(names.size()>128)throw new IOException("qnx_log_name_limit");
-                    }
-                }
-            }
+            directory(directory, raw -> { String name=utf8(raw);if(allowedLog(name))names.add(name); });
             send("c:"+directory+"\r\n");fields();
-            if(!eof){status="partial_or_unavailable";inventory.append("-\tdirectory_page_limit\t0\n");}
-            int selected=0, bytesTotal=0;
             if(names.isEmpty()){status="partial_or_unavailable";inventory.append("-\tno_matching_logs\t0\n");}
             for(String name:names) {
-                if(selected>=12||bytesTotal>=8*1024*1024) {
-                    status="partial_or_unavailable";inventory.append(name).append("\tnot_selected_limit\t0\n");continue;
-                }
                 path="/dev/shmem/slogger2/"+name;stage="slog_open";
                 send("o:\""+path+"\":0\r\n");opened=reply();
                 if(opened.startsWith("e:")) {
@@ -393,37 +644,29 @@ public final class QnxFileReader {
                     send("c:"+fd+"\r\n");fields();status="partial_or_unavailable";
                     inventory.append(name).append("\tunsupported_file_type\t0\n");continue;
                 }
-                selected++;
-                int limit=(int)Math.min(before[1],Math.min(1024*1024,8*1024*1024-bytesTotal));
-                ByteArrayOutputStream data=new ByteArrayOutputStream();String fileStatus="collected_live_file";
+                try(Artifact data=new Artifact(receiver,"slog2/"+name)) {
+                String fileStatus="partial_read_failed";
                 try {
-                    stage="slog_read";
-                    while(data.size()<limit) {
-                        offset=data.size();int count=Math.min(2048,limit-data.size());
-                        send("r:"+fd+":"+Integer.toHexString(data.size())+":"+Integer.toHexString(count)+":0\r\n");
-                        String[] f=fields();if(f.length<2)throw new IOException("qnx_bad_log_reply");
-                        long got=number(f[1],16);if(got<1||got>count)throw new IOException("qnx_short_log_read");
-                        data.write(exact((int)got));
-                    }
+                    stage="slog_read";readFile(fd,before[1],data.out);
                     stage="slog_stat_after";long[] after=stat(fd);
                     inventory.append("# ").append(name).append(" before=").append(Arrays.toString(before))
                             .append(" after=").append(Arrays.toString(after)).append('\n');
-                    if(before[1]>limit)fileStatus="truncated_size_limit";
-                    else if(before[0]!=after[0]||before[1]!=after[1]||before[6]!=after[6]||before[8]!=after[8]||before[9]!=after[9])fileStatus="changed_during_read";
                     send("c:"+fd+"\r\n");fields();
-                } catch(Exception error) {
-                    receiver.log(name,"partial_read_failed",data.toByteArray());
-                    inventory.append(name).append("\tpartial_read_failed\t").append(data.size()).append('\n');throw error;
+                    fileStatus=before[0]!=after[0]||before[1]!=after[1]||before[6]!=after[6]||before[8]!=after[8]||before[9]!=after[9]
+                            ?"changed_during_read":"collected_live_file";
+                } finally {
+                    if(!fileStatus.equals("collected_live_file"))status="partial_or_unavailable";
+                    data.flush();inventory.append(name).append('\t').append(fileStatus).append('\t').append(data.file.length()).append('\n');
+                    data.finish(fileStatus);
                 }
-                if(!fileStatus.equals("collected_live_file"))status="partial_or_unavailable";
-                receiver.log(name,fileStatus,data.toByteArray());bytesTotal+=data.size();
-                inventory.append(name).append('\t').append(fileStatus).append('\t').append(data.size()).append('\n');
+                }
             }
         } catch(Exception error) {
             status="partial_or_unavailable";inventory.append("# ").append(safe(report(error))).append('\n');
             throw new Failure(path,report(error),error);
         } finally {
-            receiver.snapshot("slog2-inventory.tsv",status,inventory.toString().getBytes(StandardCharsets.UTF_8));
+            inventory.finish(status);
+        }
         }
     }
 
@@ -436,23 +679,16 @@ public final class QnxFileReader {
         ProcFailure(byte[] prefix,Exception cause){super(cause.getMessage(),cause);this.prefix=prefix;}
     }
     private ProcRead procText(String target,int limit) throws Exception {
-        return procText(target,limit,false);
-    }
-    private ProcRead procText(String target,int limit,boolean wide) throws Exception {
         if(!target.matches("/proc/[1-9][0-9]{0,9}/(exefile|mappings)"))throw new IOException("qnx_proc_target_not_allowed");
-        if(wide && (!target.endsWith("/mappings") || limit!=MAPPING_LIMIT))
-            throw new IOException("qnx_wide_target_not_allowed");
         ByteArrayOutputStream data=new ByteArrayOutputStream();
         byte[] uncommitted=new byte[0];
         try {
             offset=0;send("o:\""+target+"\":0\r\n");String opened=reply();
             if(opened.startsWith("e:"))return new ProcRead(new byte[0],"denied_or_exited");
             long fd=descriptor(opened);String status="read";
-            if(trace.length()<2*1024*1024-512)
-                trace.append("# attempt path=").append(target).append(" strategy=")
-                    .append(wide?"wide_sequential":"bounded_overlap").append('\n');
+            trace.append("# attempt path=").append(target).append(" strategy=bounded_overlap\n");
             while(true) {
-                offset=data.size();int count=Math.min(wide?MAPPING_LIMIT+1:2048,limit+1-data.size());
+                offset=data.size();int count=Math.min(2048,limit+1-data.size());
                 send("r:"+fd+":"+Integer.toHexString(data.size())+":"+Integer.toHexString(count)+":0\r\n");
                 String[] f=fields();if(f.length<2)throw new IOException("qnx_bad_proc_reply");
                 long got=number(f[1],16);if(got>count)throw new IOException("qnx_bad_proc_count");
@@ -470,10 +706,6 @@ public final class QnxFileReader {
                     for(int n=0;n<got;n+=2048)block.write(exact((int)Math.min(2048,got-n)));
                 } catch(Exception error) {
                     // Keep complete transport pieces received before disconnect.
-                    if(wide) {
-                        byte[] prefix=block.toByteArray();
-                        data.write(prefix,0,Math.min(prefix.length,limit-data.size()));
-                    }
                     throw error;
                 }
                 byte[] part=block.toByteArray();traceRead(target,count,part);
@@ -483,19 +715,17 @@ public final class QnxFileReader {
                 if(overlapChanged) {
                     // Preserve the original received prefix. A contradictory retry
                     // is evidence, not a replacement for the previously received tail.
-                    if(trace.length()<2*1024*1024-16384) {
-                        trace.append("# overlap_mismatch path=").append(target)
-                            .append(" offset=").append(offset)
-                            .append(" expected_tail_hex=").append(hex(uncommitted))
-                            .append(" reply_hex=").append(hex(part)).append('\n');
-                    } else traceTruncated=true;
+                    trace.append("# overlap_mismatch path=").append(target)
+                        .append(" offset=").append(offset)
+                        .append(" expected_tail_hex=").append(hex(uncommitted))
+                        .append(" reply_hex=").append(hex(part)).append('\n');
                     data.write(uncommitted);uncommitted=new byte[0];
                     status="changed_during_read";break;
                 }
                 int keep=Math.min(part.length,limit-data.size());
                 uncommitted=new byte[0];
                 if(keep<part.length){data.write(part,0,keep);status="truncated_size_limit";break;}
-                if(!wide && target.endsWith("/mappings") && got==2048 && count==2048) {
+                if(target.endsWith("/mappings") && got==2048 && count==2048) {
                     // Candidate for observed QNX pseudo-file loss at chunk boundaries:
                     // re-read the trailing row from its start using the same proven
                     // offset/count GET dialect. Device validation remains necessary.
@@ -511,7 +741,7 @@ public final class QnxFileReader {
             }
             send("c:"+fd+"\r\n");fields();return new ProcRead(data.toByteArray(),status);
         } catch(Exception error) {
-            if(trace.length()<2*1024*1024)trace.append("# failed path=").append(target)
+            trace.append("# failed path=").append(target)
                     .append(" offset=").append(offset).append(" reply=").append(safe(lastReply))
                     .append(" error=").append(safe(error.getMessage())).append('\n');
             // Preserve validated payload chunks; never resume a desynchronised stream.

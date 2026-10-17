@@ -11,7 +11,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-/** Explicit, bounded firmware evidence export; never a backup or a system writer. */
+/** Explicit firmware evidence export plus the full accessible QNX namespace inventory. */
 public final class SystemFileDump {
     public interface Shell {
         AdbShellResult.Result command(String command) throws Exception;
@@ -97,7 +97,7 @@ public final class SystemFileDump {
     static void put(ZipOutputStream zip, String name, byte[] bytes) throws IOException {
         zip.putNextEntry(new ZipEntry(name)); zip.write(bytes); zip.closeEntry();
     }
-    /** Caller supplies a private, cancellable ADB dump session (600-second overall deadline). */
+    /** Caller supplies a private, cancellable ADB dump session with per-I/O deadlines. */
     public static Report collect(File directory, Shell shell, Progress progress, String version) throws Exception {
         return collect(directory,shell,progress,version,null);
     }
@@ -212,19 +212,52 @@ public final class SystemFileDump {
                     }
                     final String[] currentPath={"-"};
                     final StringBuilder qnxDetails=new StringBuilder("endpoint=198.18.34.2:8000\ntransport=adb-shell-toybox-nc\n"
-                            +"connection_scope=one_file\noverall_deadline_seconds=600\nfile_deadline_seconds=60\nprocess_deadline_seconds=60\n");
+                            +"connection_scope=one_file_or_metadata_stage\noverall_deadline_seconds=none\nio_deadline_seconds=30\n");
                     boolean qnxFailed=false;
                     try {
                         progress.update("Чтение QNX через ADB/qconn…");
                         qnx.collect(new QnxFileReader.Receiver() {
                             private final java.util.Set<String> logs=new java.util.HashSet<>();
-                            private int logBytes;
+                            private final java.util.Set<String> artifacts=new java.util.HashSet<>();
+                            private long progressAt;
+                            public File temporaryFile() throws IOException { return File.createTempFile("qnx-work-", ".part", directory); }
+                            public void progress(String text) {
+                                long now=System.nanoTime();
+                                if(now-progressAt>=1_000_000_000L) { progressAt=now;progress.update(text); }
+                            }
+                            public void artifact(String name,String status,File file) throws Exception {
+                                String key;boolean complete;
+                                if(name.startsWith("metadata/")&&java.util.Arrays.asList(QnxFileReader.SNAPSHOTS).contains(name.substring(9))
+                                        &&status.matches("collected_snapshot|partial_or_unavailable")&&snapshots.add(name.substring(9))) {
+                                    key="qnx-meta:"+name.substring(9);complete=status.equals("collected_snapshot");
+                                } else if(name.matches("mappings/[1-9][0-9]{0,9}-wide\\.txt")
+                                        &&status.matches("read|read_content_invalid|denied_or_exited|read_or_protocol_failed")) {
+                                    key="qnx-mapping:"+name.substring(9);complete=status.equals("read");
+                                } else if(name.startsWith("slog2/")&&QnxFileReader.allowedLog(name.substring(6))
+                                        &&status.matches("collected_live_file|changed_during_read|partial_read_failed")&&logs.add(name.substring(6))) {
+                                    key="qnx-slog2:"+name.substring(6);complete=status.equals("collected_live_file");
+                                } else if(name.startsWith("files/")&&java.util.Arrays.asList(QnxFileReader.TARGETS).contains(name.substring(5))
+                                        &&status.matches("collected_double_read|changed_during_read|partial_read_failed")&&qnxAttempted.add(name.substring(5))) {
+                                    key="qnx:"+name.substring(5);complete=status.equals("collected_double_read");
+                                    if(complete)qcount[0]++;
+                                } else throw new IOException("invalid_qnx_artifact");
+                                if(!artifacts.add(name))throw new IOException("duplicate_qnx_artifact");
+                                if(!complete)snapshotPartial[0]=true;
+                                MessageDigest hash=MessageDigest.getInstance("SHA-256");long bytes=0;
+                                zip.putNextEntry(new ZipEntry("qnx/"+name));
+                                try(InputStream in=new BufferedInputStream(new FileInputStream(file))) {
+                                    byte[] chunk=new byte[32768];int n;
+                                    // Cancellation stops remote reads; already acquired local bytes are still packaged.
+                                    while((n=in.read(chunk))!=-1) { zip.write(chunk,0,n);hash.update(chunk,0,n);bytes+=n; }
+                                } finally { zip.closeEntry(); }
+                                StringBuilder sha=new StringBuilder();
+                                for(byte b:hash.digest())sha.append(String.format(Locale.ROOT,"%02x",b&255));
+                                manifest.append(key).append('\t').append(status).append('\t').append(bytes).append('\t').append(sha).append('\n');
+                            }
                             public void log(String name,String status,byte[] bytes) throws Exception {
                                 if(!QnxFileReader.allowedLog(name)||!status.matches("collected_live_file|changed_during_read|truncated_size_limit|partial_read_failed")
-                                        ||bytes==null||bytes.length>1024*1024||logs.size()>=12||!logs.add(name)
-                                        ||logBytes+bytes.length>8*1024*1024||qtotal[0]+bytes.length>MAX_TOTAL)
+                                        ||bytes==null||!logs.add(name))
                                     throw new IOException("invalid_qnx_log");
-                                logBytes+=bytes.length;qtotal[0]+=bytes.length;
                                 if(!status.equals("collected_live_file"))snapshotPartial[0]=true;
                                 put(zip,"qnx/slog2/"+name,bytes);
                                 manifest.append("qnx-slog2:").append(name).append('\t').append(status).append('\t')
@@ -233,11 +266,10 @@ public final class SystemFileDump {
                             public void snapshot(String name,String status,byte[] bytes) throws Exception {
                                 if(!java.util.Arrays.asList(QnxFileReader.SNAPSHOTS).contains(name)
                                         || !status.matches("collected_snapshot|partial_or_unavailable")
-                                        || bytes==null || bytes.length>3*1024*1024 || !snapshots.add(name))
+                                        || bytes==null || !snapshots.add(name))
                                     throw new IOException("invalid_qnx_snapshot");
-                                if(qtotal[0]+bytes.length>MAX_TOTAL)throw new IOException("qnx_snapshot_total_limit");
                                 if(!status.equals("collected_snapshot"))snapshotPartial[0]=true;
-                                put(zip,"qnx/metadata/"+name,bytes);qtotal[0]+=bytes.length;
+                                put(zip,"qnx/metadata/"+name,bytes);
                                 manifest.append("qnx-meta:").append(name).append('\t').append(status).append('\t')
                                         .append(bytes.length).append('\t').append(digest(bytes)).append('\n');
                             }
@@ -245,11 +277,8 @@ public final class SystemFileDump {
                                 if(!java.util.Arrays.asList(QnxFileReader.TARGETS).contains(path)
                                         || !status.matches("[a-z_]+") || !qnxAttempted.add(path))
                                     throw new IOException("invalid_qnx_result");
-                                if(bytes!=null && (bytes.length>MAX_FILE || qtotal[0]+bytes.length>MAX_TOTAL)) {
-                                    bytes=null;status="size_limit";
-                                }
                                 String sha="-";
-                                if(bytes!=null) {sha=digest(bytes);put(zip,"qnx/files"+path,bytes);qcount[0]++;qtotal[0]+=bytes.length;}
+                                if(bytes!=null) {sha=digest(bytes);put(zip,"qnx/files"+path,bytes);qcount[0]++;}
                                 manifest.append("qnx:").append(path).append('\t').append(status).append('\t')
                                         .append(bytes==null?0:bytes.length).append('\t').append(sha).append('\n');
                             }
@@ -294,14 +323,21 @@ public final class SystemFileDump {
                     +"\ncollected="+count+"/"+(PATHS.length+(qnx==null?0:QnxFileReader.TARGETS.length))+"\nwall_ms="+System.currentTimeMillis()
                     +"\ncapture_state_user_label="+captureState+"\nstart_wall_ms="+startWall
                     +"\nelapsed_ms="+((System.nanoTime()-startMono)/1000000)
-                    +"\nLimits: 8 MiB/file, 64 MiB total, dump session 600 seconds; QNX 60 seconds/file and process stage.\n"
-                    +"Explicit allowlist only; not a complete firmware backup. Missing and inaccessible may be indistinguishable.\n"
+                    +"\nQNX: no total-time, file-size, payload-total, PID-count, log-count, directory-count or depth budget.\n"
+                    +"Cancellation, available storage, protocol framing and 30-second I/O deadlines still apply. Android evidence retains its separate bounds.\n"
+                    +"Full accessible QNX namespace inventory from /, including hidden names; discovered file contents are not downloaded.\n"
+                    +"filesystem-paths.txt is a path list with TSV-style backslash escapes. filesystem-inventory.tsv is an event journal: discovered, probe, enumeration, failure.\n"
+                    +"Directory-only opens; explicit ENOTDIR means non-directory, not regular file. Opaque errors, unknown types/sizes and unavailable directory identity are explicit.\n"
+                    +"Aliases are listed but not recursively duplicated; dev/inode identity detects revisits. Per-directory EOF and traversal_finished report coverage, not an atomic snapshot.\n"
+                    +"Content collection uses the explicit allowlist only; not a complete firmware backup. Missing and inaccessible may be indistinguishable.\n"
                     +"Files are verified against remote SHA-256 before/after transfer, but not an atomic system snapshot.\n"
-                    +"QNX exception: descriptor stat and two equal reads; SHA-256 computed locally, not remote authenticated hash.\n"
-                    +"QNX process metadata: bounded single reads of exefile and selected graphics mappings, not atomic or double-read verified.\n"
-                    +"Process inventory first: max 256 PIDs, then max 8 graphics mappings, 256 KiB each; capped prefixes kept.\n"
+                    +"QNX exception: descriptor stat and equal SHA-256 of two independent reads; hashes are local, not remote authenticated hashes.\n"
+                    +"QNX process metadata is live, not atomic or double-read verified. All discovered numeric PIDs are indexed before all matching graphics processes.\n"
+                    +"exefile uses a 4096-byte path probe; a longer reply is explicitly invalid/incomplete. Initial mappings probe is 256 KiB, preserved as diagnostic evidence.\n"
                     +"Mappings overlap mismatch: original received prefix retained; conflicting reply and expected tail in proc-read-trace.tsv as hex.\n"
-                    +"Invalid/mismatched mappings: one separate wide sequential attempt, at most 256 KiB plus one overflow-detection byte; no rewind, no merging snapshots. Both results retained; field validation pending.\n"
+                    +"Invalid/mismatched/truncated mappings: a separate sequential attempt through EOF; each wire request is at most 256 KiB+1, with no total byte cap or snapshot splicing.\n"
+                    +"Mappings format=3: initial probes in qnx/metadata/graphics-mappings.txt; full attempts in qnx/mappings/PID-wide.txt with index references and manifest hashes. Field validation pending.\n"
+                    +"Slog2: all existing matching display/graphics buffers at their observed size, no count/byte cap; no logger launch.\n"
                     +"QNX /lib and observed /lib64 configuration/driver paths collected separately; matching bytes do not prove filesystem aliases.\n"
                     +"Graphics Android context: display/layer names/clock up to 64 KiB; composition/windows up to 1 MiB before/after DLT stage.\n"
                     +"DLT: existing /mnt/userdata/DLT only, non-hidden entries, depth 2, 8 subdirectories, 128 entries, 4 newest dlt/log/txt files.\n"

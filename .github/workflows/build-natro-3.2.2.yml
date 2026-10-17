@@ -1,8 +1,6 @@
 name: Build Natro 3.2.2 update candidate
 on:
-  push:
-    branches: ['fix/qnx-reader-20261016']
-    paths: ['app/**', 'navigator-mod/**', 'tools/**', 'wechat-compat/**', 'settings.gradle', 'build.gradle', '.github/workflows/build-natro-3.2.2.yml']
+  workflow_dispatch:
 permissions:
   contents: read
 concurrency:

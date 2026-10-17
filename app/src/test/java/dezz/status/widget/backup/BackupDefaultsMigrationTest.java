@@ -223,6 +223,18 @@ public class BackupDefaultsMigrationTest {
             try { BackupDefaultsMigration.validate(metadata, 208021341); fail(); } catch (IOException expected) {}
         }
     }
+    @Test public void fullQnxInventoryReleaseAcceptsReviewedSchemas()throws Exception{
+        for(int source=208021335;source<=208021356;source++){
+            JSONObject metadata=new JSONObject().put("sourceVersionCode",source).put("defaultsSchema",source)
+                    .put("declaredMainDefaults",BackupPreferencesXml.encode(Collections.emptyMap()));
+            BackupDefaultsMigration.validate(metadata,208021356);
+        }
+        for(int invalid:new int[]{208021334,208021357}){
+            JSONObject metadata=new JSONObject().put("sourceVersionCode",invalid).put("defaultsSchema",invalid)
+                    .put("declaredMainDefaults",BackupPreferencesXml.encode(Collections.emptyMap()));
+            try{BackupDefaultsMigration.validate(metadata,208021356);fail();}catch(IOException expected){}
+        }
+    }
     @Test public void wideMappingsReleaseAcceptsReviewedSchemas()throws Exception{
         for(int source=208021335;source<=208021355;source++){
             JSONObject metadata=new JSONObject().put("sourceVersionCode",source).put("defaultsSchema",source)

@@ -7,11 +7,14 @@ import java.util.concurrent.*;
 
 /** Cancels the exact blocked operation, including adblib's monitor wait during OPEN. */
 final class AdbOperationDeadline implements AutoCloseable {
-    private static final ScheduledExecutorService TIMER = Executors.newSingleThreadScheduledExecutor(r -> {
+    private static final ScheduledThreadPoolExecutor TIMER = new ScheduledThreadPoolExecutor(1,r -> {
         Thread thread = new Thread(r, "natro-adb-io-deadline");
         thread.setDaemon(true);
         return thread;
     });
+    // Full inventory creates many short I/O deadlines. Discard cancelled tasks
+    // immediately instead of retaining every task until its original expiry.
+    static { TIMER.setRemoveOnCancelPolicy(true); }
     private final Thread worker = Thread.currentThread();
     private final Socket socket;
     private final String stage;

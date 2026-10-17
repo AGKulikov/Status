@@ -89,6 +89,41 @@ public final class SystemFileDumpReplay {
                     receiver.snapshot("../escape","collected_snapshot",new byte[1]);
                 });
         check(manifest(rejected).contains("qnx-meta:processes.tsv\tnot_collected"));
+        // Exercise the production ZIP receiver past BOTH old limits (3 MiB
+        // metadata, 64 MiB aggregate), without holding the payload in memory.
+        final long largeSize=65L*1024*1024+17;
+        final String[] largeSha={null};
+        SystemFileDump.Report streamed=SystemFileDump.collect(directory,
+                c->c.contains("readlink -f")?result("UART"):good.command(c),s->{},"test",receiver->{
+                    File spool=receiver.temporaryFile();
+                    try {
+                        java.security.MessageDigest expected=java.security.MessageDigest.getInstance("SHA-256");
+                        try(OutputStream out=new BufferedOutputStream(new FileOutputStream(spool))) {
+                            byte[] chunk=new byte[32768];for(int i=0;i<chunk.length;i++)chunk[i]=(byte)i;
+                            for(long offset=0;offset<largeSize;) {
+                                int n=(int)Math.min(chunk.length,largeSize-offset);out.write(chunk,0,n);expected.update(chunk,0,n);offset+=n;
+                            }
+                        }
+                        StringBuilder hash=new StringBuilder();for(byte b:expected.digest())hash.append(String.format(Locale.ROOT,"%02x",b&255));
+                        largeSha[0]=hash.toString();
+                        receiver.artifact("mappings/12-wide.txt","read",spool);
+                        receiver.artifact("metadata/filesystem-paths.txt","partial_or_unavailable",spool);
+                        receiver.artifact("metadata/../../escape","collected_snapshot",spool);
+                    } finally { spool.delete(); }
+                });
+        check(!streamed.complete);
+        try(ZipFile zip=new ZipFile(streamed.file)) {
+            for(String name:new String[]{"qnx/mappings/12-wide.txt","qnx/metadata/filesystem-paths.txt"}) {
+                ZipEntry entry=zip.getEntry(name);check(entry.getSize()==largeSize);
+                java.security.MessageDigest actual=java.security.MessageDigest.getInstance("SHA-256");
+                try(InputStream in=zip.getInputStream(entry)) { byte[] chunk=new byte[32768];int n;while((n=in.read(chunk))!=-1)actual.update(chunk,0,n); }
+                StringBuilder hash=new StringBuilder();for(byte b:actual.digest())hash.append(String.format(Locale.ROOT,"%02x",b&255));
+                check(hash.toString().equals(largeSha[0]));
+            }
+            check(zip.getEntry("qnx/metadata/../../escape")==null);
+        }
+        check(manifest(streamed).contains("qnx-mapping:12-wide.txt\tread\t"+largeSize+"\t"+largeSha[0]));
+        check(manifest(streamed).contains("qnx-meta:filesystem-paths.txt\tpartial_or_unavailable\t"+largeSize+"\t"+largeSha[0]));
         for(String bad:new String[]{"a","!!!!","AA==junk","AB=="}) {
             try{SystemFileDump.decode(bad,1);throw new AssertionError();}catch(IOException expected){}
         }

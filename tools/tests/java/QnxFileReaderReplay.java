@@ -4,6 +4,25 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.zip.ZipFile;
 public class QnxFileReaderReplay {
+    // Small synthetic fixtures may be materialized in memory; production receives
+    // the same disk-backed artifacts and streams them directly into ZIP.
+    static class Capture implements QnxFileReader.Receiver {
+        public void file(String p,String s,byte[] b)throws Exception {}
+        public void mapping(String p,String s,byte[] b)throws Exception {}
+        public void artifact(String name,String status,File file)throws Exception {
+            byte[] bytes=java.nio.file.Files.readAllBytes(file.toPath());
+            if(name.startsWith("files/"))file(name.substring(5),status,bytes);
+            else if(name.startsWith("metadata/"))snapshot(name.substring(9),status,bytes);
+            else if(name.startsWith("slog2/"))log(name.substring(6),status,bytes);
+            else if(name.startsWith("mappings/"))mapping(name.substring(9,name.length()-9),status,bytes);
+            else throw new AssertionError(name);
+        }
+    }
+    static Capture capture(QnxFileReader.Receiver receiver) {
+        return new Capture() {
+            public void file(String p,String s,byte[] b)throws Exception { receiver.file(p,s,b); }
+        };
+    }
     static final String MAP_HEADER="mi_vaddr,ri_flags,mi_flags,mi_pte_prot,mi_prot,ri_prot,ri_maxprot,mi_paddr,mi_hwattr,mi_pgsize,mi_sharecnt,dev,ino,ri_offset,object_name\n";
     static final String MAP_ROW="0x1000,0x1,0x14,0x3,0x3,0x3,0xf,0xffffffffffffffff,0x0,0x1000,00000001,0x1,0x3,0x0,/lib/libopenwfd_qnx.so\n";
     static class Peer implements QnxFileReader.Wire {
@@ -140,21 +159,21 @@ public class QnxFileReaderReplay {
             if(QnxFileReader.allowedLog(name))throw new AssertionError(name);
         for(int mode=0;mode<=8;mode++) {
             final int scenario=mode;Map<String,byte[]> logs=new HashMap<>();String[] inventory={null};boolean failed=false;
-            try {new QnxFileReader(new LogPeer(mode)).collectLogs(new QnxFileReader.Receiver(){
+            try {new QnxFileReader(new LogPeer(mode)).collectLogs(new Capture(){
                 public void file(String p,String s,byte[] b){throw new AssertionError();}
                 public void log(String n,String s,byte[] b){
                     if(logs.put(n,b)!=null)throw new AssertionError("duplicate");
-                    String expected=scenario==0||scenario==6?"collected_live_file":scenario==2?"truncated_size_limit":scenario==3||scenario==8?"changed_during_read":"partial_read_failed";
+                    String expected=scenario==0||scenario==2||scenario==6?"collected_live_file":scenario==3||scenario==8?"changed_during_read":"partial_read_failed";
                     if(!s.equals(expected))throw new AssertionError(s);
                 }
                 public void snapshot(String n,String s,byte[] b){
-                    if(!n.equals("slog2-inventory.tsv")||!s.equals(scenario==0||scenario==6?"collected_snapshot":"partial_or_unavailable"))throw new AssertionError(s);
+                    if(!n.equals("slog2-inventory.tsv")||!s.equals(scenario==0||scenario==2||scenario==6?"collected_snapshot":"partial_or_unavailable"))throw new AssertionError(s);
                     inventory[0]=new String(b,StandardCharsets.UTF_8);
                 }
             });}catch(QnxFileReader.Failure expected){failed=true;}
             if(failed!=(mode==4||mode==5)||inventory[0]==null||logs.size()!=(mode==1||mode==7?0:1))throw new AssertionError("log mode "+mode);
             if(mode==7&&!inventory[0].contains("mode=0x21a4"))throw new AssertionError("rejected stat missing");
-            if(mode!=1&&mode!=7&&logs.values().iterator().next().length!=(mode==2?1024*1024:mode==4?2048:mode==5?0:4101))throw new AssertionError("prefix "+mode);
+            if(mode!=1&&mode!=7&&logs.values().iterator().next().length!=(mode==2?1024*1024+1:mode==4?2048:mode==5?0:4101))throw new AssertionError("prefix "+mode);
         }
         for(boolean rejectedFirst:new boolean[]{true,false}) {
             LogPeer peer=new LogPeer(0) {
@@ -171,7 +190,7 @@ public class QnxFileReaderReplay {
                     if(s.startsWith("r:0:")&&current.equals("/dev/shmem/slogger2")) {
                         frames.add(s);StringBuilder listing=new StringBuilder();
                         if(s.split(":")[2].equals("0")) {
-                            for(int i=1;i<=13;i++)listing.append(rejectedFirst?"cluster_controller.":"display.").append(i).append("\r\n");
+                            for(int i=1;i<=140;i++)listing.append(rejectedFirst?"cluster_controller.":"display.").append(i).append("\r\n");
                             listing.append("wfd_be.99\r\n");
                         }
                         add("o:0:"+Integer.toHexString(listing.length())+":0\r\n");add(listing.toString());return;
@@ -180,14 +199,14 @@ public class QnxFileReaderReplay {
                 }
             };
             List<String> delivered=new ArrayList<>();
-            new QnxFileReader(peer).collectLogs(new QnxFileReader.Receiver(){
+            new QnxFileReader(peer).collectLogs(new Capture(){
                 public void file(String p,String s,byte[] b){throw new AssertionError();}
                 public void log(String n,String s,byte[] b){
                     if(!s.equals("collected_live_file")||b.length!=1)throw new AssertionError(s);
                     delivered.add(n);
                 }
             });
-            if(!delivered.contains("wfd_be.99")||delivered.size()!=(rejectedFirst?1:12))
+            if(!delivered.contains("wfd_be.99")||delivered.size()!=(rejectedFirst?1:141))
                 throw new AssertionError("selection/starvation "+delivered);
             if(!rejectedFirst&&!delivered.get(0).equals("wfd_be.99"))throw new AssertionError("priority");
         }
@@ -195,11 +214,12 @@ public class QnxFileReaderReplay {
 
     static void processTests()throws Exception {
         for(int mode=0;mode<=14;mode++) {
-            ProcPeer peer=new ProcPeer(mode);Map<String,String> payloads=new HashMap<>();
+            ProcPeer peer=new ProcPeer(mode);Map<String,String> payloads=new HashMap<>();Map<String,String> widePayloads=new HashMap<>();
             final int scenario=mode;
             boolean failed=false;
-            try {new QnxFileReader(peer).collectProcesses(new QnxFileReader.Receiver(){
+            try {new QnxFileReader(peer).collectProcesses(new Capture(){
                 public void file(String p,String s,byte[] b){throw new AssertionError();}
+                public void mapping(String p,String s,byte[] b){widePayloads.put(p,new String(b,StandardCharsets.UTF_8));}
                 public void snapshot(String n,String s,byte[] b){
                     boolean complete=scenario==0||scenario==11||(scenario>=6&&n.equals("processes.tsv"));
                     if(!s.equals(complete?"collected_snapshot":"partial_or_unavailable"))throw new AssertionError(n+" "+s);
@@ -229,8 +249,8 @@ public class QnxFileReaderReplay {
                 if(!trace.contains("# overlap_mismatch path=/proc/12/mappings")
                         ||!trace.contains(" expected_tail_hex=")||!trace.contains(" reply_hex=58"))
                     throw new AssertionError("conflicting reply evidence lost");
-                if(!maps.contains("attempt=wide_sequential\nstatus=read bytes="+(MAP_HEADER+MAP_ROW.repeat(100)).length()
-                        +"\n"+MAP_HEADER+MAP_ROW.repeat(100)))
+                if(!maps.contains("attempt=wide_sequential\nstatus=read file=qnx/mappings/12-wide.txt bytes="+(MAP_HEADER+MAP_ROW.repeat(100)).length())
+                        ||!(MAP_HEADER+MAP_ROW.repeat(100)).equals(widePayloads.get("12")))
                     throw new AssertionError("wide attempt failed to preserve complete independent snapshot");
                 if(!peer.frames.contains("r:0:0:40001:0\r\n"))throw new AssertionError("wide request missing");
             }
@@ -266,12 +286,12 @@ public class QnxFileReaderReplay {
                 }
             };
             Map<String,String> outputs=new HashMap<>();boolean rejected=false;
-            try {new QnxFileReader(peer).collectProcesses(new QnxFileReader.Receiver(){
+            try {new QnxFileReader(peer).collectProcesses(new Capture(){
                 public void file(String p,String s,byte[] b){throw new AssertionError();}
                 public void snapshot(String n,String s,byte[] b){outputs.put(n,new String(b,StandardCharsets.UTF_8));}
             });}catch(QnxFileReader.Failure expected){rejected=true;}
             if(!rejected||!outputs.get("graphics-mappings.txt").contains("status=changed_during_read bytes=2185")
-                    ||!outputs.get("graphics-mappings.txt").contains("status=read_or_protocol_failed bytes=0")
+                    ||!outputs.get("graphics-mappings.txt").contains("status=read_or_protocol_failed file=qnx/mappings/12-wide.txt bytes=0")
                     ||!outputs.get("graphics-mappings.txt").contains("pid=34 status=not_attempted_after_failure"))
                 throw new AssertionError("wide rejection/oversized reply must preserve evidence and stop stream");
         }
@@ -279,25 +299,24 @@ public class QnxFileReaderReplay {
                 "/lib64/libMAX96755_QC_1_UART.so","/lib64/libDP_COMMON_QC_UART.so"})
             if(!Arrays.asList(QnxFileReader.TARGETS).contains(target))throw new AssertionError("observed path missing");
         logTests();
-        for(String stat:new String[]{"o:1:800001:0:0:0:0:1:1:1:81a4:1:0:0:0:0\r\n",
-                "o:1:0:0:0:0:0:1:1:1:41a4:1:0:0:0:0\r\n"}) {
+        for(String stat:new String[]{"o:1:0:0:0:0:0:1:1:1:41a4:1:0:0:0:0\r\n"}) {
             Peer rejected=new Peer(0){public void write(byte[] bytes)throws Exception {
                 if(new String(bytes,StandardCharsets.US_ASCII).equals("s:0\r\n")){add(stat);return;}
                 super.write(bytes);
             }};
             new QnxFileReader(rejected).collectSingle(QnxFileReader.TARGETS[0],(p,s,b)->{
-                if(b!=null||!s.equals(stat.contains("800001")?"size_limit":"not_regular"))throw new AssertionError();
+                if(b!=null||!s.equals("not_regular"))throw new AssertionError();
             });
             if(rejected.reads!=0||!rejected.frames.contains("c:0\r\n"))throw new AssertionError();
         }
         for(int mode=0;mode<5;mode++) {
             Peer p=new Peer(mode);int[] received={0};final int m=mode;
-            try {new QnxFileReader(p).collect((path,status,bytes)->{
+            try {new QnxFileReader(p).collect(capture((path,status,bytes)->{
                 if(m==0&&(!status.equals("collected_double_read")||!Arrays.equals(bytes,p.body)))throw new AssertionError();
                 if(m==1&&!status.equals("remote_open_failed"))throw new AssertionError();
                 if(m==3&&received[0]==0&&!status.equals("changed_during_read"))throw new AssertionError();
                 received[0]++;
-            });if(mode==2)throw new AssertionError("Oversized read accepted");}
+            }));if(mode==2)throw new AssertionError("Oversized read accepted");}
             catch(QnxFileReader.Failure e){if(mode!=2)throw e;
                 if(!e.report.contains("stage=read_first")||!e.report.contains("qnx_short_read"))throw new AssertionError(e.report);}
             if(mode!=2&&received[0]!=QnxFileReader.TARGETS.length)throw new AssertionError();
@@ -314,7 +333,7 @@ public class QnxFileReaderReplay {
             if(recorded.body.length!=38529)throw new AssertionError("Evidence size mismatch");
         }
         int[] delivered={0},diagnostics={0};
-        new QnxFileReader(recorded).collectSingle("/bin/qcdisplaycfg.xml",new QnxFileReader.Receiver(){
+        new QnxFileReader(recorded).collectSingle("/bin/qcdisplaycfg.xml",new Capture(){
             public void file(String path,String status,byte[] bytes){
                 if(!status.equals("collected_double_read")||!Arrays.equals(bytes,recorded.body))throw new AssertionError();
                 delivered[0]++;

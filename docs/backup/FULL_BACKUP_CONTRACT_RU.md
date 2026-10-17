@@ -1,5 +1,26 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review3.2.3 — потоковый каталог QNX и снятие квот
+
+QnxFileReader — новый обнаруживаемый storage-owner: временные qnx-work-*.part
+для очереди и артефактов. Production Receiver создаёт их только в прежнем
+приватном cache/exports; finally удаляет после упаковки/ошибки. Это временная
+диагностика, не новый managed root, настройки, секреты или firmware restore.
+Прерывание процесса может оставить временный cache-файл до очистки кэша;
+он не считается завершённым ZIP и не предлагается для импорта. Архивирование
+потоковое, но требует места одновременно под spool и ZIP; при ошибке записи
+полнота не объявляется. SystemFileDump сохраняет retention2/явную выдачу ZIP.
+DiagnosticsActivity меняет объяснение/прогресс, не defaults/постоянные ключи.
+AdbTransport сохраняет RSA adb_key/adb_key.pub и endpoint; новый каталог
+не пишет на QNX и не запускает команды/службы. Общий таймер dump отключён,
+консоль60с и отдельные I/O deadlines/отмена сохранены.
+
+BackupDefaultsMigration: явно рассмотрены335…355→356 и same-schema356;
+ключи, форматы, effective defaults и приоритет explicit values прежние.
+334/357 отвергаются новым тестом. Fingerprints этих5 owners обновляются
+после данного review; runtime restore на KX11 этим не подтверждается.
+
+
 ### Review3.2.2 — выпуск wide mappings
 
 Defaults/ключи/adapters не меняются. BackupDefaultsMigration явно разрешает
