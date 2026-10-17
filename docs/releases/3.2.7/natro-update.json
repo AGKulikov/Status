@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "channel": "stable",
+  "package": "ru.natro.statuswidget",
+  "versionCode": 208021360,
+  "versionName": "3.2.7",
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "sha256": "8b8828c85542f9a126b959e77a1146d520c8cc0a395fc7f9643edcacc63c9434",
+  "size": 29760096,
+  "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.2.7/Natro-3.2.7-signed.apk"
+}

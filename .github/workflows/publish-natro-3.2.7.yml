@@ -1,0 +1,132 @@
+name: Publish verified Natro 3.2.7 stable update
+
+on:
+  push:
+    branches: ['release/natro-3.2.7-verification']
+    paths: ['.github/workflows/publish-natro-3.2.7.yml', 'docs/releases/3.2.7/**']
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: publish-natro-v3.2.7
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'AGKulikov/Status'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      actions: read
+      contents: write
+    env:
+      SOURCE_SHA: '74058cc3c3ebe6c3ae7d1d6b0f52f7ff6388081e'
+      SOURCE_TREE: '7e1c95f4ef5a16bf2c7dc22bb534844619204e13'
+      BUILD_RUN: '39043771400'
+      RELEASE_TAG: 'natro-v3.2.7'
+      SIGNED_SHA256: '8b8828c85542f9a126b959e77a1146d520c8cc0a395fc7f9643edcacc63c9434'
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Require exact successful build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$BUILD_RUN" \
+            | jq -e --arg source "$SOURCE_SHA" '.head_sha == $source and .status == "completed" and .conclusion == "success"'
+          test "$(jq -r '.versionName' docs/releases/3.2.7/release-report.json)" = 3.2.7
+          test "$(jq -r '.versionCode' docs/releases/3.2.7/release-report.json)" = 208021360
+      - name: Download exact tested candidate
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: Natro-3.2.7-offline-signing-12
+          run-id: 39043771400
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/natro327-candidate
+      - name: Download matching signing verification tools
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: Natro-3.2.7-signing-tools-12
+          run-id: 39043771400
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/natro327-tools
+      - name: Verify public offline-signature handoff without any signing key
+        run: |
+          set -euo pipefail
+          python3 -m unittest tools.tests.test_apk_signature_handoff tools.tests.test_update_channel -v
+          OUT="$RUNNER_TEMP/natro327-release"
+          mkdir "$OUT"
+          cp docs/releases/3.2.7/release-report.json docs/releases/3.2.7/natro-update.json \
+            docs/releases/3.2.7/signature-verification.txt "$OUT/"
+          cp docs/releases/3.2.7/release-notes.md "$OUT/README_RU.md"
+          python3 tools/apk_signature_handoff.py apply \
+            --unsigned "$RUNNER_TEMP/natro327-candidate/Natro-3.2.7-unsigned.apk" \
+            --patch docs/releases/3.2.7/signing-handoff.json \
+            --output "$OUT/Natro-3.2.7-signed.apk"
+          python3 tools/verify_offline_release_handoff.py \
+            --candidate "$RUNNER_TEMP/natro327-candidate" --tools "$RUNNER_TEMP/natro327-tools" \
+            --release "$OUT" --source "$SOURCE_SHA" --tree "$SOURCE_TREE" \
+            --run "$BUILD_RUN" --signed-sha256 "$SIGNED_SHA256"
+      - name: Checkout exact APK source for source archive
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          path: exact-apk-source
+          persist-credentials: false
+      - name: Package exact public source and checksums
+        run: |
+          set -euo pipefail
+          test "$(git -C exact-apk-source rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git -C exact-apk-source rev-parse 'HEAD^{tree}')" = "$SOURCE_TREE"
+          OUT="$RUNNER_TEMP/natro327-release"
+          git -C exact-apk-source archive --format=tar.gz --prefix=Natro-3.2.7-source/ \
+            --output="$OUT/Natro-3.2.7-source.tar.gz" HEAD
+          cd "$OUT"
+          sha256sum Natro-3.2.7-signed.apk natro-update.json release-report.json \
+            signature-verification.txt README_RU.md Natro-3.2.7-source.tar.gz > SHA256SUMS.txt
+          sha256sum -c SHA256SUMS.txt
+      - name: Retain exact verified signed files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Natro-3.2.7-verified-stable-files
+          path: ${{ runner.temp }}/natro327-release/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Create draft, read back every asset, then publish stable
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/natro327-release"
+          VERIFY="$RUNNER_TEMP/natro327-release-readback"
+          # Do not overwrite an existing release or assets. A failed draft can be
+          # resumed only after matching its source and every byte below.
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
+              | jq -e --arg source "$SOURCE_SHA" \
+                '.draft == true and .target_commitish == $source and (.assets | length) == 7'
+          else
+            gh release create "$RELEASE_TAG" "$OUT/"* --repo "$GITHUB_REPOSITORY" \
+              --target "$SOURCE_SHA" --draft --title "Natro 3.2.7" \
+              --notes-file docs/releases/3.2.7/release-notes.md
+          fi
+          mkdir "$VERIFY"
+          gh release download "$RELEASE_TAG" --dir "$VERIFY" --repo "$GITHUB_REPOSITORY"
+          test "$(find "$VERIFY" -maxdepth 1 -type f | wc -l)" -eq 7
+          (cd "$VERIFY" && sha256sum -c SHA256SUMS.txt)
+          for name in Natro-3.2.7-signed.apk natro-update.json release-report.json signature-verification.txt README_RU.md Natro-3.2.7-source.tar.gz SHA256SUMS.txt; do
+            cmp "$OUT/$name" "$VERIFY/$name"
+          done
+          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=false --latest
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" \
+            | jq -e --arg source "$SOURCE_SHA" '.object.type == "commit" and .object.sha == $source'
+          gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
+            | jq -e --arg tag "$RELEASE_TAG" '.tag_name == $tag and .draft == false and .prerelease == false and (.assets | length) == 7'

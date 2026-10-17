@@ -1,5 +1,20 @@
 # Единый реестр требований Natro
 
+## 17.10.2026 — Natro3.2.7: SOURCE/TEST/APK проверены, stable publication выполняется
+
+После явного подтверждения18:06МСК опубликован SOURCE74058cc3c3ebe6c3ae7d1d6b0f52f7ff6388081e,
+tree7e1c95f4ef5a16bf2c7dc22bb534844619204e13 совпал с локальным1e31abe.
+CI39043771400/job117428317776 SUCCESS:2174 Android/265tool/108Java,0fail/skip.
+977исключений проверены в фактическом APK, DEX нового сборщика присутствует.
+APK3.2.7/code208021360,29760096bytes,SHA256
+8b8828c85542f9a126b959e77a1146d520c8cc0a395fc7f9643edcacc63c9434.
+Прежние package/cert, один signer, exactAPI28/v3/v2/zipalign16KiB и1517 неизменных
+CI payload entries PASS; metadata install-over3.2.6/code+1 PASS. Временные
+извлечённые ключ/пароль удалены. Navigator patch равен3.2.6, Helper unchanged.
+Stable-публикация и readback ещё выполняются; FIELD докачки/установки, крылья,
+полоса/OEM burst/listener OPEN. Прежние блокировки/локальные SKIP — история,
+не текущий статус CI. [Протокол](docs/releases/3.2.7/README_RU.md).
+
 ## 17.10.2026 18:06 МСК — подтверждение публикации3.2.7
 
 USER: «Подтверждаю» на явный запрос публикации подготовленных исходников и
