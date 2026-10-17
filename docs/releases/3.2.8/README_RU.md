@@ -1,5 +1,16 @@
 # Natro3.2.8 /208021361 — сборщик QNX
 
+## Дополнение FIELD17.10 19:15МСК
+
+Vehicle372877 с version3.2.8 подтвердил в этом сеансе: QNX первым,966exclusions,
+26resolved links, завершённый выбранный обход1080paths,8stable+2changed payloads,
+13slog2/10mappings и сохранённый ZIP при последующем15s logcat timeout.50SHA/size PASS.
+Это закрывает наблюдение о потере всего QNX из-за раннего Android snapshot;
+3недоступных пути/live changes/optional logs остаются partial. Установка с сохранением
+всех настроек и абсолютная полнота QNX отдельно не проверены. Прежние FIELD OPEN
+ниже отражают этап выдачи; новый [разбор](../../geely-kx11/research-2026-10-17-white-bar/FIELD_1911_1915_RU.md)
+уточняет только перечисленные gate. Полоса/крылья остаются OPEN.
+
 [Stable/latest3.2.8](https://github.com/AGKulikov/Status/releases/tag/natro-v3.2.8)
 опубликован17.10.2026 в19:03:53МСК,release415910302.
 Publisher39047732914/job117439745681 SUCCESS: exact signed APK повторно

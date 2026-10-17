@@ -4,8 +4,10 @@
 
 System688852/diagnostics674546: ANR/restart plus.monjaro18:48:11, dimmenu
 PID4570→9287, затем Global/SDK1 и allow Natro; Sys2038 shown/display2.
-Кандидат MConfigInitService усилен временной связью, writer/pixel owner не
-доказан. Owner=false/2 overlapping stacks и stale tab/center блокируют repair.
+Кандидат MConfigInitService усилен временной связью: STATIC46.1/48 пишет1 и,
+при AppOp без allow, force-stop dimmenu → allow → MediaButtonReceiver broadcast.
+Выполнение ветки в этом эпизоде, installed version и writer/pixel owner не
+доказаны. Owner=false/2 overlapping stacks и stale tab/center блокируют repair.
 Vehicle3728773.2.8:1080examined/обходзавершён,966exclusions,26resolvedlinks,
 8stable+2changedfiles,3ENOENT paths,13slog2/10mappings.50manifest SHA PASS.
 Logcat timeout15005ms после QNX не потерял его bytes. Новая сводка3.2.9 и
@@ -14,7 +16,8 @@ finite logcat horizon подготовлены; исправление поло�
 
 3.2.8 опубликована19:03:53МСК: SOURCE5e4f40ce,CI39046959187,
 2175Android/265tool/108Java cases PASS; прежний cert/API28/1517payload PASS.
-[Выпуск и readback](docs/releases/3.2.8/README_RU.md). FIELD докачки остаётся OPEN.
+[Выпуск и readback](docs/releases/3.2.8/README_RU.md). Новый FIELD подтверждает
+изоляцию QNX, native links и исключения; полный архив и install-over settings OPEN.
 
 ## 17.10.2026 — SOURCE исправления досборщика3.2.8
 

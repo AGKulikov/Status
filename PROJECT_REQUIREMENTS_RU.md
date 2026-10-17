@@ -1,5 +1,27 @@
 # Единый реестр требований Natro
 
+## 17.10.2026 — 3.2.9 SOURCE / TEST / APK приняты
+
+SOURCE `030cfecf377d1b0858a59eacffa2ef6aa0fa5b34` / tree `68e6203b11c54d63ce91321fd348d913f2a9c913` опубликован и сверён.
+CI 39050946770/job117449229222 SUCCESS: 2183 Android, 265 tool tests,
+108 Java cases, без failures/errors/skips. Первые gesture fixtures были
+неattached: run39050129259 с 3 failures заменён итоговым attached API28 тестом,
+click assertions не сняты; FIT/CROP/STRETCH и 3 размера проверены.
+MEDIA-TOUCH-329, MUSIC-INFO-329 и QNX-RESULT-329 SOURCE/TEST/APK закрыты; FIELD OPEN.
+APK 29768288 bytes SHA256 `d4235965c6af6910014acf40071c44691932dd8606617a2abbca83a6f2d84f2f`.
+Прежний single cert/v2/v3/exactAPI28/16KiB alignment,1517 неизменных CI payload
+entries, package/versionCode+1, DEX media/collector и ресурс977 exclusions PASS.
+Navigator patch совпал с3.2.8; Helper source unchanged. Вложенный WeChat APK
+имеет те же payload entries при иной упаковке ZIP. Backup89owners и migration
+335…361→362 reviewed. Новых settings нет. Signing temp удалён.
+Публикация stable/readback выполняется. [Протокол](docs/releases/3.2.9/README_RU.md).
+
+FIELD vehicle3728773.2.8 подтверждает QNX-first isolation/native links/exclusions
+в данном сеансе; это уточняет прежний OPEN3.2.8, но не доказывает полный архив
+или установку поверх с сохранением всех настроек. Белая полоса/крылья и новая
+аппаратная приёмка остаются OPEN; gates не ослаблены.
+
+
 ## 17.10.2026 19:11–19:15МСК — MEDIA-TOUCH-329 / MUSIC-INFO-329 / QNX-RESULT-329
 
 USER: повтор белой полосы, проверить перехват нажатий плеера по фото/видео;
@@ -15,7 +37,7 @@ Unicode-пробелы, в том числе без пробела после с
 
 MEDIA-TOUCH-329: пустая часть перекрывающегося контейнера не забирает DOWN
 соседней видимой кнопки. Hit area follows actual glyph and screen transform,
-48dp minimum/8dp margin; отпускание после ухода/отмена не запускает соседнюю
+цель 48dp/запас 8dp в пределах самого виджета; отпускание после ухода/отмена не запускает соседнюю
 команду. Progress starts only on track; full-frame scrub изHA1178 superseded.
 Сохранённые размеры/положение/редактор и назначения кнопок сохраняются. Runtime
 регрессии должны использовать настоящий MotionEvent через proxy+frame и прямую
@@ -24,7 +46,10 @@ MEDIA-TOUCH-329: пустая часть перекрывающегося кон
 Белая полоса FIELD-002/CLUSTER-028/DIM-WHITE-317 OPEN. В3.2.7 зафиксированы
 ANR/restart plus.monjaro18:48:11, restart dimmenu18:48:15–16, Global/SDK1 и
 Natro allow18:48:16.765. Sys2038 dimmenu visible/shown на display2. Это усиливает
-кандидата MConfig-init, но не доказывает инициатора записи или пиксельный источник.
+кандидата MConfig-init: в ранее проверенных APK46.1/48 инициализация пишет1,
+а при AppOp без allow делает force-stop dimmenu, возвращает allow и посылает
+MediaButtonReceiver broadcast. Но журнал не доказывает выполнение этого callsite,
+инициатора записи или пиксельный источник; installed version неизвестна.
 Natro panel live/drawn, owner=false/2 overlapping stacks, свежих tab/center нет;
 автоматически обходить OEM-priority gates нельзя. Новый crash Natro не найден,
 сохранённый crash относится к3.1.3. Raw tap coordinates18:41 в журнале отсутствуют.

@@ -1,0 +1,17 @@
+{
+  "runId": 39050946770,
+  "jobId": 117449229222,
+  "source": "030cfecf377d1b0858a59eacffa2ef6aa0fa5b34",
+  "conclusion": "success",
+  "selectedLogLines": [
+    "2026-10-17T16:47:44.9241584Z /home/runner/work/_temp/natro-updater-fixture/Natro-3.2.5-signed.apk: OK",
+    "2026-10-17T16:47:44.9263472Z \u001b[36;1mpython3 tools/check_backup_inventory.py\u001b[0m",
+    "2026-10-17T16:47:45.8671360Z Reviewed source inventory unchanged: 89 owners. Runtime archive completeness NOT certified.",
+    "2026-10-17T16:48:11.2792285Z BUILD SUCCESSFUL in 25s",
+    "2026-10-17T16:51:11.1550377Z BUILD SUCCESSFUL in 2m 59s",
+    "2026-10-17T16:52:13.7599070Z Ran 265 tests in 55.637s",
+    "2026-10-17T16:52:13.7599270Z OK",
+    "2026-10-17T16:52:13.7599565Z Java policy/source cases: 108 passed, 0 failed",
+    "2026-10-17T16:52:14.9771120Z {\"candidate\": \"/home/runner/work/_temp/natro-3.2.9-candidate\", \"unitTests\": {\"tests\": 2183, \"failures\": 0, \"errors\": 0, \"skipped\": 0}}"
+  ]
+}

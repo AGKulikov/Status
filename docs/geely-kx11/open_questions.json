@@ -1827,7 +1827,7 @@
       "priority": "P1",
       "function": "Почему NaviMode сбрасывается после OEM lifecycle и появляется белая полоса?",
       "status": "OPEN",
-      "known": "FIELD3.2.7: plus.monjaro ANR/restart18:48:11, dimmenu restart18:48:15–16, Global/SDK1 до Natro allow; Sys2038 visible на display2. Статически MConfigInitService пишет1, выполнение этого callsite в данном эпизоде не записано. Natro panel жив/нарисован, owner/tab/center gates не разрешают repair.",
+      "known": "FIELD3.2.7: plus.monjaro ANR/restart18:48:11, dimmenu restart18:48:15–16, Global/SDK1 до Natro allow; Sys2038 visible на display2. Статически MConfigInitService в APK46.1/48 пишет1 и при AppOp без allow вызывает force-stop dimmenu, возвращает allow и шлёт MediaButtonReceiver broadcast; выполнение ветки в данном эпизоде и установленная версия не записаны. Natro panel жив/нарисован, owner/tab/center gates не разрешают repair.",
       "missing_evidence": "Инициатор конкретной записи NaviMode1, причина dimmenu restart и привязка surface к белым пикселям; свежие DIM priority signals.",
       "next_step": "Сопоставить пассивную трассу lifecycle MConfigInitService/записи Global с текущей DIM-вкладкой. Не менять mode/AppOp вслепую, не требовать очередной одинаковый полный QNX архив.",
       "sources": [
