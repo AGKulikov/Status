@@ -1,0 +1,122 @@
+{
+  "date": "2026-10-17",
+  "received_local_time": "21:16 Europe/Moscow",
+  "evidence_levels": [
+    "FIELD_VIDEO",
+    "USER_REPORTED_ACTION",
+    "SOURCE_REVIEW",
+    "INFERENCE"
+  ],
+  "videos": [
+    {
+      "name": "IMG_8808.mp4",
+      "size_bytes": 3792172,
+      "sha256": "30b024e3b225cb60355e09f3027ce79888274461dff4e7fcd162a135493b9903",
+      "video_codec": "h264",
+      "width": 512,
+      "height": 910,
+      "fps": "30/1",
+      "video_frames": 428,
+      "duration_seconds": 14.266667,
+      "visible_clock": "21:06",
+      "user_reported_action": "transfer_application",
+      "container_creation_time": "2026-10-17T18:16:18.000000Z",
+      "stream_creation_time": "2026-10-17T18:16:24.000000Z",
+      "timestamps_are_not_filming_clock": true
+    },
+    {
+      "name": "IMG_8809.mp4",
+      "size_bytes": 4952193,
+      "sha256": "dc56b4953f3d94a42535d91c4435005a04a32148e585b06afd3239dc0d3f45f1",
+      "video_codec": "h264",
+      "width": 512,
+      "height": 910,
+      "fps": "30/1",
+      "video_frames": 374,
+      "duration_seconds": 12.466667,
+      "visible_clock": "21:09→21:10",
+      "user_reported_action": "reboot_head_unit",
+      "container_creation_time": "2026-10-17T18:16:24.000000Z",
+      "stream_creation_time": "2026-10-17T18:16:26.000000Z",
+      "timestamps_are_not_filming_clock": true
+    }
+  ],
+  "visual_review": {
+    "all_frames_decoded": 802,
+    "every_frame_individually_reviewed": false,
+    "overview_step_seconds": 0.5,
+    "transition_step_seconds": 0.1,
+    "transition_ranges_seconds": {
+      "IMG_8808.mp4": [
+        9.6,
+        12.2
+      ],
+      "IMG_8809.mp4": [
+        6.5,
+        8.9
+      ]
+    },
+    "frame_number_origin": 1,
+    "relative_time_formula": "(frame_number - 1) / 30",
+    "audio_reviewed": false,
+    "synchronous_mode_packet_or_android_pixel_capture_available": false
+  },
+  "source_review": {
+    "checkout_commit": "00d3c750a9bf665dd8a150aeee2f7740131478e4",
+    "runtime_release_source": "030cfecf377d1b0858a59eacffa2ef6aa0fa5b34",
+    "files": [
+      {
+        "path": "app/src/main/java/dezz/status/widget/instrument/InstrumentDisplayLauncher.java",
+        "sha256": "cbf56de935f24169ad97407b1f8e1f58438697b35043162ac77286262df369ad"
+      },
+      {
+        "path": "app/src/main/java/dezz/status/widget/instrument/InstrumentPanelLaunchCoordinator.java",
+        "sha256": "d6e0feeb93b2e2e06ca37093309e9b286cca62dd01d276bdc96f54e50e429a1a"
+      },
+      {
+        "path": "app/src/main/java/dezz/status/widget/media/ButtonDriverAppLauncher.java",
+        "sha256": "7e2cc97d657841c411b7396fc65ec864f8f21c51cc6d38688c3159355b7380e4"
+      }
+    ]
+  },
+  "prior_qnx_archive_reused": {
+    "name": "Natro-vehicle-5783067647247932076.zip",
+    "sha256_from_previous_verified_archive": "e08f8449c09c15a523aa2c15385055bd0508fb94a1673e683ff5dba070691554",
+    "whole_archive_crc_repeated_this_review": false,
+    "selected_files": [
+      {
+        "archive_entry": "qnx/tree/usr/bin/cluster_controller",
+        "size_bytes": 3916064,
+        "sha256": "d9b7573cf3933d5a58f6c6132b1f76902f52ea108dadb91d5b76a59a474273d8",
+        "manifest_status": "collected_double_read",
+        "size_sha_reverified": true
+      },
+      {
+        "archive_entry": "qnx/tree/persist/dim_config",
+        "size_bytes": 233,
+        "sha256": "6bb2d11fc43d3633406c3710b0f3a3848d6aa9e409617dba270388a1f590dd56",
+        "manifest_status": "collected_double_read",
+        "size_sha_reverified": true
+      },
+      {
+        "archive_entry": "qnx/tree/persist/system/config/cartype.cfg",
+        "size_bytes": 4,
+        "sha256": "1df9c4870691c78ef927edf6beed5418bb988da7ef343f80fcbe4bc38b99d604",
+        "manifest_status": "collected_double_read",
+        "size_sha_reverified": true
+      }
+    ]
+  },
+  "result": {
+    "visible_transition_sequence_confirmed": true,
+    "navigation_layout_hypothesis_strengthened": true,
+    "renderer_identified": false,
+    "independent_background_hide_identified": false,
+    "separate_compositor_layers_proven": false,
+    "current_video_mode_numeric_value_observed": false,
+    "runtime_changed": false,
+    "new_apk_issued": false,
+    "physical_fix_acceptance": "OPEN",
+    "white_bar_fix_acceptance": "OPEN"
+  }
+}

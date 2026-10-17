@@ -188,9 +188,9 @@
       "priority": "P1",
       "function": "Владелец крыльев и штатной машинки",
       "status": "OPEN",
-      "known": "UDS1175639 maps PA_Gauge; initializer старого ELF содержит speed/RPM/coolant/fuel структуры. Совпадение назначений с фото не определяет renderer.",
-      "missing_evidence": "Синхронные пиксели Android display2/физического DIM; независимый hide и принимающий dispatcher. Содержимое новых полных QNX деревьев и корреляция каналов с физическим DIM.",
-      "next_step": "Проследить readers/writers PA_Gauge globals и второго consumer; renderer/hide и синхронные pixels OPEN.",
+      "known": "FIELD VIDEO IMG_8808/8809: нижние крылья появляются без видимой карты, на выходе карта исчезает раньше подложек. Декоративные подложки и цифры имеют разные фазы; после HU reboot возвращается обычная круглая компоновка. Это усиливает гипотезу navigation layout, но не доказывает отдельный layer/hide. SOURCE Natro mode3/wake до старта Activity совместим с видео; PA_Gauge остаётся цепочкой данных, renderer не установлен.",
+      "missing_evidence": "Принимающий navigation/fullscreen dispatcher и связь его состояния с background/gauge animation; отдельный параметр оформления. Синхронные Android display2 pixels/физический DIM и mode/channel trace. Видео не устанавливает процесс/числовой mode; старые dumps другой минуты не заменяют такую привязку.",
+      "next_step": "Приоритетно проследить вход/выход navigation layout до состояния/анимации подложек и цифр; PA_Gauge readers/writers исследовать как данные, не готовый renderer. Использовать имеющиеся bytes; для определения pixel owner нужен синхронный переход, не повтор всего QNX дерева. Независимое скрытие при сохранении карты/приборов остаётся OPEN.",
       "sources": [
         "display/report.md",
         "research-2026-09-05/android_platform/systems.json",
@@ -208,7 +208,8 @@
         "research-2026-10-17-white-bar/QCONN_LINKS_RU.md",
         "research-2026-10-17-white-bar/DUMPS_327_857396_663180_RU.md",
         "research-2026-10-17-white-bar/FIELD_1911_1915_RU.md",
-        "research-2026-10-17-white-bar/FIELD_2053_RU.md"
+        "research-2026-10-17-white-bar/FIELD_2053_RU.md",
+        "research-2026-10-17-white-bar/WINGS_VIDEO_2116_RU.md"
       ],
       "evidence_updates": [
         {
@@ -367,6 +368,12 @@
           "level": "FIELD_ARCHIVE_VERIFIED",
           "finding": "Vehicle2805553.2.9:52payload size/SHA PASS, QNX traversal complete, both Android logs exit0; residual paths/live changes explained. No renderer/hide proof, no historical endpoint-refusal root cause established.",
           "source": "research-2026-10-17-white-bar/FIELD_2053_RU.md"
+        },
+        {
+          "date": "2026-10-17",
+          "level": "FIELD_VIDEO_SOURCE_REVIEW_INFERENCE",
+          "finding": "Two clips30fps/428+374frames decoded, sampled visually0.5s/transition0.1s: map/background/numerals transition separately; normal layout returns on reported HU reboot. Navigation-layout hypothesis strengthened, independent hide/renderer/compositor ownership unproven; no runtime/APK change.",
+          "source": "research-2026-10-17-white-bar/WINGS_VIDEO_2116_RU.md"
         }
       ],
       "coverage_ids": [
@@ -441,6 +448,15 @@
           "superseded_by": "DUMPS_327_857396_663180_RU.md",
           "known": "974stable QNX files и DLT получены; UDS DIM handlers частично заглушки, встроенные PNG не совпали с крыльями. UART381frames CRC PASS, только opcode31/HUD. Renderer/hide и источник HUD callback burst не установлены.",
           "next_step": "Проверить докачку3.2.7: skipped/link/EOF, новые mappings и свежие канальные снимки; для крыльев нужны синхронные Android pixels/физический DIM. Подробности QCONN_LINKS_RU.md."
+        },
+        {
+          "date": "2026-10-17",
+          "reason": "Superseded current visual/mode investigation scope by two videos received21:16; prior PA_Gauge evidence remains valid.",
+          "source": "research-2026-10-17-white-bar/WINGS_VIDEO_2116_RU.md",
+          "status": "OPEN",
+          "known": "UDS1175639 maps PA_Gauge; initializer старого ELF содержит speed/RPM/coolant/fuel структуры. Совпадение назначений с фото не определяет renderer.",
+          "missing_evidence": "Синхронные пиксели Android display2/физического DIM; независимый hide и принимающий dispatcher. Содержимое новых полных QNX деревьев и корреляция каналов с физическим DIM.",
+          "next_step": "Проследить readers/writers PA_Gauge globals и второго consumer; renderer/hide и синхронные pixels OPEN."
         }
       ],
       "last_reviewed": "2026-10-17"
@@ -1944,6 +1960,11 @@
       "date": "2026-10-17",
       "scope": "FIELD3.2.9 vehicle280555: current mapping/log summaries updated with history; 4 evidence updates, all IDs/status gates retained",
       "source": "research-2026-10-17-white-bar/FIELD_2053_RU.md"
+    },
+    {
+      "date": "2026-10-17",
+      "scope": "CLUSTER_WINGS current summary and next step updated from two videos21:16; previous summary retained in history, all IDs/status gates retained.",
+      "source": "research-2026-10-17-white-bar/WINGS_VIDEO_2116_RU.md"
     }
   ]
 }
