@@ -190,7 +190,7 @@
       "status": "OPEN",
       "known": "Сохранённый разбор дампа3.2.2 (ZIP SHA ac1bf086c34110f431acab4dd4f7382b375598b54208c8b575a770085add8f89) показывает два полных wfd_be mappings и четыре ограниченных256KiB префикса. Sys2038 скрыт в двух snapshots; dimmenu MainActivity и MConfig+ overlays остаются видимыми, пикселей нет. В конкретной libopenwfd_qnx.so mask create/bind/destroy — заглушки; это не распространяется на отсутствующую фактическую /lib64/libopenwfd.so. UART/QUP4 и init worker исследованы, постоянный nav receiver и renderer крыльев не установлены. SOURCE/CI3.2.3 с полным каталогом QNX опубликованы; APK передан.  Новый FIELD ZIP8283 SHA 5d07631b4c4de575375092749af37da84d986c886f457a04c4955f8a806edad2: Connection refused до первой QNX команды,tx=0,каталог только queued /; mappings/slog2/новые файлы не получены. Android uptime66.69/68.29с. Display2:6HWC layers,Sys2038 скрыт; пикселей и доказанного renderer нет.",
       "missing_evidence": "Синхронные пиксели Android display2 и физического DIM; полные mappings четырёх оставшихся процессов и байты семи реально наблюдаемых путей; подтверждённый renderer/принимающий dispatcher и независимый способ скрытия крыльев без потери карты. Метаданные слоёв/размеры/импорты не заменяют эти свидетельства.",
-      "next_step": "Сначала проверить QNX_ENDPOINT_ACCESS повторным сбором той же3.2.3 после2–3минут работы Android. При доступном endpoint: Проанализировать следующий явно собранный системный ZIP3.2.3: каталог, EOF/partial mappings, новые реальные библиотеки, полный набор matching slog2 включая display.40986. Использовать уже разобранные материалы до запроса нового наблюдения. Для разделения Android и последующего тракта — синхронный Android frame и физическое изображение в одном состоянии. Не повторять blind mask/alpha, не выводить renderer из имени слоя и не подменять скрытие крыльев выключением всей навигации.",
+      "next_step": "Ожидание2–3минут проверено без успеха (DD605). Сначала контроль прежней nc-команды отдельно от сборщика по QNX_ENDPOINT_ACCESS. При доступном endpoint: Проанализировать следующий явно собранный системный ZIP3.2.3: каталог, EOF/partial mappings, новые реальные библиотеки, полный набор matching slog2 включая display.40986. Использовать уже разобранные материалы до запроса нового наблюдения. Для разделения Android и последующего тракта — синхронный Android frame и физическое изображение в одном состоянии. Не повторять blind mask/alpha, не выводить renderer из имени слоя и не подменять скрытие крыльев выключением всей навигации.",
       "sources": [
         "display/report.md",
         "research-2026-09-05/android_platform/systems.json",
@@ -199,7 +199,8 @@
         "research-2026-10-16-qnx/DUMP_322_RU.md",
         "research-2026-10-16-qnx/FULL_INVENTORY_RU.md",
         "../releases/3.2.3/README_RU.md",
-        "research-2026-10-16-qnx/DUMP_323_8283_RU.md"
+        "research-2026-10-16-qnx/DUMP_323_8283_RU.md",
+        "research-2026-10-16-qnx/DUMP_323_DD605_RU.md"
       ],
       "evidence_updates": [
         {
@@ -296,6 +297,12 @@
           "level": "FIELD_ARCHIVE_VERIFIED",
           "source": "research-2026-10-16-qnx/DUMP_323_8283_RU.md",
           "finding": "25 ZIP entries/CRC,20 manifest size/SHA проверены. QNX0/33,stage=greeting,rx32 diagnostic bytes from nc,tx0; проверка каталога/mappings BLOCKED_TRANSPORT. Причина отказа endpoint сверх Connection refused неизвестна."
+        },
+        {
+          "date": "2026-10-17",
+          "source": "research-2026-10-16-qnx/DUMP_323_DD605_RU.md",
+          "level": "FIELD_ARCHIVE_VERIFIED",
+          "finding": "Повторный отказ QNX до handshake при Android uptime184с; каталог/mappings остаются BLOCKED_TRANSPORT."
         }
       ],
       "coverage_ids": [
@@ -319,6 +326,11 @@
           "known": "Сохранённый разбор дампа3.2.2 (ZIP SHA ac1bf086c34110f431acab4dd4f7382b375598b54208c8b575a770085add8f89) показывает два полных wfd_be mappings и четыре ограниченных256KiB префикса. Sys2038 скрыт в двух snapshots; dimmenu MainActivity и MConfig+ overlays остаются видимыми, пикселей нет. В конкретной libopenwfd_qnx.so mask create/bind/destroy — заглушки; это не распространяется на отсутствующую фактическую /lib64/libopenwfd.so. UART/QUP4 и init worker исследованы, постоянный nav receiver и renderer крыльев не установлены. SOURCE/CI3.2.3 с полным каталогом QNX опубликованы; APK передан. Нового FIELD3.2.3 нет.",
           "missing_evidence": "Синхронные пиксели Android display2 и физического DIM; полные mappings четырёх оставшихся процессов и байты семи реально наблюдаемых путей; подтверждённый renderer/принимающий dispatcher и независимый способ скрытия крыльев без потери карты. Метаданные слоёв/размеры/импорты не заменяют эти свидетельства.",
           "next_step": "Проанализировать следующий явно собранный системный ZIP3.2.3: каталог, EOF/partial mappings, новые реальные библиотеки, полный набор matching slog2 включая display.40986. Использовать уже разобранные материалы до запроса нового наблюдения. Для разделения Android и последующего тракта — синхронный Android frame и физическое изображение в одном состоянии. Не повторять blind mask/alpha, не выводить renderer из имени слоя и не подменять скрытие крыльев выключением всей навигации."
+        },
+        {
+          "date": "2026-10-17",
+          "superseded_by": "DD605 repeat after 3 minutes",
+          "next_step": "Сначала проверить QNX_ENDPOINT_ACCESS повторным сбором той же3.2.3 после2–3минут работы Android. При доступном endpoint: Проанализировать следующий явно собранный системный ZIP3.2.3: каталог, EOF/partial mappings, новые реальные библиотеки, полный набор matching slog2 включая display.40986. Использовать уже разобранные материалы до запроса нового наблюдения. Для разделения Android и последующего тракта — синхронный Android frame и физическое изображение в одном состоянии. Не повторять blind mask/alpha, не выводить renderer из имени слоя и не подменять скрытие крыльев выключением всей навигации."
         }
       ],
       "last_reviewed": "2026-10-17"
@@ -1306,11 +1318,12 @@
       "status": "PARTLY_RESOLVED",
       "known": "Дамп3.2.2 дал два валидных EOF mappings wfd_be; screen/openwfd_server/cluster_controller/sc_qnx_vip_proxy упёрлись в256KiB. В3.2.3 реализованы полное последовательное чтение, дисковая очередь каталога и семь точных дополнительных targets; source/CI готовы, полевая полнота ещё не проверена. Новый FIELD ZIP8283 SHA 5d07631b4c4de575375092749af37da84d986c886f457a04c4955f8a806edad2: Connection refused до первой QNX команды,tx=0,каталог только queued /; mappings/slog2/новые файлы не получены. Android uptime66.69/68.29с. Новый транспортный отказ не отменяет ранее полученные данные3.2.2.",
       "missing_evidence": "FIELD3.2.3: полнота четырёх mappings, статусы каталога, содержимое семи дополнительных путей; сравнение фактических байтов/SONAME без предположения о симлинках.",
-      "next_step": "Сначала проверить QNX_ENDPOINT_ACCESS повторным сбором той же3.2.3 после2–3минут работы Android. При доступном endpoint: Проверить в новом ZIP EOF/структуру/SHA и все partial/unavailable ветви, отдельно первый probe и wide retry. Не склеивать разные snapshots, не считать unknown тип/размер угаданным и отсутствие в префиксе отсутствием объекта.",
+      "next_step": "Ожидание2–3минут проверено без успеха (DD605). Сначала контроль прежней nc-команды отдельно от сборщика по QNX_ENDPOINT_ACCESS. При доступном endpoint: Проверить в новом ZIP EOF/структуру/SHA и все partial/unavailable ветви, отдельно первый probe и wide retry. Не склеивать разные snapshots, не считать unknown тип/размер угаданным и отсутствие в префиксе отсутствием объекта.",
       "sources": [
         "research-2026-10-16-qnx/DUMP_322_RU.md",
         "research-2026-10-16-qnx/FULL_INVENTORY_RU.md",
-        "research-2026-10-16-qnx/DUMP_323_8283_RU.md"
+        "research-2026-10-16-qnx/DUMP_323_8283_RU.md",
+        "research-2026-10-16-qnx/DUMP_323_DD605_RU.md"
       ],
       "coverage_ids": [
         "BASE-DIM",
@@ -1325,6 +1338,11 @@
           "known": "Дамп3.2.2 дал два валидных EOF mappings wfd_be; screen/openwfd_server/cluster_controller/sc_qnx_vip_proxy упёрлись в256KiB. В3.2.3 реализованы полное последовательное чтение, дисковая очередь каталога и семь точных дополнительных targets; source/CI готовы, полевая полнота ещё не проверена.",
           "missing_evidence": "FIELD3.2.3: полнота четырёх mappings, статусы каталога, содержимое семи дополнительных путей; сравнение фактических байтов/SONAME без предположения о симлинках.",
           "next_step": "Проверить в новом ZIP EOF/структуру/SHA и все partial/unavailable ветви, отдельно первый probe и wide retry. Не склеивать разные snapshots, не считать unknown тип/размер угаданным и отсутствие в префиксе отсутствием объекта."
+        },
+        {
+          "date": "2026-10-17",
+          "superseded_by": "DD605 repeat after 3 minutes",
+          "next_step": "Сначала проверить QNX_ENDPOINT_ACCESS повторным сбором той же3.2.3 после2–3минут работы Android. При доступном endpoint: Проверить в новом ZIP EOF/структуру/SHA и все partial/unavailable ветви, отдельно первый probe и wide retry. Не склеивать разные snapshots, не считать unknown тип/размер угаданным и отсутствие в префиксе отсутствием объекта."
         }
       ],
       "evidence_updates": [
@@ -1333,6 +1351,12 @@
           "level": "FIELD_ARCHIVE_VERIFIED",
           "source": "research-2026-10-16-qnx/DUMP_323_8283_RU.md",
           "finding": "25 ZIP entries/CRC,20 manifest size/SHA проверены. QNX0/33,stage=greeting,rx32 diagnostic bytes from nc,tx0; проверка каталога/mappings BLOCKED_TRANSPORT. Причина отказа endpoint сверх Connection refused неизвестна."
+        },
+        {
+          "date": "2026-10-17",
+          "source": "research-2026-10-16-qnx/DUMP_323_DD605_RU.md",
+          "level": "FIELD_ARCHIVE_VERIFIED",
+          "finding": "Повторный отказ QNX до handshake при Android uptime184с; каталог/mappings остаются BLOCKED_TRANSPORT."
         }
       ]
     },
@@ -1343,13 +1367,14 @@
       "status": "OPEN",
       "known": "В3.2.2 разобраны12slog2 buffers; display.40986 пропущен cap12. Type1 arguments в отчёте декодированы, хронология кольца не восстановлена.105warning candidates не равны105новым сбоям; recovery log прежний. Android DLT path недоступен, QNX /userdata/DLT известен только из конфигурации.3.2.3 снимает счётные/байтовые QNX квоты. Новый FIELD ZIP8283 SHA 5d07631b4c4de575375092749af37da84d986c886f457a04c4955f8a806edad2: Connection refused до первой QNX команды,tx=0,каталог только queued /; mappings/slog2/новые файлы не получены. Android uptime66.69/68.29с. Новый транспортный отказ не отменяет ранее полученные данные3.2.2.",
       "missing_evidence": "Содержимое display.40986 и остальных доступных matching buffers, достоверная временная привязка к состоянию DIM, наличие актуальных DLT в своей ОС; отсутствие повторно использованных старых записей.",
-      "next_step": "Сначала проверить QNX_ENDPOINT_ACCESS повторным сбором той же3.2.3 после2–3минут работы Android. При доступном endpoint: Разобрать полный доступный сбор3.2.3, сохранить snapshot limits и timestamps. Проверять реально существующие пути без запуска logger/export/mount/driver lock. Не выдавать изменения SHA живого кольца, errno после success или count warnings за новые подтверждённые ошибки.",
+      "next_step": "Ожидание2–3минут проверено без успеха (DD605). Сначала контроль прежней nc-команды отдельно от сборщика по QNX_ENDPOINT_ACCESS. При доступном endpoint: Разобрать полный доступный сбор3.2.3, сохранить snapshot limits и timestamps. Проверять реально существующие пути без запуска logger/export/mount/driver lock. Не выдавать изменения SHA живого кольца, errno после success или count warnings за новые подтверждённые ошибки.",
       "sources": [
         "research-2026-10-16-qnx/DUMP_322_RU.md",
         "research-2026-10-16-qnx/FULL_INVENTORY_RU.md",
         "research-2026-10-14-dim/SLOG2_FORMAT_RU.md",
         "research-2026-10-14-dim/HUD_NATIVE_AND_LOG_ADAPTER_RU.md",
-        "research-2026-10-16-qnx/DUMP_323_8283_RU.md"
+        "research-2026-10-16-qnx/DUMP_323_8283_RU.md",
+        "research-2026-10-16-qnx/DUMP_323_DD605_RU.md"
       ],
       "coverage_ids": [
         "PLAT_DISPLAY"
@@ -1363,6 +1388,11 @@
           "known": "В3.2.2 разобраны12slog2 buffers; display.40986 пропущен cap12. Type1 arguments в отчёте декодированы, хронология кольца не восстановлена.105warning candidates не равны105новым сбоям; recovery log прежний. Android DLT path недоступен, QNX /userdata/DLT известен только из конфигурации.3.2.3 снимает счётные/байтовые QNX квоты.",
           "missing_evidence": "Содержимое display.40986 и остальных доступных matching buffers, достоверная временная привязка к состоянию DIM, наличие актуальных DLT в своей ОС; отсутствие повторно использованных старых записей.",
           "next_step": "Разобрать полный доступный сбор3.2.3, сохранить snapshot limits и timestamps. Проверять реально существующие пути без запуска logger/export/mount/driver lock. Не выдавать изменения SHA живого кольца, errno после success или count warnings за новые подтверждённые ошибки."
+        },
+        {
+          "date": "2026-10-17",
+          "superseded_by": "DD605 repeat after 3 minutes",
+          "next_step": "Сначала проверить QNX_ENDPOINT_ACCESS повторным сбором той же3.2.3 после2–3минут работы Android. При доступном endpoint: Разобрать полный доступный сбор3.2.3, сохранить snapshot limits и timestamps. Проверять реально существующие пути без запуска logger/export/mount/driver lock. Не выдавать изменения SHA живого кольца, errno после success или count warnings за новые подтверждённые ошибки."
         }
       ],
       "evidence_updates": [
@@ -1371,6 +1401,12 @@
           "level": "FIELD_ARCHIVE_VERIFIED",
           "source": "research-2026-10-16-qnx/DUMP_323_8283_RU.md",
           "finding": "25 ZIP entries/CRC,20 manifest size/SHA проверены. QNX0/33,stage=greeting,rx32 diagnostic bytes from nc,tx0; проверка каталога/mappings BLOCKED_TRANSPORT. Причина отказа endpoint сверх Connection refused неизвестна."
+        },
+        {
+          "date": "2026-10-17",
+          "source": "research-2026-10-16-qnx/DUMP_323_DD605_RU.md",
+          "level": "FIELD_ARCHIVE_VERIFIED",
+          "finding": "Повторный отказ QNX до handshake при Android uptime184с; каталог/mappings остаются BLOCKED_TRANSPORT."
         }
       ]
     },
@@ -1379,18 +1415,29 @@
       "priority": "P1",
       "function": "Доступность QNX qconn после загрузки Android и точная причина отказа соединения",
       "status": "OPEN",
-      "known": "ZIP8283 (3.2.3) при Android uptime66.69/68.29с получил nc: connect: Connection refused на198.18.34.2:8000. До QNX handshake/GET не дошло,tx=0. В прошлом ZIP423934bd (3.2.2) QNX чтение успешно после Android snapshots uptime131.70/133.75с. Endpoint/nc command в исходниках совпадают; версии и boot sessions различаются.",
-      "missing_evidence": "Повторный результат того же collector после прогрева; read-only сведения маршрута/listener/состояния службы при устойчивом отказе. Android uptime не является QNX uptime. Задержка старта или конкретное сетевое отклонение пока не доказаны.",
-      "next_step": "Повторить явный сбор3.2.3 после2–3минут работы Android, сопоставить endpoint result/uptime. Если Connection refused остаётся, уточнять доступность службы и сети. Улучшение диагностики: выделять transport отказ перед protocol parser и сохранять raw reason, не ослабляя framing. Автоматический запуск qconn, firewall изменения и управление автомобилем не являются частью исследования.",
+      "known": "ZIP8283 (3.2.3) при Android uptime66.69/68.29с получил nc: connect: Connection refused на198.18.34.2:8000. До QNX handshake/GET не дошло,tx=0. В прошлом ZIP423934bd (3.2.2) QNX чтение успешно после Android snapshots uptime131.70/133.75с. Endpoint/nc command в исходниках совпадают; версии и boot sessions различаются. Повторный ZIP DD605 при uptime184.25/185.28с: тот же Connection refused,tx0,30мс. Ожидание2–3минут не помогло. Source diff подтверждает изменение порядка и deadlines при прежней nc-команде, openBounded, line и handshake.",
+      "missing_evidence": "Контрольный вывод прежней команды отдельно от qnxStage/collectInventory в том же сеансе; состояние listener/сети при отказе. Первопричина Connection refused неизвестна.",
+      "next_step": "Контроль прежней toybox nc -w 30 198.18.34.2 8000 через обычный терминал Natro в том же сеансе, записать точный вывод/uptime. При QCONN сопоставить пути выполнения; при отказе проверить маршрут/доступность endpoint. Не повторять совет ждать произвольный срок и не исключать регрессию приложения без контрольного результата.",
       "sources": [
         "research-2026-10-16-qnx/DUMP_323_8283_RU.md",
-        "research-2026-10-16-qnx/dump-323-8283-audit.json"
+        "research-2026-10-16-qnx/dump-323-8283-audit.json",
+        "research-2026-10-16-qnx/DUMP_323_DD605_RU.md"
       ],
       "coverage_ids": [
         "BASE-DIM",
         "PLAT_DISPLAY"
       ],
-      "last_reviewed": "2026-10-17"
+      "last_reviewed": "2026-10-17",
+      "history": [
+        {
+          "date": "2026-10-17",
+          "superseded_by": "DUMP_323_DD605_RU.md",
+          "known": "ZIP8283 (3.2.3) при Android uptime66.69/68.29с получил nc: connect: Connection refused на198.18.34.2:8000. До QNX handshake/GET не дошло,tx=0. В прошлом ZIP423934bd (3.2.2) QNX чтение успешно после Android snapshots uptime131.70/133.75с. Endpoint/nc command в исходниках совпадают; версии и boot sessions различаются.",
+          "missing_evidence": "Повторный результат того же collector после прогрева; read-only сведения маршрута/listener/состояния службы при устойчивом отказе. Android uptime не является QNX uptime. Задержка старта или конкретное сетевое отклонение пока не доказаны.",
+          "next_step": "Повторить явный сбор3.2.3 после2–3минут работы Android, сопоставить endpoint result/uptime. Если Connection refused остаётся, уточнять доступность службы и сети. Улучшение диагностики: выделять transport отказ перед protocol parser и сохранять raw reason, не ослабляя framing. Автоматический запуск qconn, firewall изменения и управление автомобилем не являются частью исследования.",
+          "status": "OPEN"
+        }
+      ]
     }
   ],
   "revision_history": [
@@ -1406,6 +1453,11 @@
       "previous_version": "2.0",
       "scope": "primary FIELD3.2.3 ZIP8283; 54 prior IDs retained; QNX_ENDPOINT_ACCESS added",
       "note": "QNX endpoint failed before first command; source/APK gates unchanged; all unrelated questions retained."
+    },
+    {
+      "date": "2026-10-17",
+      "scope": "DD605 repeat and source connection diff; IDs preserved",
+      "note": "The 2-3 minute waiting experiment did not resolve connection refusal; next step changed to same-session standalone nc control."
     }
   ]
 }
