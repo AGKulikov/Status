@@ -31,3 +31,12 @@ update README.md, docs/releases/<version>/README_RU.md and PROJECT_REQUIREMENTS_
 and verify the remote branch/commit. State the source commit and CI evidence; distinguish
 APK checks from field acceptance. A local commit or a planned push is not publication.
 Keep the current development branch visible in README when the default branch is historical.
+
+Research persistence: after each substantive investigation, preserve new findings,
+hypotheses, negative results, user corrections and next steps without waiting for an APK.
+Record the source/date/hash when available, firmware scope, evidence level and limits.
+Update the detailed report, relevant knowledge summary, applicable open-question state,
+and requirements ledger in the same change. Keep superseded conclusions as history.
+An existing chat answer or standalone report is not automatically present in Git:
+verify the remote publication and keep docs/RESEARCH_INDEX_RU.md navigable.
+Do not claim exhaustive historical coverage unless that comparison was actually performed.

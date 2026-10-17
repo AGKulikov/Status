@@ -1,10 +1,18 @@
 # База Geely KX11 / ECARX
 
+Актуализация17.10.2026: [карта всех направлений Natro](../RESEARCH_INDEX_RU.md),
+[результаты дампа3.2.2](research-2026-10-16-qnx/DUMP_322_RU.md),
+[сборщик3.2.3 и остающиеся проверки](research-2026-10-16-qnx/FULL_INVENTORY_RU.md).
+История DIM/UART: [12–13октября](research-2026-10-12-13-archive/README_RU.md),
+[driver/MCU13октября](research-2026-10-13-dim/README_RU.md),
+[QNX/OpenWFD14октября](research-2026-10-14-dim/README_RU.md).
+Очередь обновлена по этим находкам; это не новая аппаратная проверка всех её тем.
+
 [Полная цифровая инструкция](../../GEELY_KX11_KNOWLEDGE_RU.md) ·
 [Реестр требований](../../PROJECT_REQUIREMENTS_RU.md) ·
 [Расширенная очередь вопросов](open_questions.json)
 
-Продолжение 1.2: [Mac-сборщик недостающих файлов](../../tools/geely-macos-collector/README_RU.md),
+Историческое продолжение 1.2: [Mac-сборщик недостающих файлов](../../tools/geely-macos-collector/README_RU.md),
 [углублённый разбор](research-2026-09-05-next/README_RU.md), [проверка158 источников](research-2026-09-05-next/CORPUS_CHECK.json).
 
 Историческое обновление 1.1 от 5 сентября: [матрица 94 областей](research-2026-09-05/COVERAGE_RU.md),

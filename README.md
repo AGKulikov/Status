@@ -1,5 +1,8 @@
 # Natro
 
+[Карта требований, исследований и открытых вопросов](docs/RESEARCH_INDEX_RU.md).
+Новые находки и опровержения фиксируются после исследования, независимо от выпуска APK.
+
 Доступна **3.2.3 / 208021356**: полный доступный каталог QNX от корня,
 потоковое сохранение полных mappings и журналов без прежних квот QNX.
 [Описание и статус выпуска](docs/releases/3.2.3/README_RU.md),
@@ -66,8 +69,9 @@ Navigator/Helper не менялись. Проверка сбора на KX11 и
 > Полноценный форк официального Status Widget 2.8.2. Он устанавливается рядом с оригиналом
 > (`applicationId: ru.natro.statuswidget`) и добавляет три независимых коннектора — прямой
 > Home Assistant API, MQTT и прямой Sprut.hub, независимые информационные кирпичики,
-> локальные сценарии и второй управляющий оверлей. Полное ТЗ:
-> [FORK_SPEC_RU.md](FORK_SPEC_RU.md). Настройка Home Assistant/MQTT:
+> локальные сценарии и второй управляющий оверлей. Актуальные требования:
+> [PROJECT_REQUIREMENTS_RU.md](PROJECT_REQUIREMENTS_RU.md). Первоначальное ТЗ:
+> [FORK_SPEC_RU.md](FORK_SPEC_RU.md) (историческая редакция). Настройка Home Assistant/MQTT:
 > [HA_MQTT_SETUP_RU.md](HA_MQTT_SETUP_RU.md). Настройка Sprut.hub:
 > [SPRUTHUB_SETUP_RU.md](SPRUTHUB_SETUP_RU.md). Команды с кнопок руля и Android Intent:
 > [INTENT_SCENARIOS_RU.md](INTENT_SCENARIOS_RU.md).
