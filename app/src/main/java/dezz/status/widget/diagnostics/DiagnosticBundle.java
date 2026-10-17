@@ -10,6 +10,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.util.Locale;
@@ -22,7 +23,9 @@ public final class DiagnosticBundle {
     public static File create(Context context) {
         File directory = new File(context.getCacheDir(), "exports");
         if (!directory.isDirectory() && !directory.mkdirs()) return null;
-        File target = new File(directory, "Natro-diagnostics-" + System.currentTimeMillis() + ".zip");
+        File target;
+        try { target = File.createTempFile("Natro-diagnostics-", ".zip", directory); }
+        catch (IOException unavailable) { return null; }
         try (ZipOutputStream zip = new ZipOutputStream(new FileOutputStream(target))) {
             JSONObject manifest = new JSONObject().put("schema", 1).put("version", BuildConfig.VERSION_NAME)
                     .put("version_code", BuildConfig.VERSION_CODE).put("session", CausalDiagnostics.session())

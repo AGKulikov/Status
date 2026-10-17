@@ -8,6 +8,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import dezz.status.widget.adb.AdbRemoteInbox;
 import dezz.status.widget.settings.SettingsBackNavigation;
 import dezz.status.widget.transfer.LanTransferService;
+import dezz.status.widget.transfer.LanTrustStore;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 
@@ -17,7 +18,7 @@ public final class LanTransferActivity extends dezz.status.widget.settings.Setti
     private final ExecutorService network = Executors.newSingleThreadExecutor();
     private TextView status, address, code;
     private Button toggle;
-    private Switch commands;
+    private Switch commands, autoStart;
     private EditText text;
     private boolean binding;
     private final Runnable refresh = new Runnable() {
@@ -25,6 +26,7 @@ public final class LanTransferActivity extends dezz.status.widget.settings.Setti
             LanTransferService service = LanTransferService.instance;
             binding = true; toggle.setText(service == null ? "Включить сервер" : "Выключить сервер");
             commands.setEnabled(service != null); commands.setChecked(service != null && service.commandsAllowed()); binding = false;
+            binding=true;autoStart.setChecked(new LanTrustStore(LanTransferActivity.this).autoStart());binding=false;
             status.setText(service == null ? "Сервер выключен" : service.status());
             code.setText(service == null ? "" : "Код: " + service.pin() + "  ·  " + service.pinRemainingSeconds() + " с");
             main.postDelayed(this, 1000);
@@ -41,13 +43,25 @@ public final class LanTransferActivity extends dezz.status.widget.settings.Setti
         LinearLayout actions = new LinearLayout(this);
         toggle = button("Включить сервер", () -> {
             if (LanTransferService.instance == null) startForegroundService(new Intent(this, LanTransferService.class));
-            else stopService(new Intent(this, LanTransferService.class));
+            else change(() -> {
+                if(!new LanTrustStore(this).setAutoStart(false))throw new IllegalStateException("Автозапуск не отключён");
+                stopService(new Intent(this, LanTransferService.class));
+            });
         }); actions.addView(toggle);
-        actions.addView(button("Новый код / отозвать доступ", () -> { if (LanTransferService.instance != null) LanTransferService.instance.rotate(); }));
+        actions.addView(button("Новый код / отозвать доступ", () -> change(() -> { if (LanTransferService.instance != null) LanTransferService.instance.rotate(); })));
         actions.addView(button("Обновить адреса", this::addresses)); root.addView(actions);
-        commands = new Switch(this); commands.setText("Разрешить удалённое выполнение ADB-команд, включая root");
-        commands.setOnCheckedChangeListener((view, value) -> { if (!binding && LanTransferService.instance != null) LanTransferService.instance.allowCommands(value); }); root.addView(commands);
-        root.addView(label("Используйте только доверенную сеть: локальный HTTP не шифруется. Сервер не доступен через облако. После смены сети обновите адрес. Код действует 5 минут, сопряжение — 30 минут бездействия. Отключение сервера отзывает доступ.", 15));
+        autoStart=new Switch(this);autoStart.setText("Автозапуск сервера для сохранённых телефонов");
+        autoStart.setOnCheckedChangeListener((view,value)->{if(!binding)change(()->{
+            LanTrustStore store=new LanTrustStore(this);
+            if(value&&store.hashes().isEmpty())throw new IllegalStateException("Сначала добавьте телефон с сохранением сопряжения");
+            if(!store.setAutoStart(value))throw new IllegalStateException("Автозапуск не сохранён");
+            if(value)startForegroundService(new Intent(this,LanTransferService.class));
+        });});root.addView(autoStart);
+        commands = new Switch(this); commands.setText("Разрешить ADB-команды, включая root · сохранять для доверенных телефонов");
+        commands.setOnCheckedChangeListener((view, value) -> { if (!binding)change(()->{
+            LanTransferService service=LanTransferService.instance;if(service!=null)service.allowCommands(value);
+        }); }); root.addView(commands);
+        root.addView(label("Только доверенная сеть: HTTP не шифруется. Сохранённое сопряжение и разрешение ADB действуют после перезагрузки; старые команды не повторяются. Новый код отзывает все телефоны и разрешение ADB. Выключение сервера отключает автозапуск, но сохраняет телефоны. При смене адреса Safari может потребовать сопряжение заново. Код действует 5 минут.", 15));
         text = new EditText(this); text.setHint("Текст или команда — ничего не запускается при вставке"); text.setMinLines(3); text.setMaxLines(8); root.addView(text);
         LinearLayout clipboard = new LinearLayout(this);
         clipboard.addView(button("Из буфера Android", () -> {
@@ -84,6 +98,11 @@ public final class LanTransferActivity extends dezz.status.widget.settings.Setti
         String value = String.join("\n", LanTransferService.addresses());
         main.post(() -> { if (!isDestroyed()) address.setText(value.isEmpty() ? "Нет локального IPv4. Проверьте подключение Wi-Fi / модема iPhone." : value); });
     }); }
+    private void change(Runnable action) {network.execute(()->{
+        try{action.run();}catch(RuntimeException error){main.post(()->{
+            if(!isDestroyed())Toast.makeText(this,error.getMessage(),Toast.LENGTH_LONG).show();
+        });}
+    });}
     @Override protected void onResume() { super.onResume(); main.post(refresh); addresses(); }
     @Override protected void onPause() { main.removeCallbacks(refresh); super.onPause(); }
     @Override protected void onDestroy() { network.shutdownNow(); main.removeCallbacksAndMessages(null); super.onDestroy(); }

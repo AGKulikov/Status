@@ -1,5 +1,36 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review 17.10.2026 — LAN trust, экспорты и updater (SOURCE, без APK/FIELD)
+
+Проверены восемь изменённых/новых владельцев хранения. LanTrustStore открывает
+CE `natro_lan_trust_v1` через BackupPreferences: `hashes` StringSet SHA-256 до
+4 элементов (default empty), `auto_start` и `remote_commands` Boolean (false).
+Commit синхронный в worker, ошибка закрывает доступ. Это локальная идентичность
+и разрешение: BackupStorage boundStores архивирует импортированный XML целиком
+в restored-device-records и сохраняет действующий локальный, либо удаляет
+импортированный активный. Неизвестные keys остаются в архиве. Импорт не доверяет
+чужому телефону, не включает сервер или ADB. Переустановка/очистка данных не
+обещает сохранения доверия. Существующие namespace/defaults не изменены;
+defaultsSchema нового APK потребует отдельного versionCode/migration review.
+
+LanTransferService: входящие файлы остаются на прежнем пути; jobs/bearer/статус
+экспорта только RAM, не являются настройкой и не повторяются после restore.
+DiagnosticJournal/DiagnosticBundle: те же allowlists/журналы, только уникальное
+имя временного cache/exports TXT/ZIP. Одновременный локальный экспорт не
+перезаписывает удалённый. Исходные diagnostic files по-прежнему включаются в
+полную копию; cache export не является резервной копией и не импортируется.
+NatroUpdater: только cache/updates APK, candidate/progress в RAM; ни настроек,
+ни токенов GitHub, ни автоматической установки из backup. APK перед каждой
+установкой проверяется заново. Cache может очищаться системой; это явная ошибка,
+не основание запускать другой файл.
+
+Также рассмотрены уже опубликованные QnxFileReader (uint64 stat identities,
+те же временные cache файлы) и InstrumentOemController (только описание
+диагностической причины, прежние prefs/ownership). Их storage-политики не
+изменились. Fingerprints обновляются после этой ревизии, не вместо неё.
+JVM trust replay проверяет сохранение флагов, отзыв и отказ commit на doubles;
+это не физический Android boot/restore и не сертификат полноты backup.
+
 ### Review3.2.3 — потоковый каталог QNX и снятие квот
 
 QnxFileReader — новый обнаруживаемый storage-owner: временные qnx-work-*.part

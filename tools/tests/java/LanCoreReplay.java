@@ -36,6 +36,28 @@ public final class LanCoreReplay {
         check(!p.authorized(tokens.get(0), 400100), "only four clients retained");
         check(p.authorized(tokens.get(4), 400100), "newest retained");
         check(!p.authorized(tokens.get(4), 2200100), "idle expiry boundary");
+        class Store implements LanPairing.TrustStore {
+            Set<String> hashes=new HashSet<>();boolean fail;
+            public Set<String> hashes(){return new HashSet<>(hashes);}
+            public boolean save(Set<String> values){if(fail)return false;hashes=new HashSet<>(values);return true;}
+        }
+        Store store=new Store();LanPairing first=new LanPairing(0,store);
+        String remembered=first.pair(first.pin(),1,true);
+        check(remembered!=null&&!store.hashes.contains(remembered),"only credential hash persists");
+        check(store.hashes.iterator().next().matches("[a-f0-9]{64}"),"SHA256 persisted");
+        LanPairing restarted=new LanPairing(0,store);
+        check(restarted.authorized(remembered,9_000_000),"restart and idle do not revoke remembered phone");
+        check(!restarted.authorized("x".repeat(43),1),"unknown bearer rejected");
+        String temporary=restarted.pair(restarted.pin(),1,false);
+        check(!new LanPairing(0,store).authorized(temporary,2),"temporary session not persisted");
+        check(restarted.forget(remembered)&&!first.authorized(remembered,2),"revoke is visible across readers");
+        remembered=restarted.pair(restarted.pin(),2,true);check(remembered!=null,"re-enrolment");
+        check(restarted.rotate(3)&&!new LanPairing(0,store).authorized(remembered,4),"durable revoke survives restart");
+        store.fail=true;check(restarted.pair(restarted.pin(),4,true)==null,"failed persistence never returns a credential");
+        check(!restarted.rotate(5),"failed revocation is explicit");store.fail=false;
+        restarted=new LanPairing(0,store);
+        for(int i=0;i<4;i++)check(restarted.pair(restarted.pin(),i,true)!=null,"four remembered peers");
+        check(restarted.pair(restarted.pin(),5,true)==null&&store.hashes.size()==4,"full trust store does not silently evict a phone");
     }
     static void files(Path root) throws Exception {
         Path dir = Files.createDirectory(root.resolve("incoming"));

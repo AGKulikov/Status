@@ -13,18 +13,36 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** Explicit foreground-only LAN host; no cloud, no boot start, no saved pairing secrets. */
+/** Foreground LAN host; boot startup and persisted ADB permission require remembered trust. */
 public final class LanTransferService extends Service {
     public static volatile LanTransferService instance;
     public static final int PORT = 8765;
     private final Handler main = new Handler(Looper.getMainLooper());
     private final Map<String, Job> jobs = new LinkedHashMap<>();
     private final Set<String> seenCommands = new HashSet<>();
+    private final ExecutorService exportWorker = Executors.newSingleThreadExecutor();
+    private volatile Export export;
+    private volatile AdbConsoleSession dumpSession;
+    private static final class Export {
+        final String token, id, format;
+        volatile boolean done;
+        volatile boolean cancelled;
+        volatile File file;
+        volatile String error = "";
+        volatile String progress = "Подготовка…";
+        Export(String token, String id, String format) { this.token=token; this.id=id; this.format=format; }
+        JSONObject state() throws JSONException {
+            File ready=file;
+            return new JSONObject().put("id",id).put("done",done).put("error",error).put("progress",progress)
+                    .put("name",ready==null?"":ready.getName()).put("size",ready==null?0:ready.length());
+        }
+    }
     private volatile LanHttpServer server;
     private volatile LanFileStore files;
     private NatroSharedFolder sharedFolder;
     private volatile AdbConsoleSession adb;
     private volatile LanPairing pairing;
+    private LanTrustStore trust;
     private volatile boolean remoteCommands;
     private volatile String clipboard = "", status = "Запуск…";
     private volatile boolean destroyed;
@@ -45,24 +63,39 @@ public final class LanTransferService extends Service {
                 File root = getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS); if (root == null) root = getFilesDir();
                 files = new LanFileStore(new File(root, "Natro-Incoming"));
                 sharedFolder = new NatroSharedFolder(new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), "Natro"));
-                pairing = new LanPairing(SystemClock.elapsedRealtime()); adb = new AdbConsoleSession(this);
+                trust = new LanTrustStore(this);
+                pairing = new LanPairing(SystemClock.elapsedRealtime(),trust); adb = new AdbConsoleSession(this);
+                remoteCommands=trust.commandsAllowed();
                 synchronized (this) { if (destroyed) { adb.close(); return; } server = new LanHttpServer(PORT, this::request); }
                 status = "Сервер включён";
             } catch (Exception error) { status = "Не удалось запустить сервер: " + error.getMessage(); }
         }, "natro-lan-start").start();
     }
-    @Override public int onStartCommand(Intent intent, int flags, int id) { return START_NOT_STICKY; }
+    @Override public int onStartCommand(Intent intent, int flags, int id) {
+        boolean restart=new LanTrustStore(this).autoStart();
+        if(intent==null&&!restart)stopSelf();
+        return restart?START_STICKY:START_NOT_STICKY;
+    }
     @Override public IBinder onBind(Intent intent) { return null; }
     public String status() { return status; }
     public String pin() { return pairing == null ? "…" : pairing.pin(); }
     public long pinRemainingSeconds() { return pairing == null ? 0 : Math.max(0, (pairing.expires() - SystemClock.elapsedRealtime()) / 1000); }
     public String folder() { return files == null ? "" : files.path(); }
     public boolean commandsAllowed() { return remoteCommands; }
-    public void allowCommands(boolean value) { remoteCommands = value; if (!value && adb != null) adb.cancel("Удалённое выполнение отключено"); }
+    public void allowCommands(boolean value) {
+        remoteCommands=false;
+        if(adb!=null)adb.cancel("Изменение разрешения удалённых команд");
+        if(dumpSession!=null)dumpSession.cancel("Изменение разрешения удалённых команд");
+        if(trust==null||!trust.setCommandsAllowed(value))throw new IllegalStateException("Разрешение ADB не сохранено");
+        remoteCommands=value;
+    }
     public void rotate() {
-        if (pairing != null) pairing.rotate(SystemClock.elapsedRealtime());
+        remoteCommands=false;
+        boolean revoked=pairing==null||pairing.rotate(SystemClock.elapsedRealtime());
         if (server != null) server.cancelConnections();
         if (adb != null) adb.cancel("Сопряжения отозваны");
+        if (dumpSession != null) dumpSession.cancel("Сопряжения отозваны");
+        if(!revoked){stopSelf();throw new IllegalStateException("Не удалось сохранить отзыв доступа; сервер остановлен");}
     }
     public String text() { return clipboard; }
     public void setText(String text) {
@@ -96,11 +129,91 @@ public final class LanTransferService extends Service {
             }
             long now = SystemClock.elapsedRealtime();
             if (request.path.equals("/api/pair") && request.method.equals("POST")) {
-                String token = pairing.pair(new JSONObject(request.text(1024)).optString("pin"), now);
-                json(output, token == null ? 403 : 200, token == null ? new JSONObject().put("error", "Неверный/истёкший код или превышен лимит попыток") : new JSONObject().put("token", token)); return;
+                JSONObject body=new JSONObject(request.text(1024));boolean remember=body.optBoolean("remember",false);
+                String token = pairing.pair(body.optString("pin"), now,remember);
+                if(token!=null&&remember)startService(new Intent(this,LanTransferService.class));
+                json(output, token == null ? 403 : 200, token == null ? new JSONObject().put("error", "Сопряжение не сохранено: проверьте код, лимит попыток/4 телефонов и хранилище") : new JSONObject().put("token", token).put("remembered",remember)); return;
             }
             if (!pairing.authorized(request.token(), now)) { json(output, 401, new JSONObject().put("error", "Нужно сопряжение с магнитолой")); return; }
             switch (request.path) {
+                case "/api/update":
+                    dezz.status.widget.update.NatroUpdater updater=dezz.status.widget.update.NatroUpdater.get(this);
+                    if(request.method.equals("POST")) {
+                        if(!remoteCommands){json(output,403,new JSONObject().put("error","Разрешите удалённые команды на магнитоле"));return;}
+                        String action=new JSONObject(request.text(1024)).getString("action");
+                        if(action.equals("check"))updater.check();
+                        else if(action.equals("download"))updater.download();
+                        else if(action.equals("install")) {
+                            Intent intent=updater.installationIntent();
+                            if(destroyed||!remoteCommands||!pairing.authorized(request.token(),SystemClock.elapsedRealtime()))throw new IOException("Доступ отозван");
+                            startActivity(intent);
+                        } else throw new IOException("Неизвестное действие обновления");
+                    }else if(!get(request,output))return;
+                    json(output,200,updater.status());return;
+                case "/api/logs":
+                    if (request.method.equals("GET")) {
+                        Export current=export;
+                        if(current==null||!current.token.equals(request.token())) {
+                            json(output,200,new JSONObject().put("done",true).put("id",""));return;
+                        }
+                        json(output,200,current.state());return;
+                    }
+                    if(!post(request,output))return;
+                    JSONObject logRequest=new JSONObject(request.text(1024));
+                    String exportId=logRequest.getString("id"), format=logRequest.getString("format");
+                    if(!exportId.matches("[0-9a-f-]{36}")||!(format.equals("txt")||format.equals("zip")||format.equals("dump")))
+                        throw new IOException("Некорректный формат экспорта");
+                    if(format.equals("dump")&&!remoteCommands)throw new IOException("Разрешите удалённые команды на магнитоле");
+                    synchronized(exportWorker) {
+                        Export current=export;
+                        if(current!=null&&current.id.equals(exportId)) {
+                            if(!current.token.equals(request.token())||!current.format.equals(format))throw new IOException("ID занят");
+                            json(output,200,current.state());return;
+                        }
+                        if(current!=null&&!current.done){json(output,409,new JSONObject().put("error","Экспорт уже выполняется"));return;}
+                        Export next=new Export(request.token(),exportId,format);
+                        export=next;
+                        exportWorker.execute(()->{
+                            try {
+                                if(next.cancelled||destroyed||!pairing.authorized(next.token,SystemClock.elapsedRealtime()))throw new IOException("Экспорт отменён или доступ отозван");
+                                File result=next.format.equals("dump")? collectDump(next):next.format.equals("txt")
+                                        ? dezz.status.widget.diagnostics.DiagnosticJournal.copyForExport(this)
+                                        : dezz.status.widget.diagnostics.DiagnosticBundle.create(this);
+                                if(result==null||!result.isFile())throw new IOException("Не удалось сохранить логи");
+                                next.file=result;
+                            } catch(Exception failure){next.error="Экспорт не выполнен: "+(failure instanceof IOException?failure.getMessage():failure.getClass().getSimpleName());}
+                            finally{next.done=true;}
+                        });
+                        json(output,200,next.state());return;
+                    }
+                case "/api/logs/cancel":
+                    if(!post(request,output))return;
+                    Export cancel=export;
+                    if(cancel!=null&&cancel.token.equals(request.token())&&cancel.format.equals("dump")&&!cancel.done){
+                        cancel.cancelled=true;
+                        if(dumpSession!=null)dumpSession.cancel("Сбор отменён с телефона");
+                    }
+                    json(output,200,new JSONObject().put("message","Отмена запрошена; проверьте результат, частичный архив может сохраниться"));return;
+                case "/api/logs/download":
+                    if(!get(request,output))return;
+                    Export ready=export;
+                    if(ready==null||!ready.id.equals(request.headers.get("x-natro-export"))||!ready.token.equals(request.token())||!ready.done||ready.file==null){
+                        json(output,404,new JSONObject().put("error","Готовый экспорт не найден"));return;
+                    }
+                    // Open before writing headers. Never append a JSON error to a partial file body.
+                    try(InputStream input=new FileInputStream(ready.file)) {
+                        LanHttpServer.header(output,200,ready.format.equals("txt")?"text/plain; charset=utf-8":"application/zip",
+                                ready.file.length(),"attachment; filename=\""+ready.file.getName()+"\"");
+                        try {byte[] block=new byte[65536];int count;while((count=input.read(block))!=-1)output.write(block,0,count);}
+                        catch(IOException disconnected){return;}
+                    }
+                    return;
+                case "/api/unpair":
+                    if(!post(request,output))return;
+                    if(!pairing.forget(request.token()))throw new IOException("Не удалось сохранить отзыв доступа");
+                    if(export!=null&&export.token.equals(request.token())&&dumpSession!=null)dumpSession.cancel("Сопряжение отозвано");
+                    if(trust.hashes().isEmpty()){remoteCommands=false;if(adb!=null)adb.cancel("Сопряжение отозвано");}
+                    json(output,200,new JSONObject().put("revoked",true));return;
                 case "/api/status":
                     if (!get(request, output)) return;
                     json(output, 200, new JSONObject().put("status", status).put("adb", adb.endpoint()).put("commandsAllowed", remoteCommands).put("folder", folder())); return;
@@ -204,6 +317,32 @@ public final class LanTransferService extends Service {
             json(output, 200, new JSONObject().put("id", id));
         }
     }
+    private File collectDump(Export job)throws Exception {
+        if(job.cancelled||!remoteCommands||destroyed)throw new IOException("Сбор отменён или доступ отозван");
+        if(!dezz.status.widget.diagnostics.SystemFileDump.RUNNING.compareAndSet(false,true))throw new IOException("Системный дамп уже собирается");
+        AdbConsoleSession session=new AdbConsoleSession(this);dumpSession=session;
+        CountDownLatch done=new CountDownLatch(1);
+        java.util.concurrent.atomic.AtomicReference<dezz.status.widget.diagnostics.SystemFileDump.Report> report=new java.util.concurrent.atomic.AtomicReference<>();
+        try {
+            boolean accepted=session.submitSystemDump(connection->{
+                if(job.cancelled||!remoteCommands||destroyed||!pairing.authorized(job.token,SystemClock.elapsedRealtime()))throw new IOException("Сбор отменён или доступ отозван");
+                connection.connect();
+                report.set(dezz.status.widget.diagnostics.SystemFileDump.collect(new File(getCacheDir(),"exports"),
+                        new dezz.status.widget.diagnostics.SystemFileDump.Shell(){
+                            public AdbShellResult.Result command(String value)throws Exception{return connection.command(value);}
+                            public AdbShellResult.Result commandBounded(String value,int limit)throws Exception{return connection.commandBounded(value,limit);}
+                        },text->job.progress=text,dezz.status.widget.BuildConfig.VERSION_NAME,connection::collectQnx,"unspecified"));
+            },error->{
+                dezz.status.widget.diagnostics.SystemFileDump.Report result=report.get();
+                job.progress=result==null?"Дамп не создан":(error==null&&result.complete?"Полный сбор":"Частичный дамп")+" · "+result.collected+"/"+result.requested+" файлов; причины в manifest.tsv";
+                session.close();dezz.status.widget.diagnostics.SystemFileDump.RUNNING.set(false);done.countDown();
+            });
+            if(!accepted){dezz.status.widget.diagnostics.SystemFileDump.RUNNING.set(false);throw new IOException("Сбор не принят");}
+            done.await();
+            if(report.get()==null)throw new IOException(job.progress);
+            return report.get().file;
+        }finally{session.close();if(dumpSession==session)dumpSession=null;}
+    }
     private boolean get(LanHttpServer.Request request, OutputStream output) throws Exception { return method(request, output, "GET"); }
     private boolean post(LanHttpServer.Request request, OutputStream output) throws Exception { return method(request, output, "POST"); }
     private boolean method(LanHttpServer.Request request, OutputStream output, String method) throws Exception {
@@ -213,5 +352,7 @@ public final class LanTransferService extends Service {
     @Override public void onDestroy() {
         synchronized (this) { destroyed = true; if (server != null) server.close(); }
         remoteCommands = false; if (adb != null) adb.close(); instance = null; main.removeCallbacksAndMessages(null); super.onDestroy();
+        exportWorker.shutdownNow();
+        if(dumpSession!=null)dumpSession.close();
     }
 }

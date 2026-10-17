@@ -5,6 +5,12 @@
   "scope": "Production storage owners reviewed for 3.0.5 logging in FULL_BACKUP_CONTRACT_RU.md. Diagnostic process/incident archives retain existing archive policy; temporary export is not a backup; defaults 335/336/337 to 338 reviewed. Static fingerprints do not certify runtime/device completeness.",
   "shared_preferences": [
     {
+      "name": "natro_lan_trust_v1",
+      "contents": "CE hashes StringSet (empty), auto_start/remote_commands Boolean (false); installation-bound LAN trust, no plaintext bearer.",
+      "source": "app/src/main/java/dezz/status/widget/transfer/LanTrustStore.java",
+      "restore_policy": "Archive all imported keys in restored-device-records; keep current local store or remove imported active XML. Never activate foreign trust/ADB flags."
+    },
+    {
       "name": "{package}_preferences",
       "contents": "Основные настройки, JSON документов, маршруты, сценарии, назначения экранных кнопок, HUD, DIM, шторка, телефон, ADB-флаги. Пассажирская панель, независимое избранное/документы ячеек, каталог приложений и PASSENGER-сценарии.",
       "source": "app/src/main/java/dezz/status/widget/Preferences.java",
@@ -203,6 +209,14 @@
     }
   ],
   "source_owners": {
+    "app/src/main/java/dezz/status/widget/transfer/LanTrustStore.java": {
+      "sha256": "32c456bac76f95aa46273fb3d878c8460c18d7c3cb4e725917c9f6865482d2be",
+      "access_kinds": ["preferences"]
+    },
+    "app/src/main/java/dezz/status/widget/update/NatroUpdater.java": {
+      "sha256": "e36953d73acd71fdb7de8ebd658afe1e281303bc0e04420169a4d98b39c0975d",
+      "access_kinds": ["files"]
+    },
     "app/src/geely/java/dezz/status/widget/car/HudModeFallbackBootReceiver.java": {
       "sha256": "7186f67ea218ef097769546681e0aed317095727202d5e577e0f45bb4dce03d2",
       "access_kinds": [
@@ -383,7 +397,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupStorage.java": {
-      "sha256": "e91ff6602460df277feceb6b743149493c6df4e7799c19742e8b7a2751ffc8ed",
+      "sha256": "bdc7234ee75489c5b2a2123fb096e0e61e1ae466d3f97a6327fe77227562980a",
       "access_kinds": [
         "external_resource",
         "files"
@@ -438,7 +452,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/DiagnosticBundle.java": {
-      "sha256": "51033b860722671e3fb04b94a4ebbdde3c003e2e04073feccc85550e1700fc95",
+      "sha256": "d3e268c1cd348c33817af2537a32224baea96e928639c9661506b28b82e75668",
       "access_kinds": [
         "files"
       ]
@@ -450,7 +464,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/DiagnosticJournal.java": {
-      "sha256": "dec4d2709854420fafb480fd9cb6751ad63b260b4e48e4a2f31cdb4d5d7e02c5",
+      "sha256": "a863b015e7c675c59271c94795cdbce636c6b9e3088d014de6afe5dde762fb86",
       "access_kinds": [
         "files"
       ]
@@ -474,7 +488,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/instrument/InstrumentOemController.java": {
-      "sha256": "d13012abc3aa2fb3c07e3d438c6d0b33552a35c6bdbadd0d4c99901492032455",
+      "sha256": "f6b81ff9a8fbc2f684af456ea0b549a8cf1683571c88a5dc96685b3a940a493c",
       "access_kinds": [
         "preferences"
       ]
@@ -706,7 +720,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/transfer/LanTransferService.java": {
-      "sha256": "557d0876e90c78645cba5b5815cccf2f83e633bffbcb28910602d7e3b8f73683",
+      "sha256": "4e57ec9988445ca227d8933f048aa061d002b088e183bd8e14ef5b9ac02de408",
       "access_kinds": [
         "files"
       ]
@@ -725,7 +739,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/QnxFileReader.java": {
-      "sha256": "6d5ec2880762964fb33df5204e6197314442f92f1f1beadfab835851df4134ac",
+      "sha256": "ac6e8a60c1037abc8a84b60ed10b6cefe9295c0f867a79983211a1efc4366d92",
       "access_kinds": [
         "files"
       ]

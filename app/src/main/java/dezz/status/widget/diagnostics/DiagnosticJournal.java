@@ -391,7 +391,9 @@ public final class DiagnosticJournal {
             if (source == null) return null;
             File directory = new File(context.getCacheDir(), "exports");
             if (!directory.isDirectory() && !directory.mkdirs()) return null;
-            File target = new File(directory, "status-widget-debug.txt");
+            File target;
+            try { target = File.createTempFile("Natro-logs-", ".txt", directory); }
+            catch (IOException unavailable) { return null; }
             try (FileOutputStream output = new FileOutputStream(target, false)) {
                 output.write(("Natro diagnostic export; session=" + CausalDiagnostics.session()
                         + "; pid=" + android.os.Process.myPid() + "; wall_ms=" + System.currentTimeMillis()

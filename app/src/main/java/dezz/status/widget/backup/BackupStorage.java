@@ -223,7 +223,7 @@ public final class BackupStorage {
         if(!source.matches("[a-f0-9]{64}"))throw new IOException("Invalid source installation");
         Set<String> boundStores=new HashSet<>(Arrays.asList(
                 context.getPackageName()+"_apps_to_hide.xml",context.getPackageName()+"_screen_reservation_state_v1.xml",
-                "natro_service_mode_original.xml","natro_service_mode_self.xml"));
+                "natro_service_mode_original.xml","natro_service_mode_self.xml","natro_lan_trust_v1.xml"));
         Set<String> identityKeys=new HashSet<>(Arrays.asList(
                 "phoneBleV2SwitchSnapshot","phoneBleV2HelperInstallationId","phoneBleV2AndroidInstallationId",
                 "phoneBleV2EnrollmentRecord","phoneBleV2EnrollmentPendingRecord",
