@@ -1,5 +1,24 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 17.10.2026 — FIELD после reboot и проверка фактической libopenwfd.so
+
+Пользователь подтвердил reboot ДО QCONN/tcpdump14:45; полоса исчезла после
+reboot. Связь успеха с promisc отозвана как неподтверждённая. Root/shell до
+reboot одинаково refused; причину listener/сети считать OPEN.
+ZIP833791:CRC81/76manifest hashes PASS,QNX33files,13slog2,3193examined,
+6wide mappings status=read. `/proc` stat fix получил FIELD-подтверждение;
+inventory10failures и non-atomic metadata не скрыты.
+OA_Payload dev1/ino2d7bbb74 общий у cluster_controller/vip_proxy; сами ELF
+совпали с уже изученными. Это runtime-подтверждение прежнего SPI-маршрута,
+не новый hide/renderer. В реально отображённой `/lib64/libopenwfd.so`
+SHAa4fc94f6b44a42e0fc53db93ea570f1704de2234f18303517ac633a5d9603556
+createMask0xa7cc/0xa7d4 возвращают0,bind0x9fbc/destroy0xa7dc немедленно ret.
+Ограничение прежней libopenwfd_qnx.so теперь отдельно проверено на этом ELF;
+RGBA-композиция и внешний DIM не исключены. Пиксели крыльев не локализованы.
+Диагностика до reboot и скрытый Sys2038 после reboot — разные состояния,
+не противоречие и не доказательство окончательной причины полосы.
+[Хеши, проверки, уточнения и границы](docs/geely-kx11/research-2026-10-16-qnx/DUMP_324_833791_RU.md).
+
 ## 17.10.2026 — FIELD3.2.4: Connection refused до QCONN
 
 Архив792651 проверен по CRC/20manifest hashes. Android uptime312.50/313.53с,

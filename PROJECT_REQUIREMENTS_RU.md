@@ -1,5 +1,33 @@
 # Единый реестр требований Natro
 
+## 17.10.2026 — FIELD3.2.4 после перезагрузки, mappings получены; крылья OPEN
+
+Пользователь уточнил в14:51–14:52МСК: перезагрузка была ДО успешной tcpdump
+пробы14:45:45; после неё полосы нет. Нельзя приписывать восстановление QNX
+режиму promisc или смешивать pre/post reboot snapshots. Root и shell до
+перезагрузки получали одинаковый отказ, в присланном Android iptables запрет
+не найден; первопричина сетевого отказа остаётся OPEN.
+
+Новый ZIP833791 SHA608f4fbd20e0194034a90f2b6d726d60da282e1bfa97e86519e602f665f821c5:
+CRC81entries и76manifest size/SHA PASS; QNX33files,13slog2,3193examined paths,
+6wide mappings доEOF. FIELD stat `/proc` и чтения mappings3.2.4 подтверждён
+для этого сбора;10 directory_open_failed и live/non-atomic ограничения сохранены.
+OA_Payload подтверждён в двух процессах, но его SPI-маршрут уже был изучен,
+отдельного hide крыльев там не найдено. Новая libopenwfd.so фактически загружена
+wfd_be; её mask create/bind/destroy — заглушки. Не переносить вывод на любой
+renderer и не менять global alpha DIM+HUD вслепую. Требование: продолжать
+разбор имеющихся файлов, не требовать повторного исправного дампа без причины.
+Полоса: до reboot dimmenu restart/mode3→1/allow/gates blocked; после reboot
+overlay hidden. Pixel owner и физическое исправление OPEN. Battery26→25%
+при thresholds20/10 не подтверждает пропуск предупреждения.
+SOURCE/APK изменения поведения в этом исследовании отсутствуют.
+Подробности:docs/geely-kx11/research-2026-10-16-qnx/DUMP_324_833791_RU.md.
+
+Уточнение статуса релиза: stable natro-v3.2.4 опубликован17.10 в11:19:59Z,
+release415758301, workflow39028262606 SUCCESS, tag→4db858f7337d13e917b90f2faf97787631f3a79e.
+Семь assets проверены до публикации. Историческое OPEN14:18 ниже относится
+к предшествующему этапу. Это не принятие FIELD всех функций3.2.4.
+
 ## 17.10.2026 — FIELD3.2.4, архив792651: снова транспортный отказ
 
 Пользователь прислал Natro-system-7926511661466291750.zip. CRC25entries и
