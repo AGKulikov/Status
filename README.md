@@ -9,6 +9,8 @@
 [исходный коммит `40524437`](https://github.com/AGKulikov/Status/commit/40524437fe8136b04d1404c14bcb411545bd2315),
 [успешная сборка и проверки](https://github.com/AGKulikov/Status/actions/runs/39005817352).
 APK `Natro-3.2.3-signed.apk` передан отдельно. Navigator/Helper не менялись.
+Подпись, выравнивание, происхождение APK и метаданные обновления повторно проверены:
+[машинный протокол](docs/releases/3.2.3/release-report.json). Это не аппаратная приёмка.
 Проверка полного каталога, mappings и крыльев на KX11 остаётся открытой.
 
 Актуальное дерево разработки: [`fix/qnx-reader-20261016`](https://github.com/AGKulikov/Status/tree/fix/qnx-reader-20261016).

@@ -16,12 +16,52 @@
 - SHA-256 APK: `f3b8b227911d391db175bac1106fd8279c94b23c791950ffd9c4514595a8585c`.
 - Повторная проверка выданного файла: ZIP CRC OK, package `ru.natro.statuswidget`,
   versionName `3.2.3`, versionCode `208021356`.
-- В этом аудите публикации подпись/zipalign/install-over повторно не проверялись;
-  успешный CI и проверка manifest не заменяют эти отдельные проверки REL-006.
+- При первом аудите публикации подпись/zipalign/install-over не перепроверялись.
+  Дополнительная проверка ниже подтверждает подпись, выравнивание и метаданные обновления;
+  фактическая установка и FIELD остаются открытыми.
 
 Машиночитаемые факты: [publication-audit.json](publication-audit.json).
 Ранее приведённый статус «CI, подпись и APK — в подготовке» относился к исходному
 кандидату до завершения CI и выдачи APK. Проверка на автомобиле остаётся открытой.
+
+## Дополнительная проверка REL-006 / REL-010 — 17.10.2026
+
+Обнаружен сохранённый исходный протокол подписи, которого не было в проверенной
+удалённой ветке. Он опубликован без изменения как
+[signing-report-original.json](signing-report-original.json) и
+[signature-verification.txt](signature-verification.txt).
+Прежний [publication-audit.json](publication-audit.json) сохранён как история
+более узкой проверки. Текущий результат: [release-report.json](release-report.json).
+
+Повторно проверен именно выданный APK с указанным выше SHA-256:
+
+| Проверка | Результат и граница |
+|---|---|
+| apksigner, Android 9 / API28 | PASS, прежний сертификат, один подписант |
+| Отдельная проверка v2/v3 с min-sdk24 | Обе схемы PASS; выбор v3 при ограничении API28 не означает отсутствия v2 |
+| zipalign -c -P 16 4 | PASS; native libraries в Natro нет |
+| Identity | label Natro, ru.natro.statuswidget, 3.2.3 / 208021356, min/target SDK28; debuggable marker отсутствует |
+| Обновление поверх3.2.2 | Тот же package и сертификат, versionCode208021355→208021356 (+1); это проверка метаданных, не реальная установка |
+| ZIP/подпись | CRC OK, дубликатов имён нет, все1516 unsigned entries побайтно совпали; добавлены только MANIFEST.MF, STATUS-W.RSA и STATUS-W.SF в META-INF |
+| CI provenance | Архив artifact12090982869 совпал с GitHub digest/размером; unsigned APK внутри совпал по SHA-256 |
+| Android unit XML | 422 suites,2146 tests,0 failures/errors/skipped; повторно суммированы сохранённые XML, тесты здесь заново не запускались |
+| Navigator patch | classes19.dex побайтно совпал с3.2.2; дополнительная установка Navigator не нужна только из-за смены Natro3.2.3 |
+
+Сертификат SHA-256:
+`6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75`.
+Сравнение с CI связывает опубликованные source commit/tree → архив → unsigned APK →
+неизменённый payload подписанного APK. Это проверка происхождения артефакта,
+не независимая воспроизводимая пересборка.
+
+В исходном signing report поля navigator.pairRequired/navigatorPairRequired=true —
+общие метаданные кандидата. Они не доказывают необходимость нового Navigator.
+Решение для обновления3.2.2→3.2.3 основано на точном сравнении compiled classes19.dex,
+SHA-256 `710af1b6fa476a5e78c3e19809a59a89de70a698135f4b296c45df98962b0f96`.
+
+**FIELD OPEN:** установка поверх3.2.2 без потери настроек на реальном KX11,
+полный live QNX-каталог/mappings, установление renderer и отключение крыльев.
+Другие ранее открытые критерии не закрываются. Новая сборка, установка,
+управление автомобилем или изменение его настроек в этой проверке не выполнялись.
 
 ## Изменения
 

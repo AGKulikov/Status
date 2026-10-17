@@ -40,3 +40,12 @@ and requirements ledger in the same change. Keep superseded conclusions as histo
 An existing chat answer or standalone report is not automatically present in Git:
 verify the remote publication and keep docs/RESEARCH_INDEX_RU.md navigable.
 Do not claim exhaustive historical coverage unless that comparison was actually performed.
+
+
+Requirement execution and closeout: apply the existing requirement IDs and acceptance
+gates before implementation, not only after delivery. For every affected item, record
+SOURCE / TEST / APK / FIELD evidence or an explicit OPEN/BLOCKED condition.
+Publish release verification reports with the release documentation. If evidence is
+missing, distinguish an unperformed check from a performed but unpublished check;
+recover and verify the latter without rewriting the historical audit. Never weaken
+a gate or claim project-wide compliance from a partial audit.

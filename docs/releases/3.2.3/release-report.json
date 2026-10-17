@@ -1,0 +1,120 @@
+{
+  "schema": 2,
+  "verificationDate": "2026-10-17",
+  "scope": "reverification of already delivered APK; no new build or device installation",
+  "repository": "AGKulikov/Status",
+  "branch": "fix/qnx-reader-20261016",
+  "sourceCommit": "40524437fe8136b04d1404c14bcb411545bd2315",
+  "sourceTree": "62e708214e72fef058e3fb9029fc31bdfb0e457b",
+  "ci": {
+    "runId": 39005817352,
+    "status": "completed",
+    "conclusion": "success",
+    "headSha": "40524437fe8136b04d1404c14bcb411545bd2315",
+    "artifact": {
+      "id": 12090982869,
+      "name": "Natro-3.2.3-offline-signing-1",
+      "sha256": "315611faa41cb7b027f94c30c4256463ef52debf030e0b3c980c47ec3859e222",
+      "sizeBytes": 13016839,
+      "remoteDigestAndSizeMatched": true,
+      "zipCrcPassed": true
+    }
+  },
+  "apk": {
+    "file": "Natro-3.2.3-signed.apk",
+    "sha256": "f3b8b227911d391db175bac1106fd8279c94b23c791950ffd9c4514595a8585c",
+    "sizeBytes": 29608472,
+    "unsignedSha256": "b0c2bb194a7fd677c39ac00e18fa7eff9d60ac79bc94f64a9e71721211b449ee",
+    "unsignedMatchesCiArchive": true,
+    "package": "ru.natro.statuswidget",
+    "label": "Natro",
+    "versionName": "3.2.3",
+    "versionCode": 208021356,
+    "minSdk": 28,
+    "targetSdk": 28,
+    "debuggableMarkerPresent": false,
+    "nativeLibraries": [],
+    "zipCrcPassed": true,
+    "duplicateZipEntryNames": false
+  },
+  "signing": {
+    "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+    "signerCount": 1,
+    "signatureV2": true,
+    "signatureV3": true,
+    "api28VerificationPassed": true,
+    "minSdk24VerificationPassed": true,
+    "zipalign16KiBPassed": true,
+    "commands": [
+      "apksigner verify --verbose --print-certs --min-sdk-version 28 --max-sdk-version 28 Natro-3.2.3-signed.apk",
+      "apksigner verify --verbose --min-sdk-version 24 Natro-3.2.3-signed.apk",
+      "zipalign -c -P 16 4 Natro-3.2.3-signed.apk"
+    ],
+    "signatureToolNote": "API28-only verification selects v3; separate minSDK24 verification verifies both v2 and v3.",
+    "originalReport": "signing-report-original.json",
+    "originalSignatureOutput": "signature-verification.txt"
+  },
+  "payload": {
+    "allUnsignedEntriesUnchanged": 1516,
+    "changedOrMissingUnsignedEntries": [],
+    "addedSignedEntries": [
+      "META-INF/MANIFEST.MF",
+      "META-INF/STATUS-W.RSA",
+      "META-INF/STATUS-W.SF"
+    ],
+    "scope": "all unsigned ZIP entries compared byte for byte, including non-signature META-INF entries"
+  },
+  "installOver": {
+    "previous": {
+      "package": "ru.natro.statuswidget",
+      "versionCode": 208021355,
+      "versionName": "3.2.2",
+      "sha256": "0a679034e829368ae6d4bb131859b8b0618460bd7ae28228235bc8e4fa5ca4f8"
+    },
+    "samePackage": true,
+    "sameCertificate": true,
+    "versionCodeIncrement": 1,
+    "metadataVerified": true,
+    "physicalInstallationVerified": false,
+    "dataPreservationOnKx11Verified": false
+  },
+  "unitTests": {
+    "suites": 422,
+    "tests": 2146,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "evidence": "recounted saved candidate-323/test-results/TEST-*.xml; not rerun in this audit"
+  },
+  "navigator": {
+    "comparedToNatroRelease": "3.2.2",
+    "patch": "classes19.dex",
+    "patchBytes": 365376,
+    "patchSha256": "710af1b6fa476a5e78c3e19809a59a89de70a698135f4b296c45df98962b0f96",
+    "exactCompiledPatchUnchanged": true,
+    "newNavigatorRequiredForThisUpdate": false,
+    "originalPairRequiredMetadata": "preserved in original signing report; not an instruction to rebuild or reinstall unchanged Navigator"
+  },
+  "helper": {
+    "changed": false,
+    "evidence": "candidate metadata and release description; no new Helper build"
+  },
+  "acceptance": {
+    "source": "published build commit",
+    "test": "CI passed; saved XML recounted",
+    "apk": "checks above passed",
+    "field": "OPEN"
+  },
+  "openGates": [
+    "physical install-over on KX11 and data preservation",
+    "live complete QNX inventory and mappings",
+    "wings renderer identification and field verification",
+    "other previously open project FIELD gates",
+    "exhaustive comparison of all previous conversations with Git"
+  ],
+  "limitations": [
+    "No independent reproducible rebuild",
+    "No device access or installation",
+    "No claim that all project requirements are accepted"
+  ]
+}
