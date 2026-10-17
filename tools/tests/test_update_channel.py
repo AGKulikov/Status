@@ -3,6 +3,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT=Path(__file__).resolve().parents[2]
 spec=importlib.util.spec_from_file_location('update_manifest',ROOT/'tools/create_update_manifest.py')
@@ -10,6 +11,19 @@ module=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
 
 class UpdateChannel(unittest.TestCase):
+    def test_manifest_streams_multiple_chunks_without_python_311_api(self):
+        with tempfile.TemporaryDirectory() as directory:
+            apk=Path(directory)/'Natro-3.2.4-signed.apk'
+            payload=b'multi-chunk fixture\0' * 120000 + b'final partial chunk'
+            apk.write_bytes(payload)
+            signer='Signer #1 certificate SHA-256 digest: '+module.CERT
+            badging="package: name='ru.natro.statuswidget' versionCode='208021357' versionName='3.2.4'"
+            with mock.patch.object(module.hashlib, 'file_digest', create=True,
+                                   side_effect=AssertionError('Requires Python 3.11')):
+                value=module.manifest(apk,'natro-v3.2.4',signer,badging)
+            self.assertEqual(value['sha256'],module.hashlib.sha256(payload).hexdigest())
+            self.assertEqual(value['size'],len(payload))
+
     def test_manifest_identity_signature_and_hash(self):
         with tempfile.TemporaryDirectory() as directory:
             apk=Path(directory)/'Natro-3.2.4-signed.apk'

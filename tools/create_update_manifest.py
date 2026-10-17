@@ -24,10 +24,13 @@ def manifest(apk, tag, signer_output, badging):
     size = apk.stat().st_size
     if size <= 0 or size > 128 * 1024 * 1024:
         raise ValueError('APK size out of updater bounds')
+    # The Ubuntu 22.04 release runner uses Python 3.10 (no file_digest).
+    digest = hashlib.sha256()
     with apk.open('rb') as source:
-        digest = hashlib.file_digest(source, 'sha256').hexdigest()
+        for chunk in iter(lambda: source.read(1024 * 1024), b''):
+            digest.update(chunk)
     return dict(schema=1, channel='stable', package=PACKAGE, versionCode=int(match[2]),
-                versionName=match[3], certificateSha256=CERT, sha256=digest, size=size,
+                versionName=match[3], certificateSha256=CERT, sha256=digest.hexdigest(), size=size,
                 url=f'https://github.com/AGKulikov/Status/releases/download/{tag}/{apk.name}')
 
 def main():
