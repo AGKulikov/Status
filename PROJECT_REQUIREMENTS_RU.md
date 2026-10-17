@@ -1,5 +1,18 @@
 # Единый реестр требований Natro
 
+## 17.10.2026 — FIELD3.2.4, архив792651: снова транспортный отказ
+
+Пользователь прислал Natro-system-7926511661466291750.zip. CRC25entries и
+20manifest size/SHA PASS, SHA256bcdfbad2b6ac92923ff6db1ed1ad34d27a8bb63548b61eefca4f6c066049c46f.
+Версия3.2.4 подтверждена README; Android7files сохранены,uptime312.50/313.53с.
+QNX снова Connection refused наgreeting,tx0/rx32; error=qnx_bad_line — текст
+nc попал в CRLF parser. Инвентарь только `/`,examined0. До исправленного
+stat `/proc` не дошло; FIELD исправления остаётся OPEN, полного mappings нет.
+Нельзя считать source fix подтверждённым или опровергнутым этим отказом.
+Нужен read-only контроль текущего endpoint/route/UID, ожидание не обосновано.
+Белая полоса/battery warning этим системным архивом не закрываются.
+Подробности:docs/geely-kx11/research-2026-10-16-qnx/DUMP_324_792651_RU.md.
+
 ## 17.10.2026 14:18 МСК — статус по вопросу «Готово?»
 
 Подписанный3.2.4 уже готов и ссылка передана; полный CI и APK gates PASS.

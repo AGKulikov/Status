@@ -1,5 +1,24 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 17.10.2026 — FIELD3.2.4: Connection refused до QCONN
+
+Архив792651 проверен по CRC/20manifest hashes. Android uptime312.50/313.53с,
+QNX greeting:rx32/tx0,текст nc Connection refused,root examined0. Исправленный
+stat parser не достигнут; mappings/files не собраны. Первопричина отказа OPEN.
+Sys2038 dimmenu в этом windows snapshot shown=false; имя слоя не равно
+видимости и не устанавливает пиксельного владельца полосы.
+[Источник, SHA и следующий контроль](docs/geely-kx11/research-2026-10-16-qnx/DUMP_324_792651_RU.md).
+
+## 17.10.2026 — исправление stat и диагностика в APK3.2.4
+
+Подписанный3.2.4 содержит uint64 stat-parser, сохранение частичного ADB stdout
+и расширенные owner/battery evidence. CI39026892021,2147 Android/260 tool tests
+PASS; APK/source hashes и установочные метаданные:
+[протокол3.2.4](docs/releases/3.2.4/README_RU.md).
+Это обновление статуса SOURCE/TEST/APK, не новое FIELD-наблюдение. Физический
+QNX сбор, причина белой полосы и пропуска уведомления остаются OPEN.
+Исторические записи «APK не выпущен» ниже сохраняют состояние на момент записи.
+
 ## 17.10.2026 — QNX доступна; stat-parser обрывает inventory, UI-дефекты OPEN
 
 Дамп0f61705b без перезагрузки:812 discovered paths,13 probes,11 directory EOF;
