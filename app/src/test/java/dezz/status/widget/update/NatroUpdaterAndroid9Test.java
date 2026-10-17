@@ -6,7 +6,9 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.SigningInfo;
 import java.io.File;
+import java.io.FileDescriptor;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.security.MessageDigest;
 import org.json.JSONObject;
@@ -17,8 +19,12 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.Shadows;
 import org.robolectric.annotation.Config;
+import org.robolectric.annotation.ClassName;
+import org.robolectric.annotation.Implementation;
 import org.robolectric.annotation.Implements;
+import org.robolectric.annotation.RealObject;
 import org.robolectric.util.ReflectionHelpers;
+import org.robolectric.util.ReflectionHelpers.ClassParameter;
 import static org.junit.Assert.*;
 
 /** Real published APK, real API-28 archive parser and certificate verifier.
@@ -26,12 +32,36 @@ import static org.junit.Assert.*;
  * Only the installed-package database is simulated; no network/installer/device claim. */
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=28,application=Application.class,
-        shadows=NatroUpdaterAndroid9Test.FrameworkSigningInfo.class)
+        shadows={NatroUpdaterAndroid9Test.FrameworkSigningInfo.class,
+                NatroUpdaterAndroid9Test.JvmFileDataSource.class})
 public class NatroUpdaterAndroid9Test {
     // Robolectric's default ShadowSigningInfo ignores constructor certificates.
     // Call the actual Android implementation for this parser regression.
     @Implements(value=SigningInfo.class,minSdk=28)
     public static class FrameworkSigningInfo {}
+
+    /** Android's public DirectByteBuffer constructor is not accessible on JDK21.
+     * Replace only mmap byte delivery with positional reads from the SAME fd.
+     * APK parsing, v3 signature and content-digest verification remain Android's. */
+    @Implements(className="android.util.apk.MemoryMappedFileDataSource",isInAndroidSdk=false,minSdk=28,maxSdk=28)
+    public static class JvmFileDataSource {
+        @RealObject Object source;
+        @Implementation protected void feedIntoDataDigester(
+                @ClassName("android.util.apk.DataDigester") Object digester,long offset,int size)throws IOException {
+            long length=ReflectionHelpers.getField(source,"mSize");
+            long base=ReflectionHelpers.getField(source,"mFilePosition");
+            FileDescriptor fd=ReflectionHelpers.getField(source,"mFd");
+            if(offset<0||size<0||offset>length-size)throw new IOException("Invalid digest range");
+            byte[] bytes=new byte[size];int done=0;
+            try {
+                while(done<size){
+                    int count=android.system.Os.pread(fd,bytes,done,size-done,base+offset+done);
+                    if(count<=0)throw new IOException("Truncated digest input");done+=count;
+                }
+            }catch(android.system.ErrnoException error){throw new IOException(error);}
+            ReflectionHelpers.callInstanceMethod(digester,"consume",ClassParameter.from(ByteBuffer.class,ByteBuffer.wrap(bytes)));
+        }
+    }
 
     private static final String SHA="d3fed86ca73c76d1ff10eb3a89a22a731abc50df33ab1782e0986aa164a2daf6";
     private Application app;
@@ -87,6 +117,15 @@ public class NatroUpdaterAndroid9Test {
         ReflectionHelpers.setField(updater,"apk",changed);
         ReflectionHelpers.setField(updater,"candidate",manifest);
         expectFailure(()->updater.installationIntent(),"SHA-256");
+    }
+
+    @Test public void actualV3VerifierRejectsTamperedApkEvenWithMatchingManifestHash() throws Exception {
+        installPreviousVersion(208021357L);
+        File changed=new File(app.getCacheDir(),"tampered-signed.apk");
+        byte[] bytes=Files.readAllBytes(fixture.toPath());bytes[bytes.length/2]^=1;
+        Files.write(changed.toPath(),bytes);
+        manifest.put("sha256",hex(MessageDigest.getInstance("SHA-256").digest(bytes)));
+        expectFailure(()->updater.verify(changed,manifest),"Пакет или версия");
     }
 
     private void installPreviousVersion(long version) {

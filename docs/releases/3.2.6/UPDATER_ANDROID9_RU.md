@@ -20,6 +20,11 @@ GET_SIGNATURES; без этого getPackageArchiveInfo возвращает п�
 Robolectric4.17 ShadowPackageManager пропускает незарегистрированный архив
 в реальный framework parser. Его default ShadowSigningInfo заменяет данные
 конструктора; регрессия использует call-through shadow без implementations.
+Для JDK21 заменена только подача байтов MemoryMappedFileDataSource: positional
+pread из того же fd вместо Android-only DirectByteBuffer constructor. Парсер,
+v3 криптографическая проверка и content digests исполняются настоящим API28.
+Отдельный тест меняет байт APK и обновляет SHA manifest: Android обязан
+отклонить испорченную v3 подпись даже при совпавшем SHA. Это не обход verifier.
 
 ## Исправление
 
