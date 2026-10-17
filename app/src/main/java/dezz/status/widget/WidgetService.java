@@ -6006,7 +6006,15 @@ public class WidgetService extends Service {
                 || "hfp_ecarx_percent".equals(sourceName) || "iphone_helper_coarse".equals(sourceName)
                 || "hfp_ecarx_coarse".equals(sourceName))) sourceName = "unavailable";
         String evidence = "source=" + sourceName + ", exact=" + (level != null)
-                + ", level=" + (level == null ? "unknown" : level);
+                + ", level=" + (level == null ? "unknown" : level)
+                + ", enabled=" + prefs.phoneLowBatteryAlertEnabled.get()
+                + ", thresholds=" + prefs.phoneLowBatteryAlertThreshold.get() + "/" + prefs.phoneLowBatteryAlertThreshold2.get()
+                + ", latched=" + phoneLowBatteryAlertLatched + "/" + phoneLowBatteryAlertLatched2
+                + ", pending=" + phoneLowBatteryAlertPending + "/" + phoneLowBatteryAlertPending2
+                + ", status_enabled=" + prefs.phoneStatusBarNotificationsEnabled.get()
+                + ", popup_enabled=" + prefs.phonePopupNotificationsEnabled.get()
+                + ", lock_allowed=" + phoneNotificationAllowedByLockState()
+                + ", foreground_blocked=" + phoneNotificationBlockedByForeground();
         if (!evidence.equals(lastPhoneBatteryAlertEvidence)) {
             lastPhoneBatteryAlertEvidence = evidence;
             DiagnosticJournal.infoAsync("phone-battery", evidence);
@@ -6062,7 +6070,11 @@ public class WidgetService extends Service {
 
         if (first) phoneLowBatteryAlertPending = true;
         else phoneLowBatteryAlertPending2 = true;
-        if (!enqueuePhoneLowBatteryAlert(level, color, stage)) {
+        boolean accepted = enqueuePhoneLowBatteryAlert(level, color, stage);
+        DiagnosticJournal.infoAsync("phone-battery", "warning_enqueue stage=" + stage
+                + ", level=" + level + ", threshold=" + threshold + ", accepted=" + accepted
+                + ", presentation_confirmed=" + (first ? phoneLowBatteryAlertLatched : phoneLowBatteryAlertLatched2));
+        if (!accepted) {
             // Lock/destination/queue rejection is not a delivered warning. Keep the persistent
             // latch false so a later gate change or telemetry sample can retry it.
             if (first) phoneLowBatteryAlertPending = false;

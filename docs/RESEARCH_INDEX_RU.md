@@ -5,6 +5,7 @@
 
 | Что нужно найти | Где читать |
 |---|---|
+| 17октября:812 путей QNX, ошибка stat `/proc`, повтор полосы и отсутствие battery warning | [FIELD и source patch,17tests; APK/FIELD OPEN](geely-kx11/research-2026-10-16-qnx/FIELD_20261017_STAT_AND_UI_RU.md) |
 | Текущие пользовательские требования, изменения решений, критерии приёмки | [PROJECT_REQUIREMENTS_RU.md](../PROJECT_REQUIREMENTS_RU.md) — источник актуальных требований |
 | Описание приложения и текущего выпуска | [README](../README.md), [3.2.3](releases/3.2.3/README_RU.md) |
 | Архивное первоначальное ТЗ | [FORK_SPEC_RU.md](../FORK_SPEC_RU.md); при расхождении действует актуальный реестр |
@@ -74,3 +75,11 @@ QNX отказал до handshake; каталог/mappings остаются BLOC
 ## FIELD маршрута и таймаут терминала, 17.10.2026
 
 [Дополнение IMG_8796/IMG_8797](geely-kx11/research-2026-10-16-qnx/QNX_TERMINAL_20261017_RU.md): маршрут совпал, eth0 neighbor REACHABLE. Natro отключает свою ADB-сессию по таймауту и может терять отображение накопленного вывода. Route/neigh выполнены; следующий шаг — ограниченный внешний timeout для nc, не повторение прежнего ожидания.
+
+## Исправление ADB-PARTIAL-OUTPUT, SOURCE/TEST
+
+[Реализация сохранения частичного вывода](geely-kx11/research-2026-10-16-qnx/QNX_TERMINAL_20261017_RU.md): 11/11 локальных тестов PASS. Нового APK и FIELD-приёмки пока нет; Connection refused остаётся открытым.
+
+## FIELD QCONN, 17.10.2026 13:07 МСК
+
+[Первичный архив проверки подключения](geely-kx11/research-2026-10-16-qnx/QNX_TERMINAL_20261017_RU.md): QCONN и FF FD22 получены. Следующий шаг — полный штатный системный сбор; причина прежнего отказа пока неизвестна.

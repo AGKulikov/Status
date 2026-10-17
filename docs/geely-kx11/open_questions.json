@@ -188,9 +188,9 @@
       "priority": "P1",
       "function": "Владелец крыльев и штатной машинки",
       "status": "OPEN",
-      "known": "Сохранённый разбор дампа3.2.2 (ZIP SHA ac1bf086c34110f431acab4dd4f7382b375598b54208c8b575a770085add8f89) показывает два полных wfd_be mappings и четыре ограниченных256KiB префикса. Sys2038 скрыт в двух snapshots; dimmenu MainActivity и MConfig+ overlays остаются видимыми, пикселей нет. В конкретной libopenwfd_qnx.so mask create/bind/destroy — заглушки; это не распространяется на отсутствующую фактическую /lib64/libopenwfd.so. UART/QUP4 и init worker исследованы, постоянный nav receiver и renderer крыльев не установлены. SOURCE/CI3.2.3 с полным каталогом QNX опубликованы; APK передан.  Новый FIELD ZIP8283 SHA 5d07631b4c4de575375092749af37da84d986c886f457a04c4955f8a806edad2: Connection refused до первой QNX команды,tx=0,каталог только queued /; mappings/slog2/новые файлы не получены. Android uptime66.69/68.29с. Display2:6HWC layers,Sys2038 скрыт; пикселей и доказанного renderer нет. Фото IMG_8795.jpeg (SHA256 41fc7b831a6eb66162f369da6d349a9e11a1eb1523855dbaa2a06a7d41024f59): прежняя nc-команда в обычном терминале возвращает Connection refused, exit1; локальное ADB connected127.0.0.1:5555. Отказ воспроизводится вне collectInventory/qnxStage. Uptime, версия и непрерывность boot session на фото не установлены. IMG_8797: после Connect маршрут eth0/table ecarx_ap_vp_route/src198.18.34.15/uid2000 совпал с историческим, eth0 neighbor REACHABLE, обе команды exit0. IMG_8796 показывает таймаут терминала60с, не новый Connection refused; SOURCE Natro объясняет последующее отключение ADB и возможную потерю отображения частичного вывода. Текущий QCONN не подтверждён.",
+      "known": "Сохранённый разбор дампа3.2.2 (ZIP SHA ac1bf086c34110f431acab4dd4f7382b375598b54208c8b575a770085add8f89) показывает два полных wfd_be mappings и четыре ограниченных256KiB префикса. Sys2038 скрыт в двух snapshots; dimmenu MainActivity и MConfig+ overlays остаются видимыми, пикселей нет. В конкретной libopenwfd_qnx.so mask create/bind/destroy — заглушки; это не распространяется на отсутствующую фактическую /lib64/libopenwfd.so. UART/QUP4 и init worker исследованы, постоянный nav receiver и renderer крыльев не установлены. SOURCE/CI3.2.3 с полным каталогом QNX опубликованы; APK передан.  Новый FIELD ZIP8283 SHA 5d07631b4c4de575375092749af37da84d986c886f457a04c4955f8a806edad2: Connection refused до первой QNX команды,tx=0,каталог только queued /; mappings/slog2/новые файлы не получены. Android uptime66.69/68.29с. Display2:6HWC layers,Sys2038 скрыт; пикселей и доказанного renderer нет. Фото IMG_8795.jpeg (SHA256 41fc7b831a6eb66162f369da6d349a9e11a1eb1523855dbaa2a06a7d41024f59): прежняя nc-команда в обычном терминале возвращает Connection refused, exit1; локальное ADB connected127.0.0.1:5555. Отказ воспроизводится вне collectInventory/qnxStage. Uptime, версия и непрерывность boot session на фото не установлены. IMG_8797: после Connect маршрут eth0/table ecarx_ap_vp_route/src198.18.34.15/uid2000 совпал с историческим, eth0 neighbor REACHABLE, обе команды exit0. IMG_8796 показывает таймаут терминала60с, не новый Connection refused; SOURCE Natro объясняет последующее отключение ADB и возможную потерю отображения частичного вывода. Текущий QCONN не подтверждён. FIELD 17.10.2026 13:07 МСК: QNX-check-20261017-130706-32456.tar.gz SHA256 8e11bed8e587ba66fbb0114f4db3a9ef24403f873085193c4c0ca72b79c67d1c содержит точные 10 байт 51 43 4f 4e 4e 0d 0a ff fd 22 — QCONN CRLF и начальную negotiation. Прямое подключение теперь удалось; service file/чтение файлов ещё не проверены. Android uptime2835.04с, shell UID2000, маршрут прежний eth0/src198.18.34.15. Причина прежних Connection refused не установлена.",
       "missing_evidence": "Синхронные пиксели Android display2 и физического DIM; полные mappings четырёх оставшихся процессов и байты семи реально наблюдаемых путей; подтверждённый renderer/принимающий dispatcher и независимый способ скрытия крыльев без потери карты. Метаданные слоёв/размеры/импорты не заменяют эти свидетельства.",
-      "next_step": "Контроль nc уже выполнен: такой же отказ вне сборщика. Route/neigh получены: совпадающий маршрут, eth0 REACHABLE. Теперь ограниченный nc-контроль по QNX_ENDPOINT_ACCESS. При доступном endpoint: Проанализировать следующий явно собранный системный ZIP3.2.3: каталог, EOF/partial mappings, новые реальные библиотеки, полный набор matching slog2 включая display.40986. Использовать уже разобранные материалы до запроса нового наблюдения. Для разделения Android и последующего тракта — синхронный Android frame и физическое изображение в одном состоянии. Не повторять blind mask/alpha, не выводить renderer из имени слоя и не подменять скрытие крыльев выключением всей навигации.",
+      "next_step": "Выпустить исправление stat parser с новой версией и release gates; затем проверить полный каталог, файлы/mappings/slog2. Не повторять старую3.2.3 ради уже локализованного stat-дефекта. Прежние транспортные отказы остаются отдельным открытым вопросом.",
       "sources": [
         "display/report.md",
         "research-2026-09-05/android_platform/systems.json",
@@ -314,6 +314,16 @@
           "date": "2026-10-17",
           "level": "FIELD_SCREENSHOT_AND_SOURCE",
           "finding": "IMG_8797: после Connect маршрут eth0/table ecarx_ap_vp_route/src198.18.34.15/uid2000 совпал с историческим, eth0 neighbor REACHABLE, обе команды exit0. IMG_8796 показывает таймаут терминала60с, не новый Connection refused; SOURCE Natro объясняет последующее отключение ADB и возможную потерю отображения частичного вывода. Текущий QCONN не подтверждён."
+        },
+        {
+          "date": "2026-10-17",
+          "level": "FIELD_ARCHIVE_VERIFIED_GREETING_ONLY",
+          "finding": "FIELD 17.10.2026 13:07 МСК: QNX-check-20261017-130706-32456.tar.gz SHA256 8e11bed8e587ba66fbb0114f4db3a9ef24403f873085193c4c0ca72b79c67d1c содержит точные 10 байт 51 43 4f 4e 4e 0d 0a ff fd 22 — QCONN CRLF и начальную negotiation. Прямое подключение теперь удалось; service file/чтение файлов ещё не проверены. Android uptime2835.04с, shell UID2000, маршрут прежний eth0/src198.18.34.15. Причина прежних Connection refused не установлена."
+        },
+        {
+          "date": "2026-10-17",
+          "evidence": "FIELD0f61705b без перезагрузки: service file и812 путей получены, затем qnx_bad_number на16hex inode /proc;0 QNX target files. SOURCE stat uint64 identity fix и17focused tests PASS, APK/FIELD ещё OPEN. Причина исторических TCP refused неизвестна.",
+          "source": "research-2026-10-16-qnx/FIELD_20261017_STAT_AND_UI_RU.md"
         }
       ],
       "coverage_ids": [
@@ -356,6 +366,18 @@
           "superseded_by": "QNX_TERMINAL_20261017_RU.md IMG_8796/8797",
           "next_step": "Контроль nc уже выполнен: такой же отказ вне сборщика. Сначала текущие route/neigh по QNX_ENDPOINT_ACCESS. При доступном endpoint: Проанализировать следующий явно собранный системный ZIP3.2.3: каталог, EOF/partial mappings, новые реальные библиотеки, полный набор matching slog2 включая display.40986. Использовать уже разобранные материалы до запроса нового наблюдения. Для разделения Android и последующего тракта — синхронный Android frame и физическое изображение в одном состоянии. Не повторять blind mask/alpha, не выводить renderer из имени слоя и не подменять скрытие крыльев выключением всей навигации.",
           "missing_evidence": "Синхронные пиксели Android display2 и физического DIM; полные mappings четырёх оставшихся процессов и байты семи реально наблюдаемых путей; подтверждённый renderer/принимающий dispatcher и независимый способ скрытия крыльев без потери карты. Метаданные слоёв/размеры/импорты не заменяют эти свидетельства."
+        },
+        {
+          "date": "2026-10-17",
+          "superseded_by": "QNX-check 13:07 greeting",
+          "next_step": "Контроль nc уже выполнен: такой же отказ вне сборщика. Route/neigh получены: совпадающий маршрут, eth0 REACHABLE. Теперь ограниченный nc-контроль по QNX_ENDPOINT_ACCESS. При доступном endpoint: Проанализировать следующий явно собранный системный ZIP3.2.3: каталог, EOF/partial mappings, новые реальные библиотеки, полный набор matching slog2 включая display.40986. Использовать уже разобранные материалы до запроса нового наблюдения. Для разделения Android и последующего тракта — синхронный Android frame и физическое изображение в одном состоянии. Не повторять blind mask/alpha, не выводить renderer из имени слоя и не подменять скрытие крыльев выключением всей навигации.",
+          "missing_evidence": "Синхронные пиксели Android display2 и физического DIM; полные mappings четырёх оставшихся процессов и байты семи реально наблюдаемых путей; подтверждённый renderer/принимающий dispatcher и независимый способ скрытия крыльев без потери карты. Метаданные слоёв/размеры/импорты не заменяют эти свидетельства."
+        },
+        {
+          "date": "2026-10-17",
+          "status": "OPEN",
+          "next_step": "QCONN в ограниченном контроле13:07 получен. Теперь штатный системный сбор3.2.3 в текущем сеансе без перезагрузки, ZIP В Загрузки/Natro; проверить относящиеся к этому вопросу файлы и partial/unavailable статусы. Полнота ещё не подтверждена.",
+          "reason": "superseded after FIELD0f61705b: QNX stat parser failure"
         }
       ],
       "last_reviewed": "2026-10-17"
@@ -1341,9 +1363,9 @@
       "priority": "P1",
       "function": "Полные mappings, каталог QNX и реальные загруженные библиотеки",
       "status": "PARTLY_RESOLVED",
-      "known": "Дамп3.2.2 дал два валидных EOF mappings wfd_be; screen/openwfd_server/cluster_controller/sc_qnx_vip_proxy упёрлись в256KiB. В3.2.3 реализованы полное последовательное чтение, дисковая очередь каталога и семь точных дополнительных targets; source/CI готовы, полевая полнота ещё не проверена. Новый FIELD ZIP8283 SHA 5d07631b4c4de575375092749af37da84d986c886f457a04c4955f8a806edad2: Connection refused до первой QNX команды,tx=0,каталог только queued /; mappings/slog2/новые файлы не получены. Android uptime66.69/68.29с. Новый транспортный отказ не отменяет ранее полученные данные3.2.2. Фото IMG_8795.jpeg (SHA256 41fc7b831a6eb66162f369da6d349a9e11a1eb1523855dbaa2a06a7d41024f59): прежняя nc-команда в обычном терминале возвращает Connection refused, exit1; локальное ADB connected127.0.0.1:5555. Отказ воспроизводится вне collectInventory/qnxStage. Uptime, версия и непрерывность boot session на фото не установлены. IMG_8797: после Connect маршрут eth0/table ecarx_ap_vp_route/src198.18.34.15/uid2000 совпал с историческим, eth0 neighbor REACHABLE, обе команды exit0. IMG_8796 показывает таймаут терминала60с, не новый Connection refused; SOURCE Natro объясняет последующее отключение ADB и возможную потерю отображения частичного вывода. Текущий QCONN не подтверждён.",
+      "known": "Дамп3.2.2 дал два валидных EOF mappings wfd_be; screen/openwfd_server/cluster_controller/sc_qnx_vip_proxy упёрлись в256KiB. В3.2.3 реализованы полное последовательное чтение, дисковая очередь каталога и семь точных дополнительных targets; source/CI готовы, полевая полнота ещё не проверена. Новый FIELD ZIP8283 SHA 5d07631b4c4de575375092749af37da84d986c886f457a04c4955f8a806edad2: Connection refused до первой QNX команды,tx=0,каталог только queued /; mappings/slog2/новые файлы не получены. Android uptime66.69/68.29с. Новый транспортный отказ не отменяет ранее полученные данные3.2.2. Фото IMG_8795.jpeg (SHA256 41fc7b831a6eb66162f369da6d349a9e11a1eb1523855dbaa2a06a7d41024f59): прежняя nc-команда в обычном терминале возвращает Connection refused, exit1; локальное ADB connected127.0.0.1:5555. Отказ воспроизводится вне collectInventory/qnxStage. Uptime, версия и непрерывность boot session на фото не установлены. IMG_8797: после Connect маршрут eth0/table ecarx_ap_vp_route/src198.18.34.15/uid2000 совпал с историческим, eth0 neighbor REACHABLE, обе команды exit0. IMG_8796 показывает таймаут терминала60с, не новый Connection refused; SOURCE Natro объясняет последующее отключение ADB и возможную потерю отображения частичного вывода. Текущий QCONN не подтверждён. FIELD 17.10.2026 13:07 МСК: QNX-check-20261017-130706-32456.tar.gz SHA256 8e11bed8e587ba66fbb0114f4db3a9ef24403f873085193c4c0ca72b79c67d1c содержит точные 10 байт 51 43 4f 4e 4e 0d 0a ff fd 22 — QCONN CRLF и начальную negotiation. Прямое подключение теперь удалось; service file/чтение файлов ещё не проверены. Android uptime2835.04с, shell UID2000, маршрут прежний eth0/src198.18.34.15. Причина прежних Connection refused не установлена.",
       "missing_evidence": "FIELD3.2.3: полнота четырёх mappings, статусы каталога, содержимое семи дополнительных путей; сравнение фактических байтов/SONAME без предположения о симлинках.",
-      "next_step": "Контроль nc уже выполнен: такой же отказ вне сборщика. Route/neigh получены: совпадающий маршрут, eth0 REACHABLE. Теперь ограниченный nc-контроль по QNX_ENDPOINT_ACCESS. При доступном endpoint: Проверить в новом ZIP EOF/структуру/SHA и все partial/unavailable ветви, отдельно первый probe и wide retry. Не склеивать разные snapshots, не считать unknown тип/размер угаданным и отсутствие в префиксе отсутствием объекта.",
+      "next_step": "Выпустить исправление stat parser с новой версией и release gates; затем проверить полный каталог, файлы/mappings/slog2. Не повторять старую3.2.3 ради уже локализованного stat-дефекта. Прежние транспортные отказы остаются отдельным открытым вопросом.",
       "sources": [
         "research-2026-10-16-qnx/DUMP_322_RU.md",
         "research-2026-10-16-qnx/FULL_INVENTORY_RU.md",
@@ -1383,6 +1405,18 @@
           "superseded_by": "QNX_TERMINAL_20261017_RU.md IMG_8796/8797",
           "next_step": "Контроль nc уже выполнен: такой же отказ вне сборщика. Сначала текущие route/neigh по QNX_ENDPOINT_ACCESS. При доступном endpoint: Проверить в новом ZIP EOF/структуру/SHA и все partial/unavailable ветви, отдельно первый probe и wide retry. Не склеивать разные snapshots, не считать unknown тип/размер угаданным и отсутствие в префиксе отсутствием объекта.",
           "missing_evidence": "FIELD3.2.3: полнота четырёх mappings, статусы каталога, содержимое семи дополнительных путей; сравнение фактических байтов/SONAME без предположения о симлинках."
+        },
+        {
+          "date": "2026-10-17",
+          "superseded_by": "QNX-check 13:07 greeting",
+          "next_step": "Контроль nc уже выполнен: такой же отказ вне сборщика. Route/neigh получены: совпадающий маршрут, eth0 REACHABLE. Теперь ограниченный nc-контроль по QNX_ENDPOINT_ACCESS. При доступном endpoint: Проверить в новом ZIP EOF/структуру/SHA и все partial/unavailable ветви, отдельно первый probe и wide retry. Не склеивать разные snapshots, не считать unknown тип/размер угаданным и отсутствие в префиксе отсутствием объекта.",
+          "missing_evidence": "FIELD3.2.3: полнота четырёх mappings, статусы каталога, содержимое семи дополнительных путей; сравнение фактических байтов/SONAME без предположения о симлинках."
+        },
+        {
+          "date": "2026-10-17",
+          "status": "PARTLY_RESOLVED",
+          "next_step": "QCONN в ограниченном контроле13:07 получен. Теперь штатный системный сбор3.2.3 в текущем сеансе без перезагрузки, ZIP В Загрузки/Natro; проверить относящиеся к этому вопросу файлы и partial/unavailable статусы. Полнота ещё не подтверждена.",
+          "reason": "superseded after FIELD0f61705b: QNX stat parser failure"
         }
       ],
       "evidence_updates": [
@@ -1407,6 +1441,16 @@
           "date": "2026-10-17",
           "level": "FIELD_SCREENSHOT_AND_SOURCE",
           "finding": "IMG_8797: после Connect маршрут eth0/table ecarx_ap_vp_route/src198.18.34.15/uid2000 совпал с историческим, eth0 neighbor REACHABLE, обе команды exit0. IMG_8796 показывает таймаут терминала60с, не новый Connection refused; SOURCE Natro объясняет последующее отключение ADB и возможную потерю отображения частичного вывода. Текущий QCONN не подтверждён."
+        },
+        {
+          "date": "2026-10-17",
+          "level": "FIELD_ARCHIVE_VERIFIED_GREETING_ONLY",
+          "finding": "FIELD 17.10.2026 13:07 МСК: QNX-check-20261017-130706-32456.tar.gz SHA256 8e11bed8e587ba66fbb0114f4db3a9ef24403f873085193c4c0ca72b79c67d1c содержит точные 10 байт 51 43 4f 4e 4e 0d 0a ff fd 22 — QCONN CRLF и начальную negotiation. Прямое подключение теперь удалось; service file/чтение файлов ещё не проверены. Android uptime2835.04с, shell UID2000, маршрут прежний eth0/src198.18.34.15. Причина прежних Connection refused не установлена."
+        },
+        {
+          "date": "2026-10-17",
+          "evidence": "FIELD0f61705b без перезагрузки: service file и812 путей получены, затем qnx_bad_number на16hex inode /proc;0 QNX target files. SOURCE stat uint64 identity fix и17focused tests PASS, APK/FIELD ещё OPEN. Причина исторических TCP refused неизвестна.",
+          "source": "research-2026-10-16-qnx/FIELD_20261017_STAT_AND_UI_RU.md"
         }
       ]
     },
@@ -1415,9 +1459,9 @@
       "priority": "P1",
       "function": "Полнота графических журналов и временная привязка наблюдений",
       "status": "OPEN",
-      "known": "В3.2.2 разобраны12slog2 buffers; display.40986 пропущен cap12. Type1 arguments в отчёте декодированы, хронология кольца не восстановлена.105warning candidates не равны105новым сбоям; recovery log прежний. Android DLT path недоступен, QNX /userdata/DLT известен только из конфигурации.3.2.3 снимает счётные/байтовые QNX квоты. Новый FIELD ZIP8283 SHA 5d07631b4c4de575375092749af37da84d986c886f457a04c4955f8a806edad2: Connection refused до первой QNX команды,tx=0,каталог только queued /; mappings/slog2/новые файлы не получены. Android uptime66.69/68.29с. Новый транспортный отказ не отменяет ранее полученные данные3.2.2. Фото IMG_8795.jpeg (SHA256 41fc7b831a6eb66162f369da6d349a9e11a1eb1523855dbaa2a06a7d41024f59): прежняя nc-команда в обычном терминале возвращает Connection refused, exit1; локальное ADB connected127.0.0.1:5555. Отказ воспроизводится вне collectInventory/qnxStage. Uptime, версия и непрерывность boot session на фото не установлены. IMG_8797: после Connect маршрут eth0/table ecarx_ap_vp_route/src198.18.34.15/uid2000 совпал с историческим, eth0 neighbor REACHABLE, обе команды exit0. IMG_8796 показывает таймаут терминала60с, не новый Connection refused; SOURCE Natro объясняет последующее отключение ADB и возможную потерю отображения частичного вывода. Текущий QCONN не подтверждён.",
+      "known": "В3.2.2 разобраны12slog2 buffers; display.40986 пропущен cap12. Type1 arguments в отчёте декодированы, хронология кольца не восстановлена.105warning candidates не равны105новым сбоям; recovery log прежний. Android DLT path недоступен, QNX /userdata/DLT известен только из конфигурации.3.2.3 снимает счётные/байтовые QNX квоты. Новый FIELD ZIP8283 SHA 5d07631b4c4de575375092749af37da84d986c886f457a04c4955f8a806edad2: Connection refused до первой QNX команды,tx=0,каталог только queued /; mappings/slog2/новые файлы не получены. Android uptime66.69/68.29с. Новый транспортный отказ не отменяет ранее полученные данные3.2.2. Фото IMG_8795.jpeg (SHA256 41fc7b831a6eb66162f369da6d349a9e11a1eb1523855dbaa2a06a7d41024f59): прежняя nc-команда в обычном терминале возвращает Connection refused, exit1; локальное ADB connected127.0.0.1:5555. Отказ воспроизводится вне collectInventory/qnxStage. Uptime, версия и непрерывность boot session на фото не установлены. IMG_8797: после Connect маршрут eth0/table ecarx_ap_vp_route/src198.18.34.15/uid2000 совпал с историческим, eth0 neighbor REACHABLE, обе команды exit0. IMG_8796 показывает таймаут терминала60с, не новый Connection refused; SOURCE Natro объясняет последующее отключение ADB и возможную потерю отображения частичного вывода. Текущий QCONN не подтверждён. FIELD 17.10.2026 13:07 МСК: QNX-check-20261017-130706-32456.tar.gz SHA256 8e11bed8e587ba66fbb0114f4db3a9ef24403f873085193c4c0ca72b79c67d1c содержит точные 10 байт 51 43 4f 4e 4e 0d 0a ff fd 22 — QCONN CRLF и начальную negotiation. Прямое подключение теперь удалось; service file/чтение файлов ещё не проверены. Android uptime2835.04с, shell UID2000, маршрут прежний eth0/src198.18.34.15. Причина прежних Connection refused не установлена.",
       "missing_evidence": "Содержимое display.40986 и остальных доступных matching buffers, достоверная временная привязка к состоянию DIM, наличие актуальных DLT в своей ОС; отсутствие повторно использованных старых записей.",
-      "next_step": "Контроль nc уже выполнен: такой же отказ вне сборщика. Route/neigh получены: совпадающий маршрут, eth0 REACHABLE. Теперь ограниченный nc-контроль по QNX_ENDPOINT_ACCESS. При доступном endpoint: Разобрать полный доступный сбор3.2.3, сохранить snapshot limits и timestamps. Проверять реально существующие пути без запуска logger/export/mount/driver lock. Не выдавать изменения SHA живого кольца, errno после success или count warnings за новые подтверждённые ошибки.",
+      "next_step": "Выпустить исправление stat parser с новой версией и release gates; затем проверить полный каталог, файлы/mappings/slog2. Не повторять старую3.2.3 ради уже локализованного stat-дефекта. Прежние транспортные отказы остаются отдельным открытым вопросом.",
       "sources": [
         "research-2026-10-16-qnx/DUMP_322_RU.md",
         "research-2026-10-16-qnx/FULL_INVENTORY_RU.md",
@@ -1458,6 +1502,18 @@
           "superseded_by": "QNX_TERMINAL_20261017_RU.md IMG_8796/8797",
           "next_step": "Контроль nc уже выполнен: такой же отказ вне сборщика. Сначала текущие route/neigh по QNX_ENDPOINT_ACCESS. При доступном endpoint: Разобрать полный доступный сбор3.2.3, сохранить snapshot limits и timestamps. Проверять реально существующие пути без запуска logger/export/mount/driver lock. Не выдавать изменения SHA живого кольца, errno после success или count warnings за новые подтверждённые ошибки.",
           "missing_evidence": "Содержимое display.40986 и остальных доступных matching buffers, достоверная временная привязка к состоянию DIM, наличие актуальных DLT в своей ОС; отсутствие повторно использованных старых записей."
+        },
+        {
+          "date": "2026-10-17",
+          "superseded_by": "QNX-check 13:07 greeting",
+          "next_step": "Контроль nc уже выполнен: такой же отказ вне сборщика. Route/neigh получены: совпадающий маршрут, eth0 REACHABLE. Теперь ограниченный nc-контроль по QNX_ENDPOINT_ACCESS. При доступном endpoint: Разобрать полный доступный сбор3.2.3, сохранить snapshot limits и timestamps. Проверять реально существующие пути без запуска logger/export/mount/driver lock. Не выдавать изменения SHA живого кольца, errno после success или count warnings за новые подтверждённые ошибки.",
+          "missing_evidence": "Содержимое display.40986 и остальных доступных matching buffers, достоверная временная привязка к состоянию DIM, наличие актуальных DLT в своей ОС; отсутствие повторно использованных старых записей."
+        },
+        {
+          "date": "2026-10-17",
+          "status": "OPEN",
+          "next_step": "QCONN в ограниченном контроле13:07 получен. Теперь штатный системный сбор3.2.3 в текущем сеансе без перезагрузки, ZIP В Загрузки/Natro; проверить относящиеся к этому вопросу файлы и partial/unavailable статусы. Полнота ещё не подтверждена.",
+          "reason": "superseded after FIELD0f61705b: QNX stat parser failure"
         }
       ],
       "evidence_updates": [
@@ -1482,6 +1538,16 @@
           "date": "2026-10-17",
           "level": "FIELD_SCREENSHOT_AND_SOURCE",
           "finding": "IMG_8797: после Connect маршрут eth0/table ecarx_ap_vp_route/src198.18.34.15/uid2000 совпал с историческим, eth0 neighbor REACHABLE, обе команды exit0. IMG_8796 показывает таймаут терминала60с, не новый Connection refused; SOURCE Natro объясняет последующее отключение ADB и возможную потерю отображения частичного вывода. Текущий QCONN не подтверждён."
+        },
+        {
+          "date": "2026-10-17",
+          "level": "FIELD_ARCHIVE_VERIFIED_GREETING_ONLY",
+          "finding": "FIELD 17.10.2026 13:07 МСК: QNX-check-20261017-130706-32456.tar.gz SHA256 8e11bed8e587ba66fbb0114f4db3a9ef24403f873085193c4c0ca72b79c67d1c содержит точные 10 байт 51 43 4f 4e 4e 0d 0a ff fd 22 — QCONN CRLF и начальную negotiation. Прямое подключение теперь удалось; service file/чтение файлов ещё не проверены. Android uptime2835.04с, shell UID2000, маршрут прежний eth0/src198.18.34.15. Причина прежних Connection refused не установлена."
+        },
+        {
+          "date": "2026-10-17",
+          "evidence": "FIELD0f61705b без перезагрузки: service file и812 путей получены, затем qnx_bad_number на16hex inode /proc;0 QNX target files. SOURCE stat uint64 identity fix и17focused tests PASS, APK/FIELD ещё OPEN. Причина исторических TCP refused неизвестна.",
+          "source": "research-2026-10-16-qnx/FIELD_20261017_STAT_AND_UI_RU.md"
         }
       ]
     },
@@ -1490,9 +1556,9 @@
       "priority": "P1",
       "function": "Доступность QNX qconn после загрузки Android и точная причина отказа соединения",
       "status": "OPEN",
-      "known": "ZIP8283 (3.2.3) при Android uptime66.69/68.29с получил nc: connect: Connection refused на198.18.34.2:8000. До QNX handshake/GET не дошло,tx=0. В прошлом ZIP423934bd (3.2.2) QNX чтение успешно после Android snapshots uptime131.70/133.75с. Endpoint/nc command в исходниках совпадают; версии и boot sessions различаются. Повторный ZIP DD605 при uptime184.25/185.28с: тот же Connection refused,tx0,30мс. Ожидание2–3минут не помогло. Source diff подтверждает изменение порядка и deadlines при прежней nc-команде, openBounded, line и handshake. Фото IMG_8795.jpeg (SHA256 41fc7b831a6eb66162f369da6d349a9e11a1eb1523855dbaa2a06a7d41024f59): прежняя nc-команда в обычном терминале возвращает Connection refused, exit1; локальное ADB connected127.0.0.1:5555. Отказ воспроизводится вне collectInventory/qnxStage. Uptime, версия и непрерывность boot session на фото не установлены. IMG_8797: после Connect маршрут eth0/table ecarx_ap_vp_route/src198.18.34.15/uid2000 совпал с историческим, eth0 neighbor REACHABLE, обе команды exit0. IMG_8796 показывает таймаут терминала60с, не новый Connection refused; SOURCE Natro объясняет последующее отключение ADB и возможную потерю отображения частичного вывода. Текущий QCONN не подтверждён.",
-      "missing_evidence": "Вывод ограниченной nc-проверки после восстановления ADB; текущее состояние TCP8000/QCONN и службы/фильтрации. Route/neigh уже получены. Таймаут терминала не устанавливает отсутствие greeting.",
-      "next_step": "Однократно toybox timeout 5 toybox nc -w 3 198.18.34.2 8000, сохранить весь вывод/exit. Поддержка timeout на HU пока не проверена; при Unknown command/usage сохранить ошибку. При повторном60с таймауте не зацикливать nc: нужны прикладные логи исполнения/вывода Natro. Не менять маршруты/firewall и не запускать демоны.",
+      "known": "ZIP8283 (3.2.3) при Android uptime66.69/68.29с получил nc: connect: Connection refused на198.18.34.2:8000. До QNX handshake/GET не дошло,tx=0. В прошлом ZIP423934bd (3.2.2) QNX чтение успешно после Android snapshots uptime131.70/133.75с. Endpoint/nc command в исходниках совпадают; версии и boot sessions различаются. Повторный ZIP DD605 при uptime184.25/185.28с: тот же Connection refused,tx0,30мс. Ожидание2–3минут не помогло. Source diff подтверждает изменение порядка и deadlines при прежней nc-команде, openBounded, line и handshake. Фото IMG_8795.jpeg (SHA256 41fc7b831a6eb66162f369da6d349a9e11a1eb1523855dbaa2a06a7d41024f59): прежняя nc-команда в обычном терминале возвращает Connection refused, exit1; локальное ADB connected127.0.0.1:5555. Отказ воспроизводится вне collectInventory/qnxStage. Uptime, версия и непрерывность boot session на фото не установлены. IMG_8797: после Connect маршрут eth0/table ecarx_ap_vp_route/src198.18.34.15/uid2000 совпал с историческим, eth0 neighbor REACHABLE, обе команды exit0. IMG_8796 показывает таймаут терминала60с, не новый Connection refused; SOURCE Natro объясняет последующее отключение ADB и возможную потерю отображения частичного вывода. Текущий QCONN не подтверждён. FIELD 17.10.2026 13:07 МСК: QNX-check-20261017-130706-32456.tar.gz SHA256 8e11bed8e587ba66fbb0114f4db3a9ef24403f873085193c4c0ca72b79c67d1c содержит точные 10 байт 51 43 4f 4e 4e 0d 0a ff fd 22 — QCONN CRLF и начальную negotiation. Прямое подключение теперь удалось; service file/чтение файлов ещё не проверены. Android uptime2835.04с, shell UID2000, маршрут прежний eth0/src198.18.34.15. Причина прежних Connection refused не установлена.",
+      "missing_evidence": "Причина изменения Connection refused на успешный QCONN; стабильность и результат service-file/full acquisition. Greeting/маршрут уже подтверждены.",
+      "next_step": "Выпустить исправление stat parser с новой версией и release gates; затем проверить полный каталог, файлы/mappings/slog2. Не повторять старую3.2.3 ради уже локализованного stat-дефекта. Прежние транспортные отказы остаются отдельным открытым вопросом.",
       "sources": [
         "research-2026-10-16-qnx/DUMP_323_8283_RU.md",
         "research-2026-10-16-qnx/dump-323-8283-audit.json",
@@ -1526,6 +1592,18 @@
           "superseded_by": "QNX_TERMINAL_20261017_RU.md IMG_8796/8797",
           "next_step": "В обычном терминале по отдельности ip route get 198.18.34.2 и ip neigh show 198.18.34.2; сохранить весь вывод. Сравнить с историческим eth0/src198.18.34.15/table ecarx_ap_vp_route, не считать его текущим. По результату выбрать дальнейшую read-only проверку сети/службы. Не менять firewall/маршруты, не запускать qconn, не считать любую регрессию исключённой и не повторять произвольное ожидание.",
           "missing_evidence": "Текущий маршрут/запись соседа и read-only свидетельства listener/сетевого отклонения при отказе; точная первопричина неизвестна. Терминальный контроль уже получен, но не подтверждает непрерывность boot session с DD605."
+        },
+        {
+          "date": "2026-10-17",
+          "superseded_by": "QNX-check 13:07 greeting",
+          "next_step": "Однократно toybox timeout 5 toybox nc -w 3 198.18.34.2 8000, сохранить весь вывод/exit. Поддержка timeout на HU пока не проверена; при Unknown command/usage сохранить ошибку. При повторном60с таймауте не зацикливать nc: нужны прикладные логи исполнения/вывода Natro. Не менять маршруты/firewall и не запускать демоны.",
+          "missing_evidence": "Вывод ограниченной nc-проверки после восстановления ADB; текущее состояние TCP8000/QCONN и службы/фильтрации. Route/neigh уже получены. Таймаут терминала не устанавливает отсутствие greeting."
+        },
+        {
+          "date": "2026-10-17",
+          "status": "OPEN",
+          "next_step": "В текущем сеансе штатный Дамп системных файлов Natro3.2.3, сохранить ZIP В Загрузки/Natro; проверить service file/каталог/mappings и времена отказов. Не приравнивать exit142 ограниченной пробы к отсутствию QCONN. Не вводить обязательное ожидание47минут по одному uptime.",
+          "reason": "superseded after FIELD0f61705b: QNX stat parser failure"
         }
       ],
       "evidence_updates": [
@@ -1538,6 +1616,21 @@
           "date": "2026-10-17",
           "level": "FIELD_SCREENSHOT_AND_SOURCE",
           "finding": "IMG_8797: после Connect маршрут eth0/table ecarx_ap_vp_route/src198.18.34.15/uid2000 совпал с историческим, eth0 neighbor REACHABLE, обе команды exit0. IMG_8796 показывает таймаут терминала60с, не новый Connection refused; SOURCE Natro объясняет последующее отключение ADB и возможную потерю отображения частичного вывода. Текущий QCONN не подтверждён."
+        },
+        {
+          "date": "2026-10-17",
+          "level": "SOURCE_TEST_NOT_FIELD",
+          "finding": "ADB-PARTIAL-OUTPUT: Failure сохраняет bounded partial output/cause при transport error/cancel; submit не стирает их. 11/11 локальных тестов PASS, включая scheduled deadline. Новый APK не выдан, FIELD неизвестен; endpoint отказ не объявляется исправленным."
+        },
+        {
+          "date": "2026-10-17",
+          "level": "FIELD_ARCHIVE_VERIFIED_GREETING_ONLY",
+          "finding": "FIELD 17.10.2026 13:07 МСК: QNX-check-20261017-130706-32456.tar.gz SHA256 8e11bed8e587ba66fbb0114f4db3a9ef24403f873085193c4c0ca72b79c67d1c содержит точные 10 байт 51 43 4f 4e 4e 0d 0a ff fd 22 — QCONN CRLF и начальную negotiation. Прямое подключение теперь удалось; service file/чтение файлов ещё не проверены. Android uptime2835.04с, shell UID2000, маршрут прежний eth0/src198.18.34.15. Причина прежних Connection refused не установлена."
+        },
+        {
+          "date": "2026-10-17",
+          "evidence": "FIELD0f61705b без перезагрузки: service file и812 путей получены, затем qnx_bad_number на16hex inode /proc;0 QNX target files. SOURCE stat uint64 identity fix и17focused tests PASS, APK/FIELD ещё OPEN. Причина исторических TCP refused неизвестна.",
+          "source": "research-2026-10-16-qnx/FIELD_20261017_STAT_AND_UI_RU.md"
         }
       ]
     }
@@ -1570,6 +1663,21 @@
       "date": "2026-10-17",
       "scope": "IMG_8796/8797 and terminal timeout source audit",
       "note": "Route/neighbor acquired; bounded nc next. Prior refusal and all earlier history retained; no app/APK changes."
+    },
+    {
+      "date": "2026-10-17",
+      "scope": "ADB-PARTIAL-OUTPUT source/test implementation",
+      "note": "No endpoint state/status closure, no new APK or FIELD evidence; IDs/history retained."
+    },
+    {
+      "date": "2026-10-17",
+      "scope": "QNX-check 13:07 verified greeting",
+      "note": "Nine files read, QCONN+negotiation verified; full acquisition not yet tested; previous refusal history retained."
+    },
+    {
+      "date": "2026-10-17",
+      "scope": "FIELD0f61705b and diagnostics1792232071000; all prior IDs retained",
+      "finding": "QNX stat root cause/source fix; white-bar and battery warning remain OPEN; see FIELD_20261017_STAT_AND_UI_RU.md"
     }
   ]
 }

@@ -1,5 +1,6 @@
 import android.content.Context;
 import dezz.status.widget.adb.AdbConsoleSession;
+import dezz.status.widget.adb.AdbShellResult;
 import dezz.status.widget.shell.AdbTransport;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.*;
@@ -52,5 +53,48 @@ public final class AdbSessionReplay {
             check(done.await(2,TimeUnit.SECONDS),"close-before-schedule race callback");
         }
     }
-    public static void main(String[] args) throws Exception { root();cancellation();System.out.println("ADB session: PASS"); }
+    static void partialFailure() throws Exception {
+        for (int mode=0;mode<4;mode++) {
+            AdbTransport.reset();
+            try (AdbConsoleSession session=new AdbConsoleSession(new Context())) {
+                session.connect();
+                AdbTransport.partialOutput="QCONN\r\nПривет 🌍";
+                AdbTransport.failAfterOutput=mode!=2;
+                if(mode!=0) AdbTransport.afterOutput=()->session.cancel("Таймаут 60 секунд");
+                if(mode==3) AdbTransport.afterOutput=()->{
+                    try { Thread.sleep(1200); } catch(InterruptedException e) { Thread.currentThread().interrupt(); }
+                };
+                CountDownLatch done=new CountDownLatch(1);
+                AtomicReference<Exception> failure=new AtomicReference<>();
+                AdbConsoleSession.Operation operation=s->{s.command("probe");throw new AssertionError("failure swallowed");};
+                AdbConsoleSession.Listener listener=e->{failure.set(e);done.countDown();};
+                if(mode==3) {
+                    java.lang.reflect.Method submit=AdbConsoleSession.class.getDeclaredMethod("submitBounded",
+                            AdbConsoleSession.Operation.class,AdbConsoleSession.Listener.class,int.class);
+                    submit.setAccessible(true);submit.invoke(session,operation,listener,1);
+                } else session.submit(operation,listener);
+                check(done.await(2,TimeUnit.SECONDS),"failure delivered");
+                check(failure.get() instanceof AdbShellResult.Failure,"typed output survives submit cancellation wrapper");
+                AdbShellResult.Failure f=(AdbShellResult.Failure)failure.get();
+                check(f.partial.output.equals("QCONN\r\nПривет 🌍"),"fragmented UTF8 preserved without framing");
+                check(f.partial.exitCode==null&&!f.partial.success(),"partial is never success");
+                check(f.getMessage().contains("Connect")&&f.getCause()!=null,"reason, recovery and cause preserved");
+                if(mode!=0)check(f.getMessage().contains(mode==3?"Таймаут 1 секунд":"Таймаут 60 секунд"),"cancel reason preserved");
+                check(!session.connected()&&!session.busy()&&AdbTransport.commands.size()==1,"disconnect without replay");
+                AdbTransport.partialOutput=null;AdbTransport.afterOutput=null;AdbTransport.failAfterOutput=false;
+                CountDownLatch reconnected=new CountDownLatch(1);
+                AtomicReference<Exception> reconnectFailure=new AtomicReference<>();
+                session.submit(s->{s.connect();check(s.command("id -u").success(),"explicit reconnect works");},
+                        e->{reconnectFailure.set(e);reconnected.countDown();});
+                check(reconnected.await(2,TimeUnit.SECONDS)&&reconnectFailure.get()==null,"new Connect operation clears cancellation");
+            }
+        }
+        AdbShellResult capture=new AdbShellResult();
+        byte[] huge=new byte[AdbShellResult.OUTPUT_LIMIT+4096];java.util.Arrays.fill(huge,(byte)'x');capture.accept(huge);
+        AdbShellResult.Failure f=capture.failure("timeout",new Exception());
+        check(f.partial.truncated&&f.partial.output.length()<AdbShellResult.OUTPUT_LIMIT+200,"partial output bounded");
+        check(!f.getMessage().contains("дочитана до завершения"),"no false completion for truncated output");
+        check(new AdbShellResult().failure(null,null).getMessage().contains("нет полученных данных"),"empty output explicit");
+    }
+    public static void main(String[] args) throws Exception { root();cancellation();partialFailure();System.out.println("ADB session: PASS"); }
 }

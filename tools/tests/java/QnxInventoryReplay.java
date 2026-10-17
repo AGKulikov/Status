@@ -37,12 +37,16 @@ public final class QnxInventoryReplay {
                 if(current.equals("/opaque")){reply("e:20\r\n");return;}
                 boolean directory=current.equals("/")||current.equals("/alias")||current.equals("/.hidden")||current.equals("/русский")
                         ||current.equals("/repeated")||current.equals("/statdenied")||current.startsWith("/zero")
+                        ||current.equals("/proc")||current.equals("/proc-other")
                         ||current.equals("/deep")||current.startsWith("/deep/d");
                 if(current.endsWith("/leaf")||current.endsWith("/bottom"))directory=false;
                 reply(directory?"o:0\r\n":"e:ENOTDIR\r\n");return;
             }
             if(frame.equals("s:0\r\n")) {
                 if(current.equals("/statdenied")){reply("e:permission denied\r\n");return;}
+                if(current.equals("/proc")||current.equals("/proc-other")) {
+                    reply("o:ffffffffffffffff:44ab5000:800:0:0:0:6ad37485:6ad37485:6ad37485:416d:2:0:0:0:0\r\n");return;
+                }
                 int inode=current.equals("/")||current.equals("/alias")?1:current.startsWith("/zero")?0:100+paths.size();
                 reply("o:"+Integer.toHexString(inode)+":0:9:0:0:0:0:0:0:41ed:1:0:0:0:0\r\n");return;
             }
@@ -54,11 +58,14 @@ public final class QnxInventoryReplay {
                 if(current.equals("/")) {
                     if(page==0)listing=".\r\n..\r\n.hidden\r\nрусский\r\nalias\r\ndenied\r\nopaque\r\ndeep\r\nrepeated\r\nzero\r\nstatdenied\r\nquote\"name\r\nback\\name\r\ntab\tname\r\n.hidden\r\n../escape\r\n";
                     else if(page<=300)listing="file"+page+"\r\n";
+                    else if(page==301)listing="proc\r\nproc-other\r\n";
                 } else if(current.equals("/repeated"))listing="leaf\r\n";
                 else if(page==0) {
                     if(current.equals("/.hidden")||current.equals("/русский"))listing="leaf\r\n";
                     else if(current.equals("/statdenied"))listing="available-name\r\n";
                     else if(current.startsWith("/zero"))listing="again\r\n";
+                    else if(current.equals("/proc"))listing="first-pid\r\n";
+                    else if(current.equals("/proc-other"))listing="second-pid\r\n";
                     else if(current.startsWith("/deep"))listing=current.split("/").length<152?"d\r\n":"bottom\r\n";
                 }
                 byte[] data=listing.getBytes(StandardCharsets.UTF_8);payload("o:0:"+Integer.toHexString(data.length)+":0\r\n",data);return;
@@ -96,6 +103,8 @@ public final class QnxInventoryReplay {
                 check(report.contains("alias_already_enumerated\t/"),"cycle identity");
                 check(report.contains("possible_cycle_identity_unknown"),"unknown inode cycle");
                 check(listed.contains("/statdenied/available-name"),"stat denial must not suppress directory names");
+                check(listed.contains("/proc/first-pid")&&listed.contains("/proc-other/second-pid"),"all-ones inode must not abort or alias unrelated directories");
+                check(report.contains("identity\t/proc\tdirectory_open\t1152077824\t2048\t18446744073709551615"),"preserve unsigned stat identity");
                 check(report.contains("qnx_directory_repeated_page"),"non-progress guard");
                 check(report.contains("probe\t/opaque\tunknown\tunknown"),"numeric error is opaque");
                 check(report.contains("probe\t/file300\tnon_directory\tunknown"),"ENOTDIR is not regular-file evidence");
@@ -103,6 +112,21 @@ public final class QnxInventoryReplay {
                 check(!wire.paths.contains("/quote\"name")&&!wire.paths.contains("/back\\name")&&!wire.paths.contains("/tab\tname"),"unsafe open");
             } else if(mode==1)check(report.contains("not_attempted_after_failure")&&list.contains("/file300\n"),"pending discovery preserved");
             check(directory.listFiles((d,n)->n.endsWith(".part")).length==0,"temporary files leaked");
+        }
+    }
+    static void statNumbers()throws Exception {
+        check(QnxFileReader.statNumber("ffffffffffffffff",true)==-1L,"all-ones identity");
+        check(QnxFileReader.statNumber("8000000000000000",true)==Long.MIN_VALUE,"unsigned identity bit 63");
+        check(QnxFileReader.statNumber("7fffffffffffffff",false)==Long.MAX_VALUE,"signed size maximum");
+        for(String invalid:new String[]{"10000000000000000","-1","+1","0x10","","gg"," 1"}) {
+            for(boolean identity:new boolean[]{true,false}) {
+                boolean failed=false;try {QnxFileReader.statNumber(invalid,identity);}catch(IOException expected){failed=true;}
+                check(failed,"invalid stat accepted: "+invalid);
+            }
+        }
+        for(String invalid:new String[]{"8000000000000000","ffffffffffffffff"}) {
+            boolean failed=false;try {QnxFileReader.statNumber(invalid,false);}catch(IOException expected){failed=true;}
+            check(failed,"unsigned size wrapped into successful empty read");
         }
     }
     static final byte[] HEADER=QnxFileReaderReplay.MAP_HEADER.getBytes(StandardCharsets.UTF_8);
@@ -164,7 +188,7 @@ public final class QnxInventoryReplay {
         check(directory.listFiles((d,n)->n.endsWith(".part")).length==0,"maps spool leaked");
     }
     public static void main(String[] args)throws Exception {
-        File directory=new File(args[0]);inventory(directory);mappings(directory);
+        File directory=new File(args[0]);statNumbers();inventory(directory);mappings(directory);
         System.out.println("PASS full QNX inventory, disk queue, hidden/UTF8/deep/broad, aliases/denials/cancel, 300 PIDs, 10 full mappings, >8 MiB exact SHA; inert peer only");
     }
 }

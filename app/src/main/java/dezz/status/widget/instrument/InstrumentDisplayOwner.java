@@ -8,6 +8,23 @@ final class InstrumentDisplayOwner {
     private static final Pattern STACK = Pattern.compile("(?m)^Stack id=\\d+ [^\\r\\n]*\\bdisplayId=(\\d+)\\b[^\\r\\n]*$");
     // Android 9 uses ICU: unlike the host JVM, an unescaped closing brace is invalid.
     private static final Pattern TOP = Pattern.compile("\\bvisible=true\\s+topActivity=ComponentInfo\\{([^}]+)\\}");
+    /** Bounded classification only: no raw task dump or unrelated application names in logs. */
+    static String describe(String output, int display, String packageName) {
+        if(output==null||output.length()>128*1024||display<0)return "snapshot=invalid";
+        Matcher headers=STACK.matcher(output);
+        int start=-1,stacks=0,own=0,other=0,unparsed=0;boolean target=false;
+        String component=packageName+"/dezz.status.widget.instrument.InstrumentPanelActivity";
+        while(true) {
+            boolean next=headers.find();int end=next?headers.start():output.length();
+            if(start>=0&&target) {
+                stacks++;String block=output.substring(start,end);Matcher top=TOP.matcher(block);boolean parsed=false;
+                while(top.find()) {parsed=true;if(component.equals(top.group(1)))own++;else other++;}
+                if(block.contains("visible=true")&&!parsed)unparsed++;
+            }
+            if(!next)return "target_stacks="+stacks+", visible_panel="+own+", visible_other="+other+", unparsed_visible="+unparsed;
+            start=headers.end();target=Integer.toString(display).equals(headers.group(1));
+        }
+    }
     static boolean owns(String output, int display, String packageName) {
         if (output == null || output.length() > 128 * 1024 || display < 0) return false;
         Matcher headers = STACK.matcher(output);

@@ -17,6 +17,11 @@ public final class InstrumentOwnerReplay {
             check(!InstrumentDisplayOwner.owns(bad,2,pkg));
         check(!InstrumentDisplayOwner.owns(null,2,pkg));
         check(!InstrumentDisplayOwner.owns(good,-1,pkg));
+        String description=InstrumentDisplayOwner.describe(good+stack(2,"other/.Home",true),2,pkg);
+        check(description.equals("target_stacks=2, visible_panel=1, visible_other=1, unparsed_visible=0"));
+        check(!description.contains("other/.Home"));
+        check(InstrumentDisplayOwner.describe(good.replace("topActivity=","unknown="),2,pkg).contains("unparsed_visible=1"));
+        check(InstrumentDisplayOwner.describe(null,2,pkg).equals("snapshot=invalid"));
         System.out.println("PASS exact display/activity, CRLF, hidden/unknown/ambiguous/malformed/oversize");
     }
 }

@@ -164,8 +164,19 @@ public final class QnxFileReader {
     private long[] stat(long fd) throws Exception {
         send("s:"+fd+"\r\n"); String[] f=fields();
         if(f.length<16) throw new IOException("qnx_bad_stat");
-        long[] s=new long[15];for(int i=0;i<15;i++)s[i]=number(f[i+1],16);
+        long[] s=new long[15];for(int i=0;i<15;i++)s[i]=statNumber(f[i+1],i==0||i==2);
         return s;
+    }
+    // stat identities are 64-bit bit patterns, not payload lengths or descriptors.
+    // In particular /proc on KX11 returns an all-ones inode. Never widen the
+    // framing/count parser or let an unsigned size wrap into an empty-file success.
+    static long statNumber(String value,boolean identity) throws IOException {
+        if(!value.matches("[0-9a-fA-F]{1,16}"))throw new IOException("qnx_bad_number");
+        try { return identity?Long.parseUnsignedLong(value,16):Long.parseLong(value,16); }
+        catch(NumberFormatException error) { throw new IOException("qnx_bad_number",error); }
+    }
+    private static boolean reliableIdentity(long[] stat) {
+        return stat!=null&&stat[0]!=0&&stat[0]!=-1L&&stat[2]!=-1L;
     }
     private byte[] readFile(long fd,long size,OutputStream out) throws Exception {
         java.security.MessageDigest hash=java.security.MessageDigest.getInstance("SHA-256");
@@ -295,8 +306,8 @@ public final class QnxFileReader {
     }
     private static void inventoryRow(Artifact out,String event,String path,String type,long[] stat,String status,String detail) throws IOException {
         out.append(event).append('\t').append(tsv(path)).append('\t').append(type).append('\t')
-                .append(stat==null?"unknown":stat[1]).append('\t').append(stat==null?"unknown":stat[2]).append('\t')
-                .append(stat==null?"unknown":stat[0]).append('\t').append(stat==null?"unknown":Long.toHexString(stat[9]))
+                .append(stat==null?"unknown":stat[1]).append('\t').append(stat==null?"unknown":Long.toUnsignedString(stat[2])).append('\t')
+                .append(stat==null?"unknown":Long.toUnsignedString(stat[0])).append('\t').append(stat==null?"unknown":Long.toHexString(stat[9]))
                 .append('\t').append(status).append('\t').append(tsv(detail)).append('\n');
     }
     /** Full accessible namespace, DIRECTORY-ONLY opens. No discovered file is opened for content. */
@@ -342,7 +353,7 @@ public final class QnxFileReader {
                         inventoryRow(inventory,"stat",path,"directory_open",null,"metadata_unavailable",lastReply);
                     }
                     if(attributes!=null&&(attributes[9]&0xf000)!=0x4000)throw new IOException("qnx_directory_only_open_returned_non_directory");
-                    boolean reliableIdentity=attributes!=null&&attributes[0]!=0;
+                    boolean reliableIdentity=reliableIdentity(attributes);
                     String previous=reliableIdentity?visited.putIfAbsent(attributes[2]+":"+attributes[0],path):null;
                     if(previous!=null) {
                         inventoryRow(inventory,"probe",path,"directory",attributes,

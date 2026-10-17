@@ -54,7 +54,7 @@ public final class AdbConsoleSession implements AutoCloseable {
                 if(timeoutSeconds>0)deadline = timer.schedule(() -> cancel("Таймаут " + timeoutSeconds + " секунд"), timeoutSeconds, TimeUnit.SECONDS);
                 checkCancelled(); operation.run(this); checkCancelled();
             }
-            catch (Exception error) { failure = cancelled.get() ? new IOException(stopReason
+            catch (Exception error) { failure = cancelled.get() && !(error instanceof AdbShellResult.Failure) ? new IOException(stopReason
                     + ". Команда не повторялась; проверьте её фактический результат.") : error; }
             finally {
                 if (deadline != null) deadline.cancel(false);
@@ -89,7 +89,7 @@ public final class AdbConsoleSession implements AutoCloseable {
     public AdbShellResult.Result command(String command) throws Exception {
         return command(command, null);
     }
-    /** Optional read-only observer sees chunks before a timeout can discard partial output. */
+    /** Optional read-only observer sees chunks; failures also preserve bounded partial output. */
     public AdbShellResult.Result command(String command, java.util.function.Consumer<byte[]> observer) throws Exception {
         return captureCommand(command, observer, AdbShellResult.OUTPUT_LIMIT);
     }
@@ -103,9 +103,13 @@ public final class AdbConsoleSession implements AutoCloseable {
         try { transport.execRaw(capture.wrap(command), chunk -> {
             capture.accept(chunk);
             if (observer != null) observer.accept(chunk);
-        }); }
-        catch (Exception error) { disconnect(); throw error; }
-        checkCancelled();
+        });
+            checkCancelled();
+        }
+        catch (Exception error) {
+            disconnect();
+            throw capture.failure(cancelled.get() ? stopReason : error.getMessage(), error);
+        }
         AdbShellResult.Result result = capture.finish();
         if (result.exitCode == null) disconnect();
         return result;

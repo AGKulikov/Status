@@ -166,7 +166,9 @@ public final class InstrumentOemController {
                 displayOwnerProbeBusy = false;
                 boolean own = error == null && InstrumentDisplayOwner.owns(output, display, context.getPackageName());
                 DiagnosticJournal.infoAsync("instrument-oem", "display_owner_probe own=" + own
-                        + ", display=" + display + ", failed=" + (error != null));
+                        + ", display=" + display + ", failed=" + (error != null)
+                        + ", " + InstrumentDisplayOwner.describe(output, display, context.getPackageName())
+                        + ", navigation_evidence=" + (priorityMonitor == null ? "unavailable" : priorityMonitor.navigationEvidence()));
                 if (own && generation == whiteGeneration) maybeRestoreNavigation(mode, true);
             });
         }

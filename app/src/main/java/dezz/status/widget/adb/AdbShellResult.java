@@ -42,6 +42,13 @@ public final class AdbShellResult {
         tail = next; total += chunk.length;
     }
     public Result finish() {
+        return finish(true);
+    }
+    /** Preserve received bytes without reporting an interrupted operation as successful. */
+    public Failure failure(String reason, Throwable cause) {
+        return new Failure(reason, finish(false), cause);
+    }
+    private Result finish(boolean completed) {
         String end = new String(tail, StandardCharsets.UTF_8);
         Matcher marker = Pattern.compile("\\r?\\n" + token + ":([0-9]{1,3})\\r?\\n?$").matcher(end);
         Integer code = marker.find() ? Integer.valueOf(marker.group(1)) : null;
@@ -52,8 +59,20 @@ public final class AdbShellResult {
                 + "_BEGIN\\r?\\n").matcher(output);
         if (begin.find()) output = output.substring(begin.end());
         if (total <= outputLimit) output = output.replaceFirst("\\r?\\n" + token + ":[0-9]{1,3}\\r?\\n?$", "");
-        else output += "\n… Вывод ограничен " + (outputLimit / 1024) + " КиБ; команда дочитана до завершения.";
-        return new Result(output, code, total > outputLimit);
+        else output += "\n… Вывод ограничен " + (outputLimit / 1024) + " КиБ; "
+                + (completed && code != null ? "команда дочитана до завершения." : "завершение команды не подтверждено.");
+        return new Result(output, completed ? code : null, total > outputLimit);
+    }
+    public static final class Failure extends java.io.IOException {
+        public final Result partial;
+        private Failure(String reason, Result partial, Throwable cause) {
+            super((reason == null ? "Ошибка ADB" : reason)
+                    + "\nПолученный вывод (возможно неполный):\n"
+                    + (partial.output.isEmpty() ? "(нет полученных данных)" : partial.output)
+                    + "\nЗавершение команды не подтверждено; команда не повторялась."
+                    + "\nADB отключён. Для следующей команды выполните Connect.", cause);
+            this.partial = partial;
+        }
     }
     public static final class Result {
         public final String output;

@@ -27,19 +27,23 @@ public class BatteryReplay {
  static class Pref<T> {T value;Pref(T v){value=v;}T get(){return value;}void set(T v){value=v;}}
  static class Prefs {
   Pref<Boolean> phoneLowBatteryAlertEnabled=new Pref<>(true),phoneLowBatteryAlertLatched=new Pref<>(false),phoneLowBatteryAlertLatched2=new Pref<>(false);
+  Pref<Boolean> phoneStatusBarNotificationsEnabled=new Pref<>(false),phonePopupNotificationsEnabled=new Pref<>(true);
   Pref<Integer> phoneLowBatteryAlertThreshold=new Pref<>(20),phoneLowBatteryAlertThreshold2=new Pref<>(10);
   Pref<String> phoneLowBatteryAlertColor=new Pref<>("red"),phoneLowBatteryAlertColor2=new Pref<>("red");
  }
- static class DiagnosticJournal {static void infoAsync(String t,String m){}}
+ static class DiagnosticJournal {static List<String> records=new ArrayList<>();static void infoAsync(String t,String m){records.add(m);}}
  Prefs prefs=new Prefs();Map<String,ConnectorValue> phoneStatusValues=new HashMap<>();
  boolean phoneLowBatteryAlertLatched,phoneLowBatteryAlertLatched2,phoneLowBatteryAlertPending,phoneLowBatteryAlertPending2;
  String lastPhoneBatteryAlertEvidence="";int queued;boolean accepts=true;
  boolean enqueuePhoneLowBatteryAlert(int level,String color,int stage){if(accepts)queued++;return accepts;}
+ boolean phoneNotificationAllowedByLockState(){return true;}
+ boolean phoneNotificationBlockedByForeground(){return false;}
  METHODS
  static void check(boolean condition,String message){if(!condition)throw new AssertionError(message);}
  void sample(int level,String source){ConnectorValue v=new ConnectorValue("battery.level",level);phoneStatusValues.put("battery.level",v);phoneStatusValues.put("battery.level_source",new ConnectorValue("battery.level_source",source));handlePhoneLowBatteryAlert(v);}
  public static void main(String[] args){
   BatteryReplay r=new BatteryReplay();r.sample(20,"iphone_helper_coarse");check(r.queued==0,"coarse20 must not warn");
+  check(DiagnosticJournal.records.get(0).contains("thresholds=20/10")&&DiagnosticJournal.records.get(0).contains("popup_enabled=true"),"threshold/destination evidence missing");
   r.sample(20,"ble_bas");check(r.queued==1,"same20 from BAS must warn");
   r.sample(19,"android_broadcast");check(r.queued==1,"pending stage must not duplicate");
   r.sample(25,"iphone_helper_coarse");check(r.phoneLowBatteryAlertPending,"coarse rebound must not rearm");
@@ -56,6 +60,7 @@ public class BatteryReplay {
   r.phoneStatusValues.clear();check(r.exactPhoneBatteryPercentage(v)==null,"missing source rejected");
   BatteryReplay rejected=new BatteryReplay();rejected.accepts=false;rejected.sample(19,"ble_bas");
   check(!rejected.phoneLowBatteryAlertPending&&!rejected.prefs.phoneLowBatteryAlertLatched.get(),"undelivered warning must remain retryable");
+  check(DiagnosticJournal.records.stream().anyMatch(s1->s1.contains("warning_enqueue")&&s1.contains("accepted=false")&&s1.contains("presentation_confirmed=false")),"queue rejection must be observable");
   rejected.accepts=true;rejected.sample(19,"ble_bas");check(rejected.queued==1,"gate reopening retries exact warning");
  }
 }
