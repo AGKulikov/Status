@@ -1,5 +1,17 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review 3.2.6 / 208021359 — Android9 updater
+
+Пересмотрен NatroUpdater: прежний cache/updates, временный APK удаляется при
+отказе, candidate/progress остаются только RAM. Проверка архива запрашивает оба
+certificate flags; trust pin/ключи/идентичности не меняются. Добавлены сообщения
+в существующий ограниченный DiagnosticJournal, без новых файлов/настроек.
+APK не импортируется из backup и перед installIntent повторно проверяется.
+Legacy certificate/history не заменяют current signer. Новый storage owner
+не появляется. BackupDefaultsMigration явно разрешает335…358→359 и same359,
+сохраняет прежние effective defaults/explicit/unknown keys;334/360 отвергаются.
+Тесты миграции добавлены; статический inventory не доказывает runtime restore.
+
 ### Review3.2.5 — уведомление режима вождения HUD
 
 Новая пользовательская настройка `showDriveModeNotification` находится внутри

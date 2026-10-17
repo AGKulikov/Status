@@ -9,6 +9,7 @@ import android.content.pm.Signature;
 import android.net.Uri;
 import android.provider.Settings;
 import androidx.core.content.FileProvider;
+import dezz.status.widget.diagnostics.DiagnosticJournal;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import javax.net.ssl.HttpsURLConnection;
@@ -25,6 +26,11 @@ public final class NatroUpdater {
     private static final String ASSETS="https://github.com/AGKulikov/Status/releases/download/";
     private static final String PACKAGE="ru.natro.statuswidget";
     private static final String CERT="6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75";
+    // AOSP Android 9 getPackageArchiveInfo only invokes collectCertificates when
+    // GET_SIGNATURES is present. Request both; still trust only the CURRENT
+    // SigningInfo signers below, never the legacy field or signing history.
+    @SuppressWarnings("deprecation")
+    static final int SIGNATURE_FLAGS=PackageManager.GET_SIGNING_CERTIFICATES|PackageManager.GET_SIGNATURES;
     private static final long MAX_APK=128L*1024*1024;
     private static NatroUpdater instance;
     public static synchronized NatroUpdater get(Context context) {
@@ -36,7 +42,7 @@ public final class NatroUpdater {
     private boolean busy;
     private JSONObject candidate;
     private File apk;
-    private NatroUpdater(Context context){this.context=context;}
+    NatroUpdater(Context context){this.context=context;}
     public synchronized JSONObject status() throws Exception {
         return new JSONObject().put("state",state).put("message",message).put("busy",busy)
                 .put("installed",installed().versionName).put("version",candidate==null?"":candidate.optString("versionName"))
@@ -103,23 +109,30 @@ public final class NatroUpdater {
         return new Intent(Intent.ACTION_INSTALL_PACKAGE).setDataAndType(uri,"application/vnd.android.package-archive")
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_ACTIVITY_NEW_TASK);
     }
-    private PackageInfo installed() throws Exception {return context.getPackageManager().getPackageInfo(context.getPackageName(),PackageManager.GET_SIGNING_CERTIFICATES);}
-    private void verify(File file,JSONObject manifest) throws Exception {
+    private PackageInfo installed() throws Exception {return context.getPackageManager().getPackageInfo(context.getPackageName(),SIGNATURE_FLAGS);}
+    void verify(File file,JSONObject manifest) throws Exception {
         if(!file.isFile()||file.length()!=manifest.getLong("size"))throw new IOException("Размер APK изменился");
         MessageDigest hash=MessageDigest.getInstance("SHA-256");
         try(InputStream input=new FileInputStream(file)){byte[] block=new byte[65536];int count;while((count=input.read(block))!=-1)hash.update(block,0,count);}
         if(!hex(hash.digest()).equals(manifest.getString("sha256")))throw new IOException("SHA-256 APK не совпадает");
-        PackageInfo next=context.getPackageManager().getPackageArchiveInfo(file.getAbsolutePath(),PackageManager.GET_SIGNING_CERTIFICATES);
+        PackageInfo next=context.getPackageManager().getPackageArchiveInfo(file.getAbsolutePath(),SIGNATURE_FLAGS);
         PackageInfo current=installed();
         if(next==null||!PACKAGE.equals(next.packageName)||!PACKAGE.equals(current.packageName)
                 ||next.applicationInfo==null||next.applicationInfo.minSdkVersion>android.os.Build.VERSION.SDK_INT
                 ||next.getLongVersionCode()!=manifest.getLong("versionCode")||next.getLongVersionCode()<=current.getLongVersionCode()
                 ||!manifest.getString("versionName").equals(next.versionName))throw new IOException("Пакет или версия APK не подходят");
-        if(!stableSigner(next)||!stableSigner(current))throw new IOException("Подпись APK или установленной Natro не совпадает со стабильной");
+        requireStableSigner(next,"Скачанный APK");
+        requireStableSigner(current,"Установленная Natro");
+        DiagnosticJournal.infoAsync("updater","apk_verified; version="+next.versionName+"; current_signer=stable; installed_signer=stable");
     }
-    private static boolean stableSigner(PackageInfo info)throws Exception {
-        if(info.signingInfo==null)return false;Signature[] signatures=info.signingInfo.getApkContentsSigners();
-        return signatures.length==1&&hex(MessageDigest.getInstance("SHA-256").digest(signatures[0].toByteArray())).equals(CERT);
+    static void requireStableSigner(PackageInfo info,String label)throws Exception {
+        if(info==null||info.signingInfo==null)throw new IOException(label+": Android не вернул сертификат подписи");
+        Signature[] signatures=info.signingInfo.getApkContentsSigners();
+        if(signatures==null||signatures.length==0||signatures.length==1&&signatures[0]==null)
+            throw new IOException(label+": Android не вернул сертификат подписи");
+        if(signatures.length!=1)throw new IOException(label+": ожидался один сертификат подписи");
+        if(!hex(MessageDigest.getInstance("SHA-256").digest(signatures[0].toByteArray())).equals(CERT))
+            throw new IOException(label+": сертификат подписи не совпадает со стабильным");
     }
     private static void validateManifest(JSONObject value,String source)throws Exception {
         if(value.getInt("schema")!=1||!PACKAGE.equals(value.getString("package"))||!"stable".equals(value.getString("channel"))
@@ -132,7 +145,7 @@ public final class NatroUpdater {
     }
     private synchronized void begin(String next,String text)throws IOException {if(busy)throw new IOException("Операция обновления уже выполняется");busy=true;state=next;message=text;}
     private synchronized void finish(String next,String text){busy=false;state=next;message=text;}
-    private void fail(String action,Exception error){finish("error",action+": "+(error instanceof IOException?error.getMessage():error.getClass().getSimpleName()));}
+    private void fail(String action,Exception error){String detail=action+": "+(error instanceof IOException?error.getMessage():error.getClass().getSimpleName());DiagnosticJournal.warn("updater",detail);finish("error",detail);}
     private static void requireAsset(String value)throws IOException {
         if(!value.startsWith(ASSETS)||value.contains("..")||value.contains("?")||value.contains("#"))throw new IOException("Недоверенный адрес выпуска");
     }

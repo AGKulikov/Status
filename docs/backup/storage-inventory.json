@@ -2,7 +2,7 @@
   "schema_version": 1,
   "status": "SOURCE_IMPLEMENTED_LOCAL_RUNTIME_TESTED_KX11_GATES_PENDING",
   "baseline_commit": "c4d3ffc121a0a69ba21094abe2987f889926505c",
-  "scope": "3.2.5 full QNX tree/channel archives and native LAN downloads reviewed in FULL_BACKUP_CONTRACT_RU.md; cache exports excluded from managed backup; Download/Natro is user-owned. No new settings; defaults335..357 to358 reviewed. Static fingerprints do not certify runtime/device restore.",
+  "scope": "3.2.6 Android9 updater certificate flags and diagnostics reviewed in FULL_BACKUP_CONTRACT_RU.md; same cache/updates and RAM state, no new owner/settings/trust. Defaults335..358 to359 reviewed. Static fingerprints do not certify runtime/device restore.",
   "shared_preferences": [
     {
       "name": "natro_lan_trust_v1",
@@ -216,7 +216,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/update/NatroUpdater.java": {
-      "sha256": "e36953d73acd71fdb7de8ebd658afe1e281303bc0e04420169a4d98b39c0975d",
+      "sha256": "dfde2e1c4007f4d87393efd6e1063cc481e9895e1d47253a5cd991cd26c2a698",
       "access_kinds": [
         "files"
       ]
@@ -358,7 +358,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "c2d2e98d639669f43d132dc6373b72169b7d776673ae07845366d5c764e2b9d4",
+      "sha256": "8ad905fd8ee925d0e142fe91b1a634f8f5391929f960bbe5eb5367178ea60f1d",
       "access_kinds": [
         "files"
       ]

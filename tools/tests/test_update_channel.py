@@ -40,9 +40,9 @@ class UpdateChannel(unittest.TestCase):
     def test_updater_guards_and_both_entry_points(self):
         base=ROOT/'app/src/main/java/dezz/status/widget'
         source=(base/'update/NatroUpdater.java').read_text()
-        for guard in ['GET_SIGNING_CERTIFICATES','getApkContentsSigners','next.getLongVersionCode()<=current.getLongVersionCode()',
+        for guard in ['GET_SIGNING_CERTIFICATES|PackageManager.GET_SIGNATURES','getApkContentsSigners','next.getLongVersionCode()<=current.getLongVersionCode()',
                       'canRequestPackageInstalls','ACTION_INSTALL_PACKAGE','setInstanceFollowRedirects(false)',
-                      'natro-update.json','requireAsset(url)','stableSigner(current)','stableSigner(next)']:
+                      'natro-update.json','requireAsset(url)','requireStableSigner(current,','requireStableSigner(next,']:
             self.assertIn(guard,source)
         self.assertNotIn('daemonRoot',source)
         self.assertNotIn('pm install',source)

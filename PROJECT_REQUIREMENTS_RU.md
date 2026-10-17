@@ -1,5 +1,34 @@
 # Единый реестр требований Natro
 
+## 17.10.2026 16:15–16:24 — отказ updater и повтор QNX RST
+
+FIELD: IMG_8799.png показывает установленную3.2.4 и отказ собственного
+updater «Подпись APK или установленной Natro не совпадает со стабильной».
+Пользователь сообщил, что скачанный APK установился вручную. Это подтверждение
+ручной установки со слов пользователя, не приёмка OTA/сохранения всех настроек.
+Файлы3.2.4/3.2.5 отдельно проверены apksigner: один прежний стабильный сертификат.
+
+SOURCE-причина: Android9 AOSP getPackageArchiveInfo собирает сертификаты только
+при GET_SIGNATURES; Natro передавала лишь GET_SIGNING_CERTIFICATES и ошибочно
+называла отсутствие SigningInfo несовпадением. SOURCE3.2.6 запрашивает оба флага,
+проверяет только единственный ТЕКУЩИЙ signer против прежнего SHA256. Legacy
+signatures/history не являются fallback. Пустой сертификат, несколько подписей
+и чужая подпись имеют разные ошибки с указанием APK/установленной Natro.
+Все hash/size/package/minSDK/version/HTTPS/Android-consent gates сохранены.
+Требование: исправить штатный канал и добавить регрессию на реальном signed APK
+под API28. Старый updater3.2.4/3.2.5 потребует однократного ручного install-over
+3.2.6; обход подписи или удаление приложения не предлагаются.
+TEST/CI/APK/FIELD3.2.6 пока OPEN. Подробности:docs/releases/3.2.6/UPDATER_ANDROID9_RU.md.
+
+FIELD16:22:38, IMG_8800.jpeg: .15:35586 → .2:8000 SYN и ответ .2:8000 RST/ACK
+через323мкс, nc Connection refused. ADB Connected127.0.0.1:5555; tcpdump2packets,
+0drops; итоговый0 — статус захвата, не успешного nc. Ранее14:45 был QCONN.
+Причина закрытого listener/активного reject OPEN; не объявлять это parser,
+SELinux/shell privilege или промискуитетом. Перезагрузка раньше предшествовала
+успеху, но не доказана как обязательное/гарантированное лечение. Пользователю
+дан bounded5s probe и кнопка полного архива после QCONN; проверенного запуска
+qconn из Android пока нет. Без доступного file service полный архив не снят.
+
 ## 17.10.2026 16:09 — 3.2.5 опубликована, SOURCE/TEST/APK закрыты; FIELD OPEN
 
 Stable/latest [natro-v3.2.5](https://github.com/AGKulikov/Status/releases/tag/natro-v3.2.5)

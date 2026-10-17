@@ -1,4 +1,4 @@
-name: Build Natro 3.2.5 update candidate
+name: Build Natro 3.2.6 update candidate
 on:
   push:
     branches: ['fix/qnx-reader-20261016']
@@ -13,16 +13,17 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 25
     env:
-      VERSION_NAME: '3.2.5'
-      VERSION_CODE: '208021358'
+      VERSION_NAME: '3.2.6'
+      VERSION_CODE: '208021359'
       ALLOW_UNSIGNED_RELEASE: 'true'
       HELPER_CHANGED: 'false'
+      NATRO_UPDATER_FIXTURE_APK: ${{ runner.temp }}/natro-updater-fixture/Natro-3.2.5-signed.apk
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Enforce REL-004 before build
         run: |
           python3 tools/check_release_version.py "$VERSION_NAME"
-          test "$VERSION_CODE" = 208021358
+          test "$VERSION_CODE" = 208021359
       - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
         with:
           distribution: temurin
@@ -30,6 +31,15 @@ jobs:
           cache: gradle
       - name: Install exact Android toolchain
         run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+      - name: Download pinned signed APK for Android 9 updater regression
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/natro-updater-fixture"
+          gh release download natro-v3.2.5 --repo "$GITHUB_REPOSITORY" \
+            --pattern Natro-3.2.5-signed.apk --dir "$RUNNER_TEMP/natro-updater-fixture"
+          echo "d3fed86ca73c76d1ff10eb3a89a22a731abc50df33ab1782e0986aa164a2daf6  $NATRO_UPDATER_FIXTURE_APK" | sha256sum -c -
       - name: Inventory and clean release build
         run: |
           python3 tools/audit_settings_editors.py --check
@@ -54,17 +64,17 @@ jobs:
       - name: Upload verified unsigned candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Natro-3.2.5-offline-signing-${{ github.run_number }}
+          name: Natro-3.2.6-offline-signing-${{ github.run_number }}
           path: |
-            ${{ runner.temp }}/natro-3.2.5-candidate/*
-            !${{ runner.temp }}/natro-3.2.5-candidate/tools/**
+            ${{ runner.temp }}/natro-3.2.6-candidate/*
+            !${{ runner.temp }}/natro-3.2.6-candidate/tools/**
           if-no-files-found: error
           retention-days: 7
       - name: Upload signing tools separately
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
-          name: Natro-3.2.5-signing-tools-${{ github.run_number }}
-          path: ${{ runner.temp }}/natro-3.2.5-candidate/tools/*
+          name: Natro-3.2.6-signing-tools-${{ github.run_number }}
+          path: ${{ runner.temp }}/natro-3.2.6-candidate/tools/*
           if-no-files-found: error
           retention-days: 7
       - name: Upload candidate and reports
