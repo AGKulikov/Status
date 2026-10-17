@@ -188,9 +188,9 @@
       "priority": "P1",
       "function": "Владелец крыльев и штатной машинки",
       "status": "OPEN",
-      "known": "FIELD VIDEO IMG_8808/8809: нижние крылья появляются без видимой карты, на выходе карта исчезает раньше подложек. Декоративные подложки и цифры имеют разные фазы; после HU reboot возвращается обычная круглая компоновка. Это усиливает гипотезу navigation layout, но не доказывает отдельный layer/hide. SOURCE Natro mode3/wake до старта Activity совместим с видео; PA_Gauge остаётся цепочкой данных, renderer не установлен. STATIC UDS32ca16b3: найденный direct reader PA_VS_VehicleSpeedDigital — DA2B0x1aaf0; callback bound to SomeIPClient::sendData0x3c498, service0x000d/event0x000a/2bytes. Layout/background control в этой цепочке не найден; другие gauge globals в ограниченном ADRP/GOT search связаны с initializer. Это диагностическая ветвь, не установленный renderer.",
-      "missing_evidence": "Принимающий navigation/fullscreen dispatcher и связь его состояния с background/gauge animation; отдельный параметр оформления. Синхронные Android display2 pixels/физический DIM и mode/channel trace. Видео не устанавливает процесс/числовой mode; старые dumps другой минуты не заменяют такую привязку.",
-      "next_step": "Проследить принимающую navigation/fullscreen ветвь до выбора оформления; найденный PA_Gauge→DA2B reader считать диагностическим использованием, не точкой скрытия. Атрибуция pixel owner требует синхронного Android display2/физического DIM и mode trace одного перехода. Не повторять всё QNX дерево и не интерпретировать sharecnt2 как идентификатор второго renderer. Независимое скрытие с сохранением карты/приборов OPEN.",
+      "known": "FIELD VIDEO IMG_8808/8809: нижние крылья появляются без видимой карты, на выходе карта исчезает раньше подложек. Декоративные подложки и цифры имеют разные фазы; после HU reboot возвращается обычная круглая компоновка. Это усиливает гипотезу navigation layout, но не доказывает отдельный layer/hide. SOURCE Natro mode3/wake до старта Activity совместим с видео; PA_Gauge остаётся цепочкой данных, renderer не установлен. STATIC UDS32ca16b3: найденный direct reader PA_VS_VehicleSpeedDigital — DA2B0x1aaf0; callback bound to SomeIPClient::sendData0x3c498, service0x000d/event0x000a/2bytes. Layout/background control в этой цепочке не найден; другие gauge globals в ограниченном ADRP/GOT search связаны с initializer. Это диагностическая ветвь, не установленный renderer. STATIC coverage correction21:44: PT_DYNAMIC recovers211ELF dynamic tables; 31graphics-import candidates vs16previous, all previous import hits retained. life_cycle_man_demo power/key handlers, libivrenderer Screen buffer path and ssplash image/post/pause do not establish an independent wing control. 2additional raw resources are landscape photographs. This is expanded static coverage, not exhaustive semantic analysis.",
+      "missing_evidence": "Не установлены принимающий navigation/fullscreen dispatcher, производитель пикселей/анимации и независимая точка управления оформлением. Полный смысловой разбор существующих ELF ещё не выполнен;5payload имеют явные parser exceptions. Синхронные Android display2/физический DIM/mode trace остаются пробелом физической атрибуции, а не требованием нового сбора до продолжения STATIC.",
+      "next_step": "Продолжать по уже полученному QNX: сопоставить новые graphics dependencies с существующими mappings/configuration, проследить dynamic-plugin binding и принимающий navigation/fullscreen обработчик до состояния оформления. Новый полный дамп/синхронный FIELD сейчас не являются условием статического разбора. Синхронные пиксели могут проверять конкретную будущую гипотезу, но не заменяют ещё не выполненный анализ имеющихся bytes. Независимое скрытие с сохранением карты/приборов OPEN; PA_Gauge→DA2B не считать renderer.",
       "sources": [
         "display/report.md",
         "research-2026-09-05/android_platform/systems.json",
@@ -210,7 +210,8 @@
         "research-2026-10-17-white-bar/FIELD_1911_1915_RU.md",
         "research-2026-10-17-white-bar/FIELD_2053_RU.md",
         "research-2026-10-17-white-bar/WINGS_VIDEO_2116_RU.md",
-        "research-2026-10-17-white-bar/PA_GAUGE_READER_2134_RU.md"
+        "research-2026-10-17-white-bar/PA_GAUGE_READER_2134_RU.md",
+        "research-2026-10-17-white-bar/QNX_COVERAGE_2144_RU.md"
       ],
       "evidence_updates": [
         {
@@ -381,6 +382,12 @@
           "level": "STATIC_AND_REVERIFIED_PRIOR_FIELD",
           "finding": "UDS PA_VS_VehicleSpeedDigital direct read resolved to DA2B and SomeIPClient::sendData callback. Limited relocation/ADRP scan found initializer plus DA2B; no layout link in traced route. Vehicle280555 mappings reverified: PID1175638 maps16PA_Gauge pages; other consumers not identified. No runtime/APK/physical fix.",
           "source": "research-2026-10-17-white-bar/PA_GAUGE_READER_2134_RU.md"
+        },
+        {
+          "date": "2026-10-17",
+          "level": "USER_CORRECTION_AND_EXPANDED_STATIC_REVIEW",
+          "finding": "No additional dump required for continuing existing QNX analysis. A section-only import scan missed segment-backed dynamic tables. New pass recovers211tables;685of690uniqueELF parsed,5explicit exceptions,31graphics candidates with prior16retained. Selected life-cycle/IVRenderer/ssplash/BridgeChip paths and2raw resources reviewed; no independent wings hide or exhaustive semantic claim. Runtime/APK unchanged.",
+          "source": "research-2026-10-17-white-bar/QNX_COVERAGE_2144_RU.md"
         }
       ],
       "coverage_ids": [
@@ -472,6 +479,15 @@
           "known": "FIELD VIDEO IMG_8808/8809: нижние крылья появляются без видимой карты, на выходе карта исчезает раньше подложек. Декоративные подложки и цифры имеют разные фазы; после HU reboot возвращается обычная круглая компоновка. Это усиливает гипотезу navigation layout, но не доказывает отдельный layer/hide. SOURCE Natro mode3/wake до старта Activity совместим с видео; PA_Gauge остаётся цепочкой данных, renderer не установлен.",
           "next_step": "Приоритетно проследить вход/выход navigation layout до состояния/анимации подложек и цифр; PA_Gauge readers/writers исследовать как данные, не готовый renderer. Использовать имеющиеся bytes; для определения pixel owner нужен синхронный переход, не повтор всего QNX дерева. Независимое скрытие при сохранении карты/приборов остаётся OPEN.",
           "missing_evidence": "Принимающий navigation/fullscreen dispatcher и связь его состояния с background/gauge animation; отдельный параметр оформления. Синхронные Android display2 pixels/физический DIM и mode/channel trace. Видео не устанавливает процесс/числовой mode; старые dumps другой минуты не заменяют такую привязку.",
+          "status": "OPEN"
+        },
+        {
+          "date": "2026-10-17",
+          "reason": "User correction21:44: existing full QNX must be analysed first; segment-based ELF recovery exposes prior import coverage gap. Prior video/PA_Gauge evidence retained.",
+          "source": "research-2026-10-17-white-bar/QNX_COVERAGE_2144_RU.md",
+          "known": "FIELD VIDEO IMG_8808/8809: нижние крылья появляются без видимой карты, на выходе карта исчезает раньше подложек. Декоративные подложки и цифры имеют разные фазы; после HU reboot возвращается обычная круглая компоновка. Это усиливает гипотезу navigation layout, но не доказывает отдельный layer/hide. SOURCE Natro mode3/wake до старта Activity совместим с видео; PA_Gauge остаётся цепочкой данных, renderer не установлен. STATIC UDS32ca16b3: найденный direct reader PA_VS_VehicleSpeedDigital — DA2B0x1aaf0; callback bound to SomeIPClient::sendData0x3c498, service0x000d/event0x000a/2bytes. Layout/background control в этой цепочке не найден; другие gauge globals в ограниченном ADRP/GOT search связаны с initializer. Это диагностическая ветвь, не установленный renderer.",
+          "missing_evidence": "Принимающий navigation/fullscreen dispatcher и связь его состояния с background/gauge animation; отдельный параметр оформления. Синхронные Android display2 pixels/физический DIM и mode/channel trace. Видео не устанавливает процесс/числовой mode; старые dumps другой минуты не заменяют такую привязку.",
+          "next_step": "Проследить принимающую navigation/fullscreen ветвь до выбора оформления; найденный PA_Gauge→DA2B reader считать диагностическим использованием, не точкой скрытия. Атрибуция pixel owner требует синхронного Android display2/физического DIM и mode trace одного перехода. Не повторять всё QNX дерево и не интерпретировать sharecnt2 как идентификатор второго renderer. Независимое скрытие с сохранением карты/приборов OPEN.",
           "status": "OPEN"
         }
       ],

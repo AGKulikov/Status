@@ -1,5 +1,22 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 17.10.2026 21:44 МСК — исправлено покрытие ELF, новые дампы не запрошены
+
+USER correction: полный QNX уже передан; продолжать анализ имеющихся байтов.
+Проверка файлов/строк не равна полному reverse engineering. Новый сбор не
+является условием продолжения; прежний FIELD gap — отдельная проверка гипотезы.
+
+STATIC: section-only import scan пропускал ELF без именованных dynamic sections.
+PT_DYNAMIC восстановил таблицы211ELF; в текущем корпусе690uniqueELF,
+685parsed/5explicit exceptions,31graphics candidates вместо16. Все прежние
+импортные совпадения сохранены. life_cycle_man_demo handlers — display power
+и power/sleep events; libivrenderer Screen path — передача готового OMX buffer;
+ssplash — image load/post/pause. В этих путях независимый wings control не найден.
+BridgeChip loader просмотрен до динамического plugin entry, active binding OPEN.
+Два дополнительных raw landscape ресурса визуально не совпали с видео.
+Полный смысловой разбор всех функций не заявляется; renderer/hide FIELD OPEN.
+[Подробности и машинная карта кандидатов](docs/geely-kx11/research-2026-10-17-white-bar/QNX_COVERAGE_2144_RU.md).
+
 ## 17.10.2026 — продолжение21:34: PA_Gauge reader доведён до диагностики
 
 STATIC UDS ELF32ca16b3: GOT0xf1fd8→PA_VS_VehicleSpeedDigital0x102c10,
