@@ -56,3 +56,10 @@ installer/экран разрешения на магнитоле; тихая у
 на фикстурах. Нет проверки Android installer, реальной подписи нового APK,
 Safari boot roundtrip и фактического обновления на KX11. Новая APK не выпущена.
 Белая полоса и низкий заряд iPhone остаются отдельными FIELD OPEN задачами.
+
+Полная Android-проверка предпринята командой
+`./gradlew :app:compileGeelyReleaseJavaWithJavac --offline --no-daemon`.
+Wrapper не нашёл Gradle 8.14.2 и остановился на загрузке с services.gradle.org:
+`Network is unreachable`. Компиляция приложения не началась. Для 3197a2a
+список GitHub Actions runs при проверке пуст. Нужна разрешённая среда сборки
+с зависимостями; ограничения доступа не обходились.

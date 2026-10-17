@@ -47,6 +47,10 @@ TEST: 27 локальных проверок LAN/core/trust/QNX/ADB/battery/medi
 проверки updater/export wiring статические, generator replay — с фикстурами,
 это НЕ проверка реального APK/Android installer/HTTP GitHub на магнитоле.
 APK: новая сборка и подпись ещё не проверены; старую 3.2.3 не переименовывать.
+BUILD BLOCKER: попытка `./gradlew :app:compileGeelyReleaseJavaWithJavac --offline --no-daemon`
+остановилась до компиляции: отсутствует Gradle 8.14.2, загрузка с services.gradle.org
+недоступна (Network is unreachable). GitHub Actions runs для 3197a2a при проверке
+пусты. Это не ошибка Java-компилятора и не успешная полная сборка.
 FIELD OPEN: boot/разрешение adbd, сохранение Safari, экспорт TXT/ZIP с iPhone,
 partial/cancel дампа, загрузка/отказ сети, проверенный новый выпуск и install-over
 с сохранением настроек. SOURCE не означает, что уже установлено на магнитоле.
