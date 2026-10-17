@@ -1,5 +1,15 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 17.10.2026 — FIELD3.2.7: обход подтверждён, докачка прервана ADB
+
+System857396:4772paths/552EOF/13directory failures,10wide mappings и13slog2;
+/dev/shmem перечислен после identity collision.41stable QNX файла равны прежним.
+Vehicle663180: ADB потерян на channel-log ДО QNX; исключения/readlink не проверены.
+Обнаружена зависимость основного сбора от необязательных Android-журналов.
+UDS mapping содержит PA_Gauge; initializer старого ELF создаёт speed/RPM/
+coolant/fuel AtomicStruct. Это зацепка данных, не найденный renderer/hide.
+[Источники, SHA, ограничения и следующие шаги](docs/geely-kx11/research-2026-10-17-white-bar/DUMPS_327_857396_663180_RU.md).
+
 ## 17.10.2026 — полный QNX578306 и новый путь ссылок
 
 Получены974double-read файла,29open_failed_or_link и2changing; full ZIP CRC и

@@ -1,5 +1,21 @@
 # Единый реестр требований Natro
 
+## 17.10.2026 18:30–18:35 МСК — полнота исследования и FIELD3.2.7
+
+USER спросил, весь ли прежний архив разобран и все ли зацепки проверены; затем
+передал system857396 и vehicle663180. Не называть целевой анализ исчерпывающим.
+Оба ZIP CRC PASS,101 manifest payload size/SHA PASS суммарно. FIELD:4772paths,
+10wide mappings/13slog2; identity collision /dev/shmem исправлен. Vehicle потерял
+ADB на channel-log до QNX; исключения/native link dialect ещё FIELD OPEN.
+Подтверждена проблема изоляции: необязательный snapshot может закрыть общую
+сессию и сорвать докачку. Причина первичного ADB обрыва не установлена;60s
+deadline совместим с длительностью, не доказан сообщением ошибки. Следующее
+исправление должно изолировать журнал и сохранять причину/этап без повторения
+неподтверждённых команд. System README alias-фраза устарела относительно journal.
+PA_Gauge mapped в UDS; speed/RPM/coolant/fuel структуры найдены в initializer
+старого ELF, renderer/consumer/hide не установлены. SOURCE/APK здесь не менялись.
+[Полный разбор](docs/geely-kx11/research-2026-10-17-white-bar/DUMPS_327_857396_663180_RU.md).
+
 ## 17.10.2026 18:18:44 МСК — Natro3.2.7 опубликована stable/latest
 
 Release415876139/tag natro-v3.2.7 опубликован. Publisher39044443773/job117430265859

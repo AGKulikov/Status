@@ -1,5 +1,7 @@
 # Natro — карта требований, исследований и открытых вопросов
 
+- [17.10, FIELD3.2.7: ADB-срыв докачки,4772paths,10mappings и PA_Gauge](geely-kx11/research-2026-10-17-white-bar/DUMPS_327_857396_663180_RU.md).
+
 - [17.10: полный архив578306, крылья и отрицательные результаты](geely-kx11/research-2026-10-17-white-bar/VEHICLE_578306_RU.md). [Native qconn links и докачка с977исключениями](geely-kx11/research-2026-10-17-white-bar/QCONN_LINKS_RU.md). FIELD новых путей OPEN.
 
 - [17.10 16:15: updater Android9 — неверный certificate flag](releases/3.2.6/UPDATER_ANDROID9_RU.md): SOURCE3.2.6; реальный APK/API28 regression, CI/APK/FIELD OPEN. QNX16:22 снова RST/ACK до greeting, причина listener/reject OPEN.
