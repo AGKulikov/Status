@@ -1,5 +1,16 @@
 # Единый реестр требований Natro
 
+## 17.10.2026 19:03:53МСК — Natro3.2.8 stable опубликована
+
+Release415910302/natro-v3.2.8/latest подтверждены readback. Publisher39047732914
+job117439745681 SUCCESS восстановил exact APK без private key и скачал/сверил
+все7assets до публикации; tag→5e4f40cee990cda4f5832f7734e5e14d2140ea57.
+APK/подпись/source/CI и отчёты опубликованы. QNX-COLLECTOR-328 SOURCE/TEST/APK
+приняты; FIELD установки/докачки/native links/exclusions OPEN. Крылья/полоса
+этим выпуском не исправлены. Историческое «публикация выполняется» заменено
+этим итогом. docs/releases/3.2.8/publication-verification.json.
+
+
 ## 17.10.2026 — QNX-COLLECTOR-328 SOURCE/TEST/APK приняты
 
 SOURCE5e4f40cee990cda4f5832f7734e5e14d2140ea57/tree82d94501627f5e54169eac183d0e0801dcfcc3ab

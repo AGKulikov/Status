@@ -1,5 +1,13 @@
 # Natro3.2.8 /208021361 — сборщик QNX
 
+[Stable/latest3.2.8](https://github.com/AGKulikov/Status/releases/tag/natro-v3.2.8)
+опубликован17.10.2026 в19:03:53МСК,release415910302.
+Publisher39047732914/job117439745681 SUCCESS: exact signed APK повторно
+проверен без private key,7assets скачаны и побайтно сравнены до публикации.
+Latest/tag/source/SHA/size прочитаны обратно. [Протокол](publication-verification.json).
+Источник и все собственные изменения опубликованы, FIELD остаётся OPEN.
+
+
 ## Проверенный APK
 
 SOURCE5e4f40cee990cda4f5832f7734e5e14d2140ea57,
@@ -20,7 +28,7 @@ report уточнён фактическим сравнением, оригин�
 [Отчёт](release-report.json),[подпись](signature-verification.txt),
 [манифест](natro-update.json),[локальные проверки](local-verification.json).
 SOURCE/TEST/APK приняты. FIELD установки/докачки/native link/exclusions OPEN.
-Stable-публикация и readback выполняются; результат будет добавлен отдельно.
+Stable-публикация и readback завершены; протокол выше.
 
 
 Дефект3.2.7 подтверждён архивом663180: channel-log терял ADB раньше QNX.

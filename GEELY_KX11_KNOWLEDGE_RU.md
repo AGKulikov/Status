@@ -1,5 +1,9 @@
 # Geely KX11 / ECARX — техническая база управления
 
+3.2.8 опубликована19:03:53МСК: SOURCE5e4f40ce,CI39046959187,
+2175Android/265tool/108Java cases PASS; прежний cert/API28/1517payload PASS.
+[Выпуск и readback](docs/releases/3.2.8/README_RU.md). FIELD докачки остаётся OPEN.
+
 ## 17.10.2026 — SOURCE исправления досборщика3.2.8
 
 Vehicle QNX перенесён перед всеми Android snapshots, чтобы их timeout не

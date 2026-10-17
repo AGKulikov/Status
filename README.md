@@ -1,8 +1,8 @@
 # Natro
 
-**Проверен APK3.2.8 /208021361, публикация выполняется:** QNX первым, необязательные журналы после него с15s deadline; сохранение частичного архива и причины отказа.2175Android/265tool/108Java checks PASS, прежняя подпись/API28 проверены. [Статус](docs/releases/3.2.8/README_RU.md).
+**Выпущена [3.2.8 /208021361](https://github.com/AGKulikov/Status/releases/tag/natro-v3.2.8):** QNX первым, необязательные журналы после него с15s deadline; сохранение частичного архива и причины отказа.2175Android/265tool/108Java checks PASS, прежняя подпись/API28 проверены. [Статус](docs/releases/3.2.8/README_RU.md).
 
-**Выпущена [3.2.7 / 208021360](https://github.com/AGKulikov/Status/releases/tag/natro-v3.2.7):** докачка QNX с977исключениями из полного и частичного дампов, чтение целей ссылок и исправления каталогов/диагностики. 2174 Android tests,265 tool tests и108 Java cases PASS; прежняя подпись и exactAPI28/install-over metadata проверены. [Протокол выпуска](docs/releases/3.2.7/README_RU.md). Stable/latest и все7assets проверены; FIELD докачки и крылья OPEN.
+**Предыдущая [3.2.7 / 208021360](https://github.com/AGKulikov/Status/releases/tag/natro-v3.2.7):** докачка QNX с977исключениями из полного и частичного дампов, чтение целей ссылок и исправления каталогов/диагностики. 2174 Android tests,265 tool tests и108 Java cases PASS; прежняя подпись и exactAPI28/install-over metadata проверены. [Протокол выпуска](docs/releases/3.2.7/README_RU.md). Stable/latest и все7assets проверены; FIELD докачки и крылья OPEN.
 
 **Предыдущая [3.2.5 / 208021358](https://github.com/AGKulikov/Status/releases/tag/natro-v3.2.5):**
 уведомление режима вождения на HUD как в MConfig48 — белая плашка, чёрное
