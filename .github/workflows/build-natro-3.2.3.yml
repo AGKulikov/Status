@@ -17,7 +17,6 @@ jobs:
       VERSION_CODE: '208021359'
       ALLOW_UNSIGNED_RELEASE: 'true'
       HELPER_CHANGED: 'false'
-      NATRO_UPDATER_FIXTURE_APK: ${{ runner.temp }}/natro-updater-fixture/Natro-3.2.5-signed.apk
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Enforce REL-004 before build
@@ -39,7 +38,8 @@ jobs:
           mkdir "$RUNNER_TEMP/natro-updater-fixture"
           gh release download natro-v3.2.5 --repo "$GITHUB_REPOSITORY" \
             --pattern Natro-3.2.5-signed.apk --dir "$RUNNER_TEMP/natro-updater-fixture"
-          echo "d3fed86ca73c76d1ff10eb3a89a22a731abc50df33ab1782e0986aa164a2daf6  $NATRO_UPDATER_FIXTURE_APK" | sha256sum -c -
+          echo "d3fed86ca73c76d1ff10eb3a89a22a731abc50df33ab1782e0986aa164a2daf6  $RUNNER_TEMP/natro-updater-fixture/Natro-3.2.5-signed.apk" | sha256sum -c -
+          echo "NATRO_UPDATER_FIXTURE_APK=$RUNNER_TEMP/natro-updater-fixture/Natro-3.2.5-signed.apk" >> "$GITHUB_ENV"
       - name: Inventory and clean release build
         run: |
           python3 tools/audit_settings_editors.py --check
