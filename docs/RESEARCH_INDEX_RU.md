@@ -11,7 +11,8 @@
 | Найденные маршруты, адреса, параметры, проверки и ограничения Geely/ECARX | [Техническая база](../GEELY_KX11_KNOWLEDGE_RU.md), [индекс исследований](geely-kx11/README.md) |
 | Что ещё неизвестно и какое свидетельство нужно следующим | [Очередь вопросов](geely-kx11/open_questions.json); записи имеют собственные даты и историю |
 | Исследования прошивки и DIM12–14октября | [Архив разборов](geely-kx11/research-2026-10-12-13-archive/README_RU.md), [драйвер и MCU](geely-kx11/research-2026-10-13-dim/README_RU.md), [QNX init](geely-kx11/research-2026-10-14-dim/README_RU.md) |
-| Последний разобранный системный дамп3.2.2 | [Перенесённые выводы и гипотезы](geely-kx11/research-2026-10-16-qnx/DUMP_322_RU.md) |
+| Предыдущий системный дамп3.2.2 | [Перенесённые выводы и гипотезы](geely-kx11/research-2026-10-16-qnx/DUMP_322_RU.md) |
+| Первый FIELD3.2.3: QNX Connection refused, Android evidence и следующий шаг | [Разбор ZIP8283](geely-kx11/research-2026-10-16-qnx/DUMP_323_8283_RU.md) |
 | Что изменено в сборщике3.2.3 и что предстоит проверить | [Полный доступный каталог QNX](geely-kx11/research-2026-10-16-qnx/FULL_INVENTORY_RU.md) |
 | Белая полоса, VA и восстановление DIM | Реестр: записи04/07/10/14октября, DIM-WHITE-317; [обзор3.1.7](releases/3.1.7/SOURCE_REVIEW_RU.md). Причину OEM restart и физическую приёмку не считать закрытыми по одному CI |
 | ANCS, батарея и свои иконки web app | Реестр: DIAG-313-WAL, BATTERY-EXACT-317, FIX-311-WEBICON; [архитектура ANCS](ANCS_V2_REFERENCE_ARCHITECTURE.md), [иконки](PHONE_NOTIFICATION_ICONS_RU.md) |
@@ -54,3 +55,10 @@
 Это не заявление о построчной сверке всех исторических разговоров и всех
 веток проекта. Для остальных тем таблица указывает существующие материалы,
 а не новую аппаратную проверку. В очереди сохранены все прежние вопросы.
+
+## Дополнение17.10.2026: первичный дамп3.2.3
+
+ZIP8283 проверен непосредственно:25entries/CRC,20manifest size/SHA.
+QNX отказал до handshake; каталог/mappings остаются BLOCKED_TRANSPORT.
+Сопоставлены исходники, предыдущий ZIP3.2.2 и Android HWC/window snapshots.
+Обновлены база, реестр и очередь; добавлен QNX_ENDPOINT_ACCESS. Прежние54ID сохранены.

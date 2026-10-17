@@ -1,0 +1,137 @@
+{
+  "schema": 1,
+  "reviewedDate": "2026-10-17",
+  "evidenceLevel": "FIELD_ARCHIVE_AND_SOURCE_REVIEW",
+  "source": {
+    "file": "Natro-system-8283f203-3fce-48ca-b2de-7aa148f821e3.zip",
+    "sha256": "5d07631b4c4de575375092749af37da84d986c886f457a04c4955f8a806edad2",
+    "sizeBytes": 224498,
+    "zipEntries": 25,
+    "uncompressedBytes": 1209220,
+    "zipCrcPassed": true,
+    "duplicateNames": 0,
+    "reportedCollectorVersion": "3.2.3",
+    "access": "su_0",
+    "firmwareFingerprint": "qti/kx11_high/kx11_high:9/20.24.10.23024.41151/539:userdebug/test-keys",
+    "captureStateUserLabel": "navigation",
+    "captureStateIndependentlyVerified": false
+  },
+  "time": {
+    "timezone": "Europe/Moscow",
+    "startWallMs": 1792218392829,
+    "endWallMs": 1792218412193,
+    "reportedElapsedMs": 19363,
+    "beforeEpochSeconds": 1792218409,
+    "afterEpochSeconds": 1792218410,
+    "beforeLocal": "2026-10-17T09:26:49+03:00",
+    "afterLocal": "2026-10-17T09:26:50+03:00",
+    "beforeAndroidUptimeSeconds": 66.69,
+    "afterAndroidUptimeSeconds": 68.29,
+    "clockScope": "Android guest uptime, not QNX host uptime"
+  },
+  "manifest": {
+    "rows": 59,
+    "payloadHashesAndSizesVerified": 20,
+    "statusCounts": {
+      "collected": 7,
+      "absent_or_inaccessible": 2,
+      "collected_snapshot": 10,
+      "partial_or_unavailable": 3,
+      "not_collected": 4,
+      "not_attempted_after_qnx_failure": 33
+    },
+    "reportedCollected": "7/42"
+  },
+  "qnx": {
+    "endpoint": "198.18.34.2:8000",
+    "transport": "adb-shell-toybox-nc",
+    "result": "failed",
+    "stage": "greeting",
+    "path": "/",
+    "rxBytes": 32,
+    "txBytes": 0,
+    "elapsedMs": 42,
+    "lastControlReply": "nc: connect: Connection refused",
+    "parserError": "qnx_bad_line",
+    "interpretation": "nc TCP connection failure before QNX greeting; received bytes are the nc diagnostic, not QNX file payload",
+    "reportedFiles": 0,
+    "collectedFiles": 0,
+    "targetsNotAttempted": 33,
+    "inventory": {
+      "traversalFinished": false,
+      "discovered": 1,
+      "examined": 0,
+      "paths": [
+        "/"
+      ],
+      "rootIsQueuedSeedNotSuccessfullyRead": true
+    },
+    "processIndexCollected": false,
+    "mappingsCollected": false,
+    "slog2Collected": false,
+    "failureCauseBeyondRefusedConnection": "unknown",
+    "readinessDelay": "hypothesis only"
+  },
+  "android": {
+    "firmwareFilesCollected": 7,
+    "firmwareFilesUnavailable": 2,
+    "allSevenFirmwareFilesByteIdenticalTo322": true,
+    "graphicsSnapshots": 10,
+    "display2": {
+      "size": [
+        1920,
+        1080
+      ],
+      "nominalRefreshHz": 30,
+      "hwcLayers": 6,
+      "beforeAfterHwcTableIdentical": true,
+      "sys2038DimmenuVisible": false,
+      "sys2038ExcludedFromHwc": true,
+      "mconfigParents": [
+        "plus.monjaro",
+        "plus.monjaro"
+      ],
+      "frameCounterBefore": 150,
+      "frameCounterAfter": 150,
+      "flipsBefore": 2574,
+      "flipsAfter": 2642,
+      "frameCounterLimit": "unchanged client-target counter over about 1.6 s does not prove frozen physical output"
+    },
+    "beforeAfterWindowBytesIdentical": true,
+    "beforeAfterLayerListBytesIdentical": true,
+    "dlt": "absent_or_inaccessible; inventory byte-identical to 3.2.2",
+    "hwcDumpTail": "both display3 tails terminate mid-field before Allocated buffers; 8159 characters from HWC2 display_id: 0 in each; cause not established"
+  },
+  "comparison": {
+    "previousFile": "Natro-system-423934bd-be16-4ee7-868f-5ccce8c43383.zip",
+    "previousSha256": "ac1bf086c34110f431acab4dd4f7382b375598b54208c8b575a770085add8f89",
+    "previousZipCrcPassed": true,
+    "previousCollectorVersion": "3.2.2",
+    "previousAndroidBeforeUptimeSeconds": 131.7,
+    "previousAndroidAfterUptimeSeconds": 133.75,
+    "previousQnxTargetsCollected": 26,
+    "previousDisplay2HwcLayers": 7,
+    "missingCurrentLayer": "Natro DIM menu#0",
+    "note": "Different captures, boot sessions and app versions; not a controlled proof of startup delay"
+  },
+  "sourceReview": {
+    "commit": "40524437fe8136b04d1404c14bcb411545bd2315",
+    "files": {
+      "app/src/main/java/dezz/status/widget/shell/AdbTransport.java": "a03a114040cf9aa3c8ddf2fa4e55f5831e926ab6",
+      "app/src/main/java/dezz/status/widget/diagnostics/QnxFileReader.java": "c4d393ee048cacf61f8305bc0dcf17e85dc17087",
+      "app/src/main/java/dezz/status/widget/diagnostics/SystemFileDump.java": "32e2585b43c15cb9ee327da14ea49bb255179045"
+    },
+    "finding": "qconn endpoint and nc command match 3.2.2; 3.2.3 runs inventory first; LF-only nc diagnostic is rejected by CRLF protocol line parser; failure preserves Android and partial inventory and marks later QNX targets unattempted"
+  },
+  "open": [
+    "QNX endpoint readiness and cause of refusal",
+    "full namespace directory protocol acceptance",
+    "four remaining full mappings and seven added exact file paths",
+    "all matching slog2 including screen log",
+    "wings renderer and independent hide",
+    "physical install-over and data preservation",
+    "white stripe/VA/ANCS/battery: application logs absent"
+  ],
+  "nextStep": "Repeat explicit system collection with the same 3.2.3 after Android has been running for at least 2-3 minutes; compare endpoint result and uptime. If refusal persists, collect read-only network/service availability evidence; do not infer a file-reader failure from refused TCP.",
+  "publicationScope": "derived findings and hashes only; no original firmware binaries or private raw logs"
+}

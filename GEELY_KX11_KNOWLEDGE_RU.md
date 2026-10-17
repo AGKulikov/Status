@@ -1,5 +1,29 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 17.10.2026 — FIELD3.2.3: отказ QNX endpoint, архив8283
+
+Первичный ZIP SHA-256`5d07631b4c4de575375092749af37da84d986c886f457a04c4955f8a806edad2`;
+25entries/CRC и20manifest payload SHA/size проверены.
+[Полный разбор](docs/geely-kx11/research-2026-10-16-qnx/DUMP_323_8283_RU.md).
+
+QNX0/33: nc Connection refused до greeting,tx=0. Каталог содержит только
+исходный /,examined=0; ни directory protocol, ни mappings не проверены.
+qnx_bad_line вызван LF-строкой nc; это не установленная ошибка ответа qconn.
+Android uptime66.69/68.29с; прошлый успешный3.2.2 —131.70/133.75с.
+Готовность службы после старта остаётся гипотезой; следующий опыт — тот же
+сбор после2–3минут работы с сопоставлением uptime/результата endpoint.
+
+Семь Android firmware файлов совпали с3.2.2. Display2 содержит6HWC layers,
+Sys2038 hidden, Natro DIM menu отсутствует. Полноэкранный MConfig+ overlay
+имеет текущий parent plus.monjaro; имя/геометрия не определяют его пиксели.
+Counter150→150 при flips2574→2642 не доказывает зависание.
+Хвост HWC display3 внутренне неполон; целевая таблица display2 сохранена.
+Android DLT недоступен; QNX logs и прикладные ANCS/VA/батарея отсутствуют.
+
+FIELD полного QNX каталога/mappings BLOCKED_TRANSPORT; renderer крыльев OPEN.
+Новый dump дополняет историю ниже и не опровергает два EOF mappings3.2.2.
+
+
 ## 17.10.2026 — сводка результатов дампа3.2.2 и статуса3.2.3
 
 [Карта исследований](docs/RESEARCH_INDEX_RU.md) связывает требования, отчёты,
