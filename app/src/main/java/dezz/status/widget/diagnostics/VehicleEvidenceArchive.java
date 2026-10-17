@@ -84,6 +84,11 @@ public final class VehicleEvidenceArchive {
             finally{zip.closeEntry();}
         }
     }
+    private static String shellFailure(Exception error) {
+        // Failure already bounds stdout to the requested capture limit. Do not truncate it
+        // with the 512-character protocol-field sanitizer used for unrelated exceptions.
+        return error instanceof AdbShellResult.Failure?error.getMessage():QnxFileReader.safe(error.toString());
+    }
     private static String snapshotHeader(String stage,long started) {
         return "stage="+stage+" phase=after_qnx timeout_ms=15000 elapsed_ms="
                 +((System.nanoTime()-started)/1_000_000L)+"\n";
@@ -121,7 +126,7 @@ public final class VehicleEvidenceArchive {
                                 snapshotHeader("root-probe",probeStarted)+"exit="+r.exitCode+" truncated="+r.truncated+"\n"+r.output);
                     } catch(Exception e) {
                         stopped=true;stopReason="root_probe_failed";
-                        sink.text("channels/root-probe.txt","unavailable",snapshotHeader("root-probe",probeStarted)+QnxFileReader.safe(e.toString()));
+                        sink.text("channels/root-probe.txt","unavailable",snapshotHeader("root-probe",probeStarted)+shellFailure(e));
                     }
                 }
                 for(String[] channel:CHANNELS) {
@@ -138,7 +143,7 @@ public final class VehicleEvidenceArchive {
                         if(!r.success()||r.truncated)state=r.truncated?"truncated_snapshot":
                                 (r.output.trim().isEmpty()?"command_failed_or_unavailable":"partial_snapshot");
                         if(r.exitCode==null){stopped=true;stopReason=channel[0]+"_missing_exit";}
-                    } catch(Exception e){state="unavailable";text=snapshotHeader(channel[0],channelStarted)+QnxFileReader.safe(e.toString());stopped=true;stopReason=channel[0]+"_failed";}
+                    } catch(Exception e){state="unavailable";text=snapshotHeader(channel[0],channelStarted)+shellFailure(e);stopped=true;stopReason=channel[0]+"_failed";}
                     sink.text("channels/"+channel[0]+".txt",state,text);
                 }
                 sink.text("README.txt","collected_snapshot","Natro "+version+" · full selected QNX directories + passive channel evidence\n"

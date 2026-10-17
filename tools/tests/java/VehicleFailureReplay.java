@@ -21,7 +21,7 @@ public final class VehicleFailureReplay {
                     check(!calls.isEmpty()&&calls.get(0).equals("qnx"),"QNX must precede every shell command");
                     check(timeout==15000&&limit<=1024*1024,"bounded snapshot");calls.add(c);
                     if(mode.equals("root")||mode.equals("log")&&c.contains("logcat")) {
-                        AdbShellResult capture=new AdbShellResult();capture.accept("partial-log".getBytes());
+                        AdbShellResult capture=new AdbShellResult();capture.accept(("partial-log"+"x".repeat(4096)+"partial-tail").getBytes());
                         throw capture.failure("ADB timeout at shell",new IOException("deadline"));
                     }
                     return new AdbShellResult.Result("0",mode.equals("missing_exit")&&c.contains("logcat")?null:0,false);
@@ -46,7 +46,7 @@ public final class VehicleFailureReplay {
                     check(text(z,"channels/kernel-channel-log.txt").contains("reason=channel-log"),"skip reason");
                     check(text(z,"channels/channel-log.txt").contains("timeout_ms=15000"),"deadline and stage recorded");
                 }
-                if(mode.equals("log"))check(text(z,"channels/channel-log.txt").contains("partial-log"),"partial output preserved");
+                if(mode.equals("log"))check(text(z,"channels/channel-log.txt").contains("partial-tail"),"partial output beyond 512 chars preserved");
                 if(mode.equals("qnx"))check(text(z,"qnx/failure.txt").contains("stage=qnx"),"QNX failure distinguished");
                 check(z.getEntry("manifest.tsv")!=null&&z.getEntry("README.txt")!=null,"finalized archive");
             }
