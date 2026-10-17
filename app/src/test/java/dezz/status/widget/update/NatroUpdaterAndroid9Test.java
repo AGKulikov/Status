@@ -30,7 +30,7 @@ import static org.junit.Assert.*;
 public class NatroUpdaterAndroid9Test {
     // Robolectric's default ShadowSigningInfo ignores constructor certificates.
     // Call the actual Android implementation for this parser regression.
-    @Implements(value=SigningInfo.class,minSdk=28,callThroughByDefault=true)
+    @Implements(value=SigningInfo.class,minSdk=28)
     public static class FrameworkSigningInfo {}
 
     private static final String SHA="d3fed86ca73c76d1ff10eb3a89a22a731abc50df33ab1782e0986aa164a2daf6";
