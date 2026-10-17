@@ -188,9 +188,9 @@
       "priority": "P1",
       "function": "Владелец крыльев и штатной машинки",
       "status": "OPEN",
-      "known": "FIELD VIDEO IMG_8808/8809: нижние крылья появляются без видимой карты, на выходе карта исчезает раньше подложек. Декоративные подложки и цифры имеют разные фазы; после HU reboot возвращается обычная круглая компоновка. Это усиливает гипотезу navigation layout, но не доказывает отдельный layer/hide. SOURCE Natro mode3/wake до старта Activity совместим с видео; PA_Gauge остаётся цепочкой данных, renderer не установлен.",
+      "known": "FIELD VIDEO IMG_8808/8809: нижние крылья появляются без видимой карты, на выходе карта исчезает раньше подложек. Декоративные подложки и цифры имеют разные фазы; после HU reboot возвращается обычная круглая компоновка. Это усиливает гипотезу navigation layout, но не доказывает отдельный layer/hide. SOURCE Natro mode3/wake до старта Activity совместим с видео; PA_Gauge остаётся цепочкой данных, renderer не установлен. STATIC UDS32ca16b3: найденный direct reader PA_VS_VehicleSpeedDigital — DA2B0x1aaf0; callback bound to SomeIPClient::sendData0x3c498, service0x000d/event0x000a/2bytes. Layout/background control в этой цепочке не найден; другие gauge globals в ограниченном ADRP/GOT search связаны с initializer. Это диагностическая ветвь, не установленный renderer.",
       "missing_evidence": "Принимающий navigation/fullscreen dispatcher и связь его состояния с background/gauge animation; отдельный параметр оформления. Синхронные Android display2 pixels/физический DIM и mode/channel trace. Видео не устанавливает процесс/числовой mode; старые dumps другой минуты не заменяют такую привязку.",
-      "next_step": "Приоритетно проследить вход/выход navigation layout до состояния/анимации подложек и цифр; PA_Gauge readers/writers исследовать как данные, не готовый renderer. Использовать имеющиеся bytes; для определения pixel owner нужен синхронный переход, не повтор всего QNX дерева. Независимое скрытие при сохранении карты/приборов остаётся OPEN.",
+      "next_step": "Проследить принимающую navigation/fullscreen ветвь до выбора оформления; найденный PA_Gauge→DA2B reader считать диагностическим использованием, не точкой скрытия. Атрибуция pixel owner требует синхронного Android display2/физического DIM и mode trace одного перехода. Не повторять всё QNX дерево и не интерпретировать sharecnt2 как идентификатор второго renderer. Независимое скрытие с сохранением карты/приборов OPEN.",
       "sources": [
         "display/report.md",
         "research-2026-09-05/android_platform/systems.json",
@@ -209,7 +209,8 @@
         "research-2026-10-17-white-bar/DUMPS_327_857396_663180_RU.md",
         "research-2026-10-17-white-bar/FIELD_1911_1915_RU.md",
         "research-2026-10-17-white-bar/FIELD_2053_RU.md",
-        "research-2026-10-17-white-bar/WINGS_VIDEO_2116_RU.md"
+        "research-2026-10-17-white-bar/WINGS_VIDEO_2116_RU.md",
+        "research-2026-10-17-white-bar/PA_GAUGE_READER_2134_RU.md"
       ],
       "evidence_updates": [
         {
@@ -374,6 +375,12 @@
           "level": "FIELD_VIDEO_SOURCE_REVIEW_INFERENCE",
           "finding": "Two clips30fps/428+374frames decoded, sampled visually0.5s/transition0.1s: map/background/numerals transition separately; normal layout returns on reported HU reboot. Navigation-layout hypothesis strengthened, independent hide/renderer/compositor ownership unproven; no runtime/APK change.",
           "source": "research-2026-10-17-white-bar/WINGS_VIDEO_2116_RU.md"
+        },
+        {
+          "date": "2026-10-17",
+          "level": "STATIC_AND_REVERIFIED_PRIOR_FIELD",
+          "finding": "UDS PA_VS_VehicleSpeedDigital direct read resolved to DA2B and SomeIPClient::sendData callback. Limited relocation/ADRP scan found initializer plus DA2B; no layout link in traced route. Vehicle280555 mappings reverified: PID1175638 maps16PA_Gauge pages; other consumers not identified. No runtime/APK/physical fix.",
+          "source": "research-2026-10-17-white-bar/PA_GAUGE_READER_2134_RU.md"
         }
       ],
       "coverage_ids": [
@@ -457,6 +464,15 @@
           "known": "UDS1175639 maps PA_Gauge; initializer старого ELF содержит speed/RPM/coolant/fuel структуры. Совпадение назначений с фото не определяет renderer.",
           "missing_evidence": "Синхронные пиксели Android display2/физического DIM; независимый hide и принимающий dispatcher. Содержимое новых полных QNX деревьев и корреляция каналов с физическим DIM.",
           "next_step": "Проследить readers/writers PA_Gauge globals и второго consumer; renderer/hide и синхронные pixels OPEN."
+        },
+        {
+          "date": "2026-10-17",
+          "reason": "PA_Gauge read use resolved to diagnostic DA2B callback after21:34 follow-up; video evidence retained.",
+          "source": "research-2026-10-17-white-bar/PA_GAUGE_READER_2134_RU.md",
+          "known": "FIELD VIDEO IMG_8808/8809: нижние крылья появляются без видимой карты, на выходе карта исчезает раньше подложек. Декоративные подложки и цифры имеют разные фазы; после HU reboot возвращается обычная круглая компоновка. Это усиливает гипотезу navigation layout, но не доказывает отдельный layer/hide. SOURCE Natro mode3/wake до старта Activity совместим с видео; PA_Gauge остаётся цепочкой данных, renderer не установлен.",
+          "next_step": "Приоритетно проследить вход/выход navigation layout до состояния/анимации подложек и цифр; PA_Gauge readers/writers исследовать как данные, не готовый renderer. Использовать имеющиеся bytes; для определения pixel owner нужен синхронный переход, не повтор всего QNX дерева. Независимое скрытие при сохранении карты/приборов остаётся OPEN.",
+          "missing_evidence": "Принимающий navigation/fullscreen dispatcher и связь его состояния с background/gauge animation; отдельный параметр оформления. Синхронные Android display2 pixels/физический DIM и mode/channel trace. Видео не устанавливает процесс/числовой mode; старые dumps другой минуты не заменяют такую привязку.",
+          "status": "OPEN"
         }
       ],
       "last_reviewed": "2026-10-17"
@@ -1965,6 +1981,11 @@
       "date": "2026-10-17",
       "scope": "CLUSTER_WINGS current summary and next step updated from two videos21:16; previous summary retained in history, all IDs/status gates retained.",
       "source": "research-2026-10-17-white-bar/WINGS_VIDEO_2116_RU.md"
+    },
+    {
+      "date": "2026-10-17",
+      "scope": "CLUSTER_WINGS PA_Gauge hypothesis refined after21:34 follow-up; prior history and all statuses retained.",
+      "source": "research-2026-10-17-white-bar/PA_GAUGE_READER_2134_RU.md"
     }
   ]
 }

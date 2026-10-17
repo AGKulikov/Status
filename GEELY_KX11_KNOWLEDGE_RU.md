@@ -1,5 +1,20 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 17.10.2026 — продолжение21:34: PA_Gauge reader доведён до диагностики
+
+STATIC UDS ELF32ca16b3: GOT0xf1fd8→PA_VS_VehicleSpeedDigital0x102c10,
+reader DA2B0x1aaf0 через flock/getValue читает speed; two-byte callback привязан
+к SomeIPClient::sendData0x3c498 (service0x000d/event0x000a). Прямой caller
+excuteAll0x1b9b8 вызывается после availability service0x000d/0x000f instance1.
+Это диагностическая ветвь; mode её аргумента не равен Android NaviMode.
+По ограниченному ADRP/GOT анализу другие gauge globals найдены в initializer,
+новой связи с renderer/alpha/фоном нет. Нельзя объявлять отсутствие renderer
+во всём ELF/системе. Предыдущая PA_Gauge гипотеза уточнена, не удалена.
+FIELD vehicle280555: повторно сверены mapping/metadata, PID1175638,16pages
+PA_Gauge; sharecnt2 не раскрывает другого consumer. Видео другой минуты.
+[Адреса, хеши и ограничения метода](docs/geely-kx11/research-2026-10-17-white-bar/PA_GAUGE_READER_2134_RU.md).
+Runtime/APK не менялись; независимое скрытие крыльев OPEN.
+
 ## 17.10.2026 21:16 МСК — FIELD VIDEO: крылья, цифры и карта меняются поэтапно
 
 IMG_8808: нижние подложки начинают выходить около10.1с;11.1–11.2с уже видны
