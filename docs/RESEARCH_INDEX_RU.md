@@ -13,6 +13,7 @@
 | Исследования прошивки и DIM12–14октября | [Архив разборов](geely-kx11/research-2026-10-12-13-archive/README_RU.md), [драйвер и MCU](geely-kx11/research-2026-10-13-dim/README_RU.md), [QNX init](geely-kx11/research-2026-10-14-dim/README_RU.md) |
 | Предыдущий системный дамп3.2.2 | [Перенесённые выводы и гипотезы](geely-kx11/research-2026-10-16-qnx/DUMP_322_RU.md) |
 | Первый FIELD3.2.3: QNX Connection refused, Android evidence и следующий шаг | [Разбор ZIP8283](geely-kx11/research-2026-10-16-qnx/DUMP_323_8283_RU.md) |
+| Прямой nc-контроль: отказ также вне сборщика; следующий шаг — маршрут | [Фото терминала 17 октября](geely-kx11/research-2026-10-16-qnx/QNX_TERMINAL_20261017_RU.md) |
 | Что изменено в сборщике3.2.3 и что предстоит проверить | [Полный доступный каталог QNX](geely-kx11/research-2026-10-16-qnx/FULL_INVENTORY_RU.md) |
 | Белая полоса, VA и восстановление DIM | Реестр: записи04/07/10/14октября, DIM-WHITE-317; [обзор3.1.7](releases/3.1.7/SOURCE_REVIEW_RU.md). Причину OEM restart и физическую приёмку не считать закрытыми по одному CI |
 | ANCS, батарея и свои иконки web app | Реестр: DIAG-313-WAL, BATTERY-EXACT-317, FIX-311-WEBICON; [архитектура ANCS](ANCS_V2_REFERENCE_ARCHITECTURE.md), [иконки](PHONE_NOTIFICATION_ICONS_RU.md) |
@@ -66,5 +67,6 @@ QNX отказал до handshake; каталог/mappings остаются BLOC
 ## Повторный FIELD3.2.3 DD605
 
 [Повторный отказ после трёх минут и diff подключения](geely-kx11/research-2026-10-16-qnx/DUMP_323_DD605_RU.md).
-Совет подождать2–3минуты проверен и не помог. Следующий шаг — контроль
-прежней команды отдельно от сборщика в том же сеансе; первопричина OPEN.
+Совет подождать2–3минуты проверен и не помог. Назначенный тогда контроль
+прежней команды теперь выполнен: [такой же отказ в терминале](geely-kx11/research-2026-10-16-qnx/QNX_TERMINAL_20261017_RU.md).
+Следующий шаг — текущий маршрут и запись соседа; первопричина OPEN.
