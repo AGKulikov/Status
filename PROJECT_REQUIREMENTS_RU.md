@@ -1,5 +1,21 @@
 # Единый реестр требований Natro
 
+## 17.10.2026 — QNX-COLLECTOR-328 SOURCE/TEST/APK приняты
+
+SOURCE5e4f40cee990cda4f5832f7734e5e14d2140ea57/tree82d94501627f5e54169eac183d0e0801dcfcc3ab
+опубликован и сверён. CI39046959187/job117437547451 SUCCESS:2175Android,
+265tool/108Java cases,0fail/skip. Первая сборка80f291 заменена дополнительной
+проверкой/исправлением512char truncation: typed partial stdout сохраняется
+полностью в пределах capture limit. Это входит в окончательный APK.
+APK3.2.8/code208021361,29764192bytes,SHA7eb5b575c9f7e3ee3967b2eba9e5bb9f285b7183c4758b3724af60ce3075976c.
+Прежний single cert,v2/v3/exactAPI28/zipalign16KiB,1517неизменных payload entries,
++1 version metadata относительно3.2.7,DEX и977exclusions PASS. Navigator patch
+идентичен3.2.7,Helper unchanged. Signing temp удалён. Публикация stable/readback
+выполняется; FIELD установки/докачки и крылья/полоса OPEN. Исторические OPEN
+и local4skips выше/ниже не являются текущим результатом CI. Протокол:
+docs/releases/3.2.8/README_RU.md.
+
+
 ## 17.10.2026 18:45 МСК — QNX-COLLECTOR-328
 
 USER: «Ну так исправляй досборщик». Продолжение QNX-DOWNLOAD-327.

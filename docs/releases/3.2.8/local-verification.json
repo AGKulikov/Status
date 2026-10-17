@@ -1,0 +1,15 @@
+{
+  "focusedTests": 12,
+  "postReviewFullArchiveReplay": "PASS",
+  "toolSuite": {
+    "tests": 260,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 4,
+    "note": "Local JSON dependency missing; complete CI remains required"
+  },
+  "javaCases": 108,
+  "sourceStorageInventoryOwners": 89,
+  "editorSources": 48,
+  "field": "OPEN"
+}

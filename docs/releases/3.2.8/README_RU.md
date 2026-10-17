@@ -1,5 +1,28 @@
 # Natro3.2.8 /208021361 — сборщик QNX
 
+## Проверенный APK
+
+SOURCE5e4f40cee990cda4f5832f7734e5e14d2140ea57,
+tree82d94501627f5e54169eac183d0e0801dcfcc3ab.
+[CI39046959187](https://github.com/AGKulikov/Status/actions/runs/39046959187),
+job117437547451 SUCCESS:2175Android tests/265tool tests/108Java cases,
+0failures/errors/skips. XML/CI artifact CRC,SHA и source/tree проверены.
+
+APK29764192bytes,SHA2567eb5b575c9f7e3ee3967b2eba9e5bb9f285b7183c4758b3724af60ce3075976c.
+Прежний единственный сертификат6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75,
+v2/v3/exactAPI28/zipalign16KiB и +1 install-over metadata поверх3.2.7 PASS.
+1517payload entries CI побайтно сохранены; DEX markers/977exclusions проверены.
+Временные извлечённые signing key/password удалены; приватный резерв сохранён.
+Navigator classes19 равен3.2.7 SHA710af1b6fa476a5e78c3e19809a59a89de70a698135f4b296c45df98962b0f96;
+Navigator/Helper не требуют обновления. Generic pairRequired исходного signing
+report уточнён фактическим сравнением, оригинальный отчёт сохранён отдельно.
+
+[Отчёт](release-report.json),[подпись](signature-verification.txt),
+[манифест](natro-update.json),[локальные проверки](local-verification.json).
+SOURCE/TEST/APK приняты. FIELD установки/докачки/native link/exclusions OPEN.
+Stable-публикация и readback выполняются; результат будет добавлен отдельно.
+
+
 Дефект3.2.7 подтверждён архивом663180: channel-log терял ADB раньше QNX.
 Теперь основной QNX собирается первым, до su probe и всех Android snapshots.
 Снимки каналов идут один раз после QNX, каждый с15s transport deadline и
@@ -17,7 +40,7 @@
 SOURCE готов;12 focused tests PASS: реальные collector/parser/ZIP с моделью
 разрыва на root/log/missing exit, QNX failure, исключения, full20MiB streaming,
 частичный stdout; ADB console deadline wiring/suppressed reason/no retries.
-Полный Android CI, APK подпись/provenance/install-over и FIELD пока OPEN.
+Историческое состояние перед CI: Android CI/APK были OPEN; текущий итог выше. FIELD остаётся OPEN.
 Новые настройки и протокол Navigator/Helper не вводятся. Backup335…360→361
 review; inventory обновлён только после review пяти прежних owners.
 
