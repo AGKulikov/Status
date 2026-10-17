@@ -69,21 +69,24 @@ public class MediaTouchRoutingTest {
     }
     @Test public void overlappingFramesDispatchToVisibleIconAtEveryScaleAndCancelWithoutRetargeting() {
         for (LauncherGlobalElementLayoutStore.ScaleMode mode : LauncherGlobalElementLayoutStore.ScaleMode.values()) {
+          for (int[] extent : new int[][]{{200,80},{100,40},{240,120}}) {
+            int width=extent[0],height=extent[1]; float first=width/2f+10f, second=width, y=height/2f;
             int[] calls={0,0}; FrameLayout root=new FrameLayout(context);
             LauncherGlobalElementLayoutStore.Appearance appearance=new LauncherGlobalElementLayoutStore.Appearance();
             appearance.scaleMode=mode;
-            place(root,frame(button(MediaPanelConfig.PLAY_PAUSE,calls,0),appearance),0,0,200,80);
-            place(root,frame(button(MediaPanelConfig.NEXT,calls,1),appearance),100,0,200,80);
-            size(root,320,160);
-            tap(root,110,40); assertArrayEquals(new int[]{1,0},calls);
-            tap(root,200,40); assertArrayEquals(new int[]{1,1},calls);
-            event(root,MotionEvent.ACTION_DOWN,110,40);
-            event(root,MotionEvent.ACTION_MOVE,200,40);
-            event(root,MotionEvent.ACTION_UP,200,40);
+            place(root,frame(button(MediaPanelConfig.PLAY_PAUSE,calls,0),appearance),0,0,width,height);
+            place(root,frame(button(MediaPanelConfig.NEXT,calls,1),appearance),width/2,0,width,height);
+            size(root,width*2,height*2);
+            tap(root,first,y); assertArrayEquals(new int[]{1,0},calls);
+            tap(root,second,y); assertArrayEquals(new int[]{1,1},calls);
+            event(root,MotionEvent.ACTION_DOWN,first,y);
+            event(root,MotionEvent.ACTION_MOVE,second,y);
+            event(root,MotionEvent.ACTION_UP,second,y);
             assertArrayEquals(new int[]{1,1},calls);
-            event(root,MotionEvent.ACTION_DOWN,200,40);
-            event(root,MotionEvent.ACTION_CANCEL,200,40);
+            event(root,MotionEvent.ACTION_DOWN,second,y);
+            event(root,MotionEvent.ACTION_CANCEL,second,y);
             assertArrayEquals(new int[]{1,1},calls);
+          }
         }
     }
     @Test public void fitLetterboxAndTitleBlankHeightPassThroughRealFrame() {
