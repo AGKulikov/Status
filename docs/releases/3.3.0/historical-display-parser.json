@@ -1,0 +1,13 @@
+{
+  "archive": "Natro-system-8337917180811615570.zip",
+  "sha256": "608f4fbd20e0194034a90f2b6d726d60da282e1bfa97e86519e602f665f821c5",
+  "entry": "graphics/android/before-display.txt",
+  "entrySha256": "96ef0538eb365d721387547dc7d1a6fc256c140072d7b896272492ec8fb3ca03",
+  "builtInIds": [
+    "0",
+    "1",
+    "2",
+    "3"
+  ],
+  "scope": "Historical metadata parser compatibility; not a new screenshot or FIELD attribution"
+}

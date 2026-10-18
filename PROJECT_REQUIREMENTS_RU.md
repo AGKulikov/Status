@@ -1,5 +1,22 @@
 # Единый реестр требований Natro
 
+## 18.10.2026 — 3.3.0 SOURCE / TEST / APK, публикация ожидается
+
+Окончательный SOURCE3a45d7587c099756d0ea3673fe6fe7156ec10180,
+tree83167c81ae0be17ac2fcf274fb13e2c5f32f1238; CI39099592113/job117592998135
+SUCCESS.2184Android/266tool tests, failures/errors/skipped0. Backup90owners
+и settings48editors/253methods/3012labels PASS. Первый run39099283026 заменён
+окончательной ревизией; его APK не выдавался. Повторное обнаружение partial
+ZIP включено в финальный replay. Исторический display833791 даёт built-in0…3;
+это совместимость parser, не новая атрибуция пикселей.
+
+APK29780576bytes, SHA3813fb212362ef054cea9410508c701b427ec174cf2c8720eae7ac6cd7e84aba.
+Stable signer/v2/v3/exactAPI28/zipalign16KiB/identity/release и неизменный CI
+payload PASS;208021363=3.2.9+1. Navigator patch SHA совпал с3.2.9, WeChat
+entries прежние; Helper без изменений. [Протокол](docs/releases/3.3.0/README_RU.md).
+Публичный handoff содержит только подпись, не ключ. Stable/readback ещё OPEN
+до отдельной проверки; FIELD wings owner/hide/сбор/install-over OPEN.
+
 ## 18.10.2026 — CLUSTER_WINGS: адресный сбор в Natro, кандидат3.3.0
 
 До выпуска review обнаружил отсутствие wings ZIP в восстановлении списка при

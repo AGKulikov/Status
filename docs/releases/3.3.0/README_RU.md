@@ -39,3 +39,17 @@ Renderer и независимое скрытие крыльев остаютс�
 
 Проектная ветка: fix/media-touch-329. После полного CI здесь фиксируются точные
 source/tree/run/SHA подписи. Новый полный QNX дамп не нужен.
+
+## Проверка APK
+
+SOURCE: `3a45d7587c099756d0ea3673fe6fe7156ec10180`, tree `83167c81ae0be17ac2fcf274fb13e2c5f32f1238`.
+CI: https://github.com/AGKulikov/Status/actions/runs/39099592113
+Android tests: {'tests': 2184, 'failures': 0, 'errors': 0, 'skipped': 0}.
+APK SHA256: `3813fb212362ef054cea9410508c701b427ec174cf2c8720eae7ac6cd7e84aba`, 29780576 bytes.
+Stable certificate/v2/v3, exact API28, zipalign16KiB, identity/release,
+неизменный CI payload и versionCode+1 проверены.
+Navigator patch совпал с3.2.9; вложенный WeChat payload без изменений.
+[Отчёт](release-report.json), [подпись](signature-verification.txt),
+[исходный signing report](original-signing-report.json).
+Предыдущая запись «кандидат» относится к состоянию до CI и этой проверки.
+Публикация stable фиксируется отдельно после readback всех7assets. FIELD OPEN.

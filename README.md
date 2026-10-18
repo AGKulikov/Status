@@ -1,6 +1,6 @@
 # Natro
 
-**Кандидат [3.3.0 /208021363](docs/releases/3.3.0/README_RU.md):** адресный сбор крыльев внутри Natro, без Mac. Ветка разработки `fix/media-touch-329`. SOURCE/replay готовы; CI/APK/FIELD до проверки OPEN.
+**Проверен APK [3.3.0 /208021363](docs/releases/3.3.0/README_RU.md):** адресный сбор крыльев внутри Natro, без Mac. Ветка разработки `fix/media-touch-329`. 2184 Android и266 tool tests PASS; прежняя подпись/API28/CI payload проверены. Stable-публикация и FIELD пока OPEN.
 
 **Выпущена [3.2.9 / 208021362](https://github.com/AGKulikov/Status/releases/tag/natro-v3.2.9):** области нажатия плеера, удаление начального ⓘ/ℹ и понятный итог докачки. 2183 Android-теста / 265 tool tests / 108 Java cases PASS; APK подписан прежним ключом. Stable/latest и все 7 файлов проверены. FIELD нового сбора подтвердил завершение Android logcat; приёмка media/title открыта. [Подробности](docs/releases/3.2.9/README_RU.md).
 
