@@ -5237,3 +5237,12 @@ Navigator/Helper без изменений. Исходники и накопле
 Два ZIP CRC/40 manifest hashes PASS; builtin0..3 и восемь PNG корректны. Исправление принятия OEM screencap help exit1 подтверждено FIELD. visible: NaviMode3, normal:1, но разные boot IDs. В Android builtin2 (1920×1080) крыльев не видно; display2 имеет6 Client слоёв до/после обоих сборов. Полноэкранные безымянные слои принадлежат plus.monjaro; это не атрибуция пикселей крыльев. Нет синхронного физического фото/конечного QDI1 кадра, renderer/hide OPEN. Эти архивы не содержат am stack list отказа OFF; UNKNOWN и GATE-059/066 остаются OPEN. SOURCE/TEST/APK без изменений.
 
 Подробности: [FIELD_331_WINGS_RU.md](docs/geely-kx11/research-2026-10-18-wings/FIELD_331_WINGS_RU.md).
+
+
+## 18.10.2026 — 3.3.2 SOURCE / TEST / APK, публикация
+
+Прямое подтверждение пользователя17:34МСК разрешает публикацию подготовленных исходников и подписанного APK в канал обновления. Первый CI39137261674 выявил ошибку scope в изменённом тесте; она исправлена без изменения production-кода. Полный CI39137621672 PASS:2189Android и266tool tests, inventory90owners/editor audit48 PASS. Source cbd0a5f97bbb9c2eadbcc3ce06fe02bf3331a088, tree8fefeec06934b5ab3244d9ed287eb694357285b2.
+
+APK3.3.2/208021365 подписан прежним сертификатом; v2/v3/exactAPI28, zipalign16KiB, package/label/non-debug, code+1, 1517неизменённых payload entries проверены. SHA256 a7a81acc3b2ecd91b2e7484985cc4bc6b62a914b0f0e535428a29e1e0efa0aec. Navigator patch побайтно совпадает с3.3.1; WeChat compat payload также совпадает; Helper без изменений. Физический install-over не выполнялся. Публичная публикация выполняется отдельным workflow с проверкой exactsource/CI/signature/payload, скачиванием и побайтным сравнением всех7assets до stable/latest.
+
+CLUSTER-023/024/026 и GATE-059/066: SOURCE/TEST/APK завершены; FIELD10циклов, отсутствие OEM-диалога, первый кадр, stockDIM и сохранение PID/HUD/ANCS/media OPEN. Независимое скрытие крыльев не реализовано; отсутствие аппаратного результата сохранено явно. Полного закрытия требований не заявлять. Подробности: docs/releases/3.3.2/README_RU.md и release-report.json.

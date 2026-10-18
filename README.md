@@ -1,6 +1,6 @@
 # Natro
 
-**Готовится [3.3.2 / 208021365](docs/releases/3.3.2/README_RU.md)**: отдельный запуск приборки без пакетного OEM-преддиалога и подтверждённое освобождение DIM. Ветка `fix/instrument-switch-332`. [Исследование предоставленной прошивки](docs/geely-kx11/research-2026-10-18-wings/OEM_LAUNCH_332_RU.md). FIELD и независимое скрытие крыльев OPEN; текущий опубликованный выпуск ниже.
+**Подписана [3.3.2 / 208021365](docs/releases/3.3.2/README_RU.md), публикация в stable выполняется.** 2189 Android-тестов и266 tool tests PASS; прежний сертификат, API28 и точный CI payload проверены. Изменён запуск и закрытие собственной панели приборки. SOURCE `cbd0a5f97bbb9c2eadbcc3ce06fe02bf3331a088`, ветка `fix/instrument-switch-332`; документы выпуска — `release/natro-3.3.2-verification`. FIELD и независимое скрытие крыльев OPEN.
 
 **Выпущена [3.3.1 / 208021364](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.1), stable/latest.** [Состав и доказательства](docs/releases/3.3.1/README_RU.md). 2185 Android и 266 tool tests PASS, прежний сертификат/API28/exact CI payload подтверждены. Все7файлов релиза скачаны и побайтно сверены. FIELD OEM-диалога и циклов включения/выключения OPEN. Рабочая ветка `fix/media-touch-329`; source `1ec7f42fbb1f877a177e16fb6432f053f3360d1a`.
 
@@ -52,7 +52,7 @@ APK `Natro-3.2.3-signed.apk` передан отдельно. Navigator/Helper �
 Первый [дамп3.2.3](docs/geely-kx11/research-2026-10-16-qnx/DUMP_323_8283_RU.md): Android собран;
 QNX Connection refused до первого запроса. Ожидание после старта не помогло; маршрут проверен. В контроле13:07 получено QCONN, затем системный сбор дошёл до812 путей и выявил stat-parser defect на `/proc`. Повтор старого APK не нужен; дальнейшая проверка после выпуска исправления. [История соединения](docs/geely-kx11/research-2026-10-16-qnx/QNX_TERMINAL_20261017_RU.md).
 
-Актуальное дерево разработки: [`fix/media-touch-329`](https://github.com/AGKulikov/Status/tree/fix/media-touch-329).
+Актуальное дерево разработки: [`fix/instrument-switch-332`](https://github.com/AGKulikov/Status/tree/fix/instrument-switch-332). Документы текущего выпуска: [`release/natro-3.3.2-verification`](https://github.com/AGKulikov/Status/tree/release/natro-3.3.2-verification).
 Ветка `main` содержит историческое состояние и не представляет текущую версию Natro.
 После каждого выпуска публикуются соответствующие исходники, README, описание
 выпуска и обновлённый реестр требований; ссылки на коммит и сборку фиксируются в описании.
