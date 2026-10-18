@@ -1,6 +1,6 @@
 # Natro — карта требований, исследований и открытых вопросов
 
-- [18.10: цепочка от запуска навигации до команды DIM](geely-kx11/research-2026-10-18-wings/NAV_LAUNCH_CHAIN_RU.md). STATIC: opcode14 предшествует Activity, getter читает Android Settings; дополнение20:03 — NaviInteraction обрабатывает callback7/data1 как разрешение, data2 как выход, отдельно от menu/data0. Дополнение20:08: проверены дополнительные consumers; AR renderer не найден, штатное меню переключает1/3, callback возможен от SettingsObserver. Получатель/renderer и независимое скрытие OPEN; QNX writeback не пассивный снимок.
+- [18.10: цепочка от запуска навигации до команды DIM](geely-kx11/research-2026-10-18-wings/NAV_LAUNCH_CHAIN_RU.md). STATIC: opcode14 предшествует Activity, getter читает Android Settings; дополнение20:03 — NaviInteraction обрабатывает callback7/data1 как разрешение, data2 как выход, отдельно от menu/data0. Дополнение20:08: проверены дополнительные consumers; AR renderer не найден, штатное меню переключает1/3, callback возможен от SettingsObserver. Дополнение20:11: проверены version/config/part-number кандидаты; паспорт внешнего DIM не найден. Получатель/renderer и независимое скрытие OPEN; QNX writeback не пассивный снимок.
 
 - [18.10 FIELD3.3.2: same-boot switching и скрытый Sys2038](geely-kx11/research-2026-10-18-wings/FIELD_332_WINGS_RU.md). Первый положительный FIELD переключения; конкретное полноэкранное окно dimmenu отсутствует в visible composition. Renderer/hide OPEN.
 
@@ -135,3 +135,5 @@ QNX отказал до handshake; каталог/mappings остаются BLOC
 - [17.10: полный QNX архив и другие каналы, SOURCE3.2.5](geely-kx11/research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md).
 
 - [18.10: два корректных wings-сбора3.3.1, границы Android кадра и OFF](geely-kx11/research-2026-10-18-wings/FIELD_331_WINGS_RU.md).
+
+- [18.10: публичная схема DIM≠DIS, Continental и ограничения идентификации](geely-kx11/research-2026-10-18-wings/WEB_DIM_IDENTITY_RU.md).

@@ -221,7 +221,8 @@
         "research-2026-10-18-wings/FIELD_331_WINGS_RU.md",
         "research-2026-10-18-wings/OEM_LAUNCH_332_RU.md",
         "research-2026-10-18-wings/FIELD_332_WINGS_RU.md",
-        "research-2026-10-18-wings/NAV_LAUNCH_CHAIN_RU.md"
+        "research-2026-10-18-wings/NAV_LAUNCH_CHAIN_RU.md",
+        "research-2026-10-18-wings/WEB_DIM_IDENTITY_RU.md"
       ],
       "evidence_updates": [
         {
@@ -462,7 +463,14 @@
           "level": "STATIC_SOURCE",
           "source": "research-2026-10-18-wings/NAV_LAUNCH_CHAIN_RU.md",
           "finding": "User requests tracing from navigation launch. Natro sends mode3 then wake before own Activity. Archived SDK sends opcode14/data1 for modes3/4, data2 for1/2; getNaviMode reads Settings.Global, not physical ACK. Callback7/data0 denies fullscreen in DimMenuInteraction. Follow-up after20:03: a second SDK consumer NaviInteraction maps data1 to action35/36 for local mode3/4 (permission), data2 to action33 (exit); do not generalize the menu-only negative branch. updateExtensionInfo fans out local mode callbacks and sends opcode8/data1. DimRepository/MainViewModel/FullMapFragment/MainActivity consumers traced; no independent wing control. ttyHS2→QUP4 was already established14Oct; external peer/renderer remains unproven. QNX writeback is stateful, not a validated passive final-QDI1 capture.",
-          "next_step": "Trace receiving opcode14 dispatcher beyond established ttydim→ttyHS2/QUP4. Follow-up20:08: four DEX in three extra system APKs have no direct target callback references; native/reflection not excluded. Stock menu switches1/3, not a proven AR renderer. Current Natro uses its own launch path, not a verified action35/36 consumer. SettingsObserver(fullMap) can also produce callback7: require HAL-origin trace before calling it physical RX. Do not infer wings control from SDK mode4 or local readback, send unknown modes, or open a competing UART reader. Runtime/APK unchanged; FIELD renderer/hide OPEN."
+          "next_step": "Identification20:11: KX11_HIGH and host QNX ER/ES versions do not identify external DIM. Eleven UDS part-number symbols reside in .bss; actual values/ECU attribution unavailable. Targeted logcat matches only SDK/DimMenu versions. Obtain an existing DIM diagnostic identity record (ECU address/HW/SW/part number) or label, then matching firmware; no duplicate whole-HU dump. Trace receiving opcode14 dispatcher beyond established ttydim→ttyHS2/QUP4. Follow-up20:08: four DEX in three extra system APKs have no direct target callback references; native/reflection not excluded. Stock menu switches1/3, not a proven AR renderer. Current Natro uses its own launch path, not a verified action35/36 consumer. SettingsObserver(fullMap) can also produce callback7: require HAL-origin trace before calling it physical RX. Do not infer wings control from SDK mode4 or local readback, send unknown modes, or open a competing UART reader. Runtime/APK unchanged; FIELD renderer/hide OPEN."
+        },
+        {
+          "date": "2026-10-18",
+          "level": "SOURCE_DOCUMENT_AND_PUBLIC_VENDOR_STATEMENT",
+          "finding": "USER has no DIM passport and requests web research. Geely separates DIM4/223 from DIS4/487; Continental corporate-supplied2021 statement identifies separate Xingyue L display controller with cluster/HUD outputs. Exact user hardware/firmware and opcode14 receiver remain unknown. GLDS shown part numbers belong to selected VGM, not DIM.",
+          "source": "research-2026-10-18-wings/WEB_DIM_IDENTITY_RU.md",
+          "next_step": "Search exact Continental KX11 DIM controller label/firmware, distinguishing DIS. No duplicate full HU dump prerequisite; independent hide remains OPEN."
         }
       ],
       "coverage_ids": [

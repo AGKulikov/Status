@@ -3043,3 +3043,11 @@ USER: продолжать поиск. STATIC: у opcode7 есть второй 
 ## 18.10.2026 после20:08МСК — FULL/AR: граница поддержки
 
 USER: продолжать исследование. STATIC: в четырёх DEX XSFOpenAPIService/EcarxMultidisplayService/AdaptApiTestApp не найдены прямые целевые navigation callback references; native/reflection не исключены. Штатное меню DimMenu переключает1/3; наличие SDK4 не доказывает доступный AR renderer. Текущая Natro запускает панель без прямой регистрации action35/36. Историческое ограничение восстановлено явно: SettingsObserver(fullMap) тоже порождает callback7, поэтому нужен HAL trace для атрибуции физического RX. AR как обход крыльев не подтверждён, runtime/APK/FIELD без изменений. Источники/SHA и пределы: [NAV_LAUNCH_CHAIN_RU.md](docs/geely-kx11/research-2026-10-18-wings/NAV_LAUNCH_CHAIN_RU.md).
+
+## 18.10.2026 после20:11МСК — идентификация внешнего DIM остаётся OPEN
+
+USER: идентифицировать получатель. Проверены config/version-файлы и диагностические part-number symbols в имеющемся полном архиве. KX11_HIGH — конфигурация; ER/ES20.24.10.24031 из QNX не доказаны как версия внешнего DIM. Одиннадцать part-number объектов UDS находятся в .bss, сохранённых идентификаторов не дают. Адресный logcat-поиск дал только Android/DimMenu версии. Производитель/HW/SW внешнего контроллера не установлены; требуется существующий паспорт именно DIM или маркировка, не новый полный HU dump. Никаких запросов/записей автомобилю и APK. SHA/ограничения: [NAV_LAUNCH_CHAIN_RU.md](docs/geely-kx11/research-2026-10-18-wings/NAV_LAUNCH_CHAIN_RU.md).
+
+## 18.10.2026 — внешний DIM: публичная архитектура и поставщик
+
+SOURCE_DOCUMENT: Geely IPC стр12 различает DIM-контроллер и DIS-экран, IHU→DIM→DIS/HUD. PUBLIC_VENDOR_STATEMENT: Continental описывает такой контроллер для Xingyue L2021, не паспорт пользовательского блока. GLDS DIM1013 — диагностическое имя; номера справа на примере относятся к выбранному VGM. OEM8892940491/ECMC1 на фото дисплея нельзя считать идентичностью DIM. [Источники и ограничения](docs/geely-kx11/research-2026-10-18-wings/WEB_DIM_IDENTITY_RU.md). CLUSTER_WINGS OPEN; следующий поиск — точный отдельный Continental DIM и соответствующий образ/handler, не ещё один HU dump.
