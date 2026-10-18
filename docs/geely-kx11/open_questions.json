@@ -1,6 +1,6 @@
 {
   "version": "2.1",
-  "date": "2026-10-17",
+  "date": "2026-10-18",
   "note": "Рабочая очередь приоритетных вопросов, а не исчерпывающий перечень и не расписание автоматических действий. Подробные неизвестные, аппаратные ограничения, необходимые артефакты и следующие шаги остаются в 94 связанных карточках. Сначала используются уже собранные исходники и архивы; новые наблюдения запрашиваются только для конкретного остаточного пробела. Ревизия17.10.2026 переносит результаты сохранённого отчёта3.2.2 и статус SOURCE/CI3.2.3; новые первичные байты не проверялись. Верхняя дата относится к этому обновлению, не к повторной проверке всех вопросов. Дополнение по первичному ZIP8283 (3.2.3): CRC/SHA и Android metadata проверены; QNX FIELD blocked by TCP Connection refused. Это не повторная верификация остальных тем.",
   "coverage": {
     "question_count": 56,
@@ -188,9 +188,9 @@
       "priority": "P1",
       "function": "Владелец крыльев и штатной машинки",
       "status": "OPEN",
-      "known": "FIELD VIDEO IMG_8808/8809: нижние крылья появляются без видимой карты, на выходе карта исчезает раньше подложек. Декоративные подложки и цифры имеют разные фазы; после HU reboot возвращается обычная круглая компоновка. Это усиливает гипотезу navigation layout, но не доказывает отдельный layer/hide. SOURCE Natro mode3/wake до старта Activity совместим с видео; PA_Gauge остаётся цепочкой данных, renderer не установлен. STATIC UDS32ca16b3: найденный direct reader PA_VS_VehicleSpeedDigital — DA2B0x1aaf0; callback bound to SomeIPClient::sendData0x3c498, service0x000d/event0x000a/2bytes. Layout/background control в этой цепочке не найден; другие gauge globals в ограниченном ADRP/GOT search связаны с initializer. Это диагностическая ветвь, не установленный renderer. STATIC coverage correction21:44: PT_DYNAMIC recovers211ELF dynamic tables; 31graphics-import candidates vs16previous, all previous import hits retained. life_cycle_man_demo power/key handlers, libivrenderer Screen buffer path and ssplash image/post/pause do not establish an independent wing control. 2additional raw resources are landscape photographs. This is expanded static coverage, not exhaustive semantic analysis. STATIC18.10: six sc_qnx_vip_proxy registrations and traced consumers cover power/ACK, heartbeat/health, RVC, USB and time; no nav scene control in these paths. VsomeipTestService receive callback0x3378 copies/discards payload; its0x00e0 sender was already known. MAX96755_QC_0 GetCustomAttr0x364c reads node geometry. Four DSP dynamic tables recovered through PT_LOAD virtual-address mapping,146relocations validated. Exact ZIP578306 contains976QNXentries/732ELFpaths/689uniqueSHA; prior extra exception is not an ELF in that ZIP; all31graphics candidate hashes match. Additional indirect graphics consumer screen-c2d resolved: binder0x76a0→callback0x63d0→dlsym c2dDraw0x69c8/0x6bcc. Rectangles/alpha supplied by caller, no scene identity in traced callback; not seen in ten vehicle280555 mappings. Prior31 remains direct-import scope, not complete graphics-code count.",
-      "missing_evidence": "Не установлены принимающий navigation/fullscreen dispatcher, производитель пикселей/анимации и независимая точка оформления. Полный смысловой разбор всех функций не выполнен. Прежние четыре DSP dynamic-table ошибки восстановлены; пятая прежняя exception не принадлежит ELF точного ZIP578306. Синхронные Android display2/физический DIM/mode trace остаются пробелом атрибуции, а не условием продолжения по имеющимся bytes.",
-      "next_step": "Продолжить оставшиеся косвенные graphics bindings и связь принимающего navigation/fullscreen dispatcher с состоянием сцены по уже полученным файлам. RVC notification, тестовый0x00e0 sender, PA_Gauge→DA2B и MAX96755 geometry getter не выдавать за новую независимую команду крыльев без иной цепочки. Новый полный дамп не требуется. Независимый hide с сохранением карты/приборов OPEN.",
+      "known": "73 current Natro archive objects verified (55 uploaded,18 prior analysis/tooling;70unique outer SHA); nested containers and encrypted counterparts explicitly reconciled. All2209resource entries of3KZB bounded,843images decoded (539PNG+304ASTC6x6),46image-reference lists resolved;415overview positions reviewed without confirmed wing match. Caller-driven Screen GLES/C2D/video/AIS/EGL paths traced; HAB wfd_be44/45 stubs distinguished from already-known local OpenWFD handlers. UtilityMgr thread holds shared critical section until unlock event; query is stateful. Late procnto executable LOAD segments match baseline; differences in writable segment. Prior video/nav transport/PA_Gauge findings remain in history and sources; none establishes final renderer or independent hide.",
+      "missing_evidence": "Exact producer/layer or external module for physical wing pixels; validated full Android/HWC and QDI1 image boundaries, synchronized with physical DIM; actual receiving nav dispatcher; independent background-only control. Full KZB geometry/state semantics and native Kanzi implementation remain unresolved; exhaustive interpretation of all QNX functions is not claimed.",
+      "next_step": "Follow research-2026-10-18-wings/NEXT_STEPS_RU.md: collect targeted Android ownership metadata from one known display state, validate pixel coverage, identify exact installed owner SHA/JNI/scene. A framework screenshot without wings does not exclude HWC overlays. If validated QDI1 output is clean while physical DIM has wings, identify external module HW/SW and acquire its renderer firmware. Continue static work on matching supplied binaries immediately; no duplicate whole-QNX request. Use the prepared owner collector only within its documented read scope; driver lock is not an automatic passive query.",
       "sources": [
         "display/report.md",
         "research-2026-09-05/android_platform/systems.json",
@@ -212,7 +212,10 @@
         "research-2026-10-17-white-bar/WINGS_VIDEO_2116_RU.md",
         "research-2026-10-17-white-bar/PA_GAUGE_READER_2134_RU.md",
         "research-2026-10-17-white-bar/QNX_COVERAGE_2144_RU.md",
-        "research-2026-10-17-white-bar/QNX_DISPATCH_AND_DSP_20261018_RU.md"
+        "research-2026-10-17-white-bar/QNX_DISPATCH_AND_DSP_20261018_RU.md",
+        "research-2026-10-18-wings/REPORT_RU.md",
+        "research-2026-10-18-wings/NEXT_STEPS_RU.md",
+        "research-2026-10-18-wings/SOURCES.json"
       ],
       "evidence_updates": [
         {
@@ -395,6 +398,12 @@
           "level": "OFFLINE_STATIC_AND_SOURCE_PROVENANCE",
           "finding": "Six SOME/IP callbacks and selected consumers traced; test receiver and MAX96755 getter reviewed. Four real DSP tables recovered and146relocations checked. ZIP inventory corrected to976/732/689;31candidate hashes retained. No runtime/APK/physical fix. Also traced screen-c2d dynamic bindings and full blit callback to c2dDraw; caller-provided geometry/alpha, no wing owner established.",
           "source": "research-2026-10-17-white-bar/QNX_DISPATCH_AND_DSP_20261018_RU.md"
+        },
+        {
+          "date": "2026-10-18",
+          "level": "STATIC_IMAGE_AND_CONTAINER_VERIFIED",
+          "source": "research-2026-10-18-wings/REPORT_RU.md",
+          "finding": "Current73 archive set and new KZB/raster decoding completed at the stated scope. Graphics transfer/lock paths extended. Independent hide and renderer remain OPEN; production/APK unchanged; collector field run not performed."
         }
       ],
       "coverage_ids": [
@@ -505,6 +514,15 @@
           "missing_evidence": "Не установлены принимающий navigation/fullscreen dispatcher, производитель пикселей/анимации и независимая точка управления оформлением. Полный смысловой разбор существующих ELF ещё не выполнен;5payload имеют явные parser exceptions. Синхронные Android display2/физический DIM/mode trace остаются пробелом физической атрибуции, а не требованием нового сбора до продолжения STATIC.",
           "next_step": "Продолжать по уже полученному QNX: сопоставить новые graphics dependencies с существующими mappings/configuration, проследить dynamic-plugin binding и принимающий navigation/fullscreen обработчик до состояния оформления. Новый полный дамп/синхронный FIELD сейчас не являются условием статического разбора. Синхронные пиксели могут проверять конкретную будущую гипотезу, но не заменяют ещё не выполненный анализ имеющихся bytes. Независимое скрытие с сохранением карты/приборов OPEN; PA_Gauge→DA2B не считать renderer.",
           "status": "OPEN"
+        },
+        {
+          "date": "2026-10-18",
+          "superseded_by": "research-2026-10-18-wings/REPORT_RU.md",
+          "reason": "Full current archive set reviewed; targeted graphics and KZB decoding extended, runtime ownership remains open.",
+          "status": "OPEN",
+          "known": "FIELD VIDEO IMG_8808/8809: нижние крылья появляются без видимой карты, на выходе карта исчезает раньше подложек. Декоративные подложки и цифры имеют разные фазы; после HU reboot возвращается обычная круглая компоновка. Это усиливает гипотезу navigation layout, но не доказывает отдельный layer/hide. SOURCE Natro mode3/wake до старта Activity совместим с видео; PA_Gauge остаётся цепочкой данных, renderer не установлен. STATIC UDS32ca16b3: найденный direct reader PA_VS_VehicleSpeedDigital — DA2B0x1aaf0; callback bound to SomeIPClient::sendData0x3c498, service0x000d/event0x000a/2bytes. Layout/background control в этой цепочке не найден; другие gauge globals в ограниченном ADRP/GOT search связаны с initializer. Это диагностическая ветвь, не установленный renderer. STATIC coverage correction21:44: PT_DYNAMIC recovers211ELF dynamic tables; 31graphics-import candidates vs16previous, all previous import hits retained. life_cycle_man_demo power/key handlers, libivrenderer Screen buffer path and ssplash image/post/pause do not establish an independent wing control. 2additional raw resources are landscape photographs. This is expanded static coverage, not exhaustive semantic analysis. STATIC18.10: six sc_qnx_vip_proxy registrations and traced consumers cover power/ACK, heartbeat/health, RVC, USB and time; no nav scene control in these paths. VsomeipTestService receive callback0x3378 copies/discards payload; its0x00e0 sender was already known. MAX96755_QC_0 GetCustomAttr0x364c reads node geometry. Four DSP dynamic tables recovered through PT_LOAD virtual-address mapping,146relocations validated. Exact ZIP578306 contains976QNXentries/732ELFpaths/689uniqueSHA; prior extra exception is not an ELF in that ZIP; all31graphics candidate hashes match. Additional indirect graphics consumer screen-c2d resolved: binder0x76a0→callback0x63d0→dlsym c2dDraw0x69c8/0x6bcc. Rectangles/alpha supplied by caller, no scene identity in traced callback; not seen in ten vehicle280555 mappings. Prior31 remains direct-import scope, not complete graphics-code count.",
+          "missing_evidence": "Не установлены принимающий navigation/fullscreen dispatcher, производитель пикселей/анимации и независимая точка оформления. Полный смысловой разбор всех функций не выполнен. Прежние четыре DSP dynamic-table ошибки восстановлены; пятая прежняя exception не принадлежит ELF точного ZIP578306. Синхронные Android display2/физический DIM/mode trace остаются пробелом атрибуции, а не условием продолжения по имеющимся bytes.",
+          "next_step": "Продолжить оставшиеся косвенные graphics bindings и связь принимающего navigation/fullscreen dispatcher с состоянием сцены по уже полученным файлам. RVC notification, тестовый0x00e0 sender, PA_Gauge→DA2B и MAX96755 geometry getter не выдавать за новую независимую команду крыльев без иной цепочки. Новый полный дамп не требуется. Независимый hide с сохранением карты/приборов OPEN."
         }
       ],
       "last_reviewed": "2026-10-18"
@@ -2018,6 +2036,11 @@
       "date": "2026-10-17",
       "scope": "CLUSTER_WINGS PA_Gauge hypothesis refined after21:34 follow-up; prior history and all statuses retained.",
       "source": "research-2026-10-17-white-bar/PA_GAUGE_READER_2134_RU.md"
+    },
+    {
+      "date": "2026-10-18",
+      "scope": "CLUSTER_WINGS full current archive set, KZB resource decoding, OpenWFD transport/lock comparison and concrete continuation plan; all prior history and gates preserved.",
+      "source": "research-2026-10-18-wings/REPORT_RU.md"
     }
   ]
 }

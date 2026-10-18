@@ -1,0 +1,68 @@
+{
+  "date": "2026-10-18",
+  "environment": "Offline Linux; Python3.11 for validation. No live ADB, QNX, macOS or vehicle execution.",
+  "base_commit": "86d44a05c30b27d574e50b559881b1a7932bfe13",
+  "results": {
+    "archive_inventory": "PASS at stated73-object scope",
+    "container_limits": "PASS; encrypted wrapper/fixture counterparts explicit, not fresh decryption",
+    "qnx_binary_hashes": {
+      "status": "PASS",
+      "count": 23
+    },
+    "kzb": {
+      "status": "PASS",
+      "resource_records": 2209,
+      "decoded_png": 539,
+      "decoded_astc6x6": 304,
+      "image_reference_lists": 46,
+      "resolved_image_reference_links": 463,
+      "reader_matches_executed_bytes": true
+    },
+    "owner_collector_fixtures": [
+      {
+        "check": "metadata",
+        "status": "PASS",
+        "exit_code": 0,
+        "adb_calls": 14
+      },
+      {
+        "check": "ambiguous",
+        "status": "PASS",
+        "exit_code": 3,
+        "adb_calls": 1
+      },
+      {
+        "check": "bad_png",
+        "status": "PASS",
+        "exit_code": 3,
+        "adb_calls": 15
+      },
+      {
+        "check": "capture_apk",
+        "status": "PASS",
+        "exit_code": 0,
+        "adb_calls": 18
+      },
+      {
+        "check": "timeout_partial_output_retained",
+        "status": "PASS",
+        "exit_code": 3
+      }
+    ],
+    "history_preservation": "PASS: previous ledger/knowledge/index text retained; unaffected questions identical; prior CLUSTER_WINGS fields copied to history."
+  },
+  "tool_sha256": {
+    "tools/geely-kzb-inspect/inspect_kzb.py": "8c5ee00c3a6c604ae5702251a1be6cb373d45b7bebb8de9629488b9f890834f9",
+    "tools/geely-wings-evidence/collect_owner.py": "83585eb0065e65cdc2c684d6695857c6a9da11015c12bc164468dd9df065fe5b",
+    "tools/geely-wings-evidence/check_offline.py": "991ec43acf1b5021d6d4edcf08109d9604e72feec2346fbce86182a9f1e0cae5"
+  },
+  "field": "NOT_PERFORMED",
+  "apk": "NO_NEW_BUILD",
+  "production": "UNCHANGED",
+  "limitations": [
+    "Complete container coverage does not prove complete code semantics.",
+    "Raster review does not prove absence of geometry-based wings.",
+    "Framework capture does not prove final HWC output.",
+    "Public metadata contains no proprietary firmware bytes, raster assets, disassembly or raw vehicle logs."
+  ]
+}

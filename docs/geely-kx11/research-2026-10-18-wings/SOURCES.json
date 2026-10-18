@@ -1,0 +1,1742 @@
+{
+  "date": "2026-10-18",
+  "firmware_scope": "Supplied Natro archive set; no live vehicle connection in this pass",
+  "qnx_source": {
+    "archive": "Natro-vehicle-5783067647247932076.zip",
+    "sha256": "e08f8449c09c15a523aa2c15385055bd0508fb94a1673e683ff5dba070691554",
+    "qnx_files": 976,
+    "elf_paths": 732,
+    "unique_elf_sha256": 689
+  },
+  "address_space": "ELF virtual addresses before runtime ASLR",
+  "binaries": [
+    {
+      "path": "lib64/dll/screen-gles2.so",
+      "bytes": 33442,
+      "sha256": "fb03e8b3d2b611de5a5142e7b85103d25319a10186c297244e4a3e0dd330faeb",
+      "evidence_level": "STATIC",
+      "review": {
+        "callbacks": "0x4af8",
+        "fill": "0x1fd0",
+        "texture_draw_range": [
+          "0x42c0",
+          "0x4a1c"
+        ],
+        "draw_calls": [
+          "0x2100",
+          "0x4664"
+        ],
+        "finding": "Caller-driven quad fill/blit; incoming texture content not attributed."
+      }
+    },
+    {
+      "path": "bin/wfd_be",
+      "bytes": 35112,
+      "sha256": "d7f8a24e94bac64a3c8f262e72921475553c31c4b671eb0f9b6bbf87d94dc6e1",
+      "evidence_level": "STATIC",
+      "review": {
+        "dispatch_table": "0x18008",
+        "selector44": "0x5b44",
+        "selector45": "0x5b4c",
+        "finding": "Both handlers return zero; does not negate local openwfd_server handlers."
+      }
+    },
+    {
+      "path": "lib64/libopenwfd.so",
+      "bytes": 140312,
+      "sha256": "a4fc94f6b44a42e0fc53db93ea570f1704de2234f18303517ac633a5d9603556",
+      "evidence_level": "STATIC",
+      "review": {
+        "init": "0x92a4",
+        "open_local_device": "0x94a0",
+        "send_recv": "0x94c8",
+        "composition_user": "0xf290",
+        "lock_user": "0xf510",
+        "finding": "This client uses local /dev/openwfd_server."
+      }
+    },
+    {
+      "path": "bin/openwfd_server",
+      "bytes": 1969280,
+      "sha256": "50f52f0714d828ead04227686ea916d488c79562f313c87146ff991e1f3e086c",
+      "evidence_level": "STATIC",
+      "review": {
+        "dispatch_table": "0x1efd90",
+        "write_handler": "0x135a44",
+        "selector44_host": "0xa8b98",
+        "composition_impl": "0x4eedc",
+        "selector45_host": "0xa8d80",
+        "lock_impl": "0x4feb8",
+        "lock_thread": "0xa0f54",
+        "critical_enter": "0xa1198",
+        "wait_unlock": "0xa1338",
+        "critical_leave": "0xa13e0",
+        "finding": "Local composition was already known; newly traced thread holds shared critical section until unlock event."
+      }
+    },
+    {
+      "path": "lib64/dll/screen-debug.so",
+      "bytes": 86675,
+      "sha256": "b023f4f26ede7992bb9dc4920ae2afad4fbec47e31fc61e90cff398fd1b71902",
+      "evidence_level": "STATIC",
+      "review": {
+        "parser": "0xb768",
+        "open": "0xc388",
+        "buffer_open": "0xc4e4",
+        "create_source": "0xc6e4",
+        "read_pixels": "0xcfd8",
+        "finding": "Readable Screen buffer path, not proof of complete physical DIM capture."
+      }
+    },
+    {
+      "path": "usr/bin/screenshot",
+      "bytes": 19024,
+      "sha256": "8dc5cc5a1dc9cd28682bc32e880894b3fba664db439c401086187a5a4d967561",
+      "evidence_level": "STATIC",
+      "review": {
+        "screen_read_display": "0x15b8"
+      }
+    },
+    {
+      "path": "lib64/libVideoProcessing.so",
+      "bytes": 189037,
+      "sha256": "b110412b283ee51e84592db3c7ab39a32993fc1a63059fe69e8c676ca5c06950",
+      "evidence_level": "STATIC",
+      "review": {
+        "converter": "0x106b4",
+        "draw": "0x10888",
+        "finding": "Supplied input/output surface conversion."
+      }
+    },
+    {
+      "path": "lib64/libais.so",
+      "bytes": 398121,
+      "sha256": "a37cdbf9f5a037f6ca4f46c12f297be197480158391cb5c13cb1d260066d5b87",
+      "evidence_level": "STATIC",
+      "review": {
+        "combine_buffers": "0x23840",
+        "draw": "0x23aa4",
+        "finding": "Timestamp-checked provided-buffer combination."
+      }
+    },
+    {
+      "path": "lib64/libeglSubDriverQnx.so",
+      "bytes": 142769,
+      "sha256": "a14761bad72e0544c48e8e64c3643a7824c9e0a3f7ede2f1acb101144b2bb311",
+      "evidence_level": "STATIC",
+      "review": {
+        "swap": "0xdbd8",
+        "queue": "0xdc68",
+        "thread": "0xbafc",
+        "post": [
+          "0xbc48",
+          "0xbc64"
+        ],
+        "finding": "Ready GPU buffer queue/post, upstream pixel producer unresolved."
+      }
+    },
+    {
+      "path": "bin/bridgechip_server",
+      "bytes": 76296,
+      "sha256": "77d6234690bfd3265300a4e807b43258fb6b69ab086094d0309d7603721e8923",
+      "evidence_level": "STATIC",
+      "review": {
+        "devctl": "0x3cf8",
+        "loader": "0x67c8",
+        "dal_device": "0x02000171",
+        "finding": "Plugin loader traced; no active binding found in checked configs/process list."
+      }
+    },
+    {
+      "path": "usr/bin/gles2-gears_screen",
+      "bytes": 66020,
+      "sha256": "caac9b8afef404d08e22f0060f49158b0d5ff1454ab9ca098eab123122a87a54",
+      "evidence_level": "STATIC",
+      "review": {
+        "mesh_builder": "0x6114",
+        "mesh_builder_calls": [
+          "0x72fc",
+          "0x7318",
+          "0x733c"
+        ],
+        "draw": [
+          "0x7784",
+          "0x7888",
+          "0x7994"
+        ],
+        "finding": "Three parameterized gear meshes with trig/matrix construction, 20/10/10 segments."
+      }
+    },
+    {
+      "path": "usr/sbin/events",
+      "bytes": 19056,
+      "sha256": "c5b5f6634c4561bab76269351c853b45be20188432458ec293997e0263446ae9",
+      "evidence_level": "STATIC",
+      "review": {
+        "fill": "0x19dc",
+        "post": "0x1a08",
+        "finding": "Single fixed-byte background post before event loop."
+      }
+    },
+    {
+      "path": "usr/bin/swdl_display",
+      "bytes": 35184,
+      "sha256": "eab0897a8ee9c5c5b7d89029c5d08a4357f5c4e12b5cc54e03f8f29c065a7655",
+      "evidence_level": "STATIC",
+      "review": {
+        "render_string": "0x27b0",
+        "render_image": "0x2d28",
+        "render_text": "0x3498"
+      }
+    },
+    {
+      "path": "bin/camcorder",
+      "bytes": 457829,
+      "sha256": "96761f1d874ac5e777a2882dbc3e5757173cacdd89479f9c1b96fac85d11a99d",
+      "evidence_level": "STATIC",
+      "review": {
+        "get_frame": "0x41e8c",
+        "post": "0x41fa4"
+      }
+    },
+    {
+      "path": "bin/camera/qcarcam_test/qcarcam_test",
+      "bytes": 76728,
+      "sha256": "59291173800fec39584c81cfe1ccb2450663969a87b8a5e11ae7014954639cec",
+      "evidence_level": "STATIC",
+      "review": {
+        "post": [
+          "0xb93c",
+          "0xb994"
+        ]
+      }
+    },
+    {
+      "path": "bin/qcarcam_rvc",
+      "bytes": 45827,
+      "sha256": "867365e4df5ec1a3068214211c57cd70ea6f1d9c91a373837c3946aa29c0e7bc",
+      "evidence_level": "STATIC",
+      "review": {
+        "post": [
+          "0x6cb0",
+          "0x6d08"
+        ]
+      }
+    },
+    {
+      "path": "bin/vidc_dec_test",
+      "bytes": 2551097,
+      "sha256": "a0d63078011d34e7b6e5619e063331ee59de9c4938efc9e3207061a2d997ce8a",
+      "evidence_level": "STATIC",
+      "review": {
+        "post": "0x56a8"
+      }
+    },
+    {
+      "path": "usr/bin/calib-touch",
+      "bytes": 62280,
+      "sha256": "954d1d9f4496c8aa91e6ad8153763955211f6e6c96d3df4541fdb1323c51c9f7",
+      "evidence_level": "STATIC",
+      "review": {
+        "fill": "0x4658",
+        "blit": "0x4754",
+        "post": "0x5058"
+      }
+    },
+    {
+      "path": "bin/sw-vsync",
+      "bytes": 35602,
+      "sha256": "a66a53ccf22c0d6b9858b58735f992bc0efeb42b331d2c9bf72c98ed9bc3a661",
+      "evidence_level": "STATIC",
+      "review": {
+        "blit": [
+          "0x2cac",
+          "0x2cdc"
+        ],
+        "post": "0x2cf8"
+      }
+    },
+    {
+      "path": "bin/openwfd_telltale",
+      "bytes": 18416,
+      "sha256": "639d4c28a9e17bbfd0da19601b9aefff94f46fdd46d0a6c538ca542700538e69",
+      "evidence_level": "STATIC",
+      "review": {
+        "asset_refs": [
+          "0x1a48",
+          "0x1a7c"
+        ],
+        "asset_read": "0x27c0"
+      }
+    },
+    {
+      "path": "bin/openwfd_splash",
+      "bytes": 18376,
+      "sha256": "90817f8c88051c92708f4b38f5f48b5f90988af2f0623f23229e5c13d0a419b5",
+      "evidence_level": "STATIC",
+      "review": {
+        "asset_refs": [
+          "0x1cd8",
+          "0x1d0c"
+        ]
+      }
+    },
+    {
+      "path": "bin/openwfd_test",
+      "bytes": 14272,
+      "sha256": "9c444374d33d23408e91a1497825373a40f8a663583a1963b34ae77d2b75928d",
+      "evidence_level": "STATIC",
+      "review": {
+        "asset_read": [
+          "0x195c",
+          "0x1a48"
+        ]
+      }
+    },
+    {
+      "path": "lib64/dll/vdev-virtio-input.so",
+      "bytes": 159656,
+      "sha256": "50458d16d408176accf0b40217e3ee33cd09f098aab5e77c20877cfcef0a2f3c",
+      "evidence_level": "STATIC",
+      "review": {
+        "event_via_screen": "0x3360",
+        "set_display": "0x4440",
+        "finding": "Input-event path, not Screen frame producer in this review."
+      }
+    }
+  ],
+  "additional_elf_not_in_qnx689": [
+    {
+      "sha256": "3838e73f690c7c0c216f1a5f3e8a5757a0096d8bd954140d88fdad9ffc112796",
+      "bytes": 310356,
+      "representative_source": {
+        "archive": "Natro-system-0882d46f-9aa2-4202-9bac-13d25fdc4688.zip",
+        "member": "files/vendor/lib/modules/dim_dtc.ko"
+      },
+      "source_occurrences": 20
+    },
+    {
+      "sha256": "de1e04f43087bcb1eeeb55adf9421999bfee789881d0ba3996548e575a815759",
+      "bytes": 69976,
+      "representative_source": {
+        "archive": "Natro-system-0882d46f-9aa2-4202-9bac-13d25fdc4688.zip",
+        "member": "files/system/bin/uart-tool"
+      },
+      "source_occurrences": 20
+    },
+    {
+      "sha256": "2b2325798a7e29bf39dc7ed35266d0cdb2967c3f0b281ca5cf5e7bd7602a5c46",
+      "bytes": 134608,
+      "representative_source": {
+        "archive": "Natro-system-0882d46f-9aa2-4202-9bac-13d25fdc4688.zip",
+        "member": "files/vendor/lib64/libuart.so"
+      },
+      "source_occurrences": 20
+    },
+    {
+      "sha256": "b97a9e721ee17a7885ff3be6b5edbe52541d0e350deb803c24722f6f0990a1db",
+      "bytes": 69264,
+      "representative_source": {
+        "archive": "Natro-system-0882d46f-9aa2-4202-9bac-13d25fdc4688.zip",
+        "member": "files/vendor/bin/hw/vendor.ecarx.xma.dimprotocol@1.0-service"
+      },
+      "source_occurrences": 20
+    },
+    {
+      "sha256": "a36488871cd82f03b81e6811fd895060fc5cd7ed499f0fb4850ff0c38c1cd369",
+      "bytes": 831488,
+      "representative_source": {
+        "archive": "Natro-vehicle-280555787612266509.zip",
+        "member": "qnx/tree/proc/boot/procnto-smp-instr"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "9ac97e50be0a380a56771d70d562ecdcfa7ffcd4126d0d54e9f78213b149ed52",
+      "bytes": 831488,
+      "representative_source": {
+        "archive": "Natro-vehicle-3728779933394344044.zip",
+        "member": "qnx/tree/proc/boot/procnto-smp-instr"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "b365bfd4b99d0406cb6b0e30ca008d3f8545c73d673287942028ddc301ffcf81",
+      "bytes": 34232,
+      "representative_source": {
+        "archive": "Natro-update-analysis-2026-10-12.zip",
+        "member": "tools/zip_password_check"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "4b81696f669d0e8b08d493ad03ad4735b7e8be3c03bd0141adf02d1697204963",
+      "bytes": 253328,
+      "representative_source": {
+        "archive": "Natro-update-analysis-2026-10-12.zip",
+        "member": "tools/bkcrack-fast"
+      },
+      "source_occurrences": 2
+    },
+    {
+      "sha256": "151e80d7fa9f5bc49702895a1a9ef75ff01f6aaebf98e481fb92d72b14cde93b",
+      "bytes": 1839624,
+      "representative_source": {
+        "archive": "Natro-update-analysis-2026-10-12.zip",
+        "member": "recovered/resources/GMCSoft/resources/assets/l5608e5c5_x64.so"
+      },
+      "source_occurrences": 2
+    },
+    {
+      "sha256": "97ad20dc9d92cfa3cd641bcc8a859793ac7607f581c85b98f01e0bdfb8fa2ea3",
+      "bytes": 28632,
+      "representative_source": {
+        "archive": "Natro-update-analysis-2026-10-12.zip",
+        "member": "tools/zip_fragment_check"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "95fd6129757ceae73472b014c0c7e23a27a193adc4c355693706998aa4757be8",
+      "bytes": 168176,
+      "representative_source": {
+        "archive": "update-decrypted.zip",
+        "member": "system/app/GMCSoft/GMCSoft.apk!lib/arm64-v8a/libjnidispatch.so"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "29ddc0282af7e44c790f2a7dfbcf7ed9e557361dc1acf609142c89b792d714e1",
+      "bytes": 8862928,
+      "representative_source": {
+        "archive": "update-decrypted.zip",
+        "member": "system/app/GMCSoft/GMCSoft.apk!lib/arm64-v8a/libvosk.so"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "e262e528436960b51259a62d2a44deb914d00804b25a0a295c089b739ffe8445",
+      "bytes": 122296,
+      "representative_source": {
+        "archive": "update-decrypted.zip",
+        "member": "system/app/GMCSoft/GMCSoft.apk!lib/armeabi-v7a/libjnidispatch.so"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "36cb51f57225c3bbe39a516af9886e6b9c4b78d7d47c3109d98f839c0a2ef1d1",
+      "bytes": 8279808,
+      "representative_source": {
+        "archive": "update-decrypted.zip",
+        "member": "system/app/GMCSoft/GMCSoft.apk!lib/armeabi-v7a/libvosk.so"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "05968c54b7bdc25c3e9a272389d70295692cee749a993633025397f9d01b2c56",
+      "bytes": 122784,
+      "representative_source": {
+        "archive": "update-decrypted.zip",
+        "member": "system/app/GMCSoft/GMCSoft.apk!lib/armeabi/libjnidispatch.so"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "1ff39ffce0dfc1ccc2f10a08777ece9096ae73276853a46ef307d48a78173de5",
+      "bytes": 120184,
+      "representative_source": {
+        "archive": "update-decrypted.zip",
+        "member": "system/app/GMCSoft/GMCSoft.apk!lib/x86/libjnidispatch.so"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "10fb9d923828c354d8445c6dc03ecab6580e52336fc5b698860138f2d9a036db",
+      "bytes": 9670916,
+      "representative_source": {
+        "archive": "update-decrypted.zip",
+        "member": "system/app/GMCSoft/GMCSoft.apk!lib/x86/libvosk.so"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "081d3f045743b818d4d3f1868b8655f34760828ead6e2b712659d5bceadafe04",
+      "bytes": 118584,
+      "representative_source": {
+        "archive": "update-decrypted.zip",
+        "member": "system/app/GMCSoft/GMCSoft.apk!lib/x86_64/libjnidispatch.so"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "f08e4510b391f60c57ed5f3c38657df73854b34ab78dd30009e1554edf1a1cec",
+      "bytes": 9678912,
+      "representative_source": {
+        "archive": "update-decrypted.zip",
+        "member": "system/app/GMCSoft/GMCSoft.apk!lib/x86_64/libvosk.so"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "c56817c2f5fde27f224534fcf1e15f963e7be6c451df163768d8c8d19a94a8fb",
+      "bytes": 2977344,
+      "representative_source": {
+        "archive": "update-decrypted.zip",
+        "member": "system/app/GMCSoft/GMCSoft.apk!assets/l5608e5c5_a64.so"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "02c1c19e954dfbfc3100ce9a3adf6c6ea77231af5d89d6ea32247b772cdb17c6",
+      "bytes": 2306016,
+      "representative_source": {
+        "archive": "update-decrypted.zip",
+        "member": "system/app/GMCSoft/GMCSoft.apk!assets/l5608e5c5_a32.so"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "a80165c38e1a524fd968bbc462477cbbb6f9ead05e338139a3f5ca947c9ab8bb",
+      "bytes": 1835964,
+      "representative_source": {
+        "archive": "update-decrypted.zip",
+        "member": "system/app/GMCSoft/GMCSoft.apk!assets/l5608e5c5_x86.so"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "7871729cef6d9e4eda5e4220c9b7354dbc0a4f28fbdb4f99a37483d85a940c72",
+      "bytes": 178360,
+      "representative_source": {
+        "archive": "update-decrypted.zip",
+        "member": "system/app/XCSettings2/XCSettings2.apk!lib/arm64-v8a/libBugly.so"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "a079ac5510be9da2f4f0084335c552c3a4369975e1f2a9d439a23bf716518324",
+      "bytes": 2968064,
+      "representative_source": {
+        "archive": "update-decrypted.zip",
+        "member": "vendor/preinstall2/GPSProvider.apk!assets/l2ded8cef_a64.so"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "aff8c00b2b31d59133f3f01530461401bde4f5763b6bb189d339a2642d649b23",
+      "bytes": 2325088,
+      "representative_source": {
+        "archive": "update-decrypted.zip",
+        "member": "vendor/preinstall2/GPSProvider.apk!assets/l2ded8cef_a32.so"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "ef183e26025d4fe5e74f52e5659b8d8c9e9185c2269dfedab6540f25589c9799",
+      "bytes": 1832840,
+      "representative_source": {
+        "archive": "update-decrypted.zip",
+        "member": "vendor/preinstall2/GPSProvider.apk!assets/l2ded8cef_x64.so"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "9c4c8ffb50bcb17001653b92fd7ec7d6b368597045ccf55f3b3fdc889b0ffae3",
+      "bytes": 1821180,
+      "representative_source": {
+        "archive": "update-decrypted.zip",
+        "member": "vendor/preinstall2/GPSProvider.apk!assets/l2ded8cef_x86.so"
+      },
+      "source_occurrences": 1
+    },
+    {
+      "sha256": "4353ce2dbb9c5f5922af10ae1244c55d91261c4bed6562a8f91996514a1c7db6",
+      "bytes": 5236,
+      "representative_source": {
+        "archive": "Natro-updater-APK-analysis-2026-10-12.zip",
+        "member": "apks/RKUpdateService/lib/armeabi-v7a/librockchip_update_jni.so"
+      },
+      "source_occurrences": 1
+    }
+  ],
+  "wfd_be_dispatch": {
+    "0": "0x45f0",
+    "1": "0x462c",
+    "2": "0x4668",
+    "3": "0x46a0",
+    "4": "0x46c0",
+    "5": "0x477c",
+    "6": "0x47ac",
+    "7": "0x47cc",
+    "8": "0x47f0",
+    "9": "0x48c4",
+    "10": "0x494c",
+    "11": "0x49c4",
+    "12": "0x4a00",
+    "13": "0x4a34",
+    "14": "0x4a68",
+    "15": "0x4a88",
+    "16": "0x4ab8",
+    "17": "0x4ae8",
+    "18": "0x4b18",
+    "19": "0x4b40",
+    "20": "0x4b68",
+    "21": "0x4b8c",
+    "22": "0x4bb0",
+    "23": "0x4bd8",
+    "24": "0x4c00",
+    "25": "0x4c30",
+    "26": "0x4d2c",
+    "27": "0x4d6c",
+    "28": "0x4e1c",
+    "29": "0x4f3c",
+    "30": "0x4f6c",
+    "31": "0x4f9c",
+    "32": "0x4fc4",
+    "33": "0x4fec",
+    "34": "0x5010",
+    "35": "0x5034",
+    "36": "0x505c",
+    "37": "0x4ea4",
+    "38": "0x5084",
+    "39": "0x50b4",
+    "40": "0x53b8",
+    "41": "0x5700",
+    "42": "0x597c",
+    "43": "0x5aa0",
+    "44": "0x5b44",
+    "45": "0x5b4c",
+    "46": "0x5b54"
+  },
+  "local_openwfd_dispatch": [
+    {
+      "index": 0,
+      "target": "0xa7e8c",
+      "symbol": "wfdEnumerateDevices_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 1,
+      "target": "0xa7ec8",
+      "symbol": "wfdCreateDevice_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 2,
+      "target": "0xa7ef8",
+      "symbol": "wfdDestroyDevice_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 3,
+      "target": "0xa7f24",
+      "symbol": "wfdDeviceCommit_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 4,
+      "target": "0xa7f44",
+      "symbol": "wfdDeviceCommitExt_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 5,
+      "target": "0xa7f4c",
+      "symbol": "wfdGetDeviceAttribi_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 6,
+      "target": "0xa7f7c",
+      "symbol": "wfdSetDeviceAttribi_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 7,
+      "target": "0xa7f9c",
+      "symbol": "wfdGetDeviceAttribiv_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 8,
+      "target": "0xa7fc0",
+      "symbol": "wfdEnumeratePorts_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 9,
+      "target": "0xa8000",
+      "symbol": "wfdCreatePort_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 10,
+      "target": "0xa8034",
+      "symbol": "wfdDestroyPort_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 11,
+      "target": "0xa8054",
+      "symbol": "wfdGetPortModes_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 12,
+      "target": "0xa8090",
+      "symbol": "wfdGetPortModeAttribi_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 13,
+      "target": "0xa80c4",
+      "symbol": "wfdGetPortModeAttribf_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 14,
+      "target": "0xa80f8",
+      "symbol": "wfdSetPortMode_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 15,
+      "target": "0xa8118",
+      "symbol": "wfdGetCurrentPortMode_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 16,
+      "target": "0xa8148",
+      "symbol": "wfdGetPortAttribi_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 17,
+      "target": "0xa8178",
+      "symbol": "wfdGetPortAttribf_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 18,
+      "target": "0xa81a8",
+      "symbol": "wfdGetPortAttribiv_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 19,
+      "target": "0xa81d0",
+      "symbol": "wfdGetPortAttribfv_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 20,
+      "target": "0xa81f8",
+      "symbol": "wfdSetPortAttribi_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 21,
+      "target": "0xa821c",
+      "symbol": "wfdSetPortAttribf_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 22,
+      "target": "0xa8240",
+      "symbol": "wfdSetPortAttribiv_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 23,
+      "target": "0xa8268",
+      "symbol": "wfdSetPortAttribfv_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 24,
+      "target": "0xa8290",
+      "symbol": "wfdWaitForVSync_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 25,
+      "target": "0xa82c0",
+      "symbol": "wfdBindPipelineToPort_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 26,
+      "target": "0xa82e0",
+      "symbol": "wfdEnumeratePipelines_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 27,
+      "target": "0xa8320",
+      "symbol": "wfdCreatePipeline_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 28,
+      "target": "0xa8354",
+      "symbol": "wfdDestroyPipeline_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 29,
+      "target": "0xa83a0",
+      "symbol": "wfdGetPipelineAttribi_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 30,
+      "target": "0xa83d0",
+      "symbol": "wfdGetPipelineAttribf_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 31,
+      "target": "0xa8400",
+      "symbol": "wfdGetPipelineAttribiv_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 32,
+      "target": "0xa8428",
+      "symbol": "wfdGetPipelineAttribfv_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 33,
+      "target": "0xa8450",
+      "symbol": "wfdSetPipelineAttribi_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 34,
+      "target": "0xa8474",
+      "symbol": "wfdSetPipelineAttribf_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 35,
+      "target": "0xa8498",
+      "symbol": "wfdSetPipelineAttribiv_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 36,
+      "target": "0xa84c0",
+      "symbol": "wfdSetPipelineAttribfv_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 37,
+      "target": "0xa8374",
+      "symbol": "wfdBindSourceToPipeline_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 38,
+      "target": "0xa84e8",
+      "symbol": "wfdGetPipelineLayerOrder_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 39,
+      "target": "0xa8518",
+      "symbol": "wfdCreateWFDEGLImages_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 40,
+      "target": "0xa873c",
+      "symbol": "wfdCreateWFDEGLImagesPreAlloc_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 41,
+      "target": "0xa89ac",
+      "symbol": "wfdDestroyWFDEGLImages_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 42,
+      "target": "0xa8b40",
+      "symbol": "wfdCreateSourceFromImage_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 43,
+      "target": "0xa8b78",
+      "symbol": "wfdDestroySource_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 44,
+      "target": "0xa8b98",
+      "symbol": "wfdGetDisplayCompositionInfo_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 45,
+      "target": "0xa8d80",
+      "symbol": "wfdSetLockState_Host",
+      "reloc_type": 257
+    },
+    {
+      "index": 46,
+      "target": "0xa8ea0",
+      "symbol": "wfdGetError_Host",
+      "reloc_type": 257
+    }
+  ],
+  "kanzi": [
+    {
+      "file": "kx11_car.kzb",
+      "sha256": "279942211fe89e375d2aebe16427acc6f3ba05536f6f831df7d93ebdf840bc3a",
+      "bytes": 33602324,
+      "entries": 1322,
+      "table_offset": 71385,
+      "table_end": 103117,
+      "alignment_bytes": 759,
+      "all_bytes_accounted": true,
+      "string_pool_counts": {
+        "/$strings": 1247,
+        "/$metaclass_dictionary": 29,
+        "/$plugins": 0
+      },
+      "image_encodings": {
+        "PNG": 464,
+        "ASTC6x6_observed": 13,
+        "reference_list": 44
+      },
+      "decoded_images": 477,
+      "mipmap_images": 453,
+      "image_reference_links": 443,
+      "scope": "Framing, string pools, raster decoding and internal image-list resolution; not complete scene semantics."
+    },
+    {
+      "file": "kx11_carsetting.kzb",
+      "sha256": "29abb92ad80797eb54896c31ed98139175e3d48fcfecb54f2e686d4deb17430d",
+      "bytes": 5212344,
+      "entries": 554,
+      "table_offset": 27537,
+      "table_end": 40837,
+      "alignment_bytes": 170,
+      "all_bytes_accounted": true,
+      "string_pool_counts": {
+        "/$strings": 744,
+        "/$metaclass_dictionary": 31,
+        "/$plugins": 1
+      },
+      "image_encodings": {
+        "PNG": 68,
+        "ASTC6x6_observed": 149,
+        "reference_list": 1
+      },
+      "decoded_images": 217,
+      "mipmap_images": 10,
+      "image_reference_links": 10,
+      "scope": "Framing, string pools, raster decoding and internal image-list resolution; not complete scene semantics."
+    },
+    {
+      "file": "public.kzb",
+      "sha256": "919cdf03b217d471acf271f480baa032294ef1449bf8328d1f14d146b9759b79",
+      "bytes": 27648240,
+      "entries": 333,
+      "table_offset": 16012,
+      "table_end": 24008,
+      "alignment_bytes": 39,
+      "all_bytes_accounted": true,
+      "string_pool_counts": {
+        "/$strings": 296,
+        "/$metaclass_dictionary": 14,
+        "/$plugins": 0
+      },
+      "image_encodings": {
+        "ASTC6x6_observed": 142,
+        "PNG": 7,
+        "reference_list": 1
+      },
+      "decoded_images": 149,
+      "mipmap_images": 10,
+      "image_reference_links": 10,
+      "scope": "Framing, string pools, raster decoding and internal image-list resolution; not complete scene semantics."
+    }
+  ],
+  "kanzi_decode": {
+    "tool": "tools/geely-kzb-inspect/inspect_kzb.py",
+    "texture2ddecoder_version": "1.0.6",
+    "decoded_images": 843,
+    "visual_overview_positions": 415,
+    "mip_family_representatives": 45,
+    "non_mip_images": 370,
+    "limitations": "All mip levels decoded; visual overview uses one representative per family, not a full-size visual claim for all levels. No confirmed wing match or runtime owner."
+  },
+  "nested_container_checks": {
+    "checks": [
+      {
+        "archive": "Natro-vehicle-280555787612266509.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03091_1970-01-01_00-00-03.zip",
+        "sha256": "97b7d1d2b8a5e4656361fa4791a703d5a8c370c29230a6d8a7da002a6a7f9ebc",
+        "status": "complete",
+        "expected": 5,
+        "recorded": 5,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-280555787612266509.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03091_1970-01-01_00-00-03.zip!FORENSICS_CPU_And_RAM_Usage.tar.gz",
+        "sha256": "785035058ccf3f890665118320ab9789426d1cf8d587e2a903f0f57a7fdebfc1",
+        "decompressed_bytes": 10240,
+        "decompressed_sha256": "84ff92691f909a05b224e1c56abb4864f01b4f8e3c854e4bb4c7baf1d3f6d652",
+        "status": "gzip_ok",
+        "content": "10240 zero bytes: empty tar archive",
+        "tar_members": []
+      },
+      {
+        "archive": "Natro-vehicle-280555787612266509.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03092_1970-01-01_00-00-04.zip",
+        "sha256": "79b06e05be218b8074df5bf4ff09db048b5e028d43de1ede188c976f19dc85ed",
+        "status": "complete",
+        "expected": 5,
+        "recorded": 5,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03058_1970-01-01_00-00-04.zip",
+        "sha256": "044b2b4a1dbee023c4d1d96846ed4dcbfd9f65702a52f2e0ecd874ae6c8859d4",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03058_1970-01-01_00-00-04.zip!FORENSICS_CPU_And_RAM_Usage.tar.gz",
+        "sha256": "e28ffffe19a244a98cdd52ef4805759ad65a42c9f838e7162d0fb49b099119f0",
+        "decompressed_bytes": 10240,
+        "decompressed_sha256": "84ff92691f909a05b224e1c56abb4864f01b4f8e3c854e4bb4c7baf1d3f6d652",
+        "status": "gzip_ok",
+        "content": "10240 zero bytes: empty tar archive",
+        "tar_members": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03070_1970-01-01_00-00-04.zip",
+        "sha256": "d36f39b8d39ff968238351a8420b0501d670cff75a7c720e6c0120b805c8ca37",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03072_1970-01-01_00-00-03.zip",
+        "sha256": "8a7c3ba86a6ca24e32e5915131624f11cde79f5981d42cc1794590ec14bbc36d",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03074_1970-01-01_00-00-04.zip",
+        "sha256": "aeed20fdb73cc5d2702e21be5e55f5d74486d2b20c90866964fe4e418062c0d3",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03076_1970-01-01_00-00-03.zip",
+        "sha256": "8bbf69cd4c81470e6216503039835dd9939514422d15c8125cbbd3c8da81fa71",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03077_1970-01-01_00-00-03.zip",
+        "sha256": "8b547eced41d880108b0b47a0cbd7167dc3777b15bc82da383ea485500b4cc76",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03078_1970-01-01_00-00-03.zip",
+        "sha256": "6c0870fa8d93d67a1e040eae71101bfec030256c6dde84e1182afd2da450e7a3",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03079_1970-01-01_00-00-04.zip",
+        "sha256": "58fb01469b271dffcdd2b44b57da4887b73fe6c01449fb3183c4fb69bdaeb127",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03085_1970-01-01_00-00-03.zip",
+        "sha256": "75c60d10640620ee172db1a1323bff5d79135d67a2b50c8f0a5bb04b3d428160",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03089_1970-01-01_00-00-04.zip",
+        "sha256": "9d195d8d45fdd9e30420a217f876eb9cc15da5edd62dcb50cbf2f1816f3d1b0d",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03090_1970-01-01_00-00-04.zip",
+        "sha256": "bbba4863f8f1aafb5fe02a5c4c788a9fd88cb1a033884f95ee2a78dbdcce143b",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03035_1970-01-01_00-00-04.zip",
+        "sha256": "933418ef024ad6eae66175681a2611fd5f5c28c2e0021810cb4140ae70b96c24",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03087_1970-01-01_00-00-04.zip",
+        "sha256": "257743e15daec0ae57aff2371aa4ceb5c15a001e77de497adcc75df4ac564acc",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03036_1970-01-01_00-00-03.zip",
+        "sha256": "ead9b2f14739a1283c8ed55c073bea2a040f0e13db26f271f4d80f93a29110e5",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03037_1970-01-01_00-00-04.zip",
+        "sha256": "6712fcd4e95e83b0ed9a6e9da2bdea5094ab0b50d4b313fc9710e64fc798c2d1",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03038_1970-01-01_00-00-03.zip",
+        "sha256": "66c6295d12ecbeda271c82cd6eb98a489d8246278a89f0268201a0216a7bbec1",
+        "status": "complete",
+        "expected": 5,
+        "recorded": 5,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03040_1970-01-01_00-00-04.zip",
+        "sha256": "21ce58ea1bca7734f179b12f32ae2da350d6e351c247eeae7b35cf06ffd1ee62",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03041_1970-01-01_00-00-04.zip",
+        "sha256": "b9ead6d03dc47d144f41e88f462994880749346321c70d7255d722b59c5f9743",
+        "status": "complete",
+        "expected": 5,
+        "recorded": 5,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03044_1970-01-01_00-00-04.zip",
+        "sha256": "6aa47ff0e2012733e4a1f14540562d04003f740b2c185fc63db0089c217b032c",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03045_1970-01-01_00-00-03.zip",
+        "sha256": "a21dc211ab663e49b662a85e0e0c21bec5791ccce917ea884ffe16187a1a6f07",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03046_1970-01-01_00-00-03.zip",
+        "sha256": "0533635cdcc91732938f6c62682fc815bb77f39d96f00bc120ca668d0a601156",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03048_1970-01-01_00-00-03.zip",
+        "sha256": "ad3d6adabfc082c86a864c79ba24dd1001b1d2e93fe26ddc69516aeb685223f4",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03049_1970-01-01_00-00-03.zip",
+        "sha256": "cf05b7449c7e67be9fc3dfaf0d493a1f8369fa5bb3c4e3ef122adc4af9d2895a",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03050_1970-01-01_00-00-03.zip",
+        "sha256": "a6290c1029146e20ecec844fd0fc35318e2af4e64a827d861138156eb7444a55",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03052_1970-01-01_00-00-03.zip",
+        "sha256": "0aca215d4d0e65c0eff19a5e7b58a503bd315deffdb6956f49c8cd5239bc4b6f",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03053_1970-01-01_00-00-03.zip",
+        "sha256": "efe925b9c7db5b69cca0e2e848a4c1dd1fa482ce1d37c30620c05862873221ff",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03054_1970-01-01_00-00-03.zip",
+        "sha256": "269a910347d24211a54375431512ca8aed7dd873c29495dbc30d49b2534205a5",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03055_1970-01-01_00-00-03.zip",
+        "sha256": "6c80bad0d6866bf539ba837fbde02205589c76ab0637d1fbd7a756f11c711320",
+        "status": "complete",
+        "expected": 5,
+        "recorded": 5,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03056_1970-01-01_00-00-03.zip",
+        "sha256": "11c4e19180f3577e20391fc8f7eafa1e608c1157314628c2201656378864beea",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03057_1970-01-01_00-00-03.zip",
+        "sha256": "d0f4ee9c1c5ec96ba624ef5630a45417a641bcf5cb36aa5bc54aeca17014273d",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03059_1970-01-01_00-00-03.zip",
+        "sha256": "0d2a29491d89deb8ac5dd101e47bf27437c693ae8bd4ab4800cd94f90f917f3b",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03061_1970-01-01_00-00-03.zip",
+        "sha256": "8e47d1a52be7ba8b7ca59856e27c0d5ea2c1ee5120d6456ed9026610ec9e0b05",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03062_1970-01-01_00-00-04.zip",
+        "sha256": "b0c78701b1935012398329dcdc716a6db295b9c49f3ca25f7da4eb95d5a9f2a5",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03067_1970-01-01_00-00-04.zip",
+        "sha256": "2edec5e38f4f81b3acd5c5114c890386fa22a4b2c1859c03cf81e07e9ab292e1",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03071_1970-01-01_00-00-04.zip",
+        "sha256": "73761235f3a90d88e785e8d242604173962e487f316bf8bc7cf4ad3bd77178e3",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03069_1970-01-01_00-00-04.zip",
+        "sha256": "1d9eba58fd47534289d1fd77d842b9eb50b48a48cc6fa51af920d5aa1970f922",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03073_1970-01-01_00-00-03.zip",
+        "sha256": "92e0325dac14e66bd6801ae0ac7275dd9cfe222ea3405642508e2f674e240d13",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03081_1970-01-01_00-00-03.zip",
+        "sha256": "d9ff8f24fe52819e47b7be9248ef48b18ef6c2c339bd365aac1e3906cc2034d6",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03082_1970-01-01_00-00-04.zip",
+        "sha256": "e6f630fecc8061a22fce450e883c0891e0b4ddc0076ed14ff2eff91c7648f3f5",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03083_1970-01-01_00-00-04.zip",
+        "sha256": "921a51b6645c644041c4c27f0ea13a1baa4d4a4b15ea5112602709d71a71e9c2",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03084_1970-01-01_00-00-04.zip",
+        "sha256": "2dfe09fbfb26567f4f44651e814639af3627d1b1e94a83d85b6c76c1d2602dd4",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03088_1970-01-01_00-00-03.zip",
+        "sha256": "038cce53a8b0a046d86647197ad3481811d01956f2aa8bf1bd2fad7a84c57aa2",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03086_1970-01-01_00-00-03.zip",
+        "sha256": "18b75f73c885f5ada5061872cf664e12d33c2a478d006249f05f8a36a47d6de9",
+        "status": "complete",
+        "expected": 5,
+        "recorded": 5,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03030_1970-01-01_00-00-03.zip",
+        "sha256": "86ab8137bbc464e3a1d598f2847b9f3179553a557bf6e7da3f543d8d1e471226",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03031_1970-01-01_00-00-04.zip",
+        "sha256": "469528bc0be1a634421deeadf0ca9f892a38cbbdd2b857cf6781e9d6082988ee",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03032_1970-01-01_00-00-04.zip",
+        "sha256": "37cbb6fc33a2af1bb99bb581f94cc09c4ee1b990b3808fbabe6c0fb8cf9adfd9",
+        "status": "complete",
+        "expected": 5,
+        "recorded": 5,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03033_1970-01-01_00-00-04.zip",
+        "sha256": "5a7bd7629d54a5e95bd5e362d2dc757a659f5050aebcbd19d155d3a10b27802c",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03063_1970-01-01_00-00-03.zip",
+        "sha256": "25b9dc92be292ce9346fc205f6f1c0d9f17d9d034b2be4cd90bcfc0193ac62b7",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03039_1970-01-01_00-00-04.zip",
+        "sha256": "7b868f051ccbbad97c38022852994d2a9b0912e2481d00e19222b0d1883c8e1b",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03042_1970-01-01_00-00-04.zip",
+        "sha256": "01c0924a8867d6fcdde870fe7d5e8bd50256db4ba923add3d5edf4cd8a3a12e3",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03043_1970-01-01_00-00-04.zip",
+        "sha256": "e0dbea69ea518f701af502eb46a69dec626ca7a0b8ded002d0bb1c934dce7339",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03047_1970-01-01_00-00-04.zip",
+        "sha256": "0dc9b73230fd6d067acd9dd4bf68c112935d323d12be01f19f1c23301a765eb9",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03051_1970-01-01_00-00-04.zip",
+        "sha256": "906aef21373a666602b85dd7d7ebea1884a2dee5833c93a7344222b9b197bb1c",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03064_1970-01-01_00-00-04.zip",
+        "sha256": "26a7ee3bcd27bdccf34bfdadc60c2ef05686bd8736cfb259af96587af363468c",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03065_1970-01-01_00-00-04.zip",
+        "sha256": "340404f0ba3592994dd2078a32165ff5800bb90bfa3fe2fdfe113f91d26a89be",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03066_1970-01-01_00-00-04.zip",
+        "sha256": "d3e5e8ddfe04539fb6841e7d3b6ac46a60e154cd6458b34893d644e5401650ce",
+        "status": "complete",
+        "expected": 6,
+        "recorded": 6,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03068_1970-01-01_00-00-04.zip",
+        "sha256": "5d14f38c62ba0bc24f44774dce10213dbdd3a657d06b3a092dd2807a864a2700",
+        "status": "complete",
+        "expected": 5,
+        "recorded": 5,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03034_1970-01-01_00-00-04.zip",
+        "sha256": "bb5dc6e57f3d431b7808ff2dcba88bf52a053209a5b4e2365f6dd938432997f1",
+        "status": "complete",
+        "expected": 4,
+        "recorded": 4,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03075_1970-01-01_00-00-03.zip",
+        "sha256": "279039450e0600a3177e84d1ef80459711cb6e09b4610df7a5334f8d438a41ad",
+        "status": "complete",
+        "expected": 5,
+        "recorded": 5,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03080_1970-01-01_00-00-03.zip",
+        "sha256": "c207c17788b57995523e8b3c78dbb239412c73d17634dd13433a11e64b22d147",
+        "status": "complete",
+        "expected": 6,
+        "recorded": 6,
+        "missing": []
+      },
+      {
+        "archive": "Natro-vehicle-5783067647247932076.zip",
+        "member": "qnx/tree/userdata/DLT/DIM_Slog_Boot_03060_1970-01-01_00-00-03.zip",
+        "sha256": "551a3572589b8a8225d890b23207d5cc3eccb355e8d0baacd16fbe5ff2bbd541",
+        "status": "complete",
+        "expected": 6,
+        "recorded": 6,
+        "missing": []
+      },
+      {
+        "archive": "Natro-update-analysis-2026-10-12.zip",
+        "member": "tools/crypto_fixture/fixture.zip",
+        "sha256": "ad7e09b588b4f2597d75fb0e57ab0a3edee3eb39f80b5ebb561ffa92820d3976",
+        "status": "encrypted_fixture_plaintext_verified",
+        "expected": 1,
+        "recorded": 0,
+        "missing": [
+          "fixture.bin"
+        ],
+        "plaintext": "tools/crypto_fixture/plain.bin",
+        "plaintext_sha256": "549ae908627d0f01459ed30c8a356626176b8078107745f64fed8cb42cf7aa5b",
+        "bytes_match": true,
+        "crc_match": true
+      },
+      {
+        "archive": "update-decrypted.zip",
+        "member": "system/app/GMCSoft/GMCSoft.apk",
+        "sha256": "729adada754b3177e11b677b429948acc2de478ef1ae97f4b13b3ce2cb96de89",
+        "status": "complete",
+        "expected": 1455,
+        "recorded": 1455,
+        "missing": []
+      },
+      {
+        "archive": "update-decrypted.zip",
+        "member": "system/app/GMCSoft/GMCSoft.apk!publicsuffixes.gz",
+        "sha256": "be8da686d208b34e4b3f0bf90aa2e0b7638295641132c3f0caa81b03499032ff",
+        "decompressed_bytes": 94651,
+        "decompressed_sha256": "d818c29ce5a385b13fa5909ce988c521442f9636ce9c96867f093aa0c7a5d6aa",
+        "status": "gzip_ok"
+      },
+      {
+        "archive": "update-decrypted.zip",
+        "member": "system/app/XCSettings2/XCSettings2.apk",
+        "sha256": "f4d1b3915324fd2146ea089ca30db4366d5de03fe34f34ef7be49ae4911696e4",
+        "status": "complete",
+        "expected": 12636,
+        "recorded": 12636,
+        "missing": []
+      },
+      {
+        "archive": "update-decrypted.zip",
+        "member": "system/priv-app/CarService/CarService.apk",
+        "sha256": "aaf8435b02ed69b3e78f218decea3f133d9cc7db4da6298faaf6a38b8e9dd567",
+        "status": "complete",
+        "expected": 474,
+        "recorded": 474,
+        "missing": []
+      },
+      {
+        "archive": "update-decrypted.zip",
+        "member": "vendor/preinstall2/GPSProvider.apk",
+        "sha256": "2c763c3c8f3b8c383df74f59bfe7ccfaa5b5e13839c8e7910fff6cf49896da41",
+        "status": "complete",
+        "expected": 857,
+        "recorded": 857,
+        "missing": []
+      },
+      {
+        "archive": "MonjaroPanel_3.2.1.apk.zip",
+        "member": "MonjaroPanel_3.2.1.apk",
+        "sha256": "9007d4a5c90036ed70d89fb3a129224cf179ef70e0e19069de1d4b9aeda43daf",
+        "status": "complete",
+        "expected": 666,
+        "recorded": 666,
+        "missing": []
+      },
+      {
+        "archive": "mSaver_2.8.1.apk.zip",
+        "member": "mSaver_2.8.1.apk",
+        "sha256": "fce708590d1f24ae61919609ef960fcc9a739232b3d032be9354463edaa67787",
+        "status": "complete",
+        "expected": 728,
+        "recorded": 728,
+        "missing": []
+      },
+      {
+        "archive": "mSaver_2.8.1.apk.zip",
+        "member": "mSaver_2.8.1.apk!assets/iconpacks/Sample pack.zip",
+        "sha256": "f48dd595773350be8f08089947b01bd696d6df9fc5b1bfd8c6b29a67893154a8",
+        "status": "complete",
+        "expected": 28,
+        "recorded": 28,
+        "missing": []
+      },
+      {
+        "archive": "mSaver_2.8.1.apk.zip",
+        "member": "mSaver_2.8.1.apk!okhttp3/internal/publicsuffix/publicsuffixes.gz",
+        "sha256": "a1ef3d0e4ec2cbce14c1884ab0f3a4fef46e258de83530dc562ebb805bdb12fd",
+        "decompressed_bytes": 104170,
+        "decompressed_sha256": "431223ad7c331d1bbfc0e8d5096aa49831408383ccc064b6c8e35e2d4322acf5",
+        "status": "gzip_ok"
+      },
+      {
+        "archive": "mSaver_2.8.1_HOME.apk.zip",
+        "member": "mSaver_2.8.1_HOME.apk",
+        "sha256": "7d24e66c7bd0b404433a5dbfdb77be0ede0d47ae2268af28f42274a1774ccb8c",
+        "status": "complete",
+        "expected": 728,
+        "recorded": 728,
+        "missing": []
+      }
+    ],
+    "encrypted_pair": {
+      "original_member": "update.zip",
+      "expected_bytes": 501360617,
+      "actual_bytes": 501360617,
+      "expected_crc": "0x58479763",
+      "actual_crc": "0x58479763",
+      "matches": true
+    }
+  },
+  "limits": [
+    "No exhaustive semantic reverse engineering of all code is claimed.",
+    "Local OpenWFD composition was known in the 2026-10-14 report; current contribution is transport comparison and lock-thread tracing.",
+    "No receiver, final pixel owner or independent wing-hide control confirmed.",
+    "No firmware execution, driver writes or APK release."
+  ],
+  "kernel_comparison": {
+    "baseline_sha256": "1573116476f00c901f343f1d74b952b2cfe8969946a9350980a739c2b405b55f",
+    "snapshots": [
+      {
+        "sha256": "a36488871cd82f03b81e6811fd895060fc5cd7ed499f0fb4850ff0c38c1cd369",
+        "segments": [
+          {
+            "offset": "0x1000",
+            "filesz": "0xb05e8",
+            "flags": 5,
+            "baseline_sha256": "3e86cd3935d9a9eb850835657bc78c0fd341bf123f1fec533d561228ba22b5eb",
+            "snapshot_sha256": "3e86cd3935d9a9eb850835657bc78c0fd341bf123f1fec533d561228ba22b5eb",
+            "differing_bytes": 0
+          },
+          {
+            "offset": "0xb2000",
+            "filesz": "0x18db8",
+            "flags": 6,
+            "baseline_sha256": "18b50ec0033d3f879707496cfb25f5ac7e7013bfd396441393db7062b9a974fc",
+            "snapshot_sha256": "e5ec9450d67edebe2ee741b8b171ebcd2685e16a664b63726eebb29909e8b851",
+            "differing_bytes": 992
+          }
+        ]
+      },
+      {
+        "sha256": "9ac97e50be0a380a56771d70d562ecdcfa7ffcd4126d0d54e9f78213b149ed52",
+        "segments": [
+          {
+            "offset": "0x1000",
+            "filesz": "0xb05e8",
+            "flags": 5,
+            "baseline_sha256": "3e86cd3935d9a9eb850835657bc78c0fd341bf123f1fec533d561228ba22b5eb",
+            "snapshot_sha256": "3e86cd3935d9a9eb850835657bc78c0fd341bf123f1fec533d561228ba22b5eb",
+            "differing_bytes": 0
+          },
+          {
+            "offset": "0xb2000",
+            "filesz": "0x18db8",
+            "flags": 6,
+            "baseline_sha256": "18b50ec0033d3f879707496cfb25f5ac7e7013bfd396441393db7062b9a974fc",
+            "snapshot_sha256": "de103e4ee0814b17ffdc32323eaba208fac1327d4597435875cc5361593f9aa8",
+            "differing_bytes": 991
+          }
+        ]
+      }
+    ],
+    "limitation": "Writable segment changes are not interpreted field by field."
+  },
+  "log_review": {
+    "deduplicated_matching_lines": 68,
+    "navi_mode_lines": 61,
+    "mode3": 36,
+    "mode1": 25,
+    "navigation_mode_lost_invalidations": 7,
+    "limitation": "Not independent trials; no pixel owner; Windowing substring false positives excluded."
+  }
+}

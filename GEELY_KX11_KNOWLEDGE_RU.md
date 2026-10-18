@@ -1,5 +1,42 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 18.10.2026 — 73 архива, KZB-растры и границы производителя пикселей
+
+Сверены73архивных объекта текущего набора Natro:55загруженных,18прежних
+результатов/инструментов,70уникальных SHA. Контейнеры и вложения проверены;
+полный смысловой разбор всех программ не заявляется. Исходная encrypted
+update.zip покрыта предоставленной clear-копией по размеру/CRC; отдельный
+encrypted fixture относится к старому криптоинструменту. Перечень исключает
+несвязанные и отсутствующие исторические файлы.
+
+Новый STATIC/IMAGE: в3KZB восстановлены2209табличных записей, декодированы
+539PNG+304ASTC6×6,46image-reference lists разрешены внутри контейнеров.
+Просмотр415позиций (370немиповых+45семейств mipmaps) и увеличенных кандидатов
+не дал подтверждённого совпадения с крыльями. Kanzi mesh/state/property semantics
+и отсутствующая native libkanzi.so не объявлены восстановленными. Проверенные
+Java DisplayContext usages относятся к local settings/passenger/toast UI.
+
+QNX: screen-gles2 fill/texture draw используют caller rect/alpha и готовую
+texture; VideoProcessing/AIS/EGL paths конвертируют/передают буферы. HAB wfd_be
+selectors44/45 — stubs, но локальная libopenwfd открывает /dev/openwfd_server,
+где handlers реальные. Локальный composition API был известен14.10; новое
+уточнение — разница маршрутов и поток UtilityMgr, удерживающий общую critical
+section до unlock event. Такой query не превращается в пассивный автосбор.
+В двух поздних procnto snapshots RX PT_LOAD идентичен исходному; различается RW.
+
+Renderer и принимающий UART navigation dispatcher не найдены. Идентификация
+QDI1/layer16 по config не равна владению крыльями; Screen readback и framework
+screenshot не гарантируют конечный HWC/DIM кадр. Следующая развилка — где именно
+появляются подтверждённые пиксели: Android producer, QDI1 composition или внешний
+DIM. Для конкретного owner затем извлекаются установленный SHA/JNI/сцена либо
+HW/SW-идентифицированная прошивка панели. Название поставщика не угадывается.
+
+[Отчёт, адреса и источники](docs/geely-kx11/research-2026-10-18-wings/REPORT_RU.md) ·
+[Предметный план и сборщик](docs/geely-kx11/research-2026-10-18-wings/NEXT_STEPS_RU.md).
+SOURCE/TEST — исследование; production/APK без изменений; FIELD независимого
+скрытия при сохранении карты/приборов OPEN. Полная семантика остаётся отдельным
+явным остатком, количество прочитанных файлов её не подменяет.
+
 ## 18.10.2026 — SOME/IP dispatch, MAX96755 getter и четыре DSP-таблицы
 
 STATIC по существующему ZIP578306: все шесть регистраций sc_qnx_vip_proxy

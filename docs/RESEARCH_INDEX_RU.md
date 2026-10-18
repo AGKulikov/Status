@@ -1,5 +1,7 @@
 # Natro — карта требований, исследований и открытых вопросов
 
+- [18.10: сверены73архива, вскрыты3KZB и843изображения, уточнены graphics/lock paths](geely-kx11/research-2026-10-18-wings/REPORT_RU.md). [Реестр SHA](geely-kx11/research-2026-10-18-wings/ARCHIVE_INVENTORY_RU.md), [план поиска renderer и адресный сбор](geely-kx11/research-2026-10-18-wings/NEXT_STEPS_RU.md). Полная семантика не заявляется; renderer/hide FIELD OPEN.
+
 - [18.10: шесть входных SOME/IP callbacks, RVC consumer, MAX96755 getter и восстановление четырёх DSP tables](geely-kx11/research-2026-10-17-white-bar/QNX_DISPATCH_AND_DSP_20261018_RU.md). Уточнено происхождение счётчиков корпуса; renderer/независимый hide OPEN.
 
 - [17.10 21:44: пробел section-only ELF анализа исправлен; 31 graphics candidate и новые конкретные ветви](geely-kx11/research-2026-10-17-white-bar/QNX_COVERAGE_2144_RU.md). Продолжать по уже полученному QNX, новый сбор сейчас не требуется; renderer/hide OPEN.
