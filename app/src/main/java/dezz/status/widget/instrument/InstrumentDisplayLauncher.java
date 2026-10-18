@@ -40,6 +40,8 @@ public final class InstrumentDisplayLauncher {
     // The coordinator and display subscription are owned by MAIN. The worker only reads its
     // cancellation predicate and posts results; it never changes launch admission state.
     private static InstrumentPanelLaunchCoordinator coordinator;
+    private static InstrumentPanelCloseCoordinator closing;
+    private static volatile long panelEpoch;
     private static DisplayManager watchedDisplays;
     private static int watchedDisplayId = -1;
     private static String watchedDisplayIdentity;
@@ -88,12 +90,14 @@ public final class InstrumentDisplayLauncher {
         }
         // A real power-cycle event supersedes work admitted against the previous vendor state.
         if (reason.contains("QUICKBOOT_POWERON")) {
+            panelEpoch++;
             coordinator.cancel("quickboot");
             InstrumentPanelActivity.finishForDisplayRestore();
             finishStalePanelTask(app, -1);
         }
         InstrumentPanelStore store = new InstrumentPanelStore(app);
         if (store.isEnabled() && (!automatic || store.isAutostart())) {
+            if (closing != null) closing.cancel();
             NavigationHudEndpointService.ensureClusterEndpointStarted(app);
         }
         coordinator.request(automatic, reassertDim, reason);
@@ -103,46 +107,110 @@ public final class InstrumentDisplayLauncher {
         Context app = applicationContext(context);
         onMain(() -> {
             owner = app;
+            panelEpoch++;
             if (coordinator != null) coordinator.cancel("closed");
             stopDisplayWatch();
-            // Revoke the producer generation first. Activity callbacks already queued on MAIN can
-            // no longer republish it because enabled=false is persisted before this entry point.
+            if (closing == null) {
+                closing = new InstrumentPanelCloseCoordinator(new CloseHost(app),
+                        new InstrumentPanelLaunchCoordinator.Scheduler() {
+                    @Override public long now() { return SystemClock.uptimeMillis(); }
+                    @Override public void after(long delay, Runnable task) {
+                        MAIN.postDelayed(task, delay);
+                    }
+                });
+            }
+            closing.close();
+        });
+    }
+
+    private static final class CloseHost implements InstrumentPanelCloseCoordinator.Host {
+        private final Context app;
+        private volatile long ownerObservedAt;
+        CloseHost(Context app) { this.app = app; }
+
+        @Override public void finishPanel() {
             NavigationHudEndpointService.disableClusterProjection();
             InstrumentPanelActivity.finishForExplicitClose();
-            Intent close = new Intent(InstrumentPanelStore.ACTION_CLOSE)
-                    .setPackage(app.getPackageName());
-            try { app.sendBroadcast(close); } catch (RuntimeException failure) {
-                trace("close broadcast failed=" + failure.getClass().getSimpleName());
-            }
+            // Synchronous task removal belongs to this MAIN event. An old worker must never
+            // enumerate and remove a new task created after the next ON event.
+            finishStalePanelTask(app, -1);
+        }
+
+        @Override public void revokeToken(BooleanSupplier current, Runnable done) {
             execute(() -> {
+                if (!current.getAsBoolean()) return;
                 try { new InstrumentPanelStore(app).revokeLaunchToken(); }
                 catch (RuntimeException failure) {
                     trace("token revoke failed=" + failure.getClass().getSimpleName());
                 }
-                // The close receiver is registered only after authorization. Remove a pending or
-                // otherwise stale task as well, without ever stopping the Natro package.
-                finishStalePanelTask(app, -1);
+                MAIN.post(done);
+            }, () -> trace("close worker unavailable"));
+        }
+
+        @Override public void readOwner(BooleanSupplier current,
+                Consumer<InstrumentPanelCloseCoordinator.Owner> done) {
+            int display = new InstrumentPanelStore(app).load().displayId;
+            // Same read-only ownership source as OEM navigation recovery. No task manipulation
+            // or package stop is delegated to shell; unavailable ownership preserves DIM.
+            dezz.status.widget.shell.PrivilegedShell.get(app).runCommand(
+                    () -> current.getAsBoolean() ? "am stack list" : null, (output, error) -> {
+                if (!current.getAsBoolean()) return;
+                ownerObservedAt = SystemClock.uptimeMillis();
+                done.accept(error == null
+                        ? InstrumentDisplayOwner.ownerAfterClose(output, display, app.getPackageName())
+                        : InstrumentPanelCloseCoordinator.Owner.UNKNOWN);
+            });
+        }
+
+        @Override public void restoreDim(BooleanSupplier current, Consumer<Boolean> done) {
+            execute(() -> {
+                if (!current.getAsBoolean() || new InstrumentPanelStore(app).isEnabled()) return;
+                if (SystemClock.uptimeMillis() - ownerObservedAt > 1_500L) {
+                    MAIN.post(() -> done.accept(false));
+                    trace("close preserved DIM: owner snapshot expired in worker queue");
+                    return;
+                }
                 boolean switched = switchDimMode(app, DIM_STOCK_MODE);
                 Integer actual = readDimMode(app);
-                MAIN.post(() -> trace("panel closed dim accepted=" + switched
-                        + " readback=" + actual + " "
-                        + InstrumentPanelActivity.windowState()));
+                if (!current.getAsBoolean() || new InstrumentPanelStore(app).isEnabled()) return;
+                // mNavi's matching release for DIM(2,8,8,[1]); keep it on the same serial lane
+                // as wake so a superseded OFF can never run after the next generation's wake.
+                boolean released = Integer.valueOf(DIM_STOCK_MODE).equals(actual)
+                        && sendDimPresentation(app, false);
+                MAIN.post(() -> {
+                    trace("panel closed dim accepted=" + switched + " readback=" + actual
+                            + " release_sent=" + released + " physical_effect=unobserved");
+                    done.accept(released);
+                });
             }, () -> trace("close worker unavailable"));
-        });
+        }
+
+        @Override public void trace(String message) {
+            InstrumentDisplayLauncher.trace(message);
+            if (message.contains("UNKNOWN") || message.contains("timeout")
+                    || message.equals("close DIM stock readback=false")) {
+                dezz.status.widget.diagnostics.CausalDiagnostics.capture("instrument_close_unconfirmed", false);
+                android.widget.Toast.makeText(app,
+                        "Панель закрыта. Возврат штатной приборки не подтверждён; подробности в диагностике.",
+                        android.widget.Toast.LENGTH_LONG).show();
+            }
+        }
     }
 
     /** Authorization is durable, single-use and off the main Looper, including onNewIntent. */
     static void authorize(Context context, String candidate, Consumer<Boolean> completion) {
         Context app = applicationContext(context);
+        long admissionEpoch = panelEpoch;
         execute(() -> {
             boolean accepted;
-            try { accepted = new InstrumentPanelStore(app).consumeLaunchToken(candidate); }
+            try { accepted = admissionEpoch == panelEpoch
+                    && new InstrumentPanelStore(app).consumeLaunchToken(candidate); }
             catch (RuntimeException failure) {
                 trace("authorization failed=" + failure.getClass().getSimpleName());
                 accepted = false;
             }
             boolean result = accepted;
-            MAIN.post(() -> completion.accept(result));
+            MAIN.post(() -> completion.accept(result && admissionEpoch == panelEpoch));
         }, () -> completion.accept(false));
     }
 
@@ -156,10 +224,13 @@ public final class InstrumentDisplayLauncher {
     /** Repair only the verified mode reset; do not recreate a healthy Activity or wake DIM. */
     static void restoreNavigationMode(Context app, BooleanSupplier allowed, Consumer<Boolean> done) {
         execute(() -> {
-            if (!allowed.getAsBoolean()) { MAIN.post(() -> done.accept(false)); return; }
+            if (!allowed.getAsBoolean() || !new InstrumentPanelStore(app).isEnabled()) {
+                MAIN.post(() -> done.accept(false)); return;
+            }
             Integer before = readDimMode(app);
             boolean accepted = false;
-            if (Integer.valueOf(1).equals(before) && allowed.getAsBoolean())
+            if (Integer.valueOf(1).equals(before) && allowed.getAsBoolean()
+                    && new InstrumentPanelStore(app).isEnabled())
                 accepted = switchDimMode(app, DIM_NAVIGATION_MODE);
             Integer after = readDimMode(app);
             boolean verified = Integer.valueOf(3).equals(after);
@@ -189,7 +260,11 @@ public final class InstrumentDisplayLauncher {
             return InstrumentPanelActivity.windowState();
         }
         @Override public void reloadPanel() { InstrumentPanelActivity.requestReload(); }
-        @Override public void trace(String message) { InstrumentDisplayLauncher.trace(message); }
+        @Override public void trace(String message) {
+            InstrumentDisplayLauncher.trace(message);
+            if (message.contains("window-not-ready") || message.contains("timeout"))
+                dezz.status.widget.diagnostics.CausalDiagnostics.capture("instrument_launch_unconfirmed", false);
+        }
 
         @Override public void prepareDim(BooleanSupplier allowed, Consumer<Boolean> completion) {
             execute(() -> {
@@ -318,6 +393,7 @@ public final class InstrumentDisplayLauncher {
         trace("display changed id=" + displayId + " state="
                 + (display == null ? "absent" : display.getState()));
         if (coordinator != null) coordinator.cancel("display-changed");
+        panelEpoch++;
         if (usableDisplay(owner, displayId)) {
             // Power/hotplug can invalidate the real window while Java references survive.
             InstrumentPanelActivity.finishForDisplayRestore();
@@ -369,15 +445,23 @@ public final class InstrumentDisplayLauncher {
     }
 
     private static void sendDimWake(Context app) {
+        sendDimPresentation(app, true);
+    }
+
+    private static boolean sendDimPresentation(Context app, boolean enabled) {
         try {
             Class<?> type = Class.forName("ecarx.dimprotocol.DIMProtocolManager");
             Object manager = type.getMethod("getInstance", Context.class).invoke(null, app);
-            if (manager == null) return;
+            if (manager == null) return false;
             Method send = type.getMethod("sendMessageToDIM",
                     byte.class, byte.class, byte.class, byte[].class);
-            send.invoke(manager, (byte) 2, (byte) 8, (byte) 8, new byte[]{1});
+            send.invoke(manager, (byte) 2, (byte) 8, (byte) 8,
+                    new byte[]{(byte) (enabled ? 1 : 0)});
+            return true;
         } catch (Throwable unavailable) {
-            trace("optional DIM wake unavailable=" + unavailable.getClass().getSimpleName());
+            trace("optional DIM presentation enabled=" + enabled + " unavailable="
+                    + unavailable.getClass().getSimpleName());
+            return false;
         }
     }
 

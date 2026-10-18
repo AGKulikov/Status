@@ -1,5 +1,14 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review18.10.2026 — lifecycle переключателя приборки
+
+Проверены launcher/activity/close coordinator: отмена хранится только в RAM,
+прежний single-use token отзывается через существующий InstrumentPanelStore.
+Новых ключей, defaults, persistent roots, backup adapters или миграций нет.
+Read-only ownership использует настроенный PrivilegedShell; его storage API
+не меняется. Inventory90owners PASS без изменения fingerprints. Диагностические
+incidents используют прежний журнал и его retention; FIELD restore не проверен.
+
 ### Review18.10.2026 — полный OEM screencap help с exit1
 
 Пересмотрен diff WingsEvidenceArchive: изменено только признание известного

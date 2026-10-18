@@ -45,7 +45,8 @@ public final class InstrumentPanelActivity extends Activity {
         @Override public void onReceive(Context context, Intent intent) {
             String action = intent == null ? null : intent.getAction();
             if (InstrumentPanelStore.ACTION_CLOSE.equals(action)) {
-                finishPanel("close-command");
+                // Compatibility broadcasts can outlive OFF->ON. The current setting wins.
+                if (store != null && !store.isEnabled()) finishPanel("close-command");
             } else if (InstrumentPanelStore.ACTION_CONFIG_CHANGED.equals(action)) {
                 reload();
             }

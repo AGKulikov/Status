@@ -216,9 +216,17 @@
         "research-2026-10-18-wings/REPORT_RU.md",
         "research-2026-10-18-wings/NEXT_STEPS_RU.md",
         "research-2026-10-18-wings/SOURCES.json",
-        "research-2026-10-18-wings/FIELD_0859_AND_SWITCHING_RU.md"
+        "research-2026-10-18-wings/FIELD_0859_AND_SWITCHING_RU.md",
+        "research-2026-10-18-wings/SWITCH_CLOSE_FIX_RU.md"
       ],
       "evidence_updates": [
+        {
+          "date": "2026-10-18",
+          "level": "SOURCE_WITH_PORTABLE_REPLAY",
+          "finding": "Natro close now cancels stale OFF work on ON, removes only its panel task synchronously, gates token authorization by epoch, and checks current display ownership before mode1/readback/DIM(2,8,8,[0]). Other or unknown owners preserve DIM. Replay covers10cycles and delayed revoke/owner/DIM/deadline. This does not prove the OEM dialog cause or generic mNavi active-task transfer.",
+          "source": "research-2026-10-18-wings/SWITCH_CLOSE_FIX_RU.md",
+          "next_step": "Complete Android CI and signed-candidate delivery; run GATE-059/066 on KX11. Capture the actual dialog owner and task/display transition if reproduced. Use corrected mapped screenshots for wings attribution; renderer/independent hide remain OPEN."
+        },
         {
           "date": "2026-10-18",
           "level": "FIELD_ARCHIVE_WITH_SOURCE_REPLAY",

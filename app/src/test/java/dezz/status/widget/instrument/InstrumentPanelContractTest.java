@@ -476,7 +476,13 @@ public final class InstrumentPanelContractTest {
         assertTrue(launcher.contains("panel closed dim accepted="));
         assertFalse(launcher.contains("prepareInstrumentPanelLaunch"));
         assertFalse(launcher.contains("am force-stop"));
-        assertFalse(launcher.contains("PrivilegedShell"));
+        // Ownership is read through the existing shell channel; launching remains direct.
+        assertTrue(launcher.contains("\"am stack list\""));
+        assertFalse(launcher.contains("\"am start"));
+        assertFalse(launcher.contains("\"am task"));
+        assertFalse(launcher.contains("app.sendBroadcast(close)"));
+        assertTrue(launcher.contains("if (closing != null) closing.cancel()"));
+        assertTrue(launcher.contains("sendDimPresentation(app, false)"));
         assertTrue(launcher.contains("InstrumentPanelActivity.windowState()"));
         assertTrue(launcher.contains("allowed.getAsBoolean()"));
         assertTrue(endpoint.contains("CAP_EXTERNAL_INSTRUMENT_LAUNCHER"));

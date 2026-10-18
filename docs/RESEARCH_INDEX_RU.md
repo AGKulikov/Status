@@ -1,5 +1,7 @@
 # Natro — карта требований, исследований и открытых вопросов
 
+- [18.10 после10:00: отменяемое закрытие приборки, ownership gate и DIM release](geely-kx11/research-2026-10-18-wings/SWITCH_CLOSE_FIX_RU.md). SOURCE/replay; OEM-диалог и FIELD остаются OPEN.
+
 - [18.10 08:55/08:58: два wings ZIP, exit1 help и точные ветви меню mNavi/MConfig](geely-kx11/research-2026-10-18-wings/FIELD_0859_AND_SWITCHING_RU.md). SOURCE collector/replay; перенос активного приложения без остановки — обязательный эталон, точный handler и OEM-диалог OPEN. Нового APK нет.
 
 - [18.10: адресная диагностика крыльев внутри Natro, кандидат3.3.0](releases/3.3.0/README_RU.md). SOURCE/replay; FIELD renderer/hide OPEN.

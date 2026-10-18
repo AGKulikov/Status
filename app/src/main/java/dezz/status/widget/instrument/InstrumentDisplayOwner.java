@@ -27,6 +27,19 @@ final class InstrumentDisplayOwner {
                 && value.unknownBounds == 0 && value.overlapping == 0;
     }
 
+    /** A foreign dashboard must retain DIM even after our own task has been removed. */
+    static InstrumentPanelCloseCoordinator.Owner ownerAfterClose(String output, int display,
+                                                                  String packageName) {
+        if (output == null || !output.trim().startsWith("Stack id="))
+            return InstrumentPanelCloseCoordinator.Owner.UNKNOWN;
+        Snapshot value = inspect(output, display, packageName);
+        if (value == null || value.stacks == 0 || value.tasks == 0 || value.unparsed != 0
+                || value.unknownBounds != 0 || value.own > 1)
+            return InstrumentPanelCloseCoordinator.Owner.UNKNOWN;
+        return value.foreignDashboard == 0 ? InstrumentPanelCloseCoordinator.Owner.FREE
+                : InstrumentPanelCloseCoordinator.Owner.OTHER;
+    }
+
     private static Snapshot inspect(String output, int display, String packageName) {
         if (output == null || output.length() > 128 * 1024 || display < 0
                 || packageName == null || packageName.isEmpty()) return null;
@@ -43,6 +56,13 @@ final class InstrumentDisplayOwner {
                 value.stacks++;
                 String owner = null;
                 for (String line : output.substring(start, end).split("\\r?\\n")) {
+                    // A malformed/truncated next stack header must not hide a foreign owner.
+                    if (line.trim().startsWith("Stack id=")) value.unparsed++;
+                    if (line.contains("taskId=")) {
+                        value.tasks++;
+                        if (!line.contains("visible=true") && !line.contains("visible=false"))
+                            value.unparsed++;
+                    }
                     if (!line.contains("visible=true")) continue;
                     Matcher top = TOP.matcher(line);
                     if (!top.find()) { value.unparsed++; continue; }
@@ -61,6 +81,10 @@ final class InstrumentDisplayOwner {
                     } else {
                         value.other++;
                         if (area != null) value.others.add(area);
+                        // These are OEM presentation surfaces, not a competing dashboard.
+                        // Any other visible activity (including another Natro page) retains DIM.
+                        if (!owner.startsWith("com.ecarx.dimmenu/")
+                                && !owner.startsWith("com.ecarx.hud/")) value.foreignDashboard++;
                     }
                 }
             }
@@ -77,7 +101,7 @@ final class InstrumentDisplayOwner {
     }
 
     private static final class Snapshot {
-        int stacks, own, other, unparsed, overlapping, outside, unknownBounds;
+        int stacks, tasks, own, other, unparsed, overlapping, outside, unknownBounds, foreignDashboard;
         Area panel;
         final List<Area> others = new ArrayList<>();
     }

@@ -1,5 +1,29 @@
 # Единый реестр требований Natro
 
+## 18.10.2026 10:00 МСК — продолжить исправление переключателя (CLUSTER-023/024/026)
+
+USER: «Жду, доделывай». В SOURCE внесено симметричное освобождение DIM:
+сначала завершается только panel task/lease; отменяемая операция отзыва token
+читает владельцев display через прежний read-only `am stack list`. При свободном
+экране запрашивает mode1, проверяет readback и отправляет DIM(2,8,8,[0]).
+Другое приложение сохраняет DIM. Неизвестный/устаревший snapshot или timeout
+не разрешают изменение DIM; UI сообщает, что штатный режим не подтверждён.
+Это уточняет прежний безусловный restore в CLUSTER-026, сохраняя запрет остановки
+Natro/HUD/ANCS, поздних запусков и переноса настроек. Shell используется только
+для чтения ownership, не для запуска/переноса/остановки задач.
+
+OFF отменяется новым ON; удаление task перенесено из отложенного worker в текущий
+MAIN event; отправка unversioned CLOSE убрана, legacy receiver проверяет enabled.
+Результат авторизации ограничен panel epoch; OEM mode3 repair дополнительно
+проверяет enabled перед записью. Deadline закрытия10с, owner snapshot не старше1.5с.
+Новые настройки/схемы/persistent roots отсутствуют, inventory90owners без изменений.
+TEST: production close replay (10циклов, поздние revoke/owner/DIM/deadline,
+чужой/неизвестный owner, OFF→ON→OFF) и parser/ICU проходят; общий portable набор
+collector+backup16tests PASS. Полная Android CI этой runtime-ревизии ещё ожидается.
+APK: новой подписанной версии нет. FIELD: причина OEM-диалога и GATE-059/066 OPEN;
+эта защита не объявляется доказанным устранением окна или найденным generic mNavi move.
+[Изменения и ограничения](docs/geely-kx11/research-2026-10-18-wings/SWITCH_CLOSE_FIX_RU.md).
+
 ## 18.10.2026 09:35 МСК — проверить обратный путь DIM, не только caller
 
 USER указывает на последовательность mode3/wake/display2 → display0/mode1

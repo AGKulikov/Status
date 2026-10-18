@@ -33,6 +33,16 @@ public final class InstrumentOwnerReplay {
         check(!InstrumentDisplayOwner.owns(good+hud.replace("bounds=","unknown="),2,pkg));
         check(!InstrumentDisplayOwner.owns(good+stack(2,own,true),2,pkg));
         check(!InstrumentDisplayOwner.owns(good+" taskId=18 visible=true\n",2,pkg));
+        check(InstrumentDisplayOwner.ownerAfterClose(good,2,pkg)==InstrumentPanelCloseCoordinator.Owner.FREE);
+        check(InstrumentDisplayOwner.ownerAfterClose(hud+menu,2,pkg)==InstrumentPanelCloseCoordinator.Owner.FREE);
+        check(InstrumentDisplayOwner.ownerAfterClose(good+stack(2,"com.auto_soft.monjaro_dashboard/.Main",true),2,pkg)
+                ==InstrumentPanelCloseCoordinator.Owner.OTHER);
+        check(InstrumentDisplayOwner.ownerAfterClose(stack(2,"plus.monjaro/.Main",true),2,pkg)
+                ==InstrumentPanelCloseCoordinator.Owner.OTHER);
+        for(String bad:new String[]{"", "Permission denied", "Stack id=4 bounds=[0,0][1920,720] displayId=2 userId=0\n",
+                good.replace("visible=true", "visibility=unknown"), good.replace("topActivity=", "unknown=")})
+            check(InstrumentDisplayOwner.ownerAfterClose(bad,2,pkg)==InstrumentPanelCloseCoordinator.Owner.UNKNOWN);
+        check(InstrumentDisplayOwner.ownerAfterClose(null,2,pkg)==InstrumentPanelCloseCoordinator.Owner.UNKNOWN);
         check(InstrumentDisplayOwner.owns(good+hud+" taskId=19 bounds=[0,0][1920,1080] visible=true topActivity=ComponentInfo{com.ecarx.hud/.HomeActivity}\n",2,pkg));
         System.out.println("PASS exact display/activity, regional HUD separation, overlaps, geometry, duplicated stack top, CRLF, hidden/unknown/ambiguous/malformed/oversize");
     }

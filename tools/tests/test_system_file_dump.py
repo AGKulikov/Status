@@ -64,9 +64,15 @@ class SystemDumpTest(unittest.TestCase):
     def test_production_owner_parser(self):
         with tempfile.TemporaryDirectory() as work:
             run=subprocess.run(['java','com.sun.tools.javac.Main','-d',work,
-                str(SOURCE/'instrument/InstrumentDisplayOwner.java'),str(ROOT/'tools/tests/java/InstrumentOwnerReplay.java')],capture_output=True,text=True)
+                str(SOURCE/'instrument/InstrumentDisplayOwner.java'),
+                str(SOURCE/'instrument/InstrumentPanelCloseCoordinator.java'),
+                str(SOURCE/'instrument/InstrumentPanelLaunchCoordinator.java'),
+                str(ROOT/'tools/tests/java/InstrumentOwnerReplay.java'),
+                str(ROOT/'tools/tests/java/InstrumentCloseReplay.java')],capture_output=True,text=True)
             self.assertEqual(run.returncode,0,run.stderr)
             run=subprocess.run(['java','-cp',work,'dezz.status.widget.instrument.InstrumentOwnerReplay'],capture_output=True,text=True,timeout=15)
+            self.assertEqual(run.returncode,0,run.stdout+run.stderr)
+            run=subprocess.run(['java','-cp',work,'dezz.status.widget.instrument.InstrumentCloseReplay'],capture_output=True,text=True,timeout=15)
             self.assertEqual(run.returncode,0,run.stdout+run.stderr)
     def test_production_binary_collector(self):
         with tempfile.TemporaryDirectory() as work:
