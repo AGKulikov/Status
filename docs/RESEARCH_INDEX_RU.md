@@ -1,5 +1,7 @@
 # Natro — карта требований, исследований и открытых вопросов
 
+- [18.10: шесть входных SOME/IP callbacks, RVC consumer, MAX96755 getter и восстановление четырёх DSP tables](geely-kx11/research-2026-10-17-white-bar/QNX_DISPATCH_AND_DSP_20261018_RU.md). Уточнено происхождение счётчиков корпуса; renderer/независимый hide OPEN.
+
 - [17.10 21:44: пробел section-only ELF анализа исправлен; 31 graphics candidate и новые конкретные ветви](geely-kx11/research-2026-10-17-white-bar/QNX_COVERAGE_2144_RU.md). Продолжать по уже полученному QNX, новый сбор сейчас не требуется; renderer/hide OPEN.
 
 - [17.10, продолжение21:34: PA_Gauge reader → DA2B → sender callback; связи с оформлением не найдено](geely-kx11/research-2026-10-17-white-bar/PA_GAUGE_READER_2134_RU.md). Ограниченный STATIC, независимое скрытие OPEN.

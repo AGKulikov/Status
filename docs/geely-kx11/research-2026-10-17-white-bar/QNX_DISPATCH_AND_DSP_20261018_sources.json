@@ -1,0 +1,322 @@
+{
+  "date": "2026-10-18",
+  "level": "OFFLINE_STATIC_AND_SOURCE_PROVENANCE",
+  "archive": {
+    "name": "Natro-vehicle-5783067647247932076.zip",
+    "sha256": "e08f8449c09c15a523aa2c15385055bd0508fb94a1673e683ff5dba070691554"
+  },
+  "direct_zip_inventory": {
+    "qnx_file_entries": 976,
+    "elf_paths": 732,
+    "unique_elf_sha256": 689,
+    "previous_31_candidate_sha_matches": 31,
+    "previous_31_candidate_sha_mismatches": 0,
+    "previous_unattributed_exception_sha256": "d5bc7b486ee771978ccbbe0ebeb3dc9ff89488d5f6144c4e4af3286154f4e020",
+    "unattributed_exception_in_direct_zip_elfs": false
+  },
+  "sources": [
+    {
+      "path": "/bin/sc_qnx_vip_proxy",
+      "bytes": 335440,
+      "sha256": "c367be16ebdc7da9e55bf6575cfceb8f4a9f900d5146ef743d0d0b6527513d55"
+    },
+    {
+      "path": "/bin/VsomeipTestService",
+      "bytes": 46992,
+      "sha256": "6df50cb8d4a3022a663c0f84fd506415c65cbe68ea9729851c5b892c90188bd8"
+    },
+    {
+      "path": "/lib64/libvsomeip.so.2.10.21",
+      "bytes": 2615544,
+      "sha256": "da18a212bb894c5875995321be81bd9b220c87721952ada3c3050f6046d609b5"
+    },
+    {
+      "path": "/lib64/libMAX96755_QC_0_UART.so",
+      "bytes": 35600,
+      "sha256": "3a75815e494bf5d5bbcd8155097f0a7046a24526f33fe8718003836b02b62b80"
+    },
+    {
+      "path": "/lib64/libMAX96755_QC_1_UART.so",
+      "bytes": 35720,
+      "sha256": "9305e7023370fd968e705493df99c81d66770e89edcfb2cb327b4548c9be1a71"
+    },
+    {
+      "path": "/lib64/libqdi.so",
+      "bytes": 215272,
+      "sha256": "2ffb90430b6be6a925f670020e8eec5ef01b5152117b517c42c5952119a5e7db"
+    },
+    {
+      "path": "/etc/vsomeip.json",
+      "bytes": 4375,
+      "sha256": "459d45f5f8395d32e5c3f7079df28e47f0790516afef8c078171ded28d19d315"
+    },
+    {
+      "path": "/etc/slm_ecarx_android.xml",
+      "bytes": 2848,
+      "sha256": "1c7a3ef6170da67896eea3c5cb343f387e69c68ad3b66b16ddbf38ae6096fd02"
+    },
+    {
+      "path": "/scripts/startup.sh",
+      "bytes": 30116,
+      "sha256": "db9d3c055ed19c240546bdeebaadf7a07c291c201707b46ca4c396dd35dfb729"
+    },
+    {
+      "path": "/lib64/screen-c2d.so",
+      "bytes": 58104,
+      "sha256": "95e70d54c315d4ec6030965aa66f6f745364522ada888a34ebb725cf4f17596a"
+    },
+    {
+      "path": "/lib64/graphics.conf",
+      "bytes": 1285,
+      "sha256": "a8387607efbccf06f2c0db78e1dee8301acfc7c21b488dde1fcc2339ad9622ca"
+    }
+  ],
+  "registrations": [
+    {
+      "service": "0xc9",
+      "instance": 1,
+      "method": 1,
+      "callback": "onRecvACK",
+      "callback_va": "0x7490",
+      "registration_call_va": "0x6728"
+    },
+    {
+      "service": "0xc9",
+      "instance": 1,
+      "method": 2,
+      "callback": "onRecvRegRvcEvent",
+      "callback_va": "0x5c70",
+      "registration_call_va": "0x6780"
+    },
+    {
+      "service": "0x191",
+      "instance": 1,
+      "method": 2,
+      "callback": "onRecvHeartBeat",
+      "callback_va": "0x70a0",
+      "registration_call_va": "0x67d8"
+    },
+    {
+      "service": "0xc7",
+      "instance": 1,
+      "method": 6,
+      "callback": "onRecvHealthMenagerHeartBeat",
+      "callback_va": "0x5dc8",
+      "registration_call_va": "0x6830"
+    },
+    {
+      "service": "0xc9",
+      "instance": 1,
+      "method": 3,
+      "callback": "onRecvUsbupdateReq",
+      "callback_va": "0x5fb0",
+      "registration_call_va": "0x6888"
+    },
+    {
+      "service": "0xc9",
+      "instance": 1,
+      "method": 4,
+      "callback": "onRecvLocalTimeSyncEvent",
+      "callback_va": "0x60d8",
+      "registration_call_va": "0x68e0"
+    }
+  ],
+  "dsp_dynamic_recovery": [
+    {
+      "path": "etc/images/dsp/capi_v2_bmt.so",
+      "sha256": "8b8522b37981838ffd5ceaa6ec5a909fab2ee017f5b49f1eb586e9bc1d9b25c3",
+      "bytes": 53248,
+      "machine": 164,
+      "declared_dynamic_offset": 57344,
+      "dynamic_va": 45056,
+      "recovered_dynamic_offset": 49152,
+      "dynamic_bytes": 128,
+      "symbol_count": 23,
+      "hash_buckets": 23,
+      "validated_relocations": 34,
+      "undefined": [
+        "__hexagon_udivsi3",
+        "sqrtf",
+        "tanf",
+        "frexpf",
+        "roundf",
+        "powf",
+        "memcmp",
+        "vsnprintf",
+        "memset",
+        "HAP_cx_malloc",
+        "HAP_cx_free",
+        "HAP_debug",
+        "__hexagon_divsf3",
+        "HAP_debug_v2",
+        "__hexagon_memcpy_likely_aligned_min32bytes_mult8bytes",
+        "memcpy",
+        "sinf",
+        "_Assert",
+        "ldexpf",
+        "cosf"
+      ],
+      "defined_functions": [
+        "capi_v2_bmt_init",
+        "capi_v2_bmt_get_static_properties"
+      ],
+      "validation": "DT_NULL; all mapped table ranges; symbol names bounded and terminated; SysV hash indexes; relocation symbol indexes and target VAs"
+    },
+    {
+      "path": "etc/images/dsp/capi_v2_fnb.so",
+      "sha256": "8de6937555158f4e82256c2cb13050f7a43c3a3ac926d4ca20e71c2290fc10d6",
+      "bytes": 57344,
+      "machine": 164,
+      "declared_dynamic_offset": 61440,
+      "dynamic_va": 49152,
+      "recovered_dynamic_offset": 53248,
+      "dynamic_bytes": 128,
+      "symbol_count": 19,
+      "hash_buckets": 19,
+      "validated_relocations": 29,
+      "undefined": [
+        "__hexagon_udivsi3",
+        "sqrtf",
+        "roundf",
+        "memcmp",
+        "HAP_cx_malloc",
+        "vsnprintf",
+        "memset",
+        "HAP_cx_free",
+        "HAP_debug",
+        "__hexagon_divsf3",
+        "HAP_debug_v2",
+        "__hexagon_memcpy_likely_aligned_min32bytes_mult8bytes",
+        "memcpy",
+        "_Assert",
+        "ldexpf",
+        "__hexagon_divsi3"
+      ],
+      "defined_functions": [
+        "capi_v2_fnb_init",
+        "capi_v2_fnb_get_static_properties"
+      ],
+      "validation": "DT_NULL; all mapped table ranges; symbol names bounded and terminated; SysV hash indexes; relocation symbol indexes and target VAs"
+    },
+    {
+      "path": "etc/images/dsp/capi_v2_peq.so",
+      "sha256": "5095a2aa303ff1e570a15edc87162c319c65b3603a5cca3143e1d4460ac3d545",
+      "bytes": 49152,
+      "machine": 164,
+      "declared_dynamic_offset": 53248,
+      "dynamic_va": 40960,
+      "recovered_dynamic_offset": 45056,
+      "dynamic_bytes": 128,
+      "symbol_count": 19,
+      "hash_buckets": 19,
+      "validated_relocations": 23,
+      "undefined": [
+        "sqrtf",
+        "tanf",
+        "frexpf",
+        "roundf",
+        "powf",
+        "HAP_cx_malloc",
+        "vsnprintf",
+        "memset",
+        "HAP_cx_free",
+        "HAP_debug",
+        "__hexagon_divsf3",
+        "HAP_debug_v2",
+        "__hexagon_memcpy_likely_aligned_min32bytes_mult8bytes",
+        "memcpy",
+        "_Assert",
+        "ldexpf"
+      ],
+      "defined_functions": [
+        "capi_v2_peq_init",
+        "capi_v2_peq_get_static_properties"
+      ],
+      "validation": "DT_NULL; all mapped table ranges; symbol names bounded and terminated; SysV hash indexes; relocation symbol indexes and target VAs"
+    },
+    {
+      "path": "etc/images/dsp/capi_v2_sumx.so",
+      "sha256": "82b6bc2a1d6054db3c36c964326acd8048c9a7b8b7d07be2acac558867559b8d",
+      "bytes": 65536,
+      "machine": 164,
+      "declared_dynamic_offset": 69632,
+      "dynamic_va": 57344,
+      "recovered_dynamic_offset": 61440,
+      "dynamic_bytes": 128,
+      "symbol_count": 20,
+      "hash_buckets": 20,
+      "validated_relocations": 60,
+      "undefined": [
+        "sqrtf",
+        "roundf",
+        "powf",
+        "memcmp",
+        "HAP_cx_malloc",
+        "vsnprintf",
+        "memset",
+        "HAP_cx_free",
+        "HAP_debug",
+        "__hexagon_divsf3",
+        "HAP_debug_v2",
+        "memmove",
+        "__hexagon_memcpy_likely_aligned_min32bytes_mult8bytes",
+        "memcpy",
+        "_Assert",
+        "sinf",
+        "floorf"
+      ],
+      "defined_functions": [
+        "capi_v2_sumx_get_static_properties",
+        "capi_v2_sumx_init"
+      ],
+      "validation": "DT_NULL; all mapped table ranges; symbol names bounded and terminated; SysV hash indexes; relocation symbol indexes and target VAs"
+    }
+  ],
+  "historical_dlt_recheck": {
+    "outer_zip_count": 61,
+    "expanded_stream_count": 258,
+    "unique_stream_sha256_count": 85,
+    "new_independent_observation": false
+  },
+  "limits": [
+    "Not exhaustive semantic reverse engineering",
+    "No vehicle commands or runtime/APK changes",
+    "Mappings and videos are not synchronized",
+    "Renderer, receiving nav dispatcher and independent wings hide remain OPEN"
+  ],
+  "indirect_graphics_consumer": {
+    "path": "/lib64/screen-c2d.so",
+    "binder_va": "0x76a0",
+    "blit_callback_va": "0x63d0",
+    "callback_slot": "0x40",
+    "draw_pointer_storage_va": "0x1d0b8",
+    "draw_calls": [
+      "0x69c8",
+      "0x6bcc"
+    ],
+    "arguments_supplied_by_caller": {
+      "source_rectangle": [
+        "0x0",
+        "0x4",
+        "0x8",
+        "0xc"
+      ],
+      "destination_rectangle": [
+        "0x10",
+        "0x14",
+        "0x18",
+        "0x1c"
+      ],
+      "transparency": "0x20",
+      "premult_alpha": "0x24",
+      "global_alpha": "0x28",
+      "quality": "0x2c",
+      "rotation": "0x30",
+      "flip": "0x34",
+      "mirror": "0x38"
+    },
+    "direct_graphics_imports": 0,
+    "observed_in_ten_vehicle280555_mappings": false,
+    "wing_pixel_owner_proven": false
+  }
+}

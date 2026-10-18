@@ -1,5 +1,31 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 18.10.2026 — SOME/IP dispatch, MAX96755 getter и четыре DSP-таблицы
+
+STATIC по существующему ZIP578306: все шесть регистраций sc_qnx_vip_proxy
+сопоставлены с реальными callback и назначением vtable. Прослеженные потребители
+обслуживают ACK/питание, heartbeat/health, USB, время и RVC. Display notification
+в проверенной ветви относится к камере заднего вида, не к navigation layout.
+VsomeipTestService sendFullMapModeReq — уже известный тестовый sender;
+дополнительно разобран callback0x3378, не меняющий графическое состояние.
+MAX96755_QC_0 GetCustomAttr0x364c возвращает геометрию/параметры строк узла.
+Загрузка обеих UART panel libraries в openwfd_server подтверждена старым mapping,
+но вызов getter во время анимации не установлен.
+
+Дополнительно прослежен screen-c2d: dlsym binding→blit callback→c2dDraw;
+геометрия/alpha поступают от caller, связь с крыльями не установлена. Прежние31
+относятся только к direct-import candidates, не ко всему графическому коду.
+Четыре прежних DSP dynamic-table ошибки разобраны: данные доступны по
+PT_DYNAMIC.p_vaddr через PT_LOAD, хотя p_offset заEOF. Проверены все таблицы
+и146relocations; новых Screen/OpenWFD/GLES consumers не выявлено.
+Поправка provenance: прямо в ZIP976QNXentries/732ELFpaths/689uniqueSHA,
+а977/733/690 ниже — прежний извлечённый корпус. Пятая прежняя exception
+не соответствует ELF в этом ZIP. Все31graphics candidates сверены по SHA.
+Не считать восстановление metadata полным semantic reverse engineering.
+[Подробный разбор и машинные источники](docs/geely-kx11/research-2026-10-17-white-bar/QNX_DISPATCH_AND_DSP_20261018_RU.md).
+Renderer/принимающий navigation dispatcher/независимый hide OPEN;
+production/APK/FIELD исправления не менялись. Новый полный сбор не требуется.
+
 ## 17.10.2026 21:44 МСК — исправлено покрытие ELF, новые дампы не запрошены
 
 USER correction: полный QNX уже передан; продолжать анализ имеющихся байтов.
