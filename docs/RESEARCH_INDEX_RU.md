@@ -137,3 +137,5 @@ QNX отказал до handshake; каталог/mappings остаются BLOC
 - [18.10: два корректных wings-сбора3.3.1, границы Android кадра и OFF](geely-kx11/research-2026-10-18-wings/FIELD_331_WINGS_RU.md).
 
 - [18.10: публичная схема DIM≠DIS, Continental и ограничения идентификации](geely-kx11/research-2026-10-18-wings/WEB_DIM_IDENTITY_RU.md).
+
+- [18.10: непрерывная запись DIM](geely-kx11/research-2026-10-18-wings/DIM_UART_RECORDING_RU.md): SOURCE/portable TEST; APK/FIELD OPEN.

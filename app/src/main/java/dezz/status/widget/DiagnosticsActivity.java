@@ -79,6 +79,15 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
     private Button systemDumpShare;
     private Button systemDumpSave;
     private TextView systemDumpState;
+    private TextView dimCaptureState;
+    private final android.os.Handler dimStatusHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable dimStatusRefresh = new Runnable() {
+        @Override public void run() {
+            if (!screenResumed) return;
+            dimCaptureState.setText(dezz.status.widget.diagnostics.DimUartCapture.status());
+            dimStatusHandler.postDelayed(this, 1000);
+        }
+    };
     private File systemDumpFile;
     private long refreshGeneration;
     private long lifecycleGeneration;
@@ -108,6 +117,7 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
     protected void onResume() {
         super.onResume();
         screenResumed = true;
+        dimStatusHandler.post(dimStatusRefresh);
         refreshAll();
         if (systemDumpFile == null && systemDumpSession == null) {
             final Context app = getApplicationContext();
@@ -132,6 +142,7 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
 
     @Override protected void onPause() {
         screenResumed = false;
+        dimStatusHandler.removeCallbacks(dimStatusRefresh);
         lifecycleGeneration++;
         refreshGeneration++;
         refreshWorker.getQueue().clear();
@@ -262,6 +273,39 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
                     .setPositiveButton("Крылья видны", (dialog, which) -> startSystemDump("wings_visible")).show();
         });
         page.addView(wingsArchive, topMargin(8));
+        Button dimRecord = button("Запись обмена DIM: начать / остановить");
+        dimRecord.setOnClickListener(view -> {
+            if (dezz.status.widget.diagnostics.DimUartCapture.running()) {
+                dezz.status.widget.diagnostics.DimUartCapture.stop();
+                systemDumpState.setText(dezz.status.widget.diagnostics.DimUartCapture.status());
+                return;
+            }
+            new AlertDialog.Builder(this).setTitle("Записать обмен DIM")
+                    .setMessage("На стоянке запустите запись, затем воспроизведите появление крыльев. "
+                            + "Снимите видео приборки с часами для сопоставления. Читается существующий системный журнал; "
+                            + "режимы автомобиля не меняются. Предел — 20 минут или 64 МиБ, до трёх записей. "
+                            + "Запись продолжится при выходе с экрана, пока процесс работает. После перезагрузки "
+                            + "уже сохранённые данные можно выгрузить, запись сама не возобновится. ZIP передавайте лично.")
+                    .setNegativeButton("Отмена", null)
+                    .setPositiveButton("Начать", (dialog, which) -> {
+                        boolean started = dezz.status.widget.diagnostics.DimUartCapture.start(getApplicationContext(), BuildConfig.VERSION_NAME);
+                        systemDumpState.setText(started ? dezz.status.widget.diagnostics.DimUartCapture.status()
+                                : "Другой сбор уже выполняется.");
+                    }).show();
+        });
+        page.addView(dimRecord, topMargin(8));
+        dimCaptureState = label(dezz.status.widget.diagnostics.DimUartCapture.status());
+        page.addView(dimCaptureState, topMargin(8));
+        Button dimExport = button("Выгрузить сохранённые записи DIM");
+        dimExport.setOnClickListener(view -> dimRecordingFiles(false));
+        page.addView(dimExport, topMargin(8));
+        Button dimDelete = button("Удалить сохранённые записи DIM");
+        dimDelete.setOnClickListener(view -> new AlertDialog.Builder(this)
+                .setTitle("Удалить записи DIM?")
+                .setMessage("Сначала сохраните выгруженный ZIP. Все три исходные записи будут удалены.")
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Удалить", (dialog, which) -> dimRecordingFiles(true)).show());
+        page.addView(dimDelete, topMargin(8));
         systemDumpState = label("Отдельный сбор DIM/UART через ADB: системные файлы, не полный образ прошивки.");
         page.addView(systemDumpState, topMargin(8));
 
@@ -559,6 +603,28 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
     }
 
     private void refreshRecorder() { refreshJournal(); }
+
+    private void dimRecordingFiles(boolean delete) {
+        final Context app = getApplicationContext();
+        try { exportWorker.execute(() -> {
+            try {
+                File file;
+                if (delete) { dezz.status.widget.diagnostics.DimUartCapture.delete(app); file = null; }
+                else file = dezz.status.widget.diagnostics.DimUartCapture.export(app);
+                runOnUiThread(() -> {
+                    if (isDestroyed()) return;
+                    if (file != null) share(file, "application/zip");
+                    else systemDumpState.setText(dezz.status.widget.diagnostics.DimUartCapture.status());
+                });
+            } catch (Exception error) {
+                runOnUiThread(() -> {
+                    if (!isDestroyed()) systemDumpState.setText("Записи DIM: " + error.getMessage());
+                });
+            }
+        }); } catch (java.util.concurrent.RejectedExecutionException busy) {
+            systemDumpState.setText("Дождитесь завершения текущего экспорта.");
+        }
+    }
 
     private void exportAsync(int type) {
         final long expected = lifecycleGeneration;

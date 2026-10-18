@@ -471,6 +471,13 @@
           "finding": "USER has no DIM passport and requests web research. Geely separates DIM4/223 from DIS4/487; Continental corporate-supplied2021 statement identifies separate Xingyue L display controller with cluster/HUD outputs. Exact user hardware/firmware and opcode14 receiver remain unknown. GLDS shown part numbers belong to selected VGM, not DIM.",
           "source": "research-2026-10-18-wings/WEB_DIM_IDENTITY_RU.md",
           "next_step": "Search exact Continental KX11 DIM controller label/firmware, distinguishing DIS. No duplicate full HU dump prerequisite; independent hide remains OPEN."
+        },
+        {
+          "date": "2026-10-18",
+          "level": "SOURCE_PORTABLE_TEST",
+          "finding": "Explicit continuous passive linoverlvds logcat capture with durable partial files; no automatic restart, root, vehicle write or second UART/HIDL consumer. APK/FIELD OPEN.",
+          "source": "research-2026-10-18-wings/DIM_UART_RECORDING_RU.md",
+          "next_step": "Complete Android CI then synchronize physical video with captured TX/RX across the transition; ACK is not visual proof."
         }
       ],
       "coverage_ids": [

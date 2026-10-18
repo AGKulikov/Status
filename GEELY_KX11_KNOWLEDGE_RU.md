@@ -3051,3 +3051,13 @@ USER: идентифицировать получатель. Проверены 
 ## 18.10.2026 — внешний DIM: публичная архитектура и поставщик
 
 SOURCE_DOCUMENT: Geely IPC стр12 различает DIM-контроллер и DIS-экран, IHU→DIM→DIS/HUD. PUBLIC_VENDOR_STATEMENT: Continental описывает такой контроллер для Xingyue L2021, не паспорт пользовательского блока. GLDS DIM1013 — диагностическое имя; номера справа на примере относятся к выбранному VGM. OEM8892940491/ECMC1 на фото дисплея нельзя считать идентичностью DIM. [Источники и ограничения](docs/geely-kx11/research-2026-10-18-wings/WEB_DIM_IDENTITY_RU.md). CLUSTER_WINGS OPEN; следующий поиск — точный отдельный Continental DIM и соответствующий образ/handler, не ещё один HU dump.
+
+
+## 18.10.2026 — пассивная запись существующего UART logcat
+
+SOURCE: отдельный bounded logcat collector linoverlvds, без ttydim reader/HIDL
+callback/root/изменения режима. Уже полученные байты сохраняются отдельно
+от ZIP; после перезагрузки возможен экспорт, автоматического старта нет.
+TEST portable; APK/Android CI/FIELD OPEN. Содержимое logcat не доказывает
+физический эффект; source marker/terminal отражают обрыв, не ACK команды.
+[Протокол](docs/geely-kx11/research-2026-10-18-wings/DIM_UART_RECORDING_RU.md).

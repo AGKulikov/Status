@@ -898,3 +898,16 @@ BackupDefaultsMigration явно допускает335…352→353 с прежн
 Неизвестная334 и будущая354 отвергаются; тест проверяет перенос explicit values.
 Новых settings и storage roots нет; fingerprint migration пересмотрен.
 Аппаратная приёмка restore остаётся OPEN.
+
+
+## Review18.10.2026 — DimUartCapture / DimUartRecording
+
+Пересмотрены DiagnosticsActivity и два новых storage owners.
+files/diagnostics/dim-uart/session-* содержит только архивные свидетельства:
+metadata/state/terminal/uart.log; не prefs, не executable queue. На старте нет
+чтения marker для запуска: восстановленные данные не активируют ADB/команды.
+Прежняя группа files/diagnostics включается рекурсивно в архив по действующему
+контракту; новых adapters/keys/defaults/migrations нет. Макс3×64МиБ, ручное
+удаление. cache/exports Natro-dim-uart-* хранит2ZIP; в restore payload не входит.
+Экспорт блокируется активным сбором; symlink не читается. Transport ключи прежние.
+Fingerprints обновлены только после этого review. Runtime backup FIELD OPEN.

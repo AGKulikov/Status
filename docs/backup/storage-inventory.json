@@ -444,7 +444,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/DiagnosticsActivity.java": {
-      "sha256": "82918c381fcb8b25a472656ea9fa2f82f79dc4cc10f28a1794d8996f92e6b329",
+      "sha256": "503b14c65440cca9137da75974ebc6d4c3630859eb69b7a399eff31ea59700dc",
       "access_kinds": [
         "files"
       ]
@@ -756,6 +756,18 @@
     },
     "app/src/main/java/dezz/status/widget/diagnostics/WingsEvidenceArchive.java": {
       "sha256": "2565019a9bd012b97c9e3b6032934a81e2706d41c731dbb7d4cfea6b42b683ad",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/diagnostics/DimUartCapture.java": {
+      "sha256": "88e1d4159807185ec94d386cfeae055f4a6149b4915c5502fbeac34adf7ed1df",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/diagnostics/DimUartRecording.java": {
+      "sha256": "98fa1f9fbada8c763ab2bfee1d6e80f90c74badc764be889484230dc499e7000",
       "access_kinds": [
         "files"
       ]

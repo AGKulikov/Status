@@ -111,5 +111,22 @@ public final class AdbSessionReplay {
         method.setAccessible(true);String reason=(String)method.invoke(null,interrupted);
         check(reason.contains("InterruptedException")&&reason.contains("ADB timeout at shell"),"suppressed timeout retained");
     }
-    public static void main(String[] args) throws Exception { root();cancellation();partialFailure();timedCapture();System.out.println("ADB session: PASS"); }
+    static void dimStream() throws Exception {
+        for (boolean cancel : new boolean[]{false, true}) {
+            AdbTransport.reset();
+            try (AdbConsoleSession session = new AdbConsoleSession(new Context())) {
+                session.connect();
+                java.io.ByteArrayOutputStream prefix = new java.io.ByteArrayOutputStream();
+                if (cancel) AdbTransport.afterOutput = () -> session.cancel("user_stop");
+                else AdbTransport.failAfterOutput = true;
+                try { session.recordDimLog(chunk -> prefix.write(chunk, 0, chunk.length)); throw new AssertionError(); }
+                catch (java.io.IOException expected) {}
+                check(prefix.size() > 0, "prefix survives cancel/disconnect");
+                check(AdbTransport.commands.size() == 1 && AdbTransport.services.isEmpty(), "one read, no retry/root");
+                check(AdbTransport.commands.get(0).equals("logcat -b all -v threadtime -T 1 'linoverlvds:V' '*:S'"), "fixed log source");
+                check(AdbTransport.lastTimeout == 1_200_000L, "bounded long-lived capture");
+            }
+        }
+    }
+    public static void main(String[] args) throws Exception { root();cancellation();partialFailure();timedCapture();dimStream();System.out.println("ADB session: PASS"); }
 }

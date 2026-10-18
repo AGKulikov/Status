@@ -25,6 +25,12 @@ public class AdbTransport {
     }
     public void execRaw(String wrapped,Consumer<byte[]> output) throws IOException {
         commands.add(wrapped);
+        if (wrapped.startsWith("logcat ")) {
+            output.accept("UART prefix\n".getBytes(StandardCharsets.UTF_8));
+            if (afterOutput != null) afterOutput.run();
+            if (failAfterOutput) throw new IOException("synthetic disconnect");
+            return;
+        }
         java.util.regex.Matcher match = java.util.regex.Pattern.compile("NATRO_EXIT_[0-9a-f]{32}").matcher(wrapped);
         if (!match.find()) throw new IllegalArgumentException("Missing shell framing nonce");
         String marker = match.group();

@@ -37,6 +37,13 @@ public final class AdbConsoleSession implements AutoCloseable {
         transport.collectQnxFull(receiver);checkCancelled();
     }
     public boolean connected() { return transport != null; }
+    /** Fixed passive source, private cancellable connection; never opens the DIM device. */
+    public void recordDimLog(java.util.function.Consumer<byte[]> sink) throws Exception {
+        checkCancelled();
+        if (transport == null) throw new IOException("ADB disconnected");
+        transport.execRaw("logcat -b all -v threadtime -T 1 'linoverlvds:V' '*:S'", sink, 1_200_000L);
+        checkCancelled();
+    }
     public boolean busy() { return busy.get(); }
     public String stage() { return stage; }
     public String rootProbeSummary() { return rootProbeSummary; }

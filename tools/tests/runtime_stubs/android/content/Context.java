@@ -8,6 +8,8 @@ public class Context {
     public final TelecomManager telecom = new TelecomManager();
     private final Map<String,SharedPreferences> prefs = new HashMap<>();
     public Context getApplicationContext() { return this; }
+    public java.io.File getFilesDir() { return new java.io.File(System.getProperty("java.io.tmpdir"), "fixture-files"); }
+    public java.io.File getCacheDir() { return new java.io.File(System.getProperty("java.io.tmpdir"), "fixture-cache"); }
     public Context createDeviceProtectedStorageContext() { return this; }
     public String getPackageName() { return "ru.natro.statuswidget"; }
     public PackageManager getPackageManager() { return packages; }
