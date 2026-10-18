@@ -1,0 +1,67 @@
+{
+  "versionName": "3.3.1",
+  "versionCode": 208021364,
+  "releaseId": 416467464,
+  "tag": "natro-v3.3.1",
+  "publishedAt": "2026-10-18T13:30:30Z",
+  "channel": "stable",
+  "latest": true,
+  "draft": false,
+  "prerelease": false,
+  "sourceCommit": "1ec7f42fbb1f877a177e16fb6432f053f3360d1a",
+  "publicationCommit": "d343096930554492fd476e30945556451dd2bd9d",
+  "publisherRun": 39131800780,
+  "publisherJob": 117688327590,
+  "publisherConclusion": "success",
+  "readback": {
+    "assetCount": 7,
+    "allChecksumsPassed": true,
+    "allBytesCompared": true,
+    "signatureAndPayloadVerified": true
+  },
+  "assets": [
+    {
+      "name": "Natro-3.3.1-signed.apk",
+      "size": 29780576,
+      "digest": "sha256:b12e7c21c5360b7c75fae6f0967e2f36da49ba8f55b98f804e18c37932fc05ba",
+      "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.3.1/Natro-3.3.1-signed.apk"
+    },
+    {
+      "name": "Natro-3.3.1-source.tar.gz",
+      "size": 33497551,
+      "digest": "sha256:07f60d6b5a66df2df6710808a32c41554ee37e49318d0e2fa1f9c426ae3f39ce",
+      "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.3.1/Natro-3.3.1-source.tar.gz"
+    },
+    {
+      "name": "natro-update.json",
+      "size": 389,
+      "digest": "sha256:d5d8f3953ca4812c1273b9ec628050b402fd438c9dbea3af651079050e52694b",
+      "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.3.1/natro-update.json"
+    },
+    {
+      "name": "README_RU.md",
+      "size": 2491,
+      "digest": "sha256:22f98d4c81c7a17c228a0463488829191ae94a53273a5a6e01a9c3a8efd19c5f",
+      "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.3.1/README_RU.md"
+    },
+    {
+      "name": "release-report.json",
+      "size": 3476,
+      "digest": "sha256:fcad09d8f98582ea42cfc5eeddf0eb6e3830b06f0df53f15a0303e0f0cafc83a",
+      "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.3.1/release-report.json"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "size": 523,
+      "digest": "sha256:a42f4ec1a6e635e738ac3746edea20212278f7c2b6b67ef3874d9b4bb08841ec",
+      "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.3.1/SHA256SUMS.txt"
+    },
+    {
+      "name": "signature-verification.txt",
+      "size": 2341,
+      "digest": "sha256:64e2120c2d8b27ca604ab56544853b36687e6b327c2c94b2b4c5c4e33b47f9c9",
+      "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.3.1/signature-verification.txt"
+    }
+  ],
+  "fieldAcceptance": "OPEN: OEM dialog, 10 ON/OFF cycles, physical install-over, independent wings hide"
+}

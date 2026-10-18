@@ -1,11 +1,11 @@
 # Natro
 
-**3.3.1 / 208021364 собрана и подписана; stable публикация проверяется.** [Состав и доказательства](docs/releases/3.3.1/README_RU.md). 2185 Android и 266 tool tests PASS, прежний сертификат/API28/exact CI payload подтверждены. FIELD OEM-диалога и циклов включения/выключения OPEN. Рабочая ветка `fix/media-touch-329`; source `1ec7f42fbb1f877a177e16fb6432f053f3360d1a`.
+**Выпущена [3.3.1 / 208021364](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.1), stable/latest.** [Состав и доказательства](docs/releases/3.3.1/README_RU.md). 2185 Android и 266 tool tests PASS, прежний сертификат/API28/exact CI payload подтверждены. Все7файлов релиза скачаны и побайтно сверены. FIELD OEM-диалога и циклов включения/выключения OPEN. Рабочая ветка `fix/media-touch-329`; source `1ec7f42fbb1f877a177e16fb6432f053f3360d1a`.
 
 
-18.10, SOURCE: [отмена старого OFF и освобождение DIM с проверкой владельца](docs/geely-kx11/research-2026-10-18-wings/SWITCH_CLOSE_FIX_RU.md). Локальный replay прошёл; Android CI и FIELD переключения ещё открыты. Подписанная версия в канале остаётся3.3.0.
+История до выпуска3.3.1 — 18.10, SOURCE: [отмена старого OFF и освобождение DIM с проверкой владельца](docs/geely-kx11/research-2026-10-18-wings/SWITCH_CLOSE_FIX_RU.md). Локальный replay прошёл; Android CI и FIELD переключения ещё открыты. Подписанная версия в канале остаётся3.3.0.
 
-18.10, после3.3.0: [первые wings ZIP и сравнение переноса mNavi/MConfig](docs/geely-kx11/research-2026-10-18-wings/FIELD_0859_AND_SWITCHING_RU.md). Узкий SOURCE/replay фикс screencap help; переключатель без остановки и OEM-диалог ещё OPEN. Нового APK в канале нет.
+История до выпуска3.3.1 — 18.10, после3.3.0: [первые wings ZIP и сравнение переноса mNavi/MConfig](docs/geely-kx11/research-2026-10-18-wings/FIELD_0859_AND_SWITCHING_RU.md). Узкий SOURCE/replay фикс screencap help; переключатель без остановки и OEM-диалог ещё OPEN. Нового APK в канале нет.
 
 **Выпущена [3.3.0 /208021363](docs/releases/3.3.0/README_RU.md):** адресный сбор крыльев внутри Natro, без Mac. Ветка разработки `fix/media-touch-329`. 2184 Android и266 tool tests PASS; прежняя подпись/API28/CI payload проверены. Stable/latest и все7файлов проверены; FIELD сборщика и renderer/hide OPEN.
 
