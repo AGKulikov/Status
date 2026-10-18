@@ -2,12 +2,10 @@
 package dezz.status.widget.instrument;
 
 import android.app.ActivityManager;
-import android.app.ActivityOptions;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.hardware.display.DisplayManager;
-import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
@@ -150,22 +148,27 @@ public final class InstrumentDisplayLauncher {
         @Override public void readOwner(BooleanSupplier current,
                 Consumer<InstrumentPanelCloseCoordinator.Owner> done) {
             int display = new InstrumentPanelStore(app).load().displayId;
+            InstrumentOwnerQuery query = new InstrumentOwnerQuery();
             // Same read-only ownership source as OEM navigation recovery. No task manipulation
             // or package stop is delegated to shell; unavailable ownership preserves DIM.
             dezz.status.widget.shell.PrivilegedShell.get(app).runCommand(
-                    () -> current.getAsBoolean() ? "am stack list" : null, (output, error) -> {
+                    () -> {
+                        if (!current.getAsBoolean()) return null;
+                        return query.command(SystemClock.uptimeMillis());
+                    }, (output, error) -> {
                 if (!current.getAsBoolean()) return;
-                ownerObservedAt = SystemClock.uptimeMillis();
-                done.accept(error == null
-                        ? InstrumentDisplayOwner.ownerAfterClose(output, display, app.getPackageName())
-                        : InstrumentPanelCloseCoordinator.Owner.UNKNOWN);
+                InstrumentOwnerQuery.Observation observed = query.finish(output, error,
+                        SystemClock.uptimeMillis(), display, app.getPackageName());
+                ownerObservedAt = observed.observedAt;
+                trace("close owner snapshot " + observed.description);
+                done.accept(observed.owner);
             });
         }
 
         @Override public void restoreDim(BooleanSupplier current, Consumer<Boolean> done) {
             execute(() -> {
                 if (!current.getAsBoolean() || new InstrumentPanelStore(app).isEnabled()) return;
-                if (SystemClock.uptimeMillis() - ownerObservedAt > 1_500L) {
+                if (SystemClock.uptimeMillis() - ownerObservedAt > InstrumentOwnerQuery.MAX_AGE_MS) {
                     MAIN.post(() -> done.accept(false));
                     trace("close preserved DIM: owner snapshot expired in worker queue");
                     return;
@@ -187,7 +190,7 @@ public final class InstrumentDisplayLauncher {
 
         @Override public void trace(String message) {
             InstrumentDisplayLauncher.trace(message);
-            if (message.contains("UNKNOWN") || message.contains("timeout")
+            if (message.startsWith("close preserved DIM owner=UNKNOWN") || message.contains("timeout")
                     || message.equals("close DIM stock readback=false")) {
                 dezz.status.widget.diagnostics.CausalDiagnostics.capture("instrument_close_unconfirmed", false);
                 android.widget.Toast.makeText(app,
@@ -307,17 +310,9 @@ public final class InstrumentDisplayLauncher {
                         completion.accept(false);
                         return;
                     }
-                    Intent intent = new Intent(app, InstrumentPanelActivity.class)
-                            .setAction(Intent.ACTION_MAIN)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            .putExtra(InstrumentPanelStore.EXTRA_LAUNCH_TOKEN, launchToken);
-                    ActivityOptions options = ActivityOptions.makeBasic();
-                    options.setLaunchDisplayId(displayId);
-                    Bundle launchOptions = options.toBundle();
-                    launchOptions.putInt("android.activity.windowingMode", 5);
-                    launchOptions.putInt("android.activity.SplitScreenShownPosition", 0);
                     try {
-                        app.startActivity(intent, launchOptions);
+                        InstrumentPanelTaskLauncher.start(app, displayId, launchToken);
+                        trace("instrument task submitted route=public-batch-single display=" + displayId);
                         completion.accept(true);
                     } catch (RuntimeException failure) {
                         trace("activity start failed=" + failure.getClass().getSimpleName()

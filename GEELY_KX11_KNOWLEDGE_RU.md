@@ -1,5 +1,21 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 18.10.2026 — 3.3.2 SOURCE: OEM-преддиалог и завершённый OFF
+
+STATIC framework/services из KX11 dump20.24.10.23024.41151/539: одиночный
+Instrumentation.execStartActivity перед запуском проверяет верхний пакет другого
+дисплея; getOtherThanCurrentDisplay(2)=0, поэтому настройки Natro могут вызвать
+CSD/PSD-диалог вместо создания окна. Public startActivities с одним собственным
+intent проходит в обычный ActivityStarter с теми же options/правами, без этого
+преддиалога. SOURCE выделяет данный путь; никакой остановки пакета/переноса settings.
+OFF использует BEGIN/exit0/freshness и5ограниченных повторных чтений UNKNOWN;
+полный пустой display допускает FREE, видимая собственная панель ждёт удаления.
+Production replay/ICU PASS; Android CI/APK ожидаются. FIELD10циклов OPEN.
+Точная причина исторического UNKNOWN по отсутствующему raw ответу не установлена;
+совпадение JAR с текущей машиной не измерено. Renderer/hide крыльев не реализован.
+[Разбор и SHA](docs/geely-kx11/research-2026-10-18-wings/OEM_LAUNCH_332_RU.md).
+
+
 ## 18.10.2026 — 3.3.1 OFF остановился на UNKNOWN
 
 FIELD: собственная Activity закрылась, но CloseCoordinator завершил переход

@@ -279,6 +279,10 @@ public final class InstrumentPanelContractTest {
                 + "InstrumentClusterView.java"));
         String launcher = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
                 + "InstrumentDisplayLauncher.java"));
+        String taskLauncher = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
+                + "InstrumentPanelTaskLauncher.java"));
+        String ownerQuery = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
+                + "InstrumentOwnerQuery.java"));
 
         assertTrue(repository.contains("ownerMetrics"));
         assertTrue(repository.contains("reconcileSubscriptionLocked"));
@@ -462,10 +466,11 @@ public final class InstrumentPanelContractTest {
         assertTrue(launcher.contains("DIM_NAVIGATION_MODE = 3"));
         assertTrue(launcher.contains("switchNaviMode"));
         assertTrue(launcher.contains("(byte) 2, (byte) 8, (byte) 8"));
-        assertTrue(launcher.contains("setLaunchDisplayId(displayId)"));
-        assertTrue(launcher.contains("setAction(Intent.ACTION_MAIN)"));
-        assertTrue(launcher.contains("android.activity.windowingMode"));
-        assertTrue(launcher.contains("android.activity.SplitScreenShownPosition"));
+        assertTrue(launcher.contains("InstrumentPanelTaskLauncher.start(app, displayId, launchToken)"));
+        assertTrue(taskLauncher.contains("setLaunchDisplayId(displayId)"));
+        assertTrue(taskLauncher.contains("setAction(Intent.ACTION_MAIN)"));
+        assertTrue(taskLauncher.contains("android.activity.windowingMode"));
+        assertTrue(taskLauncher.contains("android.activity.SplitScreenShownPosition"));
         assertTrue(launcher.contains("DIM_WAKE_TO_TASK_RESET_MS = 200L"));
         assertTrue(launcher.contains("finishStalePanelTask"));
         assertTrue(launcher.contains("ensureClusterEndpointStarted(app)"));
@@ -477,7 +482,7 @@ public final class InstrumentPanelContractTest {
         assertFalse(launcher.contains("prepareInstrumentPanelLaunch"));
         assertFalse(launcher.contains("am force-stop"));
         // Ownership is read through the existing shell channel; launching remains direct.
-        assertTrue(launcher.contains("\"am stack list\""));
+        assertTrue(ownerQuery.contains("\"am stack list\""));
         assertFalse(launcher.contains("\"am start"));
         assertFalse(launcher.contains("\"am task"));
         assertFalse(launcher.contains("app.sendBroadcast(close)"));
@@ -493,9 +498,9 @@ public final class InstrumentPanelContractTest {
         assertTrue(client.contains("reconnectAfterInstrumentLaunch"));
         assertTrue(client.contains("binder.isBinderAlive() && binder.pingBinder()"));
         assertTrue(client.contains("retryMs = MIN_RETRY_MS"));
-        assertFalse(launcher.contains("Intent.FLAG_ACTIVITY_CLEAR_TOP"));
-        assertFalse(launcher.contains("Intent.FLAG_ACTIVITY_SINGLE_TOP"));
-        assertFalse(launcher.contains("Intent.FLAG_ACTIVITY_NO_ANIMATION"));
+        assertFalse((launcher+taskLauncher).contains("Intent.FLAG_ACTIVITY_CLEAR_TOP"));
+        assertFalse((launcher+taskLauncher).contains("Intent.FLAG_ACTIVITY_SINGLE_TOP"));
+        assertFalse((launcher+taskLauncher).contains("Intent.FLAG_ACTIVITY_NO_ANIMATION"));
         assertTrue(launcher.contains("DisplayManager.DisplayListener"));
         assertTrue(bootstrap.contains("InstrumentDisplayLauncher.reconcileAutomatic"));
         assertTrue(boot.contains("InstrumentDisplayLauncher.reconcileAutomatic"));

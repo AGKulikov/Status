@@ -1,0 +1,58 @@
+{
+  "versionName": "3.3.2",
+  "versionCode": 208021365,
+  "sourceStatus": "LOCAL_COMMIT_ONLY; final local commit identified by git history",
+  "checks": {
+    "system_file_dump_suite": {
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "adb_service_and_signature_handoff": {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "owner_query_after_transport_newline_normalization": {
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "note": "rerun of one test from the10-test suite, not an additional unique test"
+    },
+    "backup_inventory": {
+      "owners": 90,
+      "result": "PASS; static only"
+    },
+    "settings_editors": {
+      "editors": 48,
+      "methods": 253,
+      "labels": 3012,
+      "result": "PASS"
+    },
+    "diff_whitespace": "PASS"
+  },
+  "androidCI": "NOT_RUN: git push blocked by automatic approval review",
+  "apk": "NOT_BUILT_OR_SIGNED",
+  "remotePublication": "BLOCKED",
+  "approvalBlock": {
+    "action": "git push -u origin fix/instrument-switch-332 to AGKulikov/Status",
+    "firstReason": "Fix request was not accepted as explicit authorization for public source/research publication.",
+    "authorizationCheck": "Personal context recovered direct user instruction dated2026-10-14T15:23:35Z: не забывай все исходники выкладывать на гит и описание менять.",
+    "secondReason": "Automatic review rejected recovered authorization because it appeared in personal-context/tool output rather than a direct user message in this transcript.",
+    "nextStep": "Ask for direct confirmation of publishing the prepared3.3.2 source/report and releasing the verified APK; do not use an alternate push transport."
+  },
+  "field": {
+    "instrument_on_off": "OPEN:10cycles, no OEM dialog, unchanged process/HUD/ANCS/media",
+    "wings": "OPEN: renderer and independent hide not found; no implementation claimed",
+    "installOver": "NOT_RUN"
+  },
+  "approvalResolution": {
+    "date": "2026-10-18T17:34:10+03:00",
+    "userMessage": "Подтверждаю",
+    "scope": "Publish the prepared3.3.2 source/report to public AGKulikov/Status, build, verify, sign, and publish APK to update channel.",
+    "state": "DIRECT_USER_AUTHORIZATION; previous blocked checks retained as historical evidence"
+  }
+}

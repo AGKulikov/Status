@@ -57,11 +57,12 @@ public final class AdbShellResult {
         // the complete, per-command boundary separates that preamble from actual stdout.
         Matcher begin = Pattern.compile("\\r?\\n" + Pattern.quote(token)
                 + "_BEGIN\\r?\\n").matcher(output);
-        if (begin.find()) output = output.substring(begin.end());
+        boolean began = begin.find();
+        if (began) output = output.substring(begin.end());
         if (total <= outputLimit) output = output.replaceFirst("\\r?\\n" + token + ":[0-9]{1,3}\\r?\\n?$", "");
         else output += "\n… Вывод ограничен " + (outputLimit / 1024) + " КиБ; "
                 + (completed && code != null ? "команда дочитана до завершения." : "завершение команды не подтверждено.");
-        return new Result(output, completed ? code : null, total > outputLimit);
+        return new Result(output, completed ? code : null, total > outputLimit, began);
     }
     public static final class Failure extends java.io.IOException {
         public final Result partial;
@@ -78,8 +79,13 @@ public final class AdbShellResult {
         public final String output;
         public final Integer exitCode;
         public final boolean truncated;
+        public final boolean began;
         public Result(String output, Integer exitCode, boolean truncated) {
+            this(output, exitCode, truncated, false);
+        }
+        private Result(String output, Integer exitCode, boolean truncated, boolean began) {
             this.output = output; this.exitCode = exitCode; this.truncated = truncated;
+            this.began = began;
         }
         public boolean success() { return exitCode != null && exitCode == 0; }
         public String describe() {

@@ -1,5 +1,18 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review3.3.2 — отдельная задача приборки и подтверждённый OFF
+
+Пересмотрены diff launcher/owner/query/coordinator и AdbShellResult: только RAM,
+прежние launch token, диагностический журнал/retention и shell transport.
+Новых keys/defaults/roots/adapters нет. Begin-marker и exit status не меняют
+семантику существующих потребителей Result.success; строгий новый owner query
+проверяет оба маркера. Режим OEM-диалога/настройки прошивки не записываются.
+Версия365 требует defaults335…364→365; новая отдельная regression сохраняет
+explicit/unknown/effective значения и same-version XML, отклоняет334/366.
+Прежние version-specific tests сохранены. Fingerprint обновлён только для
+проверенного BackupDefaultsMigration после этого review. Runtime restore FIELD OPEN.
+
+
 ### Review3.3.1 — install-over и совместимость defaults
 
 Новый release code208021364 требует разрешить прежние схемы335…363→364.

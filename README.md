@@ -1,5 +1,7 @@
 # Natro
 
+**Готовится [3.3.2 / 208021365](docs/releases/3.3.2/README_RU.md)**: отдельный запуск приборки без пакетного OEM-преддиалога и подтверждённое освобождение DIM. Ветка `fix/instrument-switch-332`. [Исследование предоставленной прошивки](docs/geely-kx11/research-2026-10-18-wings/OEM_LAUNCH_332_RU.md). FIELD и независимое скрытие крыльев OPEN; текущий опубликованный выпуск ниже.
+
 **Выпущена [3.3.1 / 208021364](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.1), stable/latest.** [Состав и доказательства](docs/releases/3.3.1/README_RU.md). 2185 Android и 266 tool tests PASS, прежний сертификат/API28/exact CI payload подтверждены. Все7файлов релиза скачаны и побайтно сверены. FIELD OEM-диалога и циклов включения/выключения OPEN. Рабочая ветка `fix/media-touch-329`; source `1ec7f42fbb1f877a177e16fb6432f053f3360d1a`.
 
 

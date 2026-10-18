@@ -13,6 +13,25 @@ import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=28,application=Application.class)
 public class BackupDefaultsMigrationTest {
+    @Test public void instrument332PreservesEffectiveAndExplicitDefaults() throws Exception {
+        for(int source=208021335;source<=208021365;source++) {
+            Map<String,Object> defaults=new LinkedHashMap<>();defaults.put("enabled",false);defaults.put("old-default",7);
+            JSONObject metadata=new JSONObject().put("sourceVersionCode",source).put("defaultsSchema",source)
+                    .put("declaredMainDefaults",BackupPreferencesXml.encode(defaults));
+            File snapshot=new File(RuntimeEnvironment.getApplication().getCacheDir(),"332-"+source);
+            File main=BackupFiles.child(snapshot,"de_prefs/example_preferences.xml");
+            Map<String,Object> values=new LinkedHashMap<>();values.put("enabled",true);values.put("unknown-key","preserved");
+            BackupPreferencesXml.write(main,values);
+            BackupDefaultsMigration.materialize(snapshot,"example",metadata,208021365);
+            if(source!=208021365)values.put("old-default",7);
+            assertEquals(values,BackupPreferencesXml.read(main));
+        }
+        for(int invalid:new int[]{208021334,208021366}) {
+            JSONObject metadata=new JSONObject().put("sourceVersionCode",invalid).put("defaultsSchema",invalid)
+                    .put("declaredMainDefaults",BackupPreferencesXml.encode(Collections.emptyMap()));
+            try {BackupDefaultsMigration.validate(metadata,208021365);fail();}catch(IOException expected){}
+        }
+    }
     @Test public void instrument331PreservesEffectiveAndExplicitDefaults() throws Exception {
         for(int source=208021335;source<=208021364;source++) {
             Map<String,Object> defaults=new LinkedHashMap<>();defaults.put("enabled",false);defaults.put("old-default",7);

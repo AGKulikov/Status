@@ -24,26 +24,60 @@ final class InstrumentDisplayOwner {
     static boolean owns(String output, int display, String packageName) {
         Snapshot value = inspect(output, display, packageName);
         return value != null && value.own == 1 && value.unparsed == 0
-                && value.unknownBounds == 0 && value.overlapping == 0;
+                && value.malformedHeaders == 0 && value.unknownBounds == 0 && value.overlapping == 0;
     }
 
     /** A foreign dashboard must retain DIM even after our own task has been removed. */
     static InstrumentPanelCloseCoordinator.Owner ownerAfterClose(String output, int display,
                                                                   String packageName) {
-        if (output == null || !output.trim().startsWith("Stack id="))
+        return ownerAfterClose(output, display, packageName, false);
+    }
+
+    /** Only an exit-framed, complete command can establish an empty display. */
+    static InstrumentPanelCloseCoordinator.Owner ownerAfterClose(String output, int display,
+                                                                  String packageName, boolean complete) {
+        if (!"ok".equals(closeReason(output, display, packageName, complete)))
             return InstrumentPanelCloseCoordinator.Owner.UNKNOWN;
-        Snapshot value = inspect(output, display, packageName);
-        if (value == null || value.stacks == 0 || value.tasks == 0 || value.unparsed != 0
-                || value.unknownBounds != 0 || value.own > 1)
-            return InstrumentPanelCloseCoordinator.Owner.UNKNOWN;
+        Snapshot value = inspect(output.trim(), display, packageName);
         return value.foreignDashboard == 0 ? InstrumentPanelCloseCoordinator.Owner.FREE
                 : InstrumentPanelCloseCoordinator.Owner.OTHER;
+    }
+
+    static String describeClose(String output, int display, String packageName, boolean complete) {
+        String reason = closeReason(output, display, packageName, complete);
+        Snapshot value = output == null ? null : inspect(output.trim(), display, packageName);
+        return "reason=" + reason + ", complete=" + complete
+                + (value == null ? "" : ", all_stacks=" + value.allStacks + ", target_tasks="
+                    + value.tasks + ", foreign_dashboards=" + value.foreignDashboard
+                    + ", malformed_headers=" + value.malformedHeaders + ", unknown_lines=" + value.unknownLines)
+                + ", " + describe(output == null ? null : output.trim(), display, packageName);
+    }
+
+    private static String closeReason(String output, int display, String packageName, boolean complete) {
+        if (output == null || !output.trim().startsWith("Stack id=")) return "missing_stack_header";
+        Snapshot value = inspect(output.trim(), display, packageName);
+        if (value == null || value.allStacks == 0) return "invalid_snapshot";
+        if (value.malformedHeaders != 0) return "malformed_stack_header";
+        if (value.unknownLines != 0) return "unknown_snapshot_line";
+        if (value.unparsed != 0) return "unparsed_visible_or_task";
+        if (value.unknownBounds != 0) return "unknown_bounds";
+        if (value.own != 0) return "panel_still_visible";
+        if (!complete && (value.stacks == 0 || value.tasks == 0)) return "empty_unconfirmed";
+        return "ok";
     }
 
     private static Snapshot inspect(String output, int display, String packageName) {
         if (output == null || output.length() > 128 * 1024 || display < 0
                 || packageName == null || packageName.isEmpty()) return null;
         Snapshot value = new Snapshot();
+        for (String line : output.split("\\r?\\n")) {
+            String trimmed = line.trim();
+            boolean stack = STACK.matcher(line).matches();
+            if (trimmed.startsWith("Stack") && !stack)
+                value.malformedHeaders++;
+            if (!trimmed.isEmpty() && !stack && !trimmed.startsWith("taskId=")
+                    && !trimmed.startsWith("configuration=")) value.unknownLines++;
+        }
         Matcher headers = STACK.matcher(output);
         int start = -1;
         boolean target = false;
@@ -89,6 +123,7 @@ final class InstrumentDisplayOwner {
                 }
             }
             if (!next) break;
+            value.allStacks++;
             header = headers.group();
             start = headers.end();
             target = Integer.toString(display).equals(headers.group(1));
@@ -101,7 +136,8 @@ final class InstrumentDisplayOwner {
     }
 
     private static final class Snapshot {
-        int stacks, tasks, own, other, unparsed, overlapping, outside, unknownBounds, foreignDashboard;
+        int allStacks, stacks, tasks, own, other, unparsed, overlapping, outside, unknownBounds, foreignDashboard,
+                malformedHeaders, unknownLines;
         Area panel;
         final List<Area> others = new ArrayList<>();
     }

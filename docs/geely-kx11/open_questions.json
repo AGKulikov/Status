@@ -218,7 +218,8 @@
         "research-2026-10-18-wings/SOURCES.json",
         "research-2026-10-18-wings/FIELD_0859_AND_SWITCHING_RU.md",
         "research-2026-10-18-wings/SWITCH_CLOSE_FIX_RU.md",
-        "research-2026-10-18-wings/FIELD_331_WINGS_RU.md"
+        "research-2026-10-18-wings/FIELD_331_WINGS_RU.md",
+        "research-2026-10-18-wings/OEM_LAUNCH_332_RU.md"
       ],
       "evidence_updates": [
         {
@@ -439,6 +440,13 @@
           "level": "FIELD_ARCHIVE_VERIFIED",
           "finding": "Two3.3.1 archives: CRC/40manifest SHA PASS, eight PNG decoded; corrected help exit1 acceptance works. visible mode3 and normal mode1 have different boot IDs. No visible wings in Android builtin2; six Client display2 layers before/after both. Unnamed fullscreen/HUD layers map to plus.monjaro, not proof of wing pixel ownership. No synchronized physical photo/QDI1; renderer/hide and failed OFF UNKNOWN remain OPEN.",
           "source": "research-2026-10-18-wings/FIELD_331_WINGS_RU.md"
+        },
+        {
+          "date": "2026-10-18",
+          "level": "STATIC_SOURCE_PORTABLE_REPLAY",
+          "source": "research-2026-10-18-wings/OEM_LAUNCH_332_RU.md",
+          "finding": "Supplied framework/services539 establish package-scoped CSD/PSD dialog route: launch display2 maps other display0, so foreground Natro settings can intercept single startActivity before an Activity is created. Public one-intent startActivities retains regular ActivityStarter permission/options checks and own task affinity. Source changes this route and adds complete BEGIN/exit0/freshness-based OFF reads with up to5 cancellable retries. Exact historical UNKNOWN input remains unavailable; no independent wing renderer/hide found.",
+          "next_step": "Complete exact Android CI and signed3.3.2 update; GATE-059/066 on hardware. Wings require synchronized physical pixels and validated composition boundary; no duplicate whole-QNX request."
         }
       ],
       "coverage_ids": [
@@ -2086,6 +2094,11 @@
       "date": "2026-10-18",
       "scope": "Two verified3.3.1 wings snapshots; collector FIELD evidence, renderer and OFF gates remain OPEN.",
       "source": "research-2026-10-18-wings/FIELD_331_WINGS_RU.md"
+    },
+    {
+      "date": "2026-10-18",
+      "scope": "OEM launch path and OFF source/replay evidence; all prior gates/history retained; CLUSTER_WINGS remains OPEN.",
+      "source": "research-2026-10-18-wings/OEM_LAUNCH_332_RU.md"
     }
   ]
 }

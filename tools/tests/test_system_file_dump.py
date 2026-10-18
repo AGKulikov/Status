@@ -67,12 +67,17 @@ class SystemDumpTest(unittest.TestCase):
                 str(SOURCE/'instrument/InstrumentDisplayOwner.java'),
                 str(SOURCE/'instrument/InstrumentPanelCloseCoordinator.java'),
                 str(SOURCE/'instrument/InstrumentPanelLaunchCoordinator.java'),
+                str(SOURCE/'instrument/InstrumentOwnerQuery.java'),
+                str(SOURCE/'adb/AdbShellResult.java'),
                 str(ROOT/'tools/tests/java/InstrumentOwnerReplay.java'),
+                str(ROOT/'tools/tests/java/InstrumentOwnerQueryReplay.java'),
                 str(ROOT/'tools/tests/java/InstrumentCloseReplay.java')],capture_output=True,text=True)
             self.assertEqual(run.returncode,0,run.stderr)
             run=subprocess.run(['java','-cp',work,'dezz.status.widget.instrument.InstrumentOwnerReplay'],capture_output=True,text=True,timeout=15)
             self.assertEqual(run.returncode,0,run.stdout+run.stderr)
             run=subprocess.run(['java','-cp',work,'dezz.status.widget.instrument.InstrumentCloseReplay'],capture_output=True,text=True,timeout=15)
+            self.assertEqual(run.returncode,0,run.stdout+run.stderr)
+            run=subprocess.run(['java','-cp',work,'dezz.status.widget.instrument.InstrumentOwnerQueryReplay'],capture_output=True,text=True,timeout=15)
             self.assertEqual(run.returncode,0,run.stdout+run.stderr)
     def test_production_binary_collector(self):
         with tempfile.TemporaryDirectory() as work:
