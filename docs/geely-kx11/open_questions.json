@@ -220,7 +220,8 @@
         "research-2026-10-18-wings/SWITCH_CLOSE_FIX_RU.md",
         "research-2026-10-18-wings/FIELD_331_WINGS_RU.md",
         "research-2026-10-18-wings/OEM_LAUNCH_332_RU.md",
-        "research-2026-10-18-wings/FIELD_332_WINGS_RU.md"
+        "research-2026-10-18-wings/FIELD_332_WINGS_RU.md",
+        "research-2026-10-18-wings/NAV_LAUNCH_CHAIN_RU.md"
       ],
       "evidence_updates": [
         {
@@ -455,6 +456,13 @@
           "source": "research-2026-10-18-wings/FIELD_332_WINGS_RU.md",
           "finding": "3.3.2 visible/normal share boot and Natro PID372/settings task16664; own panel16668 disappears, mode3→1, HUD remains. User preliminarily confirms switching. Display2 seven Client vs seven Device; Sys2038 DimMenu is hidden in visible (empty region/shown=false), restored in normal. Static exact archived DimMenu traces FullMapPresentation2038 and nav-mode-gated popup/lanes container, not a proven wing renderer. Android PNG lacks wings; full physical/QDI1 boundary absent.",
           "next_step": "Do not target Sys2038 merely by full-screen dimensions or toggle Client/Device as a wing fix. Continue validated Android/HWC→QDI1 boundary and actual nav receiver; no duplicate whole-QNX dump. CLUSTER_WINGS and full ten-cycle gate remain OPEN."
+        },
+        {
+          "date": "2026-10-18",
+          "level": "STATIC_SOURCE",
+          "source": "research-2026-10-18-wings/NAV_LAUNCH_CHAIN_RU.md",
+          "finding": "User requests tracing from navigation launch. Natro sends mode3 then wake before own Activity. Archived SDK sends opcode14/data1 for modes3/4, data2 for1/2; getNaviMode reads Settings.Global, not physical ACK. Callback7/data0 denies fullscreen. Actual ttyHS2 peer/renderer remains unproven. QNX writeback registers buffers and commits state, not a validated passive final-QDI1 capture.",
+          "next_step": "Trace receiving opcode14 dispatcher beyond the previously established ttydim→ttyHS2 bridge; correlate existing passive transition traces if available. Do not infer wings control from local mode readback, send unknown modes, or open a competing UART reader. Runtime/APK unchanged; FIELD renderer/hide OPEN."
         }
       ],
       "coverage_ids": [
@@ -2112,6 +2120,11 @@
       "date": "2026-10-18",
       "scope": "First positive switching FIELD and addressed Sys2038 hypothesis; no full field gate closure.",
       "source": "research-2026-10-18-wings/FIELD_332_WINGS_RU.md"
+    },
+    {
+      "date": "2026-10-18",
+      "scope": "Navigation launch chain, software-only readback, negative callback and stateful writeback clarified; all prior evidence and OPEN gates preserved.",
+      "source": "research-2026-10-18-wings/NAV_LAUNCH_CHAIN_RU.md"
     }
   ]
 }

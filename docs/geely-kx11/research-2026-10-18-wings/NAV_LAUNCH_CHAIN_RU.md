@@ -1,0 +1,74 @@
+# От включения Natro до команды компоновки DIM
+
+18.10.2026, продолжение по указанию пользователя19:46МСК: проследить цепочку от вывода навигационного приложения. STATIC по предоставленным файлам; новых команд автомобилю, runtime-патча или APK нет.
+
+## Разделение двух путей
+
+Natro3.3.2 source cbd0a5f97bbb9c2eadbcc3ce06fe02bf3331a088, InstrumentDisplayLauncher.prepareDim:
+switchNaviMode(3) → задержка100мс → sendMessageToDIM(2,8,8,[1]) → задержка200мс → getNaviMode → допуск startPanel.
+Затем InstrumentPanelTaskLauncher запускает единственный собственный intent через startActivities с launchDisplayId2. Подтверждение первого кадра отдельно от допуска запуска. Это последовательность исходников, не измерение физического времени перестроения приборки.
+
+```mermaid
+flowchart TD
+    A["Включение панели Natro"] --> B["DIM: запрос компоновки и wake"]
+    B --> C["HAL → UART → получатель DIM"]
+    B --> D["Проверка настройки NaviMode"]
+    D --> E["Activity на display 2 → Android кадр"]
+```
+
+Рендерер на стороне C пока не установлен. Наличие карты в E не доказывает, что оформление шкал/крыльев создаётся в E. Две ветви сходятся визуально, но не следует объединять их в один Android layer только из-за общего действия пользователя.
+
+## Повторно проверенные первичные файлы
+
+Архив KX11-Cruise-Trace-20260809-001402.zip, SHA bbb4b7bb8c2f04864ef41777c6679e2881d2db3084563c9d10518a20cb61bc05. Файлы не объявляются идентичными текущим установленным без их свежего SHA.
+
+| Файл | SHA256 |
+|---|---|
+| BOOTCLASSPATH_ecarx.adaptapi.jar |87a6fcf44f2a3a2dab7575d6e7a50396b980794074fd5fb5843162fbbde62ef0|
+| BOOTCLASSPATH_ecarx.jar |126048eceb47a640ad3d96dbdcca0fa754b589799cd5876c472a713b8042dfd7|
+| DIMProtocolService.apk |c435f1be2402be76355172f7d50d66d1de782a792cea912851c7571a1fd4739c|
+| ECarXCarService.apk |1cab337a3c056d6ba2a7a58f12638c2b7137f672a1613a2fb78305602c6683f3|
+
+Адреса DEX ниже — относительные байтовые смещения инструкции внутри метода.
+
+## Что делает switchNaviMode
+
+DimMenuInteraction.switchNaviMode задаёт msgType0, len8, opcode14; сначала пишет режим через DIMProtocolManager.setNaviMode, затем отправляет один смысловой байт:
+
+| Режим Android | Ветка | data[0] | set / send offsets |
+|---|---|---:|---|
+|1 OFF|штатная|2|0xe4 /0xf8|
+|2 SIMPLIFY|упрощённая|2|0xb6 /0xca|
+|3 FULL|полная карта|1|0x8a /0x9c|
+|4 AR|AR|1|0x5c /0x6e|
+
+Значения3/4 различаются в локальной настройке, но показанная отправка одинакова. То же относится к1/2. Это не разрешение испытывать4 или неизвестные значения как патч крыльев. В этом сообщении нет имени приложения, bitmap или отдельного поля видимости крыльев. Ветка возвращает true даже после default неизвестного режима; boolean не является ACK физической приборки.
+
+DIMProtocolManager.sendMessageToDIM(B,B,B,byte[]):0x6a берёт только vec[0],0x6e передаёт его через Binder как отдельный byte. DIMProtocolServiceImpl.sendMessageToDIM:0x66..0x6e создаёт ArrayList из одного byte,0xc0 передаёт в HIDL IDIMProtocol. Proxy записывает type/len/opcode/vector,0x3e выполняет transact1. Указание len8 не доказывает наличие восьми осмысленных флагов. Native-обработка длины ранее исследована отдельно; не вводить догадки о дополнительных полях.
+
+## Readback и callback — не одно и то же
+
+DimMenuInteraction.getNaviMode → DIMProtocolManager → DIMProtocolServiceImpl.getNaviMode:0x20 читает Settings.Global["NaviMode"] с default2. setNaviMode:0x3c делает putInt. Таким образом успешный getter подтверждает сохранённую Android-настройку, а не завершённую отрисовку или ответ получателя UART. Существующий gate Natro следует описывать как software-state readback; положительный FIELD пользователя остаётся самостоятельным свидетельством.
+
+DimMenuInteraction$DIMProtocolServiceCallbackImpl.onReceived:opcode7 переходит на0x42e. При data0 ветка0x460 содержит сообщение «не разрешён вход в полноэкранную карту» и0x4a2 рассылает onChangeNaviMode(1). При data!=0 записывает0x07 error и выходит из этой ветви. Поэтому callback7 нельзя в этой версии SDK считать общим положительным ACK команды14. Обобщение на неполученные версии запрещено. Сам callback не доказывает ни наличие, ни отсутствие крыльев.
+
+## Где заканчивается установленная цепочка
+
+Ранее независимо разобранный dim_dtc.ko SHA3838e73f690c7c0c216f1a5f3e8a5757a0096d8bd954140d88fdad9ffc112796 связывает ttydim→ttyHS2; см.[driver-findings](../research-2026-10-13-dim/driver-findings-ru.txt). В этом проходе native-файлы заново не извлекались и прежний результат не объявляется новым. Драйвер переносит payload и не является установленным nav renderer. Точный peer ttyHS2 и его обработчик14 остаются незакрытой границей. QNX cluster_controller/SPI не назначать получателем без связи транспорта.
+
+Новые wings ZIP содержат два устойчивых состояния, но не журнал вызовов14/8/callback7 между ними. Повтор двух screenshots не заполнит этот пробел. Следующий полезный материал — существующая пассивная трасса штатного перехода с общими timestamp и код самого получателя; не второй reader на ttyHS2, который может отбирать данные HAL.
+
+## Проверка обещанного пути захвата QNX
+
+Из уже полученного Natro-vehicle-5783067647247932076.zip извлечён openwfd_server1969280байт, SHA50f52f0714d828ead04227686ea916d488c79562f313c87146ff991e1f3e086c. Совпадает с ранее разобранным. ELF адреса ниже виртуальные, не runtime.
+
+- wfdCreateDevice0x34080 вызывает WFD_Writeback_Open0xa73a0; wfdDeviceCommit0x34c28 вызывает WFD_Writeback_Commit0xa7908. Поэтому найденная ветвь не просто чтение существующего финального кадра.
+- Open: ValidateOpenParams0xa73d0; FrameBufferMap_Open0xa7514/0xa76c0; RegisterFrameBuffer0xa7588/0xa7734; RateControl_Open0xa761c/0xa780c. На ошибке0xa78e8 вызывает Close. Это подготовка/регистрация буферов и состояния.
+- Commit перебирает изменённые записи: RemoveRequest0xa7b64; AddSuspendRequest0xa7d44 либо AddRequest0xa7db8. Привязка этой ветви именно к финальному QDI1 и сохранение вывода на физической приборке не доказаны.
+- WFD_UtilityMgr_Close0xa1980 удаляет critical section, три event и thread через DestroyThread0xa1b78. В просмотренном Close нет вызова SetEvent для unlock. Это не доказательство зависания: эффекты DestroyThread/внешнего caller ещё не разобраны. Но наличие Close само по себе не подтверждает безопасный timeout/cleanup общей блокировки.
+
+Автоматическая кнопка «конечный снимок DIM» пока не обоснована. Исследование writeback продолжать статически; его наличие не заменяет проверенную область пикселей. Обычный Screen capture и композиционные метаданные также не объявлять конечным кадром QDI1.
+
+## Результат
+
+Предложение проследить цепочку от включения приложения применено: отдельно установлены запрос компоновки, wake, локальный readback, запуск окна и отрицательный callback. Получатель команды14/выбор геометрии крыльев пока не найден. CLUSTER_WINGS OPEN. SOURCE runtime без изменений; TEST здесь — статический разбор/сопоставление, APK/FIELD новых действий отсутствуют.
