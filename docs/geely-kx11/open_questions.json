@@ -461,7 +461,7 @@
           "date": "2026-10-18",
           "level": "STATIC_SOURCE",
           "source": "research-2026-10-18-wings/NAV_LAUNCH_CHAIN_RU.md",
-          "finding": "User requests tracing from navigation launch. Natro sends mode3 then wake before own Activity. Archived SDK sends opcode14/data1 for modes3/4, data2 for1/2; getNaviMode reads Settings.Global, not physical ACK. Callback7/data0 denies fullscreen. Actual ttyHS2 peer/renderer remains unproven. QNX writeback registers buffers and commits state, not a validated passive final-QDI1 capture.",
+          "finding": "User requests tracing from navigation launch. Natro sends mode3 then wake before own Activity. Archived SDK sends opcode14/data1 for modes3/4, data2 for1/2; getNaviMode reads Settings.Global, not physical ACK. Callback7/data0 denies fullscreen in DimMenuInteraction. Follow-up after20:03: a second SDK consumer NaviInteraction maps data1 to action35/36 for local mode3/4 (permission), data2 to action33 (exit); do not generalize the menu-only negative branch. updateExtensionInfo fans out local mode callbacks and sends opcode8/data1. DimRepository/MainViewModel/FullMapFragment/MainActivity consumers traced; no independent wing control. ttyHS2→QUP4 was already established14Oct; external peer/renderer remains unproven. QNX writeback is stateful, not a validated passive final-QDI1 capture.",
           "next_step": "Trace receiving opcode14 dispatcher beyond the previously established ttydim→ttyHS2 bridge; correlate existing passive transition traces if available. Do not infer wings control from local mode readback, send unknown modes, or open a competing UART reader. Runtime/APK unchanged; FIELD renderer/hide OPEN."
         }
       ],

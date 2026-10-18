@@ -72,3 +72,17 @@ DimMenuInteraction$DIMProtocolServiceCallbackImpl.onReceived:opcode7 перех�
 ## Результат
 
 Предложение проследить цепочку от включения приложения применено: отдельно установлены запрос компоновки, wake, локальный readback, запуск окна и отрицательный callback. Получатель команды14/выбор геометрии крыльев пока не найден. CLUSTER_WINGS OPEN. SOURCE runtime без изменений; TEST здесь — статический разбор/сопоставление, APK/FIELD новых действий отсутствуют.
+
+## 18.10.2026 после20:03МСК — второй потребитель callback7 и публикация режима
+
+Продолжение по USER «Ищи дальше». Важное ограничение предыдущего вывода: отрицательная обработка callback7 описывала только DimMenuInteraction, не весь SDK. В том же adaptapi JAR NaviInteraction$DIMProtocolServiceCallbackImpl обрабатывает opcode7 иначе. Таблица packed-switch проверена отдельно: keys[1,2], targets[35,4] относительно инструкции0x0c (code units), то есть data1→0x52, data2→0x14.
+
+- data1: getter локального режима0x6a; при mode3 вызов onDoInteractionAction(35,null) в0x92; при mode4 action36 в0xba. Строки обозначают разрешение полной/AR карты.
+- data2: onDoInteractionAction(33,null) в0x3a — требование выхода. data0 не входит в эти две ветви, но отдельно обработано меню как отказ.
+- Конструктор NaviInteraction регистрирует свой DIM callback в0x2e; registerNavigationInteractionCallback сохраняет callback приложения в0x36. Поэтому разрешение может дойти до приложения, хотя меню на ненулевой data пишет error. Утверждение «callback7 только отрицательный» для всего SDK неверно и здесь исправлено. Ни action35, ни transport ACK не подтверждают физический кадр/крылья.
+
+Публикация режима приложением: updateExtensionInfo читает EXT_KEY_DIM_DISPLAY_MODE, вызывает manager.onChangeNaviMode(1/2/3/4), затем во всех четырёх ветвях sendMessageToDIM(2,8,8,[1]). Сервис onChangeNaviMode рассылает RemoteCallbackList (invoke0x4e), а не пишет Settings.Global и не отправляет opcode14 в этом методе. DimMenuInteraction.NaviFunctionCallback передаёт событие в DimRepository. Repository ставит currentNavMode/IS_FULL_SCREEN_MODE, очищает cache и передаёт на главный поток. MainViewModel публикует LiveData0x10 и вызывает FullMapFragment0x2e; тот меняет видимость popup/navigation-контейнера. MainActivity observer7 устанавливает fullscreen LiveData и видимость viewMenuContain. Этот прослеженный путь не устанавливает владельца физических крыльев и не является независимым hide.
+
+Историческая сверка: updateExtensionInfo и положительный RX7/data1 уже были в исследовании12.10, а ttyHS2→0x890000/QUP4 подтверждён sysfs14.10. Это не новые открытия; предыдущий узкий отчёт следует читать с этими дополнениями. В текущем проходе повторно найден boot log из Cruise Trace: logcat-static-full.txt,24699820байт,SHA3db01217988d24cab7fc04277806e777bc2d625b3b1c868174bdee6f0fd0d939, строки393/998/1000 связывают ttyHS2 с MMIO0x890000 и max9675x_uart_open. Он не раскрывает внешний endpoint. См. [UART12.10](../research-2026-10-12-13-archive/dim-oct12/Natro-DIM-UART-parameters.txt) и [sysfs/panel14.10](../research-2026-10-14-dim/README_RU.md).
+
+Следующий незакрытый участок — код внешнего получателя/его идентификатор и выбор геометрии после разрешения; не повторное установление номера UART. Вызов callback вручную не проверялся и не предлагается как исправление. Runtime/APK без изменений, CLUSTER_WINGS OPEN.
