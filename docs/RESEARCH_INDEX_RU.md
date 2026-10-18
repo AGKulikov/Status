@@ -1,5 +1,8 @@
 # Natro — карта требований, исследований и открытых вопросов
 
+- [18.10 FIELD3.3.1: OFF остановлен проверкой owner=UNKNOWN](geely-kx11/research-2026-10-18-wings/FIELD_331_CLOSE_UNKNOWN_RU.md). Activity закрылась, штатный DIM не восстановлен; точный parser input отсутствует.
+
+
 - [18.10 после10:00: отменяемое закрытие приборки, ownership gate и DIM release](geely-kx11/research-2026-10-18-wings/SWITCH_CLOSE_FIX_RU.md). SOURCE/replay; OEM-диалог и FIELD остаются OPEN.
 
 - [18.10 08:55/08:58: два wings ZIP, exit1 help и точные ветви меню mNavi/MConfig](geely-kx11/research-2026-10-18-wings/FIELD_0859_AND_SWITCHING_RU.md). SOURCE collector/replay; перенос активного приложения без остановки — обязательный эталон, точный handler и OEM-диалог OPEN. Нового APK нет.

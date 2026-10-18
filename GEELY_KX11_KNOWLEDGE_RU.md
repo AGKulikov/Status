@@ -1,5 +1,15 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 18.10.2026 — 3.3.1 OFF остановился на UNKNOWN
+
+FIELD: собственная Activity закрылась, но CloseCoordinator завершил переход
+с owner=UNKNOWN и не отправил stock DIM sequence. Сырой am stack list отсутствует;
+неизвестный parser/owner нельзя объявлять свободным экраном. Следующий шаг —
+адресный read-only task snapshot сразу после OFF, без QNX и повторного reboot.
+[Временная шкала и ограничения](docs/geely-kx11/research-2026-10-18-wings/FIELD_331_CLOSE_UNKNOWN_RU.md).
+Production не менялся; причина UNKNOWN и GATE-059/066 OPEN.
+
+
 ## 18.10 после10:00 — освобождение DIM и отмена старого OFF
 
 SOURCE добавляет подтверждённую по mNavi команду DIM(2,8,8,[0]) после mode1

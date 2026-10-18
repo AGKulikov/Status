@@ -426,6 +426,12 @@
           "level": "SOURCE/TEST, FIELD OPEN",
           "finding": "Адресный сбор внутри Natro3.3.0: metadata и доступные PNG, без Mac; namespace/crop/HWC остаются проверяемыми ограничениями, renderer/hide не установлен.",
           "source": "../releases/3.3.0/README_RU.md"
+        },
+        {
+          "date": "2026-10-18",
+          "scope": "3.3.1 panel close/DIM transition, not independent wings hide",
+          "source": "research-2026-10-18-wings/FIELD_331_CLOSE_UNKNOWN_RU.md",
+          "finding": "Own Activity destroyed; owner UNKNOWN prevented stock DIM release. Exact am stack list response missing; need targeted post-OFF task snapshot. No production fix or FIELD acceptance."
         }
       ],
       "coverage_ids": [
@@ -2063,6 +2069,11 @@
       "date": "2026-10-18",
       "scope": "CLUSTER_WINGS full current archive set, KZB resource decoding, OpenWFD transport/lock comparison and concrete continuation plan; all prior history and gates preserved.",
       "source": "research-2026-10-18-wings/REPORT_RU.md"
+    },
+    {
+      "date": "2026-10-18",
+      "scope": "Negative 3.3.1 OFF result; UNKNOWN ownership blocks DIM restore; exact cause remains open.",
+      "source": "research-2026-10-18-wings/FIELD_331_CLOSE_UNKNOWN_RU.md"
     }
   ]
 }
