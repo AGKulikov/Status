@@ -1,5 +1,7 @@
 # Natro — карта требований, исследований и открытых вопросов
 
+- [18.10 FIELD3.3.2: same-boot switching и скрытый Sys2038](geely-kx11/research-2026-10-18-wings/FIELD_332_WINGS_RU.md). Первый положительный FIELD переключения; конкретное полноэкранное окно dimmenu отсутствует в visible composition. Renderer/hide OPEN.
+
 - [18.10: системная пакетная проверка OEM-диалога, отдельный запуск приборки и повторные чтения OFF](geely-kx11/research-2026-10-18-wings/OEM_LAUNCH_332_RU.md). STATIC/SOURCE/replay; CI/APK ожидаются, FIELD и крылья OPEN.
 
 - [18.10 FIELD3.3.1: OFF остановлен проверкой owner=UNKNOWN](geely-kx11/research-2026-10-18-wings/FIELD_331_CLOSE_UNKNOWN_RU.md). Activity закрылась, штатный DIM не восстановлен; точный parser input отсутствует.

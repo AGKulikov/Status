@@ -1,0 +1,56 @@
+[
+  {
+    "archive": "Natro-wings-6c1ed8c5-22c5-43dc-94e1-cfc99b20b8aa.zip",
+    "sha256": "f1949d43ff651202be59552b9cbfed9841061467cd538a976a52d54f5953f27b",
+    "state": "normal",
+    "version": "3.3.2",
+    "startMoscow": "2026-10-18T18:16:05.800000+03:00",
+    "manifestEntries": 20,
+    "hashesVerified": true,
+    "bootId": "714ae222-ca2b-4374-a58d-bfb947fdd16a",
+    "beforeMode": "1",
+    "afterMode": "1",
+    "composition": [
+      {
+        "phase": "before",
+        "client": 0,
+        "device": 7
+      },
+      {
+        "phase": "after",
+        "client": 0,
+        "device": 7
+      }
+    ],
+    "natroPid": 372,
+    "settingsTask": 16664,
+    "instrumentTask": null
+  },
+  {
+    "archive": "Natro-wings-cb09738c-1399-48c0-b184-268414747846.zip",
+    "sha256": "df30baaaf3b430f38e1aec8c67c1e1e0835534313e5433d44276a1e66c34434e",
+    "state": "visible",
+    "version": "3.3.2",
+    "startMoscow": "2026-10-18T18:14:49.866000+03:00",
+    "manifestEntries": 20,
+    "hashesVerified": true,
+    "bootId": "714ae222-ca2b-4374-a58d-bfb947fdd16a",
+    "beforeMode": "3",
+    "afterMode": "3",
+    "composition": [
+      {
+        "phase": "before",
+        "client": 7,
+        "device": 0
+      },
+      {
+        "phase": "after",
+        "client": 7,
+        "device": 0
+      }
+    ],
+    "natroPid": 372,
+    "settingsTask": 16664,
+    "instrumentTask": 16668
+  }
+]

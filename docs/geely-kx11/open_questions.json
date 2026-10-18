@@ -219,7 +219,8 @@
         "research-2026-10-18-wings/FIELD_0859_AND_SWITCHING_RU.md",
         "research-2026-10-18-wings/SWITCH_CLOSE_FIX_RU.md",
         "research-2026-10-18-wings/FIELD_331_WINGS_RU.md",
-        "research-2026-10-18-wings/OEM_LAUNCH_332_RU.md"
+        "research-2026-10-18-wings/OEM_LAUNCH_332_RU.md",
+        "research-2026-10-18-wings/FIELD_332_WINGS_RU.md"
       ],
       "evidence_updates": [
         {
@@ -447,6 +448,13 @@
           "source": "research-2026-10-18-wings/OEM_LAUNCH_332_RU.md",
           "finding": "Supplied framework/services539 establish package-scoped CSD/PSD dialog route: launch display2 maps other display0, so foreground Natro settings can intercept single startActivity before an Activity is created. Public one-intent startActivities retains regular ActivityStarter permission/options checks and own task affinity. Source changes this route and adds complete BEGIN/exit0/freshness-based OFF reads with up to5 cancellable retries. Exact historical UNKNOWN input remains unavailable; no independent wing renderer/hide found.",
           "next_step": "Complete exact Android CI and signed3.3.2 update; GATE-059/066 on hardware. Wings require synchronized physical pixels and validated composition boundary; no duplicate whole-QNX request."
+        },
+        {
+          "date": "2026-10-18",
+          "level": "FIELD_SAME_BOOT_AND_STATIC",
+          "source": "research-2026-10-18-wings/FIELD_332_WINGS_RU.md",
+          "finding": "3.3.2 visible/normal share boot and Natro PID372/settings task16664; own panel16668 disappears, mode3→1, HUD remains. User preliminarily confirms switching. Display2 seven Client vs seven Device; Sys2038 DimMenu is hidden in visible (empty region/shown=false), restored in normal. Static exact archived DimMenu traces FullMapPresentation2038 and nav-mode-gated popup/lanes container, not a proven wing renderer. Android PNG lacks wings; full physical/QDI1 boundary absent.",
+          "next_step": "Do not target Sys2038 merely by full-screen dimensions or toggle Client/Device as a wing fix. Continue validated Android/HWC→QDI1 boundary and actual nav receiver; no duplicate whole-QNX dump. CLUSTER_WINGS and full ten-cycle gate remain OPEN."
         }
       ],
       "coverage_ids": [
@@ -2099,6 +2107,11 @@
       "date": "2026-10-18",
       "scope": "OEM launch path and OFF source/replay evidence; all prior gates/history retained; CLUSTER_WINGS remains OPEN.",
       "source": "research-2026-10-18-wings/OEM_LAUNCH_332_RU.md"
+    },
+    {
+      "date": "2026-10-18",
+      "scope": "First positive switching FIELD and addressed Sys2038 hypothesis; no full field gate closure.",
+      "source": "research-2026-10-18-wings/FIELD_332_WINGS_RU.md"
     }
   ]
 }

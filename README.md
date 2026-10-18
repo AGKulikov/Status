@@ -1,6 +1,6 @@
 # Natro
 
-**Подписана [3.3.2 / 208021365](docs/releases/3.3.2/README_RU.md), публикация в stable выполняется.** 2189 Android-тестов и266 tool tests PASS; прежний сертификат, API28 и точный CI payload проверены. Изменён запуск и закрытие собственной панели приборки. SOURCE `cbd0a5f97bbb9c2eadbcc3ce06fe02bf3331a088`, ветка `fix/instrument-switch-332`; документы выпуска — `release/natro-3.3.2-verification`. FIELD и независимое скрытие крыльев OPEN.
+**Выпущена [3.3.2 /208021365](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.2), stable/latest.** 2189 Android и266 tool tests PASS; прежняя подпись/API28/exact CI payload и все7assets проверены. Source `cbd0a5f97bbb9c2eadbcc3ce06fe02bf3331a088`, build CI39137621672, publish CI39138540611. [Новые FIELD-снимки](docs/geely-kx11/research-2026-10-18-wings/FIELD_332_WINGS_RU.md): одна загрузка, тот же PID/задача настроек, собственная панель закрылась, HUD сохранён; пользователь предварительно подтверждает переключение. Полный gate10циклов и независимое скрытие крыльев OPEN.
 
 **Выпущена [3.3.1 / 208021364](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.1), stable/latest.** [Состав и доказательства](docs/releases/3.3.1/README_RU.md). 2185 Android и 266 tool tests PASS, прежний сертификат/API28/exact CI payload подтверждены. Все7файлов релиза скачаны и побайтно сверены. FIELD OEM-диалога и циклов включения/выключения OPEN. Рабочая ветка `fix/media-touch-329`; source `1ec7f42fbb1f877a177e16fb6432f053f3360d1a`.
 

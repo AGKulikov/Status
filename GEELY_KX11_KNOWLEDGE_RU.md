@@ -3020,3 +3020,12 @@ live/proc/PID; ENOTDIR не доказывает S_IFREG. Full-content QNX и wi
 Два ZIP CRC/40 manifest hashes PASS; builtin0..3 и восемь PNG корректны. Исправление принятия OEM screencap help exit1 подтверждено FIELD. visible: NaviMode3, normal:1, но разные boot IDs. В Android builtin2 (1920×1080) крыльев не видно; display2 имеет6 Client слоёв до/после обоих сборов. Полноэкранные безымянные слои принадлежат plus.monjaro; это не атрибуция пикселей крыльев. Нет синхронного физического фото/конечного QDI1 кадра, renderer/hide OPEN. Эти архивы не содержат am stack list отказа OFF; UNKNOWN и GATE-059/066 остаются OPEN. SOURCE/TEST/APK без изменений.
 
 Подробности: [FIELD_331_WINGS_RU.md](docs/geely-kx11/research-2026-10-18-wings/FIELD_331_WINGS_RU.md).
+
+
+## 18.10.2026 — FIELD3.3.2, Sys2038 и границы вывода
+
+USER: «Переключение приборки вроде работает»;18:33продолжить поиск крыльев. Stable/latest3.3.2 опубликован, CI39137621672:2189Android/266tool PASS; publisher39138540611:all7assets readback PASS. SOURCE cbd0a5f97bbb9c2eadbcc3ce06fe02bf3331a088; APK a7a81acc3b2ecd91b2e7484985cc4bc6b62a914b0f0e535428a29e1e0efa0aec.
+
+Новые visible18:14:49/normal18:16:05 ZIP в одной загрузке: CRC/40manifest hashes PASS,8PNG; тот же PID372/settings task16664, InstrumentPanelActivity16668 исчезает, NaviMode3→1, HUD сохраняется. CLUSTER-023/024/026 и GATE-059/066: первый положительный FIELD эпизод, полный10-cycle/ANCS/media/OEM-dialog gate OPEN.
+
+Display2:7Client в visible и7Device в normal. Sys2038dimmenu в visible уже shown=false/isVisible=false/VisibleRegion empty; при normal возвращается то же окно. STATIC DimMenu SHA214193adbfd1f6ee9033c455b4f8f373fdfee95d89a12b3522f445a4ce647820:MainViewModel.initPresentation→FullMapPresentation(type2038,displays[2]); FullMapFragment.onNavModeChanged показывает свой контейнер только при3, состав — lanes/popups/volume/navigation. Именно Sys2038не участвует в captured visible composition; весь пакет/команды не исключены. Appops suppression согласуется с существующим white-bar кодом, но actual appops trace отсутствует. Client/Device не причина по одному совпадению. Крылья отсутствуют в Android PNG, физический/QDI1 boundary не подтверждён. CLUSTER_WINGS OPEN. Подробности: [docs/geely-kx11/research-2026-10-18-wings/FIELD_332_WINGS_RU.md](docs/geely-kx11/research-2026-10-18-wings/FIELD_332_WINGS_RU.md). Сырые пользовательские данные/декомпиляция не публикуются.
