@@ -1,5 +1,32 @@
 # Единый реестр требований Natro
 
+## 18.10.2026 — проверка готовности и публикация 3.3.1
+
+USER: «Доделал новую версию 3.3.1? Разместил ее в канале обновлений?»
+На начало проверки latest/stable содержал 3.3.0; релиз natro-v3.3.1 отсутствовал.
+Готовый подписанный APK восстановлен и проверен без изменения runtime:
+source 1ec7f42fbb1f877a177e16fb6432f053f3360d1a,
+tree 167e1e4a4215f94268926210a22be2b8cbf19bbc, CI39108683065/job117619936398 SUCCESS.
+2185 Android и266 tool tests, failures/errors/skipped0; backup90owners,
+settings48editors/253methods/3012labels PASS.
+APK SHA b12e7c21c5360b7c75fae6f0967e2f36da49ba8f55b98f804e18c37932fc05ba,
+29780576bytes. Stable signer/v2/v3/exactAPI28/identity/zipalign16KiB,
+неизменный CI payload и manifest PASS; versionCode208021364=3.3.0+1.
+Navigator patch совпал с3.3.0, Helper прежний; WeChat container отличается,
+четыре распакованные записи совпадают. Миграция defaults проверена в CI.
+
+Запускается прежняя схема выпуска: exact successful CI + публичный signature
+handoff → draft → скачивание и сравнение всех7assets → stable/latest.
+Ключи/пароли и proprietary baselines в Git не добавляются. До успешного
+readback публикация OPEN. Исходники уже опубликованы; актуализируются README,
+release notes, отчёт и этот реестр по REL-007/009/010/013.
+CLUSTER-023/024/026/GATE-059/066: SOURCE/TEST/APK выполнены в объёме отменяемого
+OFF и owner-aware DIM release, FIELD остаётся OPEN. Причина OEM-окна и полное
+соответствие generic active-app move mNavi не доказаны. Независимый hide крыльев
+не объявляется исправленным. Новых production storage owners нет.
+[Протокол выпуска](docs/releases/3.3.1/README_RU.md).
+
+
 ## 18.10.2026 10:39 МСК — подготовить установочную3.3.1
 
 USER: «Ну так доделывай». Runtime SOURCE ae7a514e67b1c5585242b348c11a8def5b67ccac

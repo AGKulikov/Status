@@ -1,5 +1,8 @@
 # Natro
 
+**3.3.1 / 208021364 собрана и подписана; stable публикация проверяется.** [Состав и доказательства](docs/releases/3.3.1/README_RU.md). 2185 Android и 266 tool tests PASS, прежний сертификат/API28/exact CI payload подтверждены. FIELD OEM-диалога и циклов включения/выключения OPEN. Рабочая ветка `fix/media-touch-329`; source `1ec7f42fbb1f877a177e16fb6432f053f3360d1a`.
+
+
 18.10, SOURCE: [отмена старого OFF и освобождение DIM с проверкой владельца](docs/geely-kx11/research-2026-10-18-wings/SWITCH_CLOSE_FIX_RU.md). Локальный replay прошёл; Android CI и FIELD переключения ещё открыты. Подписанная версия в канале остаётся3.3.0.
 
 18.10, после3.3.0: [первые wings ZIP и сравнение переноса mNavi/MConfig](docs/geely-kx11/research-2026-10-18-wings/FIELD_0859_AND_SWITCHING_RU.md). Узкий SOURCE/replay фикс screencap help; переключатель без остановки и OEM-диалог ещё OPEN. Нового APK в канале нет.
