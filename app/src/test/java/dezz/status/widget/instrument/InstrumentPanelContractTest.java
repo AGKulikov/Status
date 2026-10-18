@@ -279,10 +279,6 @@ public final class InstrumentPanelContractTest {
                 + "InstrumentClusterView.java"));
         String launcher = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
                 + "InstrumentDisplayLauncher.java"));
-        String taskLauncher = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
-                + "InstrumentPanelTaskLauncher.java"));
-        String ownerQuery = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
-                + "InstrumentOwnerQuery.java"));
 
         assertTrue(repository.contains("ownerMetrics"));
         assertTrue(repository.contains("reconcileSubscriptionLocked"));
@@ -450,6 +446,10 @@ public final class InstrumentPanelContractTest {
         Path root = projectRoot();
         String launcher = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
                 + "InstrumentDisplayLauncher.java"));
+        String taskLauncher = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
+                + "InstrumentPanelTaskLauncher.java"));
+        String ownerQuery = read(root.resolve("app/src/main/java/dezz/status/widget/instrument/"
+                + "InstrumentOwnerQuery.java"));
         String bootstrap = read(root.resolve(
                 "app/src/main/java/dezz/status/widget/AppRuntimeBootstrap.java"));
         String boot = read(root.resolve("app/src/main/java/dezz/status/widget/BootReceiver.java"));
