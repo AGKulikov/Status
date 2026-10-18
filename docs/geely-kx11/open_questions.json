@@ -215,9 +215,17 @@
         "research-2026-10-17-white-bar/QNX_DISPATCH_AND_DSP_20261018_RU.md",
         "research-2026-10-18-wings/REPORT_RU.md",
         "research-2026-10-18-wings/NEXT_STEPS_RU.md",
-        "research-2026-10-18-wings/SOURCES.json"
+        "research-2026-10-18-wings/SOURCES.json",
+        "research-2026-10-18-wings/FIELD_0859_AND_SWITCHING_RU.md"
       ],
       "evidence_updates": [
+        {
+          "date": "2026-10-18",
+          "level": "FIELD_ARCHIVE_WITH_SOURCE_REPLAY",
+          "finding": "Two Natro3.3.0 wings ZIPs verified:34manifest hashes/sizes and CRC PASS, NaviMode1/1 versus3/3 but different boot IDs. Full known API28 screencap help returned exit1; collector rejected it and captured only default-unmapped HU, not DIM. Before Client/after Device composition does not exclude HWC. Narrow complete-help-only exit0/1 source fix passes10portable tests; no new APK or field capture. User requires active-application transfer like mNavi without stopping Natro. Exact standalone mNavi2.0 menu resource-to-handler chains address a configured nav package; generic active-app handler and actual stop success/PID are not established. Three saved mNavi2.0 APK copies have identical SHA. Same-process Natro versus external mNavi caller is a source difference, not a proven cause of the current dialog.",
+          "source": "research-2026-10-18-wings/FIELD_0859_AND_SWITCHING_RU.md",
+          "next_step": "Identify the exact installed mNavi/menu path before copying transfer semantics; preserve process/HUD/ANCS and GATE-059/066. Deliver collector fix separately with verified build/signing, then pair discovered built-in captures with physical DIM photo and existing ownership metadata. Continue matching supplied binaries; do not request a duplicate full QNX dump or claim screenshot absence proves external wings. Renderer/independent hide remain OPEN."
+        },
         {
           "date": "2026-10-03",
           "level": "STATIC",

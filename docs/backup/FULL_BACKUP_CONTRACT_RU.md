@@ -1,5 +1,16 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review18.10.2026 — полный OEM screencap help с exit1
+
+Пересмотрен diff WingsEvidenceArchive: изменено только признание известного
+шестистрочного API28 help с exit0/1; оригинальный exit/output остаётся в manifest.
+Это допускает прежний адресный capture вместо default-unmapped fallback.
+Пределы170с/15с/1MiB/4дисплея/8MiBPNG, временные shell paths и cleanup,
+cache/exports, retention2, canonical guard и явный Download-export сохранены.
+Новых prefs/keys/defaults/roots нет, схема и restore payload не меняются;
+миграция не нужна. Пересмотрен fingerprint только этого owner после проверки
+контракта. Static inventory и collector replay не являются FIELD backup/restore.
+
 ### Review3.3.0 — адресный wings ZIP
 
 Рассмотрены DiagnosticsActivity, NatroSharedFolder, WingsEvidenceArchive,

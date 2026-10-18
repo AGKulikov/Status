@@ -10,10 +10,17 @@ import java.util.zip.*;
 import java.awt.image.BufferedImage;
 import javax.imageio.ImageIO;
 public final class WingsEvidenceReplay {
+    static final String OEM_HELP="usage: screencap [-hp] [-d display-id] [FILENAME]\n"
+            +"   -h: this message\n   -p: save the file as a png.\n"
+            +"   -d: specify the display id to capture, default 0.\n"
+            +"If FILENAME ends with .png it will be saved as a png.\n"
+            +"If FILENAME is not given, the results will be printed to stdout.\n";
     static void check(boolean value,String reason) { if(!value)throw new AssertionError(reason); }
     static String read(ZipFile z,String name)throws Exception { return new String(z.getInputStream(z.getEntry(name)).readAllBytes(),StandardCharsets.UTF_8); }
     static class Shell implements SystemFileDump.Shell {
         byte[] png;String path;int chunks,captures,calls;boolean fail,corrupt,truncated,deny;
+        Integer helpExit=0;String help=OEM_HELP;
+        boolean helpTruncated;
         Shell(byte[] png) { this.png=png; }
         public AdbShellResult.Result command(String cmd) { throw new AssertionError("untimed command"); }
         public AdbShellResult.Result commandTimed(String cmd,int limit,long timeout)throws Exception {
@@ -23,7 +30,7 @@ public final class WingsEvidenceReplay {
             String out="snapshot";int code=0;
             if(cmd.equals("getprop ro.build.version.sdk"))out="28\n";
             else if(cmd.equals("dumpsys display"))out="Display 2 layerStack=2\n  mBuiltInDisplayId=0\n  mBuiltInDisplayId=1\n";
-            else if(cmd.equals("screencap -h"))out="usage: screencap [-hp] [-d display-id] [FILENAME]";
+            else if(cmd.equals("screencap -h"))return new AdbShellResult.Result(help,helpExit,helpTruncated);
             else if(cmd.startsWith("umask")) {
                 captures++;check(!cmd.contains("-d 2"),"no logical ID guessing");
                 Matcher m=Pattern.compile("'(/data/local/tmp/natro-wings-[a-z0-9-]+/frame.png)'").matcher(cmd);
@@ -59,6 +66,31 @@ public final class WingsEvidenceReplay {
             check(read(z,"images/builtin-1.txt").contains("remote_cleanup=removed"),"cleanup");
             check(read(z,"session.txt").contains("owner_attribution=OPEN"),"no false owner claim");
             check(read(z,"manifest.tsv").contains("start_elapsed_ms"),"timings");
+        }
+        shell=new Shell(png);shell.help=OEM_HELP;shell.helpExit=1;
+        r=WingsEvidenceArchive.collect(dir,shell,t->{},"candidate","visible");
+        check(r.complete&&shell.captures==2,"OEM exit1 must capture mapped built-in displays");
+        try(ZipFile z=new ZipFile(r.file)) {
+            String line=Arrays.stream(read(z,"manifest.tsv").split("\n"))
+                    .filter(s->s.startsWith("screencap-help.txt\t")).findFirst().orElseThrow();
+            check(line.split("\t")[6].equals("1"),"preserve actual help exit");
+            check(read(z,"screencap-help.txt").equals(OEM_HELP),"preserve original help");
+            check(z.getEntry("images/default-unmapped.png")==null,"not HU-only fallback");
+        }
+        for(int scenario=0;scenario<6;scenario++) {
+            shell=new Shell(png);shell.help=OEM_HELP;shell.helpExit=1;
+            if(scenario==0)shell.help="permission denied: -d";
+            if(scenario==1)shell.helpTruncated=true;
+            if(scenario==2)shell.helpExit=null;
+            if(scenario==3)shell.helpExit=2;
+            if(scenario==4)shell.help=OEM_HELP+"permission denied\n";
+            if(scenario==5){shell.help="unrecognized -d help";shell.helpExit=0;}
+            r=WingsEvidenceArchive.collect(dir,shell,t->{},"candidate","normal");
+            check(!r.complete,"unrecognized/partial help remains failed "+scenario);
+            try(ZipFile z=new ZipFile(r.file)) {
+                check(z.getEntry("images/builtin-0.png")==null,"invalid help cannot select IDs");
+            }
+            check(shell.captures==(scenario==2?0:1),"transport failure must stop capture");
         }
         shell=new Shell(png);shell.corrupt=true;
         r=WingsEvidenceArchive.collect(dir,shell,t->{},"3.3.0","normal");

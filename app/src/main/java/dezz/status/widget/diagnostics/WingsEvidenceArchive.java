@@ -56,6 +56,9 @@ public final class WingsEvidenceArchive {
                 .append(bytes.length).append('\t').append(SystemFileDump.digest(bytes)).append('\n');
     }
     private String text(String name,String command) throws Exception {
+        return text(name, command, false);
+    }
+    private String text(String name,String command,boolean screencapHelp) throws Exception {
         long wall=System.currentTimeMillis(),mono=elapsed();
         if(stopped()) { record(name,"not_attempted",new byte[0],wall,mono,null,false);return null; }
         progress.update("Диагностика крыльев: "+name);
@@ -63,9 +66,21 @@ public final class WingsEvidenceArchive {
         try { r=run(command); }
         catch(AdbShellResult.Failure e) { r=e.partial; }
         catch(Exception e) { record(name,"transport_failed",new byte[0],wall,mono,null,false);return null; }
-        boolean ok=r.success()&&!r.truncated;
+        boolean ok=!r.truncated && (screencapHelp ? recognizedHelp(r) : r.success());
         record(name,ok?"collected":r.truncated?"truncated":"command_failed",r.output.getBytes(StandardCharsets.UTF_8),wall,mono,r.exitCode,r.truncated);
         return ok?r.output:null;
+    }
+    /** KX11/API28 prints this complete usage with exit 1. Never relax other commands. */
+    static boolean recognizedHelp(AdbShellResult.Result result) {
+        if (result.truncated || result.exitCode == null
+                || (result.exitCode != 0 && result.exitCode != 1)) return false;
+        String help = result.output.replace("\r\n", "\n").trim();
+        return help.equals("usage: screencap [-hp] [-d display-id] [FILENAME]\n"
+                + "   -h: this message\n"
+                + "   -p: save the file as a png.\n"
+                + "   -d: specify the display id to capture, default 0.\n"
+                + "If FILENAME ends with .png it will be saved as a png.\n"
+                + "If FILENAME is not given, the results will be printed to stdout.");
     }
     /** API28 uses built-in IDs; neither logical displayId nor layerStack is substituted. */
     static List<Integer> captureIds(String sdk,String help,String display) {
@@ -173,8 +188,9 @@ public final class WingsEvidenceArchive {
                 c.text("processes.txt","ps -A -o USER,UID,PID,PPID,NAME,ARGS");
                 c.text("packages.txt","pm list packages -U -f");
                 c.text("activities.txt","dumpsys activity activities");
-                // Some OEM help commands exit nonzero. Preserve output, but do not infer IDs from it.
-                String help=c.text("screencap-help.txt","screencap -h");
+                // Only the observed complete API28 usage may succeed with exit 1;
+                // the original exit code/output remain in the evidence manifest.
+                String help=c.text("screencap-help.txt","screencap -h",true);
                 List<Integer> ids=captureIds(sdk,help,display);
                 if(ids.isEmpty())c.capture("default-unmapped",null);
                 else for(int id:ids)c.capture("builtin-"+id,id);
