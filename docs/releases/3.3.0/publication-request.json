@@ -1,0 +1,11 @@
+{
+  "version": "3.3.0",
+  "sourceCommit": "3a45d7587c099756d0ea3673fe6fe7156ec10180",
+  "sourceTree": "83167c81ae0be17ac2fcf274fb13e2c5f32f1238",
+  "successfulBuildRun": 39099592113,
+  "signedSha256": "3813fb212362ef054cea9410508c701b427ec174cf2c8720eae7ac6cd7e84aba",
+  "localSignatureAndPayloadVerification": "PASS",
+  "expectedAssetCount": 7,
+  "publication": "pending publisher readback",
+  "fieldAcceptance": "OPEN"
+}
