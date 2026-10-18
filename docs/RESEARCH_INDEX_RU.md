@@ -127,3 +127,5 @@ QNX отказал до handshake; каталог/mappings остаются BLOC
 [Первичный архив проверки подключения](geely-kx11/research-2026-10-16-qnx/QNX_TERMINAL_20261017_RU.md): QCONN и FF FD22 получены. Следующий шаг — полный штатный системный сбор; причина прежнего отказа пока неизвестна.
 
 - [17.10: полный QNX архив и другие каналы, SOURCE3.2.5](geely-kx11/research-2026-10-17-white-bar/FULL_VEHICLE_ARCHIVE_RU.md).
+
+- [18.10: два корректных wings-сбора3.3.1, границы Android кадра и OFF](geely-kx11/research-2026-10-18-wings/FIELD_331_WINGS_RU.md).

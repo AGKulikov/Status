@@ -2997,3 +2997,10 @@ live/proc/PID; ENOTDIR не доказывает S_IFREG. Full-content QNX и wi
 Подробности и границы: [новый FIELD и targets](docs/geely-kx11/research-2026-10-17-white-bar/WHITE_BAR_552935_RU.md),
 [MConfig48/46.1](docs/geely-kx11/research-2026-10-17-white-bar/MCONFIG_48_COMPARISON_RU.md).
 
+
+
+## 18.10.2026 — FIELD двух сборов крыльев 3.3.1
+
+Два ZIP CRC/40 manifest hashes PASS; builtin0..3 и восемь PNG корректны. Исправление принятия OEM screencap help exit1 подтверждено FIELD. visible: NaviMode3, normal:1, но разные boot IDs. В Android builtin2 (1920×1080) крыльев не видно; display2 имеет6 Client слоёв до/после обоих сборов. Полноэкранные безымянные слои принадлежат plus.monjaro; это не атрибуция пикселей крыльев. Нет синхронного физического фото/конечного QDI1 кадра, renderer/hide OPEN. Эти архивы не содержат am stack list отказа OFF; UNKNOWN и GATE-059/066 остаются OPEN. SOURCE/TEST/APK без изменений.
+
+Подробности: [FIELD_331_WINGS_RU.md](docs/geely-kx11/research-2026-10-18-wings/FIELD_331_WINGS_RU.md).

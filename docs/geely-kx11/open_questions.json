@@ -217,7 +217,8 @@
         "research-2026-10-18-wings/NEXT_STEPS_RU.md",
         "research-2026-10-18-wings/SOURCES.json",
         "research-2026-10-18-wings/FIELD_0859_AND_SWITCHING_RU.md",
-        "research-2026-10-18-wings/SWITCH_CLOSE_FIX_RU.md"
+        "research-2026-10-18-wings/SWITCH_CLOSE_FIX_RU.md",
+        "research-2026-10-18-wings/FIELD_331_WINGS_RU.md"
       ],
       "evidence_updates": [
         {
@@ -432,6 +433,12 @@
           "scope": "3.3.1 panel close/DIM transition, not independent wings hide",
           "source": "research-2026-10-18-wings/FIELD_331_CLOSE_UNKNOWN_RU.md",
           "finding": "Own Activity destroyed; owner UNKNOWN prevented stock DIM release. Exact am stack list response missing; need targeted post-OFF task snapshot. No production fix or FIELD acceptance."
+        },
+        {
+          "date": "2026-10-18",
+          "level": "FIELD_ARCHIVE_VERIFIED",
+          "finding": "Two3.3.1 archives: CRC/40manifest SHA PASS, eight PNG decoded; corrected help exit1 acceptance works. visible mode3 and normal mode1 have different boot IDs. No visible wings in Android builtin2; six Client display2 layers before/after both. Unnamed fullscreen/HUD layers map to plus.monjaro, not proof of wing pixel ownership. No synchronized physical photo/QDI1; renderer/hide and failed OFF UNKNOWN remain OPEN.",
+          "source": "research-2026-10-18-wings/FIELD_331_WINGS_RU.md"
         }
       ],
       "coverage_ids": [
@@ -2074,6 +2081,11 @@
       "date": "2026-10-18",
       "scope": "Negative 3.3.1 OFF result; UNKNOWN ownership blocks DIM restore; exact cause remains open.",
       "source": "research-2026-10-18-wings/FIELD_331_CLOSE_UNKNOWN_RU.md"
+    },
+    {
+      "date": "2026-10-18",
+      "scope": "Two verified3.3.1 wings snapshots; collector FIELD evidence, renderer and OFF gates remain OPEN.",
+      "source": "research-2026-10-18-wings/FIELD_331_WINGS_RU.md"
     }
   ]
 }
