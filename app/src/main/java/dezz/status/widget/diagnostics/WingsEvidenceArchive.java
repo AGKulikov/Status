@@ -24,6 +24,15 @@ public final class WingsEvidenceArchive {
     private WingsEvidenceArchive(SystemFileDump.Shell shell,SystemFileDump.Progress progress,ZipOutputStream zip) {
         this.shell=shell;this.progress=progress;this.zip=zip;
     }
+    public static File latest(File directory) {
+        File[] files=archives(directory);return files.length==0?null:files[0];
+    }
+    private static File[] archives(File directory) {
+        File[] files=directory.listFiles(f->{try{return f.getName().matches("Natro-wings-[0-9]+\\.zip")&&f.isFile()
+                &&f.getCanonicalFile().equals(f.getAbsoluteFile());}catch(IOException e){return false;}});
+        if(files==null)return new File[0];
+        Arrays.sort(files,(a,b)->Long.compare(b.lastModified(),a.lastModified()));return files;
+    }
     private long elapsed() { return (System.nanoTime()-started)/1_000_000L; }
     private boolean stopped() {
         return broken || Thread.currentThread().isInterrupted() || System.nanoTime()-started>=DEADLINE_NS;
@@ -108,7 +117,7 @@ public final class WingsEvidenceArchive {
             try {
                 cleanup="unconfirmed";
                 // Unique private directory; only this generated PNG is removed. Bound remote disk use.
-                checked("umask 077; mkdir "+AdbShellResult.quote(dir)+" && (ulimit -f 16384; screencap -p "
+                checked("umask 077; mkdir "+AdbShellResult.quote(dir)+" && (ulimit -f 16384 && screencap -p "
                         +(id==null?"":"-d "+id+" ")+q+")");
                 String size=checked(SystemFileDump.probe(path));
                 if(!size.matches("[0-9]{1,9}"))throw new IOException("invalid_image_size");
@@ -177,12 +186,8 @@ public final class WingsEvidenceArchive {
             }
             if(!partial.renameTo(target))throw new IOException("archive_publish");
             published=true;
-            File[] old=directory.listFiles(f->f.getName().matches("Natro-wings-[0-9]+\\.zip")&&f.isFile());
-            if(old!=null) {
-                Arrays.sort(old,(a,b)->Long.compare(b.lastModified(),a.lastModified()));
-                int kept=0;
-                for(File f:old)if(!f.equals(target)&&kept++>=1&&f.getCanonicalFile().equals(f.getAbsoluteFile()))f.delete();
-            }
+            int kept=0;
+            for(File f:archives(directory))if(!f.equals(target)&&kept++>=1)f.delete();
             return new SystemFileDump.Report(target,c.collected,c.requested,c.complete,
                     "Получено "+c.collected+"/"+c.requested+" записей. Фото приборки передайте вместе с ZIP.");
         } finally { if(!published)partial.delete(); }

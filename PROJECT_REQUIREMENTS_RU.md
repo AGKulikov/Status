@@ -2,6 +2,11 @@
 
 ## 18.10.2026 — CLUSTER_WINGS: адресный сбор в Natro, кандидат3.3.0
 
+До выпуска review обнаружил отсутствие wings ZIP в восстановлении списка при
+повторном открытии диагностики. Добавлен latest() с NOFOLLOW/canonical guard;
+replay проверяет повторное обнаружение complete и partial архивов. Первый CI
+кандидата заменяется полной проверкой окончательного source, APK не выдавался.
+
 USER: «Давай» — реализовать предложенную диагностику через существующий ADB
 Natro и подготовить APK. Mac не требуется. SOURCE: отдельный wings ZIP с
 NaviMode/display/layer/window/PID/UID/packages и доступными PNG, временными

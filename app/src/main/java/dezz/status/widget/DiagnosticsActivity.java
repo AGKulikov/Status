@@ -114,7 +114,9 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
             try { exportWorker.execute(() -> {
                 File system = dezz.status.widget.diagnostics.SystemFileDump.latest(new File(app.getCacheDir(), "exports"));
                 File vehicle = dezz.status.widget.diagnostics.VehicleEvidenceArchive.latest(new File(app.getCacheDir(), "exports"));
-                File latest = vehicle!=null&&(system==null||vehicle.lastModified()>system.lastModified())?vehicle:system;
+                File previous = vehicle!=null&&(system==null||vehicle.lastModified()>system.lastModified())?vehicle:system;
+                File wings = dezz.status.widget.diagnostics.WingsEvidenceArchive.latest(new File(app.getCacheDir(), "exports"));
+                File latest = wings!=null&&(previous==null||wings.lastModified()>previous.lastModified())?wings:previous;
                 runOnUiThread(() -> {
                     if (isDestroyed() || systemDumpSession != null || systemDumpFile != null || latest == null) return;
                     systemDumpFile = latest;

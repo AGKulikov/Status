@@ -52,6 +52,7 @@ public final class WingsEvidenceReplay {
         File dir=Files.createTempDirectory("wings-replay").toFile();
         Shell shell=new Shell(png);
         SystemFileDump.Report r=WingsEvidenceArchive.collect(dir,shell,t->{},"3.3.0","visible");
+        check(WingsEvidenceArchive.latest(dir).equals(r.file),"reopen discovers completed archive");
         check(r.complete&&shell.captures==2&&shell.chunks>2,"multi-chunk images");
         try(ZipFile z=new ZipFile(r.file)) {
             check(Arrays.equals(png,z.getInputStream(z.getEntry("images/builtin-1.png")).readAllBytes()),"exact payload");
@@ -65,6 +66,7 @@ public final class WingsEvidenceReplay {
         try(ZipFile z=new ZipFile(r.file)){check(z.getEntry("images/builtin-0.png")==null,"reject corrupt image");}
         shell=new Shell(png);shell.fail=true;
         r=WingsEvidenceArchive.collect(dir,shell,t->{},"3.3.0","visible");
+        check(WingsEvidenceArchive.latest(dir).equals(r.file),"reopen discovers partial archive");
         check(!r.complete&&shell.calls==5&&shell.captures==0,"stop after transport error");
         try(ZipFile z=new ZipFile(r.file)){check(read(z,"manifest.tsv").contains("not_attempted"),"partial manifest");}
         check(dir.listFiles(f->f.getName().endsWith(".zip")).length==2,"own retention");

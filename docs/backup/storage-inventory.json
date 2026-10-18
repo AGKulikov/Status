@@ -444,7 +444,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/DiagnosticsActivity.java": {
-      "sha256": "cb49282bb47036a2c0a9ad4b754fe8b3c48a04555e75fbb92e3068f4b66c6c41",
+      "sha256": "82918c381fcb8b25a472656ea9fa2f82f79dc4cc10f28a1794d8996f92e6b329",
       "access_kinds": [
         "files"
       ]
@@ -755,7 +755,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/WingsEvidenceArchive.java": {
-      "sha256": "62ea3cd9faac0e3c6306d6cfcac8594c0560e5b6c0c8bc957505ebd69da76a75",
+      "sha256": "60dde389080a7dec9b558a376965ecc735bb92cfe33f69fbecbe49aa2eae3f2a",
       "access_kinds": [
         "files"
       ]

@@ -4,7 +4,8 @@
 
 Рассмотрены DiagnosticsActivity, NatroSharedFolder, WingsEvidenceArchive,
 BackupDefaultsMigration. Прежний cache/exports получает отдельный префикс
-Natro-wings-, retention2 только собственных ZIP; явный Download экспорт
+Natro-wings-, retention2 только собственных ZIP; повторное открытие экрана
+обнаруживает последний complete/partial wings ZIP с canonical guard; явный Download экспорт
 сохраняет префикс и не перезаписывает пользовательские файлы. Новых preferences,
 ключей, defaults и persistent roots нет. ZIP диагностический, в restore payload
 не входит. Временные PNG shell /data/local/tmp вне app backup; путь/cleanup
