@@ -1,5 +1,16 @@
 # Единый реестр требований Natro
 
+## 18.10.2026 05:21:21UTC — 3.3.0 stable опубликована
+
+Release416253133/natro-v3.3.0/latest подтверждены. Publisher39100238750,
+job117594848294 SUCCESS: exact APK восстановлен из CI39099592113 и public
+signature handoff; все7assets скачаны обратно, SHA/cmp PASS, tag→source3a45d75.
+APK3813fb212362ef054cea9410508c701b427ec174cf2c8720eae7ac6cd7e84aba,
+29780576bytes, сохранён для выдачи.2184Android/266tool tests без ошибок/пропусков.
+[Протокол](docs/releases/3.3.0/publication-verification.json). Это завершение
+SOURCE/TEST/APK публикации, не закрытие FIELD независимого скрытия крыльев,
+атрибуции renderer, съёмки на KX11 или физической install-over приёмки.
+
 ## 18.10.2026 — 3.3.0 SOURCE / TEST / APK, публикация ожидается
 
 Окончательный SOURCE3a45d7587c099756d0ea3673fe6fe7156ec10180,
