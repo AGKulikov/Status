@@ -1,5 +1,15 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review3.3.1 — install-over и совместимость defaults
+
+Новый release code208021364 требует разрешить прежние схемы335…363→364.
+Проверено отсутствие новых defaults/keys в исправлении переключателя и collector.
+Материализация сохраняет effective defaults, explicit значения и неизвестные ключи;
+same364 не переписывает XML,334/365 и несовпадение source/schema отклоняются.
+Добавлен отдельный migration test; старые version-specific проверки сохранены.
+Пересмотрен только fingerprint BackupDefaultsMigration. Это не физическая
+проверка восстановления на KX11.
+
 ### Review18.10.2026 — lifecycle переключателя приборки
 
 Проверены launcher/activity/close coordinator: отмена хранится только в RAM,
