@@ -1,5 +1,13 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 18.10 — адресный Android collector в Natro
+
+Кандидат3.3.0 переносит следующий шаг поиска владельца в приложение: две
+метки состояния, NaviMode и ownership metadata, временные границы, PNG из
+обнаруженных built-in IDs на API28 либо явно unmapped default. Без QNX driver
+lock/смены режима/root escalation. Это SOURCE/TEST, не новая FIELD атрибуция.
+[Инструкция и ограничения](docs/releases/3.3.0/README_RU.md). Renderer/hide OPEN.
+
 ## 18.10.2026 — 73 архива, KZB-растры и границы производителя пикселей
 
 Сверены73архивных объекта текущего набора Natro:55загруженных,18прежних

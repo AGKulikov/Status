@@ -1,5 +1,18 @@
 # Единый реестр требований Natro
 
+## 18.10.2026 — CLUSTER_WINGS: адресный сбор в Natro, кандидат3.3.0
+
+USER: «Давай» — реализовать предложенную диагностику через существующий ADB
+Natro и подготовить APK. Mac не требуется. SOURCE: отдельный wings ZIP с
+NaviMode/display/layer/window/PID/UID/packages и доступными PNG, временными
+границами, SHA, partial/stop semantics. Namespace built-in не подменяется
+logical display2; screenshot не доказывает полный HWC. Без смены режима,
+root escalation, QNX lock или перезапуска. Фото реальной приборки обязательно.
+TEST: production replay проверяет чанки/CRC/SHA, ограничения, ошибки, отмену,
+retention. Полная CI/подпись APK ещё OPEN до публикации протокола. FIELD
+renderer/hide и приёмка на KX11 OPEN, gates не ослаблены. Нумерация3.3.0
+по REL-004, code208021363 (+1). [Инструкция](docs/releases/3.3.0/README_RU.md).
+
 ## 18.10.2026 — CLUSTER_WINGS / KNOW-005: все архивы проекта и адресный план
 
 USER: «Не останавливайся в разборе пока не разберешь полностью все архивы.

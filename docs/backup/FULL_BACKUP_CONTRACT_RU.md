@@ -1,5 +1,17 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review3.3.0 — адресный wings ZIP
+
+Рассмотрены DiagnosticsActivity, NatroSharedFolder, WingsEvidenceArchive,
+BackupDefaultsMigration. Прежний cache/exports получает отдельный префикс
+Natro-wings-, retention2 только собственных ZIP; явный Download экспорт
+сохраняет префикс и не перезаписывает пользовательские файлы. Новых preferences,
+ключей, defaults и persistent roots нет. ZIP диагностический, в restore payload
+не входит. Временные PNG shell /data/local/tmp вне app backup; путь/cleanup
+записываются в ZIP, обрыв не выдаётся за удаление. Defaults335…362→363 сохраняют
+explicit/unknown/effective keys, будущие схемы отклоняются. Fingerprints обновлены
+после review этих4owners; static inventory не доказывает runtime restore.
+
 ### Review3.2.9 — касания, текст музыки и отчёт докачки
 
 По diff рассмотрены DiagnosticsActivity, LanTransferService, SystemFileDump,

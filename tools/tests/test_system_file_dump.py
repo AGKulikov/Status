@@ -12,6 +12,16 @@ ROOT = Path(__file__).resolve().parents[2]
 SOURCE = ROOT / 'app/src/main/java/dezz/status/widget'
 
 class SystemDumpTest(unittest.TestCase):
+    def test_wings_evidence_replay(self):
+        with tempfile.TemporaryDirectory() as work:
+            files = [SOURCE/'diagnostics/SystemFileDump.java', SOURCE/'diagnostics/QnxFileReader.java',
+                     SOURCE/'diagnostics/GraphicsEvidence.java', SOURCE/'diagnostics/WingsEvidenceArchive.java',
+                     SOURCE/'adb/AdbShellResult.java', ROOT/'tools/tests/java/WingsEvidenceReplay.java']
+            compiled = subprocess.run(['java','com.sun.tools.javac.Main','-d',work,*map(str,files)],capture_output=True,text=True)
+            self.assertEqual(compiled.returncode,0,compiled.stderr)
+            run = subprocess.run(['java','-Xmx64m','-cp',work,'dezz.status.widget.diagnostics.WingsEvidenceReplay'],capture_output=True,text=True,timeout=30)
+            self.assertEqual(run.returncode,0,run.stdout+run.stderr)
+
     def test_full_vehicle_archive_and_download(self):
         with tempfile.TemporaryDirectory() as work:
             files=[SOURCE/'diagnostics/SystemFileDump.java',SOURCE/'diagnostics/QnxFileReader.java',

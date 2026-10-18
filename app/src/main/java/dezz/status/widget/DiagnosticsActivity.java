@@ -244,6 +244,22 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
                     .setPositiveButton("Доскачать",(dialog,which)->startSystemDump("full_vehicle")).show();
         });
         page.addView(vehicleArchive, topMargin(8));
+        Button wingsArchive = button("Диагностика крыльев");
+        wingsArchive.setOnClickListener(view -> {
+            if (systemDumpSession != null) {
+                systemDumpState.setText("Сбор уже идёт. Для отмены нажмите «Отменить сбор».");
+                return;
+            }
+            new AlertDialog.Builder(this).setTitle("Состояние приборки")
+                    .setMessage("На стоянке оставьте приборку в выбранном состоянии до конца сбора. "
+                            + "Сделайте фото приборки во время сбора и передайте его вместе с ZIP. "
+                            + "Архив содержит снимки экранов и сведения о приложениях. Передавайте лично. "
+                            + "Сбор занимает до трёх минут; режим приборки не переключается.")
+                    .setNegativeButton("Отмена", null)
+                    .setNeutralButton("Обычная приборка", (dialog, which) -> startSystemDump("wings_normal"))
+                    .setPositiveButton("Крылья видны", (dialog, which) -> startSystemDump("wings_visible")).show();
+        });
+        page.addView(wingsArchive, topMargin(8));
         systemDumpState = label("Отдельный сбор DIM/UART через ADB: системные файлы, не полный образ прошивки.");
         page.addView(systemDumpState, topMargin(8));
 
@@ -588,6 +604,7 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
     }
 
     private void startSystemDump(String captureState) {
+        final boolean wings=captureState.startsWith("wings_");
         final boolean fullVehicle=captureState.equals("full_vehicle")||captureState.equals("full_vehicle_all");
         if (!dezz.status.widget.diagnostics.SystemFileDump.RUNNING.compareAndSet(false, true)) {
             systemDumpState.setText("Другой сбор ещё выполняется. Дождитесь завершения.");
@@ -619,7 +636,9 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
             dezz.status.widget.diagnostics.SystemFileDump.Progress progress=text -> runOnUiThread(() -> {
                         if (!isDestroyed() && systemDumpSession == session) systemDumpState.setText(text);
                     });
-            result.set(fullVehicle
+            result.set(wings
+                    ?dezz.status.widget.diagnostics.WingsEvidenceArchive.collect(new File(getCacheDir(),"exports"),shell,progress,BuildConfig.VERSION_NAME,captureState.substring(6))
+                    :fullVehicle
                     ?dezz.status.widget.diagnostics.VehicleEvidenceArchive.collect(new File(getCacheDir(),"exports"),shell,progress,BuildConfig.VERSION_NAME,adb::collectQnxFull, captureState.equals("full_vehicle_all")?null:dezz.status.widget.diagnostics.QnxExclusions.load())
                     :dezz.status.widget.diagnostics.SystemFileDump.collect(new File(getCacheDir(),"exports"),shell,progress,BuildConfig.VERSION_NAME,adb::collectQnx,captureState));
         }, error -> {
@@ -638,8 +657,8 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
                     systemDumpShare.setEnabled(true);
                     systemDumpSave.setEnabled(true);
                     systemDumpState.setText((report.complete && error == null ? "Сбор завершён. " : "Частичный дамп. ")
-                            + (fullVehicle?report.summary+" ":"Получено "+report.collected+"/"+report.requested+" файлов. ")
-                            + (fullVehicle?"Охват и пропуски — в qnx/metadata/full-tree.tsv; контрольные суммы — в manifest.tsv. "
+                            + ((fullVehicle||wings)?report.summary+" ":"Получено "+report.collected+"/"+report.requested+" файлов. ")
+                            + (wings?"Время, снимки и пропуски — в manifest.tsv и session.txt. ":fullVehicle?"Охват и пропуски — в qnx/metadata/full-tree.tsv; контрольные суммы — в manifest.tsv. "
                             :"Причины пропусков — в manifest.tsv, QNX — в qnx-diagnostics.txt. ")+"Нажмите «Отправить дамп ZIP».");
                 }
             });

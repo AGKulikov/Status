@@ -358,7 +358,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "c842076ca08512fc4d91d475f3cac132174aeb96b554cdff991cffcaf7675736",
+      "sha256": "6d2d86353a1742f78d0db567cd654f3d8bb76e184c14b6ccc772fd76d5f08eed",
       "access_kinds": [
         "files"
       ]
@@ -444,7 +444,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/DiagnosticsActivity.java": {
-      "sha256": "a41359bbd3c1fd5f6c5622e72ddbd98f64159f45a7cab21822bfd31e3484e2a7",
+      "sha256": "cb49282bb47036a2c0a9ad4b754fe8b3c48a04555e75fbb92e3068f4b66c6c41",
       "access_kinds": [
         "files"
       ]
@@ -718,7 +718,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/transfer/NatroSharedFolder.java": {
-      "sha256": "d9b8bb4dff933ccaa04a259fd75549a991c2313280ca5c8b49f6e2b21c479173",
+      "sha256": "6994d3f0a32dcae112ba14c33f8e8096feb8de0fd36899ee5e823f9ac80542ea",
       "access_kinds": [
         "files"
       ]
@@ -750,6 +750,12 @@
     },
     "app/src/main/java/dezz/status/widget/diagnostics/VehicleEvidenceArchive.java": {
       "sha256": "4fd99d9edcc5b383c2783dbe4753b2dc30dfd6a464094e234c14b48358fddb4c",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/diagnostics/WingsEvidenceArchive.java": {
+      "sha256": "62ea3cd9faac0e3c6306d6cfcac8594c0560e5b6c0c8bc957505ebd69da76a75",
       "access_kinds": [
         "files"
       ]

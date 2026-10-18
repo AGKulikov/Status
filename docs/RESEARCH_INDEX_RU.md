@@ -1,5 +1,7 @@
 # Natro — карта требований, исследований и открытых вопросов
 
+- [18.10: адресная диагностика крыльев внутри Natro, кандидат3.3.0](releases/3.3.0/README_RU.md). SOURCE/replay; FIELD renderer/hide OPEN.
+
 - [18.10: сверены73архива, вскрыты3KZB и843изображения, уточнены graphics/lock paths](geely-kx11/research-2026-10-18-wings/REPORT_RU.md). [Реестр SHA](geely-kx11/research-2026-10-18-wings/ARCHIVE_INVENTORY_RU.md), [план поиска renderer и адресный сбор](geely-kx11/research-2026-10-18-wings/NEXT_STEPS_RU.md). Полная семантика не заявляется; renderer/hide FIELD OPEN.
 
 - [18.10: шесть входных SOME/IP callbacks, RVC consumer, MAX96755 getter и восстановление четырёх DSP tables](geely-kx11/research-2026-10-17-white-bar/QNX_DISPATCH_AND_DSP_20261018_RU.md). Уточнено происхождение счётчиков корпуса; renderer/независимый hide OPEN.

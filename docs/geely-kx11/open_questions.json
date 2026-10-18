@@ -404,6 +404,12 @@
           "level": "STATIC_IMAGE_AND_CONTAINER_VERIFIED",
           "source": "research-2026-10-18-wings/REPORT_RU.md",
           "finding": "Current73 archive set and new KZB/raster decoding completed at the stated scope. Graphics transfer/lock paths extended. Independent hide and renderer remain OPEN; production/APK unchanged; collector field run not performed."
+        },
+        {
+          "date": "2026-10-18",
+          "level": "SOURCE/TEST, FIELD OPEN",
+          "finding": "Адресный сбор внутри Natro3.3.0: metadata и доступные PNG, без Mac; namespace/crop/HWC остаются проверяемыми ограничениями, renderer/hide не установлен.",
+          "source": "../releases/3.3.0/README_RU.md"
         }
       ],
       "coverage_ids": [
