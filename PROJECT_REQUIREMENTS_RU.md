@@ -5336,3 +5336,15 @@ SOURCE включает проверенный регистратор и явн�
 Предыдущий CI39196246165 PASS проверял3.3.2 identity, не этот release candidate.
 Нужен полный новый CI/точный APK/signature/install-over metadata/публикация stable.
 [Состав](docs/releases/3.3.3/README_RU.md). Крылья/аппаратные gates остаются OPEN.
+
+
+## 19.10.2026 — APK3.3.3 подписан и проверен
+
+SOURCEd56b438bb79137146d264c406c7102bad69b9941, tree18cd793ded29c2e3da19bb4fafa7b3e721bf78aa;
+CI39196882806 PASS:2190Android/268tool,92owners. Прежний резерв подписи найден
+и проверен самостоятельно, key/cert совпали; секреты не публикуются.
+APK3.3.3/208021366 SHA9f66efaeb9567c7cb969ea47d5aef9049569af2887dd67b0526424d57ecc1eec;
+v2/v3/exactAPI28/zipalign16KiB/identity/+1/1517payload entries PASS.
+Navigator patch совпадает с3.3.2, Helper не изменён. Signed APK сохранён для выдачи.
+[Протокол](docs/releases/3.3.3/README_RU.md). Stable publisher/readback пока OPEN,
+FIELD установки и записи на KX11 OPEN; крылья не объявляются исправленными.

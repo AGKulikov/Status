@@ -9,7 +9,30 @@
 Проверку выполняйте на стоянке, ZIP передавайте лично.
 
 Обновление поверх3.3.2 с прежним пакетом и подписью; данные приложения сохраняются.
-Navigator и iPhone Helper менять не требуется при подтверждении прежнего DEX.
+Navigator и iPhone Helper менять не требуется (DEX совпал с предыдущим выпуском).
 Это диагностическое обновление. Независимое скрытие крыльев ещё не реализовано.
 
-Подготовка: versionCode208021366, SOURCE/CI/APK проверяются отдельно. FIELD OPEN.
+## Проверенный APK
+
+SOURCE `d56b438bb79137146d264c406c7102bad69b9941`, tree
+`18cd793ded29c2e3da19bb4fafa7b3e721bf78aa`.
+[CI39196882806](https://github.com/AGKulikov/Status/actions/runs/39196882806):
+2190 Android tests,268 tool tests,92storage owners, без ошибок и пропусков.
+Версия3.3.3/code208021366; прежний signer, v2/v3, exact API28, zipalign16KiB,
+package/label/nondebug/+1 и неизменность1517payload entries подтверждены.
+SHA256 `9f66efaeb9567c7cb969ea47d5aef9049569af2887dd67b0526424d57ecc1eec`.
+В DEX присутствуют DimUartCapture/DimUartRecording/recordDimLog и logcat filter.
+Navigator patch совпадает с3.3.2, Helper без изменений.
+
+[Отчёт](release-report.json), [подписи](signature-verification.txt),
+[канал](natro-update.json). Подписанный APK сохранён для выдачи.
+Публикация stable/latest ожидает отдельного publisher/readback.
+FIELD: реальная установка, запись через adbd/перезагрузку и независимое скрытие
+крыльев OPEN. Метаданные install-over не заменяют физическую установку.
+
+| Проверка | Результат |
+|---|---|
+| SOURCE/TEST | полный release CI PASS |
+| APK | подпись, identity, payload, CRC, API28 PASS |
+| Defaults/backup | миграция335…365→366, предыдущие тесты сохранены; runtime restore OPEN |
+| Крылья | диагностическая запись добавлена; hide не реализован |

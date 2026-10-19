@@ -1,6 +1,6 @@
 # Natro
 
-Готовится [3.3.3 с записью DIM](docs/releases/3.3.3/README_RU.md); текущая release-ветка `release/natro-3.3.3`. APK/FIELD ещё не подтверждены.
+[3.3.3 с записью DIM](docs/releases/3.3.3/README_RU.md): APK подписан прежним ключом, CI39196882806 PASS (2190Android/268tool). Текущая release-ветка `release/natro-3.3.3`; stable публикация ожидается, FIELD OPEN.
 
 Разработка записи DIM: `feature/dim-uart-20261018` — [SOURCE/TEST и ограничения](docs/geely-kx11/research-2026-10-18-wings/DIM_UART_RECORDING_RU.md). Это ещё не новый APK и не исправление крыльев.
 
