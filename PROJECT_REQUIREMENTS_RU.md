@@ -5326,3 +5326,13 @@ tree9616bbb90aa19a384f4fce1013989decdf039fca, run39196246165 — completed/succe
 не исключались. Протокол: https://github.com/AGKulikov/Status/actions/runs/39196246165 .
 Отказ предыдущего CI устранён. Это проверка Android исходников/тестов, не новый
 подписанный установочный APK и не FIELD исправления крыльев. APK/FIELD OPEN.
+
+
+## 19.10.2026 06:52МСК — выпуск Natro3.3.3
+
+USER: «Так выпускай обновленный апк!!!». Выпустить запись DIM с прежней подписью,
+пакетом ru.natro.statuswidget, version3.3.3/code208021366 (+1 к3.3.2).
+SOURCE включает проверенный регистратор и явную defaults-совместимость335…365→366.
+Предыдущий CI39196246165 PASS проверял3.3.2 identity, не этот release candidate.
+Нужен полный новый CI/точный APK/signature/install-over metadata/публикация stable.
+[Состав](docs/releases/3.3.3/README_RU.md). Крылья/аппаратные gates остаются OPEN.

@@ -911,3 +911,13 @@ metadata/state/terminal/uart.log; не prefs, не executable queue. На ста
 удаление. cache/exports Natro-dim-uart-* хранит2ZIP; в restore payload не входит.
 Экспорт блокируется активным сбором; symlink не читается. Transport ключи прежние.
 Fingerprints обновлены только после этого review. Runtime backup FIELD OPEN.
+
+
+## Review3.3.3 — defaults и непрерывный журнал DIM
+
+Разрешён переход335…365→366 при прежних keys/defaults. Same366 сохраняет XML,
+explicit/unknown/effective значения сохраняются;334/367 и source/schema mismatch
+по-прежнему отклоняются. Добавлена отдельная regression333, прежние тесты
+сохранены. Пересмотрен fingerprint только BackupDefaultsMigration после review.
+Запись DIM использует ранее рассмотренную архивную diagnostics, не автозапуск
+после restore. Физическая приёмка backup/restore OPEN.
