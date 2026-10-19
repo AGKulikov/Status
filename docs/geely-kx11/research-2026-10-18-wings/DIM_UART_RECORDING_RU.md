@@ -72,3 +72,12 @@ d3fed86ca73c76d1ff10eb3a89a22a731abc50df33ab1782e0986aa164a2daf6,
 передать путь через GITHUB_ENV. Тесты не отключены и их проверки не ослаблены.
 Изменена настройка CI, не код автомобиля/хранения и не defaults.
 Повторный CI ожидается. APK не выпускался; FIELD/CLUSTER_WINGS OPEN.
+
+
+Итог повторного CI от19.10.2026: SOURCE4c03ab7f84d53a68bae85133d21d9b77316a3fe5,
+tree9616bbb90aa19a384f4fce1013989decdf039fca, run39196246165 — completed/success.
+Контрольный APK скачан, SHA проверен; inventory92owners и23portable tests PASS.
+Полный testGeelyDebugUnitTest: BUILD SUCCESSFUL in3m17s; ранее упавшие тесты
+не исключались. Протокол: https://github.com/AGKulikov/Status/actions/runs/39196246165 .
+Отказ предыдущего CI устранён. Это проверка Android исходников/тестов, не новый
+подписанный установочный APK и не FIELD исправления крыльев. APK/FIELD OPEN.
