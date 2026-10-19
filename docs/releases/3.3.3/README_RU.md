@@ -26,7 +26,9 @@ Navigator patch совпадает с3.3.2, Helper без изменений.
 
 [Отчёт](release-report.json), [подписи](signature-verification.txt),
 [канал](natro-update.json). Подписанный APK сохранён для выдачи.
-Публикация stable/latest ожидает отдельного publisher/readback.
+Stable/latest опубликован: [релиз](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.3).
+Publisher CI39197643251 PASS: все 7 файлов скачаны и побайтно сверены.
+Повторная проверка releases/latest, тега source и SHA256 APK пройдена 19.10.2026.
 FIELD: реальная установка, запись через adbd/перезагрузку и независимое скрытие
 крыльев OPEN. Метаданные install-over не заменяют физическую установку.
 

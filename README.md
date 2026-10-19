@@ -1,8 +1,8 @@
 # Natro
 
-[3.3.3 с записью DIM](docs/releases/3.3.3/README_RU.md): APK подписан прежним ключом, CI39196882806 PASS (2190Android/268tool). Текущая release-ветка `release/natro-3.3.3`; stable публикация ожидается, FIELD OPEN.
+[3.3.3 с записью DIM](docs/releases/3.3.3/README_RU.md): APK подписан прежним ключом, CI39196882806 PASS (2190Android/268tool). Текущая release-ветка `release/natro-3.3.3`; [stable/latest опубликован](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.3), все 7 файлов проверены publisher CI39197643251; FIELD OPEN.
 
-Разработка записи DIM: `feature/dim-uart-20261018` — [SOURCE/TEST и ограничения](docs/geely-kx11/research-2026-10-18-wings/DIM_UART_RECORDING_RU.md). Это ещё не новый APK и не исправление крыльев.
+Разработка записи DIM: `feature/dim-uart-20261018` — [SOURCE/TEST и ограничения](docs/geely-kx11/research-2026-10-18-wings/DIM_UART_RECORDING_RU.md). Включено в APK 3.3.3; независимое скрытие крыльев ещё не исправлено.
 
 **Выпущена [3.3.2 /208021365](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.2), stable/latest.** 2189 Android и266 tool tests PASS; прежняя подпись/API28/exact CI payload и все7assets проверены. Source `cbd0a5f97bbb9c2eadbcc3ce06fe02bf3331a088`, build CI39137621672, publish CI39138540611. [Новые FIELD-снимки](docs/geely-kx11/research-2026-10-18-wings/FIELD_332_WINGS_RU.md): одна загрузка, тот же PID/задача настроек, собственная панель закрылась, HUD сохранён; пользователь предварительно подтверждает переключение. Полный gate10циклов и независимое скрытие крыльев OPEN.
 

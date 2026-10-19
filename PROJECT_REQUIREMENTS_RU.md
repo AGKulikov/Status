@@ -5348,3 +5348,13 @@ v2/v3/exactAPI28/zipalign16KiB/identity/+1/1517payload entries PASS.
 Navigator patch совпадает с3.3.2, Helper не изменён. Signed APK сохранён для выдачи.
 [Протокол](docs/releases/3.3.3/README_RU.md). Stable publisher/readback пока OPEN,
 FIELD установки и записи на KX11 OPEN; крылья не объявляются исправленными.
+
+
+## 2026-10-19 — выпуск Natro 3.3.3 завершён
+
+По явному запросу пользователя опубликован stable/latest `natro-v3.3.3`, code208021366.
+SOURCE d56b438bb79137146d264c406c7102bad69b9941; TEST CI39196882806 PASS:2190 Android/268 tool.
+APK SHA256 9f66efaeb9567c7cb969ea47d5aef9049569af2887dd67b0526424d57ecc1eec; прежний signer/API28/exact payload проверены.
+PUBLISH CI39197643251 PASS: все 7 assets прочитаны обратно и побайтно сверены до stable публикации; releases/latest и тег повторно проверены.
+Подписанный APK сохранён и готов к выдаче. Navigator/Helper без изменений.
+FIELD: установка на автомобиле, запись через обрыв/перезагрузку и независимое скрытие крыльев остаются OPEN. Выпуск добавляет диагностическую запись, не исправление hide.
