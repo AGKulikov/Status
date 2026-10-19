@@ -5303,3 +5303,17 @@ git diff --check PASS. Это не Android compilation/APK/FIELD.
 18.10.2026 22:38МСК: пользователь явно разрешил отправку кода и отчёта
 в AGKulikov/Status для CI. Прежняя блокировка разрешения superseded этим
 подтверждением; фактическая публикация и результат CI проверяются отдельно.
+
+
+## 19.10.2026 — исправление CI записи DIM
+
+USER: «Ну так делай» после отказа CI39159904559. Опубликованный SOURCE
+6dbebf000ba04f082109e7ac168f66297222b08e с tree529437ad7ebc69d5cbd6cba8154391081c0ba401
+прошёл компиляцию и portable stage; Android suite2189/6failed. Все6 failures
+NatroUpdaterAndroid9Test требуют отсутствовавший NATRO_UPDATER_FIXTURE_APK.
+В verify-dim-uart перенесён существующий release-workflow шаг: скачать
+Natro-3.2.5-signed.apk из natro-v3.2.5, проверить SHA256
+d3fed86ca73c76d1ff10eb3a89a22a731abc50df33ab1782e0986aa164a2daf6,
+передать путь через GITHUB_ENV. Тесты не отключены и их проверки не ослаблены.
+Изменена настройка CI, не код автомобиля/хранения и не defaults.
+Повторный CI ожидается. APK не выпускался; FIELD/CLUSTER_WINGS OPEN.

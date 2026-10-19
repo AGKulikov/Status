@@ -23,6 +23,16 @@ jobs:
           cache: gradle
       - name: Android toolchain
         run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+      - name: Download pinned signed APK for Android 9 updater regression
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir "$RUNNER_TEMP/natro-updater-fixture"
+          gh release download natro-v3.2.5 --repo "$GITHUB_REPOSITORY" \
+            --pattern Natro-3.2.5-signed.apk --dir "$RUNNER_TEMP/natro-updater-fixture"
+          echo "d3fed86ca73c76d1ff10eb3a89a22a731abc50df33ab1782e0986aa164a2daf6  $RUNNER_TEMP/natro-updater-fixture/Natro-3.2.5-signed.apk" | sha256sum -c -
+          echo "NATRO_UPDATER_FIXTURE_APK=$RUNNER_TEMP/natro-updater-fixture/Natro-3.2.5-signed.apk" >> "$GITHUB_ENV"
       - name: Storage review and portable regressions
         run: |
           python3 tools/check_backup_inventory.py
