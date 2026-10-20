@@ -12,8 +12,10 @@ public final class DimUartCapture {
     private static volatile boolean stopRequested;
     private static volatile String status = "Запись выключена. После перезапуска можно выгрузить предыдущую запись.";
     private DimUartCapture() {}
-    private static File root(Context context) {
-        return new File(context.getFilesDir(), "diagnostics/dim-uart");
+    private static File root(Context context) throws IOException {
+        // Android may expose its app-data directory through /data/user/0 aliases.
+        // Normalize the trusted platform directory, while still rejecting linked sessions.
+        return new File(context.getFilesDir().getCanonicalFile(), "diagnostics/dim-uart");
     }
     public static String status() { return status; }
     public static synchronized boolean running() { return active != null; }
@@ -28,6 +30,7 @@ public final class DimUartCapture {
         Context app = context.getApplicationContext();
         AdbConsoleSession session = new AdbConsoleSession(app);
         active = session; stopRequested = false; status = "Подключение для записи DIM…";
+        DiagnosticJournal.infoAsync("dim-recording", "start_requested");
         session.submitSystemDump(adb -> {
             // Refuse to silently discard earlier evidence. Three bounded sessions maximum.
             if (DimUartRecording.sessions(root(app)).length >= 3)
@@ -37,6 +40,7 @@ public final class DimUartCapture {
             try (DimUartRecording recording = new DimUartRecording(root(app),
                     "version=" + version + "\nclock_probe_exit=" + clock.exitCode + "\n" + clock.output + "\n")) {
                 status = "Запись DIM идёт. Предел: 20 минут или 64 МиБ. Можно переключать приборку.";
+                DiagnosticJournal.infoAsync("dim-recording", "recording_created");
                 String reason = "stream_ended_unconfirmed";
                 try {
                     adb.recordDimLog(chunk -> {
@@ -59,7 +63,12 @@ public final class DimUartCapture {
                 active = null;
                 status = error != null && "recording_storage_full".equals(error.getMessage())
                         ? "Сохранены три записи. Выгрузите их и удалите перед новым сбором."
-                        : "Запись остановлена. Выгрузите ZIP; возможные обрыв и пропуски отмечены внутри.";
+                        : error != null && !stopRequested
+                        ? "Запись прервана: " + error.getClass().getSimpleName() + ": " + error.getMessage()
+                        + ". Если данные успели сохраниться, их можно выгрузить."
+                        : "Запись остановлена. Наличие сохранённых данных проверяется при выгрузке.";
+                DiagnosticJournal.infoAsync("dim-recording", "finished stop_requested=" + stopRequested
+                        + ", error=" + (error == null ? "none" : error.toString()));
                 SystemFileDump.RUNNING.set(false);
             }
         });

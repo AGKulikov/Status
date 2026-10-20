@@ -358,7 +358,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "a26a6bce82c0597e51ad2092c1b12a373459bab9ebf7a5b04d65ae82130ed19b",
+      "sha256": "f7ee3413f9d97adb01555cad5bf87532cd3150fcea867d4df5555d3735c837fc",
       "access_kinds": [
         "files"
       ]
@@ -444,7 +444,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/DiagnosticsActivity.java": {
-      "sha256": "503b14c65440cca9137da75974ebc6d4c3630859eb69b7a399eff31ea59700dc",
+      "sha256": "bd79f94810fda8301a59fd3e959c78a58003a5f8226ccf9f14d14850386290cb",
       "access_kinds": [
         "files"
       ]
@@ -761,7 +761,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/DimUartCapture.java": {
-      "sha256": "88e1d4159807185ec94d386cfeae055f4a6149b4915c5502fbeac34adf7ed1df",
+      "sha256": "be902d164c7da411bd5154d30b2422ad9df199394e83b63d7d65ecebf208fde5",
       "access_kinds": [
         "files"
       ]

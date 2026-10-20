@@ -6,6 +6,9 @@ import java.util.concurrent.*;
 public final class DimUartCaptureReplay {
     static void check(boolean ok) { if (!ok) throw new AssertionError(); }
     public static void main(String[] args) throws Exception {
+        File realFiles = new File(args[0], "real-files");
+        check(realFiles.mkdirs());
+        java.nio.file.Files.createSymbolicLink(new File(args[0], "files").toPath(), realFiles.toPath());
         Context context = new Context() {
             public File getFilesDir() { return new File(args[0], "files"); }
             public File getCacheDir() { return new File(args[0], "cache"); }
@@ -28,6 +31,7 @@ public final class DimUartCaptureReplay {
         check(!DimUartCapture.running() && !SystemFileDump.RUNNING.get());
         check(AdbTransport.commands.size() == 2 && AdbTransport.services.isEmpty());
         check(DimUartCapture.export(context).isFile());
+        check(DimUartRecording.sessions(new File(realFiles, "diagnostics/dim-uart")).length == 1);
         DimUartCapture.delete(context);
         check(!DimUartCapture.running());
         System.out.println("PASS single owner / cancel / export guard / no reconnect / no root");

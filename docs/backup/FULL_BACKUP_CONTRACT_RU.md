@@ -1,5 +1,17 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review3.3.4 — выгрузка DIM
+
+DiagnosticsActivity: transient progress/dialogs, явная копия существующего ZIP через
+NatroSharedFolder в Download/Natro с прежним разрешением и подтверждением. Новых
+keys/defaults/roots нет. DimUartCapture нормализует только доверенный getFilesDir;
+защита от ссылок внутри diagnostics остаётся. Формат session/state/terminal/uart.log
+версии3.3.3 не меняется, исходные записи не удаляются при выгрузке/обновлении.
+Добавлены события в существующий DiagnosticJournal, без сырых данных UART.
+Defaults335…366→367 рассмотрены при неизменных defaults; same367 не переписывается,
+explicit/unknown/effective сохраняются,334/368 отвергаются отдельной регрессией.
+Fingerprints трёх изменённых owners пересмотрены по этому diff; FIELD restore OPEN.
+
 ### Review3.3.2 — отдельная задача приборки и подтверждённый OFF
 
 Пересмотрены diff launcher/owner/query/coordinator и AdbShellResult: только RAM,

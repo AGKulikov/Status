@@ -89,6 +89,9 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
         }
     };
     private File systemDumpFile;
+    private boolean dimFilesBusy;
+
+    @Override protected boolean usesEditorSections() { return false; }
     private long refreshGeneration;
     private long lifecycleGeneration;
     private List<String> lastComponentChoices = new ArrayList<>();
@@ -605,25 +608,101 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
     private void refreshRecorder() { refreshJournal(); }
 
     private void dimRecordingFiles(boolean delete) {
+        if (dimFilesBusy) {
+            Toast.makeText(this, "Выгрузка записей DIM уже выполняется", Toast.LENGTH_LONG).show();
+            return;
+        }
+        dimFilesBusy = true;
+        systemDumpState.setText(delete ? "Удаление записей DIM…" : "Подготовка ZIP записей DIM…");
+        Toast.makeText(this, systemDumpState.getText(), Toast.LENGTH_LONG).show();
+        DiagnosticJournal.infoAsync("dim-export", delete ? "delete_requested" : "export_requested");
         final Context app = getApplicationContext();
         try { exportWorker.execute(() -> {
             try {
                 File file;
                 if (delete) { dezz.status.widget.diagnostics.DimUartCapture.delete(app); file = null; }
                 else file = dezz.status.widget.diagnostics.DimUartCapture.export(app);
+                DiagnosticJournal.infoAsync("dim-export", file == null ? "deleted" : "zip_ready bytes=" + file.length());
                 runOnUiThread(() -> {
+                    dimFilesBusy = false;
                     if (isDestroyed()) return;
-                    if (file != null) share(file, "application/zip");
+                    if (file != null) showDimExport(file);
                     else systemDumpState.setText(dezz.status.widget.diagnostics.DimUartCapture.status());
                 });
             } catch (Exception error) {
+                DiagnosticJournal.infoAsync("dim-export", "failed " + error.toString());
                 runOnUiThread(() -> {
-                    if (!isDestroyed()) systemDumpState.setText("Записи DIM: " + error.getMessage());
+                    dimFilesBusy = false;
+                    if (!isDestroyed()) {
+                        String message = "no_recording".equals(error.getMessage())
+                                ? "Сохранённые записи DIM не найдены. Подключение могло завершиться до начала записи."
+                                : "Записи DIM: " + error.getClass().getSimpleName() + ": " + error.getMessage();
+                        systemDumpState.setText(message);
+                        new AlertDialog.Builder(this).setTitle("Не удалось выгрузить DIM")
+                                .setMessage(message).setPositiveButton("Закрыть", null).show();
+                    }
                 });
             }
         }); } catch (java.util.concurrent.RejectedExecutionException busy) {
+            dimFilesBusy = false;
             systemDumpState.setText("Дождитесь завершения текущего экспорта.");
+            Toast.makeText(this, systemDumpState.getText(), Toast.LENGTH_LONG).show();
         }
+    }
+
+    private void showDimExport(File file) {
+        systemDumpState.setText("ZIP DIM готов: " + file.getName() + " · " + file.length() + " байт");
+        new AlertDialog.Builder(this).setTitle("Записи DIM готовы")
+                .setMessage(systemDumpState.getText())
+                .setNegativeButton("Закрыть", null)
+                .setNeutralButton("В Загрузки/Natro", (dialog, which) -> saveDimExport(file))
+                .setPositiveButton("Отправить ZIP", (dialog, which) -> {
+                    try {
+                        share(file, "application/zip");
+                        DiagnosticJournal.infoAsync("dim-export", "share_launched");
+                    } catch (RuntimeException error) {
+                        DiagnosticJournal.infoAsync("dim-export", "share_failed " + error.toString());
+                        new AlertDialog.Builder(this).setTitle("Не удалось открыть отправку")
+                                .setMessage("ZIP сохранён. Можно выгрузить его в Загрузки/Natro.\n" + error)
+                                .setPositiveButton("Сохранить ZIP", (d, w) -> saveDimExport(file))
+                                .setNegativeButton("Закрыть", null).show();
+                    }
+                }).show();
+    }
+
+    private void saveDimExport(File file) {
+        if (android.os.Build.VERSION.SDK_INT >= 23 && checkSelfPermission(
+                android.Manifest.permission.WRITE_EXTERNAL_STORAGE) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{android.Manifest.permission.WRITE_EXTERNAL_STORAGE}, 904);
+            Toast.makeText(this, "Разрешите доступ и повторите выгрузку. Исходные записи сохранены.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        new AlertDialog.Builder(this).setTitle("Сохранить записи DIM?")
+                .setMessage("ZIP будет доступен другим приложениям в Download/Natro. Передавайте его лично.")
+                .setNegativeButton("Отмена", null)
+                .setPositiveButton("Сохранить", (dialog, which) -> {
+                    try { exportWorker.execute(() -> {
+                        String result;
+                        try {
+                            File directory = new File(android.os.Environment.getExternalStoragePublicDirectory(
+                                    android.os.Environment.DIRECTORY_DOWNLOADS), "Natro");
+                            File saved = new dezz.status.widget.transfer.NatroSharedFolder(directory).exportDump(file);
+                            result = "Сохранено: Download/Natro/" + saved.getName();
+                            DiagnosticJournal.infoAsync("dim-export", "download_saved bytes=" + saved.length());
+                        } catch (Exception error) {
+                            result = "Не удалось сохранить ZIP: " + error + ". Исходные записи сохранены.";
+                            DiagnosticJournal.infoAsync("dim-export", "download_failed " + error.toString());
+                        }
+                        final String message = result;
+                        runOnUiThread(() -> { if (!isDestroyed()) {
+                            systemDumpState.setText(message);
+                            new AlertDialog.Builder(this).setTitle("Выгрузка DIM").setMessage(message)
+                                    .setPositiveButton("Закрыть", null).show();
+                        }});
+                    }); } catch (java.util.concurrent.RejectedExecutionException busy) {
+                        Toast.makeText(this, "Дождитесь завершения текущего экспорта", Toast.LENGTH_LONG).show();
+                    }
+                }).show();
     }
 
     private void exportAsync(int type) {

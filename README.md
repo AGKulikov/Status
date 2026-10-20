@@ -1,5 +1,8 @@
 # Natro
 
+В работе: [3.3.4 — выгрузка записей DIM](docs/releases/3.3.4/README_RU.md),
+ветка `release/natro-3.3.4`. Локальные 18 тестов PASS; полный CI/APK/FIELD OPEN.
+
 [3.3.3 с записью DIM](docs/releases/3.3.3/README_RU.md): APK подписан прежним ключом, CI39196882806 PASS (2190Android/268tool). Текущая release-ветка `release/natro-3.3.3`; [stable/latest опубликован](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.3), все 7 файлов проверены publisher CI39197643251; FIELD OPEN.
 
 Разработка записи DIM: `feature/dim-uart-20261018` — [SOURCE/TEST и ограничения](docs/geely-kx11/research-2026-10-18-wings/DIM_UART_RECORDING_RU.md). Включено в APK 3.3.3; независимое скрытие крыльев ещё не исправлено.
