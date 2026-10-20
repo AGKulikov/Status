@@ -5391,3 +5391,9 @@ Navigator DEX совпал с3.3.3; Helper unchanged. Stable publisher/readback 
 Повторная проверка releases/latest: natro-v3.3.4, draft=false,7assets, SHA256APK
 ac7293233836540f472e8bac350a892edc9f50700d895d74d9f448d35cef6219.
 APK передан пользователю. SOURCE/TEST/APK/PUBLISH PASS; FIELD выгрузки на KX11 OPEN.
+
+## 20.10.2026 — CLUSTER_WINGS: сопоставление записи UART19.10
+
+USER: продолжить сопоставление и разбор. Пассивная UART-запись19.10 (Natro3.3.3, KX11 Android9 build20.24.10.23024.41151/539) содержит три выхода/входа: TX14/data2 + TX8/data0 → RX7/data2 через357–365мс; TX14/data1 + TX8/data1 → RX7/data1 через280–304мс. Все6 TX14 и6 TX8 имеют отдельный RX type3 ACK. После каждого выхода TX1/data1 иTX19/data1, затемRX20/data1: соответствует ранее статически разобранным IHU-ready и обоям; значение обоев неизменно. По recvData восстановлены111 RX с верным CRC32, также111 TX с верным CRC32. test-data показывает110RX: RX20 в08:06:22.108 есть в recvData, отсутствие дублирующей строки не является потерей кадра. Нет синхронного видео/идентификатора вызывающего процесса/кода внешнего renderer; независимый hide OPEN.
+
+SOURCE/TEST: анализ и CRC; runtime без изменений. APK: без нового APK. FIELD: пассивный обмен подтверждён, независимый hide OPEN. [Подробный отчёт](docs/geely-kx11/research-2026-10-18-wings/UART_FIELD_2026_10_19_RU.md).
