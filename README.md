@@ -1,7 +1,7 @@
 # Natro
 
 В работе: [3.3.4 — выгрузка записей DIM](docs/releases/3.3.4/README_RU.md),
-ветка `release/natro-3.3.4`. Локальные 18 тестов PASS; полный CI/APK/FIELD OPEN.
+ветка `release/natro-3.3.4`. CI39437320944 PASS:2191 Android/268 tool. APK подписан и проверен; stable публикация ожидается, FIELD OPEN.
 
 [3.3.3 с записью DIM](docs/releases/3.3.3/README_RU.md): APK подписан прежним ключом, CI39196882806 PASS (2190Android/268tool). Текущая release-ветка `release/natro-3.3.3`; [stable/latest опубликован](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.3), все 7 файлов проверены publisher CI39197643251; FIELD OPEN.
 

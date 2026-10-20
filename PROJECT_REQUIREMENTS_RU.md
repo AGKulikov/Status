@@ -5378,3 +5378,9 @@ TEST: replay через ссылку на app-data root; прежние quota/ca
 Причина конкретного отказа пока UNKNOWN; UI/logging defects подтверждены SOURCE.
 
 LOCAL TEST: 18 tests PASS; inventory92owners PASS; полный Android CI/APK/FIELD OPEN.
+
+
+20.10.2026 — APK3.3.4 подготовлен: SOURCE12ddfb63f068bfd6934d5906dd66a975ed4212e2;
+CI39437320944 PASS:2191 Android/268 tool,92owners. SHA256ac7293233836540f472e8bac350a892edc9f50700d895d74d9f448d35cef6219.
+Прежний сертификат, v2/v3, exactAPI28, zipalign16KiB, identity/+1/1517payload entries PASS.
+Navigator DEX совпал с3.3.3; Helper unchanged. Stable publisher/readback pending; FIELD OPEN.

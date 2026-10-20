@@ -12,5 +12,10 @@ Download/Natro. События записи/выгрузки включены в
 Причина отказа на конкретном автомобиле пока не установлена: предоставленные
 TXT/ZIP не содержали событий DIM-export и файлов uart.log/session.txt.
 
-SOURCE: изменения подготовлены. TEST: pending. APK: pending. FIELD: OPEN.
+SOURCE: `12ddfb63f068bfd6934d5906dd66a975ed4212e2`, tree `4fcf4b05de24fcf05af1cf5e61feeb091b22873c`.
+TEST: CI39437320944 PASS,2191 Android/268 tool;92storage owners.
+APK:3.3.4/code208021367 подписан прежним сертификатом; exactAPI28/v2/v3,
+zipalign16KiB/identity/1517payload entries/install-over metadata PASS.
+SHA256 `ac7293233836540f472e8bac350a892edc9f50700d895d74d9f448d35cef6219`.
+Публикация stable/readback ожидается. FIELD выгрузки/установки: OPEN.
 Независимое скрытие крыльев не реализовано. Navigator и Helper без изменений.
