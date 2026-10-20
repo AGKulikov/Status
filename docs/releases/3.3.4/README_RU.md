@@ -1,6 +1,6 @@
 # Natro 3.3.4 — выгрузка записей DIM
 
-Кандидат, ещё не опубликованный APK. Ветка release/natro-3.3.4.
+Выпущен stable/latest: [Natro 3.3.4](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.4). Ветка release/natro-3.3.4.
 
 Диагностика больше не разбивается автоматическим редактором на вкладки:
 кнопки DIM и результат находятся на одном экране. Выгрузка показывает начало,
@@ -17,5 +17,6 @@ TEST: CI39437320944 PASS,2191 Android/268 tool;92storage owners.
 APK:3.3.4/code208021367 подписан прежним сертификатом; exactAPI28/v2/v3,
 zipalign16KiB/identity/1517payload entries/install-over metadata PASS.
 SHA256 `ac7293233836540f472e8bac350a892edc9f50700d895d74d9f448d35cef6219`.
-Публикация stable/readback ожидается. FIELD выгрузки/установки: OPEN.
+Publisher CI39438958977 PASS: все 7 файлов скачаны и побайтно сверены.
+Повторно проверены releases/latest и SHA256 APK. FIELD выгрузки/установки: OPEN.
 Независимое скрытие крыльев не реализовано. Navigator и Helper без изменений.

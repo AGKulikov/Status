@@ -5384,3 +5384,10 @@ LOCAL TEST: 18 tests PASS; inventory92owners PASS; полный Android CI/APK/F
 CI39437320944 PASS:2191 Android/268 tool,92owners. SHA256ac7293233836540f472e8bac350a892edc9f50700d895d74d9f448d35cef6219.
 Прежний сертификат, v2/v3, exactAPI28, zipalign16KiB, identity/+1/1517payload entries PASS.
 Navigator DEX совпал с3.3.3; Helper unchanged. Stable publisher/readback pending; FIELD OPEN.
+
+
+20.10.2026 — выпуск3.3.4 завершён. Publisher CI39438958977 completed/success;
+все7assets прочитаны обратно и побайтно сверены до публикации stable/latest.
+Повторная проверка releases/latest: natro-v3.3.4, draft=false,7assets, SHA256APK
+ac7293233836540f472e8bac350a892edc9f50700d895d74d9f448d35cef6219.
+APK передан пользователю. SOURCE/TEST/APK/PUBLISH PASS; FIELD выгрузки на KX11 OPEN.
