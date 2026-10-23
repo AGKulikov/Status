@@ -1,5 +1,14 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review23.10.2026 — media delivery / traffic heartbeat
+
+Рассмотрены diff MediaButtonController и NavigationDataRepository: дополнительная
+runtime-подписка, диагностический ingress и RAM limiter уведомлений. Новых prefs,
+keys/defaults/roots нет. encodeTrafficLights(values) сохраняет прежний JSON с
+updatedAt; вариант без timestamp используется только для сравнения в RAM.
+Все принятые обновления по-прежнему сохраняют актуальность, clear и schema прежние.
+Два fingerprints обновлены после этого review. FIELD backup/restore не проверен.
+
 ### Review3.3.4 — выгрузка DIM
 
 DiagnosticsActivity: transient progress/dialogs, явная копия существующего ZIP через

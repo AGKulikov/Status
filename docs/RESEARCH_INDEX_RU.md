@@ -141,3 +141,5 @@ QNX отказал до handshake; каталог/mappings остаются BLOC
 - [18.10: непрерывная запись DIM](geely-kx11/research-2026-10-18-wings/DIM_UART_RECORDING_RU.md): SOURCE/portable TEST; APK/FIELD OPEN.
 
 - 20.10.2026: [UART19.10: шесть переходов, ACK/RX7, IHU-ready/обои](geely-kx11/research-2026-10-18-wings/UART_FIELD_2026_10_19_RU.md). Независимый hide OPEN.
+
+- 23.10.2026: [XSF, stale-медиакнопки и traffic broadcast](geely-kx11/MEDIA_DELIVERY_2026_10_23_RU.md). SOURCE candidate, portable tests; APK/FIELD OPEN.

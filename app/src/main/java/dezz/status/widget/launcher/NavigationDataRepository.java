@@ -1157,6 +1157,9 @@ public final class NavigationDataRepository {
         return true;
     }
 
+    private static final TrafficNotificationPolicy TRAFFIC_NOTIFICATIONS =
+            new TrafficNotificationPolicy();
+
     private static boolean updateTrafficLight(@NonNull Context context,
             @NonNull Intent intent) {
         Bundle extras = intent.getExtras();
@@ -1170,7 +1173,7 @@ public final class NavigationDataRepository {
                 : position >= 0 ? "pos:" + position + "|src:" + source : "single";
         SharedPreferences prefs = preferences(context);
         LinkedHashMap<String, TrafficLight> values = trafficLightsMap(prefs);
-        String before = encodeTrafficLights(values);
+        String before = encodeTrafficLights(values, false);
         long now = System.currentTimeMillis();
         if (color.isEmpty()) {
             if (id.isEmpty() && position < 0) {
@@ -1216,7 +1219,7 @@ public final class NavigationDataRepository {
                     now, phaseOrigin));
         }
         trimTrafficLights(values);
-        boolean changed = !before.equals(encodeTrafficLights(values));
+        String after = encodeTrafficLights(values, false);
         List<TrafficLight> sorted = sortedTrafficLights(values.values());
         TrafficLight primary = sorted.isEmpty() ? null : sorted.get(0);
         SharedPreferences.Editor editor = prefs.edit()
@@ -1231,7 +1234,11 @@ public final class NavigationDataRepository {
                     .putLong(PREF_TRAFFIC_UPDATED_AT, primary.updatedAt);
         }
         editor.apply();
-        if (changed) notifyChanged(context);
+        // Refresh stored timestamps on every accepted update. Timestamp-only repeats
+        // still refresh consumers once a second; color/countdown/source/clear changes
+        // notify immediately, including after an identical heartbeat was suppressed.
+        if (TRAFFIC_NOTIFICATIONS.shouldNotify(before, after,
+                android.os.SystemClock.uptimeMillis())) notifyChanged(context);
         return true;
     }
 
@@ -1419,7 +1426,15 @@ public final class NavigationDataRepository {
     }
 
     private static String encodeTrafficLights(Map<String, TrafficLight> values) {
+        return encodeTrafficLights(values, true);
+    }
+
+    private static String encodeTrafficLights(Map<String, TrafficLight> values,
+            boolean includeTimestamp) {
         JSONArray array = new JSONArray();
+        // Replacement moves a slot to the end of the LinkedHashMap. That storage
+        // order is not a display change (readers sort by position separately).
+        if (!includeTimestamp) values = new java.util.TreeMap<>(values);
         for (Map.Entry<String, TrafficLight> entry : values.entrySet()) {
             TrafficLight value = entry.getValue();
             try {
@@ -1431,7 +1446,7 @@ public final class NavigationDataRepository {
                 item.put("countdown", value.countdown);
                 item.put("arrow", value.arrow);
                 item.put("position", value.position);
-                item.put("updatedAt", value.updatedAt);
+                if (includeTimestamp) item.put("updatedAt", value.updatedAt);
                 item.put("phaseOrigin", value.phaseOrigin);
                 array.put(item);
             } catch (JSONException ignored) {

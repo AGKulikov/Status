@@ -530,7 +530,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/launcher/NavigationDataRepository.java": {
-      "sha256": "07be76945ef403e74f96b742ef8b575ff5f02a77bacd461aa87e405b9e8069c4",
+      "sha256": "fcd340525bc1831cdd0ba32bb8c23c48d53711e7efb9432ccb9272a0434b7b2a",
       "access_kinds": [
         "preferences"
       ]
@@ -554,7 +554,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/media/MediaButtonController.java": {
-      "sha256": "24ebb88f7381699b3d7e52093a0d363a21fb35d80c6a54910a6bb51d930905e1",
+      "sha256": "4641f61a6881a196ffaf0896ea238c33dd4c8535f47cb0c538bbc754b0dd2f9a",
       "access_kinds": [
         "preferences"
       ]

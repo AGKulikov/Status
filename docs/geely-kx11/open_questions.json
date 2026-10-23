@@ -662,13 +662,19 @@
       ],
       "evidence_updates": [
         {
+          "date": "2026-10-23",
+          "level": "FIELD_ARCHIVE_STATIC_APK_SOURCE_CANDIDATE",
+          "finding": "21.10:26 stale records age26.9–30.2s; traffic updates315–351/20s. XSF constructs uptime KeyEvent then sendBroadcast. Added dynamic NEDIA intake and timestamp-only traffic notification heartbeat.6 portable tests PASS; broadcast queue causality, Android integration, APK and FIELD OPEN. Historical queue_ms=0 in stale branch is not an independent queue measurement.",
+          "source": "MEDIA_DELIVERY_2026_10_23_RU.md"
+        },
+        {
           "date": "2026-10-17",
           "level": "FIELD_ARCHIVE_AND_SOURCE",
           "finding": "User IMG_8804/8805 shows overlapping HOME media frames. SOURCE defect: blank proxy FIT area consumed DOWN; whole-cell buttons/progress interception.3.2.9 admits visible content, preserves gesture owner and editor geometry. Not attributed to steering latency; FIELD repeat pending.",
           "source": "research-2026-10-17-white-bar/FIELD_1911_1915_RU.md"
         }
       ],
-      "last_reviewed": "2026-10-17"
+      "last_reviewed": "2026-10-23"
     },
     {
       "id": "SHADE_OWNER",

@@ -5397,3 +5397,16 @@ APK передан пользователю. SOURCE/TEST/APK/PUBLISH PASS; FIELD
 USER: продолжить сопоставление и разбор. Пассивная UART-запись19.10 (Natro3.3.3, KX11 Android9 build20.24.10.23024.41151/539) содержит три выхода/входа: TX14/data2 + TX8/data0 → RX7/data2 через357–365мс; TX14/data1 + TX8/data1 → RX7/data1 через280–304мс. Все6 TX14 и6 TX8 имеют отдельный RX type3 ACK. После каждого выхода TX1/data1 иTX19/data1, затемRX20/data1: соответствует ранее статически разобранным IHU-ready и обоям; значение обоев неизменно. По recvData восстановлены111 RX с верным CRC32, также111 TX с верным CRC32. test-data показывает110RX: RX20 в08:06:22.108 есть в recvData, отсутствие дублирующей строки не является потерей кадра. Нет синхронного видео/идентификатора вызывающего процесса/кода внешнего renderer; независимый hide OPEN.
 
 SOURCE/TEST: анализ и CRC; runtime без изменений. APK: без нового APK. FIELD: пассивный обмен подтверждён, независимый hide OPEN. [Подробный отчёт](docs/geely-kx11/research-2026-10-18-wings/UART_FIELD_2026_10_19_RU.md).
+
+## 23.10.2026 — BASE-MEDIAKEY / MEDIA_LATENCY / GATE-079
+
+USER: после старта кнопки работают, затем перестают; продолжить разбор найденного
+XSF APK и исправление. FIELD21.10:8 forwarded /26 stale records, age26.9–30.2s.
+STATIC XSF создаёт uptime KeyEvent перед sendBroadcast. Нагрузка светофоров
+растёт до315–351/20s; связь с задержкой пока гипотеза. SOURCE: динамический NEDIA
+приём на выделенном потоке с общей identity дедупликацией; ingress action/thread;
+timestamp-only traffic уведомления до1Hz при немедленных содержательных изменениях.
+TTL750ms сохранён. Формат данных/настройки/подпись не меняются.
+TEST:6 portable tests PASS; backup inventory92owners PASS, git diff check PASS.
+Android integration/полная компиляция OPEN; APK не выпущен, FIELD3×30min OPEN.
+Источник/границы/следующий сбор: docs/geely-kx11/MEDIA_DELIVERY_2026_10_23_RU.md.

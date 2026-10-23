@@ -57,6 +57,12 @@ public final class MediaButtonController {
         if (event == null || (event.getAction() != KeyEvent.ACTION_DOWN
                 && event.getAction() != KeyEvent.ACTION_UP)) { finished.run(); return; }
         final long received = SystemClock.uptimeMillis();
+        DiagnosticJournal.infoAsync("media-input", "action=" + intent.getAction()
+                + ", thread=" + Thread.currentThread().getName()
+                + ", code=" + event.getKeyCode() + ", key_action=" + event.getAction()
+                + ", event_uptime=" + event.getEventTime()
+                + ", received_uptime=" + received
+                + ", source_age_ms=" + (received - event.getEventTime()));
         final long owner = generation;
         if (!MediaKeyPolicy.freshAt(event.getEventTime(), received)) {
             record(event, "discarded_source_stale", received, received); finished.run(); return;
@@ -259,6 +265,10 @@ public final class MediaButtonController {
         inputThread = new HandlerThread("natro-media-input");
         inputThread.start();
         IntentFilter filter = new IntentFilter(Intent.ACTION_MEDIA_BUTTON);
+        // The patched XSF sends NEDIA, not MEDIA. Receive it on the input thread too;
+        // the manifest receiver remains the cold-process fallback. Both paths share
+        // the command executor and KeyEvent identity cache, so a duplicate is harmless.
+        filter.addAction(MediaKeyPolicy.NATRO);
         filter.addCategory(Intent.CATEGORY_DEFAULT);
         Handler handler = new Handler(inputThread.getLooper());
         if (Build.VERSION.SDK_INT >= 33) context.registerReceiver(receiver, filter, null, handler, Context.RECEIVER_EXPORTED);

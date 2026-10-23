@@ -1,5 +1,13 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 23.10.2026 — media delivery, SOURCE candidate / FIELD OPEN
+
+Лог21.10:26 stale-событий с age26.9–30.2s; до отказа вырос поток светофоров.
+XSF APK создаёт свежие uptime KeyEvent и sendBroadcast, точка runtime-задержки
+не установлена. Добавлены активный NEDIA receiver и ограничение timestamp-only
+уведомлений светофора;6 portable tests PASS, Android/APK/FIELD OPEN.
+[Доказательства, SHA и границы](docs/geely-kx11/MEDIA_DELIVERY_2026_10_23_RU.md).
+
 ## 18.10.2026 — 3.3.2 SOURCE: OEM-преддиалог и завершённый OFF
 
 STATIC framework/services из KX11 dump20.24.10.23024.41151/539: одиночный
