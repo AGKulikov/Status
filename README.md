@@ -1,17 +1,21 @@
 # Natro
 
-Подготовка3.3.5: `release/natro-3.3.5`, [протокол](docs/releases/3.3.5/README_RU.md).
-Сборка/подпись/публикация в процессе; FIELD медиакнопок OPEN.
+**Natro 3.3.5 / 208021368 подписана и проверена.** Ветка `release/natro-3.3.5`,
+[протокол и матрица](docs/releases/3.3.5/README_RU.md). Полный CI 39904116513 PASS:
+2192 Android-теста и 269 tool/replay tests. Прежний сертификат, v2/v3/API 28,
+версия +1 и точный CI payload подтверждены. Публикация stable/latest выполняется;
+FIELD устранения задержки медиакнопок и GATE-079 остаются OPEN.
+Navigator и Helper переустанавливать для этого выпуска не требуется.
 
 Разработка медиакнопок: `fix/media-broadcast-20261023` —
 [XSF delivery и повторные traffic updates](docs/geely-kx11/MEDIA_DELIVERY_2026_10_23_RU.md).
 SOURCE5e0c73e опубликован; [Android CI39903305810](https://github.com/AGKulikov/Status/actions/runs/39903305810)
-PASS,6 portable tests PASS; новый APK и FIELD пока OPEN.
+PASS, 6 portable tests PASS. Изменения включены в подписанную 3.3.5; FIELD OPEN.
 
 Выпущена: [3.3.4 — выгрузка записей DIM](docs/releases/3.3.4/README_RU.md),
 ветка `release/natro-3.3.4`. CI39437320944 PASS:2191 Android/268 tool. APK подписан и проверен; [stable/latest опубликован](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.4). Publisher CI39438958977 PASS, все 7 файлов сверены; FIELD OPEN.
 
-[3.3.3 с записью DIM](docs/releases/3.3.3/README_RU.md): APK подписан прежним ключом, CI39196882806 PASS (2190Android/268tool). Текущая release-ветка `release/natro-3.3.3`; [stable/latest опубликован](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.3), все 7 файлов проверены publisher CI39197643251; FIELD OPEN.
+[3.3.3 с записью DIM](docs/releases/3.3.3/README_RU.md): APK подписан прежним ключом, CI39196882806 PASS (2190Android/268tool). Историческая release-ветка `release/natro-3.3.3`; [stable/latest опубликован](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.3), все 7 файлов проверены publisher CI39197643251; FIELD OPEN.
 
 Разработка записи DIM: `feature/dim-uart-20261018` — [SOURCE/TEST и ограничения](docs/geely-kx11/research-2026-10-18-wings/DIM_UART_RECORDING_RU.md). Включено в APK 3.3.3; независимое скрытие крыльев ещё не исправлено.
 
@@ -67,7 +71,8 @@ APK `Natro-3.2.3-signed.apk` передан отдельно. Navigator/Helper �
 Первый [дамп3.2.3](docs/geely-kx11/research-2026-10-16-qnx/DUMP_323_8283_RU.md): Android собран;
 QNX Connection refused до первого запроса. Ожидание после старта не помогло; маршрут проверен. В контроле13:07 получено QCONN, затем системный сбор дошёл до812 путей и выявил stat-parser defect на `/proc`. Повтор старого APK не нужен; дальнейшая проверка после выпуска исправления. [История соединения](docs/geely-kx11/research-2026-10-16-qnx/QNX_TERMINAL_20261017_RU.md).
 
-Актуальное дерево разработки: [`fix/instrument-switch-332`](https://github.com/AGKulikov/Status/tree/fix/instrument-switch-332). Документы текущего выпуска: [`release/natro-3.3.2-verification`](https://github.com/AGKulikov/Status/tree/release/natro-3.3.2-verification).
+Актуальная ветка разработки и выпуска: [`release/natro-3.3.5`](https://github.com/AGKulikov/Status/tree/release/natro-3.3.5).
+Историческое дерево 3.3.2: [`fix/instrument-switch-332`](https://github.com/AGKulikov/Status/tree/fix/instrument-switch-332); документы 3.3.2: [`release/natro-3.3.2-verification`](https://github.com/AGKulikov/Status/tree/release/natro-3.3.2-verification).
 Ветка `main` содержит историческое состояние и не представляет текущую версию Natro.
 После каждого выпуска публикуются соответствующие исходники, README, описание
 выпуска и обновлённый реестр требований; ссылки на коммит и сборку фиксируются в описании.

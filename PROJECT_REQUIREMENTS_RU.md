@@ -5424,3 +5424,29 @@ USER: «собирай апк и публикуй в ветке обновлен
 ключи/defaults прежние, миграция сохраняет effective/explicit/unknown.
 Navigator/Helper без функциональных изменений. SOURCE готов; release TEST/APK/
 PUBLISH в процессе. FIELD устранения задержки и3×30min GATE-079 OPEN.
+
+
+## 23.10.2026 — 3.3.5: проверенный APK, публикация выполняется
+
+USER: «Ну так продолжай работу» после сообщения о готовом неподписанном кандидате.
+Продолжена ранее разрешённая подпись и публикация в канале обновлений. SOURCE
+ed846b2b7f6514a2b6a1a9392d5769eeb2efe686, tree 0b11b8520a668679005e951b71e86185493b2710.
+CI 39904116513 SUCCESS: 2192 Android-теста / 429 XML suites и 269 tool/replay tests,
+failures/errors/skipped 0; settings 48/253/3012 и inventory 92 owners PASS.
+Повторно локально 8 handoff/update/media-policy tests PASS.
+
+APK 3.3.5 / 208021368, SHA-256
+cbd4bf5fa474bbf0c13d5c3d12ea56d9030d777ab3d5dd3a4bc8b0f716510768.
+Прежний ключ восстановлен из существующего приватного резерва по REL-015;
+новый ключ не создавался, секреты не публикуются, временные копии удалены.
+Один signer, v2/v3, точный API 28, identity/non-debug/zipalign 16 KiB,
+версия +1 к реальному APK 3.3.4 и все 1517 payload entries проверены.
+Defaults 335…367 → 368 покрыты CI, физический install-over не заявляется.
+Navigator classes19.dex побайтно равен кандидату 3.3.4; Helper прежний.
+Дополнительная установка Navigator для этого обновления не требуется.
+
+SOURCE/TEST/APK PASS в указанном объёме; PUBLISH выполняется через прежний
+signature-only handoff, draft и readback всех 7 assets перед stable/latest.
+FIELD BASE-MEDIAKEY / MEDIA_LATENCY / GATE-079 (3 × 30 минут), фактическое
+устранение задержки, сохранение настроек на KX11 и независимый hide крыльев OPEN.
+Исторические результаты выше сохранены. [Матрица и отчёт](docs/releases/3.3.5/README_RU.md).
