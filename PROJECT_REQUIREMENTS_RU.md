@@ -5410,3 +5410,8 @@ TTL750ms сохранён. Формат данных/настройки/подп
 TEST:6 portable tests PASS; backup inventory92owners PASS, git diff check PASS.
 Android integration/полная компиляция OPEN; APK не выпущен, FIELD3×30min OPEN.
 Источник/границы/следующий сбор: docs/geely-kx11/MEDIA_DELIVERY_2026_10_23_RU.md.
+
+23.10 SOURCE publication verified:5e0c73e0b45dba6d43f5cae108fd188598b00613,
+fix/media-broadcast-20261023; tree совпадает с локальным2b49135e.
+TEST CI39903305810 SUCCESS:testGeelyDebugUnitTest/65tasks,6 portable replays,
+inventory92owners. Android compile gate закрыт; runtime integration/APK/FIELD OPEN.

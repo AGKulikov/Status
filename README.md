@@ -2,7 +2,8 @@
 
 Разработка медиакнопок: `fix/media-broadcast-20261023` —
 [XSF delivery и повторные traffic updates](docs/geely-kx11/MEDIA_DELIVERY_2026_10_23_RU.md).
-SOURCE candidate,6 portable tests PASS; новый APK и FIELD пока OPEN.
+SOURCE5e0c73e опубликован; [Android CI39903305810](https://github.com/AGKulikov/Status/actions/runs/39903305810)
+PASS,6 portable tests PASS; новый APK и FIELD пока OPEN.
 
 Выпущена: [3.3.4 — выгрузка записей DIM](docs/releases/3.3.4/README_RU.md),
 ветка `release/natro-3.3.4`. CI39437320944 PASS:2191 Android/268 tool. APK подписан и проверен; [stable/latest опубликован](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.4). Publisher CI39438958977 PASS, все 7 файлов сверены; FIELD OPEN.

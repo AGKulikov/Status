@@ -50,3 +50,13 @@ FIELD OPEN: холодный/тёплый старт, обе очереднос�
 OFF/defaultSource,3×30min по GATE-079 с отметками10/20min и реальным плеером.
 Нужно проверить source_age в обоих путях; оставшаяся задержка требует снимка
 системной broadcast-очереди и сопоставления XSF send-time с ingress.
+
+## Проверка публикации и Android CI
+
+23.10.2026 SOURCE опубликован в fix/media-broadcast-20261023:
+5e0c73e0b45dba6d43f5cae108fd188598b00613. Tree2ffe52de240e189e629e7eed23c3aac17335a846
+совпадает с локальным2b49135e (метаданные commit различаются).
+CI39903305810/job120249500519 SUCCESS: testGeelyDebugUnitTest,
+BUILD SUCCESSFUL,65tasks;6 portable replay tests PASS; inventory92owners PASS.
+Предыдущая отметка Android compilation OPEN закрыта этим прогоном.
+Android runtime delivery/load, подписанный APK и FIELD остаются OPEN.
