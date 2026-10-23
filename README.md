@@ -1,5 +1,8 @@
 # Natro
 
+Подготовка3.3.5: `release/natro-3.3.5`, [протокол](docs/releases/3.3.5/README_RU.md).
+Сборка/подпись/публикация в процессе; FIELD медиакнопок OPEN.
+
 Разработка медиакнопок: `fix/media-broadcast-20261023` —
 [XSF delivery и повторные traffic updates](docs/geely-kx11/MEDIA_DELIVERY_2026_10_23_RU.md).
 SOURCE5e0c73e опубликован; [Android CI39903305810](https://github.com/AGKulikov/Status/actions/runs/39903305810)

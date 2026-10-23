@@ -1,5 +1,12 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review3.3.5 — release defaults
+
+Defaults335…367→368 рассмотрены при неизменных keys/defaults/roots.
+Регрессия сохраняет effective/explicit/unknown значения и same368;
+334/369 отвергаются. Пересмотрен fingerprint BackupDefaultsMigration.
+Реальная установка/restore FIELD OPEN.
+
 ### Review23.10.2026 — media delivery / traffic heartbeat
 
 Рассмотрены diff MediaButtonController и NavigationDataRepository: дополнительная

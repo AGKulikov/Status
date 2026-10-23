@@ -5415,3 +5415,12 @@ Android integration/полная компиляция OPEN; APK не выпущ�
 fix/media-broadcast-20261023; tree совпадает с локальным2b49135e.
 TEST CI39903305810 SUCCESS:testGeelyDebugUnitTest/65tasks,6 portable replays,
 inventory92owners. Android compile gate закрыт; runtime integration/APK/FIELD OPEN.
+
+## 23.10.2026 — выпуск3.3.5 разрешён
+
+USER: «собирай апк и публикуй в ветке обновлений». Version3.3.5/code208021368,
+прежняя подпись/install-over3.3.4, verified source/test/candidate/payload;
+публикация stable/latest с readback каждого asset. Defaults335…367→368:
+ключи/defaults прежние, миграция сохраняет effective/explicit/unknown.
+Navigator/Helper без функциональных изменений. SOURCE готов; release TEST/APK/
+PUBLISH в процессе. FIELD устранения задержки и3×30min GATE-079 OPEN.
