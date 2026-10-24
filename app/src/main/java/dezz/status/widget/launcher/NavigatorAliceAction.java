@@ -13,6 +13,8 @@ import android.util.Log;
 import android.widget.Toast;
 import dezz.status.widget.shell.PrivilegedShell;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.BooleanSupplier;
 import java.util.function.IntConsumer;
 
 /** Commands the paired Navigator receiver without moving an existing task. */
@@ -21,10 +23,12 @@ public final class NavigatorAliceAction {
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static volatile NavigatorAliceRequest current;
     private static volatile AliceMusicResume music;
+    private static final AtomicLong MANUAL_GENERATION = new AtomicLong();
     private NavigatorAliceAction() {}
 
     public static void invoke(Context context) {
         Context app = context.getApplicationContext();
+        BooleanSupplier manualPermit = musicResumePermit();
         MAIN.post(() -> {
             if ((current != null && current.active()) || (music != null && music.active())) return;
             if (music != null) music.cancel();
@@ -44,7 +48,8 @@ public final class NavigatorAliceAction {
                         final AliceMusicResume[] continuation = new AliceMusicResume[1];
                         continuation[0] = new AliceMusicResume((delay, task) -> MAIN.postDelayed(task, delay),
                                 playing == null ? null : () -> AliceMediaPlayback.resume(app, playing,
-                                        () -> music == continuation[0] && continuation[0].mayResume()));
+                                        () -> manualPermit.getAsBoolean() && music == continuation[0]
+                                                && continuation[0].mayResume()));
                         music = continuation[0];
                         MAIN.postDelayed(continuation[0]::cancel, 31 * 60 * 1000);
                         ResultReceiver callback = new ResultReceiver(MAIN) {
@@ -109,8 +114,15 @@ public final class NavigatorAliceAction {
 
     /** A manual transport command supersedes the pending automatic continuation. */
     public static void onManualTransportControl() {
+        MANUAL_GENERATION.incrementAndGet();
         AliceMusicResume pending = music;
         if (pending != null) pending.cancel();
+    }
+
+    /** Created before asynchronous capture/launch so a manual pause cannot be forgotten. */
+    static BooleanSupplier musicResumePermit() {
+        long generation = MANUAL_GENERATION.get();
+        return () -> generation == MANUAL_GENERATION.get();
     }
 
     static Intent command(String id, long deadline, boolean probe) {

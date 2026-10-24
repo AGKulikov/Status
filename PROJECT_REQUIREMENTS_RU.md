@@ -5646,3 +5646,8 @@ assertions зависели от перенесённого service literal/им
 one-shot требования, заменённого BOOT-338. Обновлены на resolver + bounded policy,
 сохранены запреты player UI/global dispatch/прямого startService. Новые runtime
 resolver/protocol/music tests прошли в этом CI; полный TEST/APK/PUBLISH ещё OPEN.
+
+MUSIC-ALICE-338 review: закрыто окно отмены между invoke и созданием продолжения:
+поколение ручного transport фиксируется до async capture/проверки процесса и
+повторно проверяется непосредственно перед PLAY. Ручная пауза в этот период
+теперь также запрещает поздний возврат музыки. Только RAM, новый regression.

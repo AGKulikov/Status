@@ -8,6 +8,13 @@ import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=28,application=Application.class)
 public class NavigatorAliceActionTest {
+ @Test public void manualChangeBeforeCaptureReturnsRevokesFutureResume() {
+  java.util.function.BooleanSupplier captured=NavigatorAliceAction.musicResumePermit();
+  assertTrue(captured.getAsBoolean());
+  NavigatorAliceAction.onManualTransportControl();
+  assertFalse(captured.getAsBoolean());
+  assertTrue(NavigatorAliceAction.musicResumePermit().getAsBoolean());
+ }
  @Test public void commandUsesExactActionPackageAndDeadlineWithoutActivityFlags() {
   android.content.Intent i=NavigatorAliceAction.command("id",1234,true);
   assertEquals("dd.call_alice",i.getAction());assertEquals("ru.yandex.yandexnavi",i.getPackage());
