@@ -5580,3 +5580,11 @@ SHA25649bd6878eac273300194440f79aec7fba164cf77b6f3fa2c8afd16bdf871554a.
 Navigator patch прежний, Helper не менялся. PUBLISH OPEN до readback.
 FIELD лайк/Алиса/физические назначения и прежние MEDIA gates OPEN.
 [Отчёт](docs/releases/3.3.7/README_RU.md).
+
+
+## 24.10.2026 12:24 МСК — публикация3.3.7 завершена
+
+Stable/latest natro-v3.3.7, release422633894. Publisher40081769491 SUCCESS:
+все7assets скачаны и побайтно сверены перед публикацией. SOURCE/TEST/APK/PUBLISH
+PASS в указанном объёме; FIELD лайк/Алиса/установка/медиакнопки OPEN.
+Временные приватные копии ключа удалены.

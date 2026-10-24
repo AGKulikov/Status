@@ -3,7 +3,7 @@
 Разработка3.3.7: `feature/media-actions-20261024` — готовые действия
 «Лайк / убрать лайк» и «Алиса в Навигаторе». Android CI40079391509 PASS;
 Полный CI40081126066 PASS:2197Android/279tool. APK3.3.7 подписан и проверен,
-публикация готовится. [Отчёт](docs/releases/3.3.7/README_RU.md). FIELD OPEN.
+[Опубликована в канале обновлений](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.7). [Отчёт](docs/releases/3.3.7/README_RU.md). FIELD OPEN.
 
 Разработка3.3.6: `feature/media-gestures-20261024` —
 [одиночные/двойные/тройные/длинные MEDIA](docs/geely-kx11/MEDIA_GESTURES_2026_10_24_RU.md).
