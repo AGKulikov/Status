@@ -5588,3 +5588,17 @@ Stable/latest natro-v3.3.7, release422633894. Publisher40081769491 SUCCESS:
 все7assets скачаны и побайтно сверены перед публикацией. SOURCE/TEST/APK/PUBLISH
 PASS в указанном объёме; FIELD лайк/Алиса/установка/медиакнопки OPEN.
 Временные приватные копии ключа удалены.
+
+
+## 24.10.2026 — ALICE-338: исправление вызова, сохранение окна
+
+USER: Алиса в3.3.7 не работает. Требуется способ mNavi: работающий
+Навигатор сохраняет фон/окно/экран; запуск допускается только если он не запущен.
+STATIC mNavi2.0 SHA410d3464af2a1b6ea374e9818e6752f75ff79b837fdb2846e4a7652919180be3:
+OverlayService.d декодирует T через g (Base64 dd.call_alice), setPackage,
+sendBroadcast. Его foreground/retry ветки намеренно не воспроизводятся.
+Natro использует адресный broadcast; полное shell ps подтверждает отсутствие
+процесса перед launch. Неизвестное состояние не запускает Activity.
+Очередь ограничена поколением и10s deadline; холодный запуск ждёт1500ms.
+SOURCE candidate; TEST/APK OPEN. FIELD3.3.7 Alice FAILED по сообщению
+пользователя; FIELD нового вызова и сохранения окна OPEN.

@@ -1,7 +1,7 @@
 name: Verify media action assignments
 on:
   push:
-    branches: ['feature/media-actions-20261024']
+    branches: ['fix/navigator-alice-20261024']
     paths: ['app/**', 'tools/**', '.github/workflows/verify-media-actions.yml']
 permissions:
   contents: read

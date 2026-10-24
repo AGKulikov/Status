@@ -2,8 +2,6 @@
 package dezz.status.widget.launcher;
 
 import android.content.Context;
-import android.content.Intent;
-import android.net.Uri;
 import android.widget.Toast;
 import dezz.status.widget.Preferences;
 
@@ -15,12 +13,6 @@ public final class MediaExtraActions {
             Toast.makeText(context, "Плеер не предоставил действие «Нравится»", Toast.LENGTH_SHORT).show();
     }
     public static void alice(Context context) {
-        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse("yandexnavi://ask_alice"))
-                .setPackage("ru.yandex.yandexnavi")
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        try { context.startActivity(intent); }
-        catch (android.content.ActivityNotFoundException | SecurityException unavailable) {
-            Toast.makeText(context, "Алиса в Навигаторе недоступна", Toast.LENGTH_SHORT).show();
-        }
+        NavigatorAliceAction.invoke(context);
     }
 }
