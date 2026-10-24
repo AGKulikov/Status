@@ -1,0 +1,60 @@
+{
+  "releaseId": 422746080,
+  "tag": "natro-v3.3.8",
+  "stable": true,
+  "latest": true,
+  "publishedAt": "2026-10-24T13:22:19Z",
+  "sourceCommit": "52069153bee7afd9447a88ef6a5ab803bf7fcfe8",
+  "sourceTree": "e9693676836ae6e88dd62c4c5ef8ac460f62618e",
+  "buildRunId": 40096694911,
+  "publisherCommit": "724ef853f6a38ed635e872148944c419c3dde6e7",
+  "publisherRunId": 40097813509,
+  "publisherJobId": 120883640002,
+  "publisherConclusion": "success",
+  "allSevenAssetsDownloadedAndByteComparedBeforePublication": true,
+  "assets": [
+    {
+      "id": 672326556,
+      "name": "Natro-3.3.8-signed.apk",
+      "size": 29842016,
+      "sha256": "ee7294017a970ed9eb640a87fc1c46bd9a34a4376f5fa5954de4ec656f482d95"
+    },
+    {
+      "id": 672326551,
+      "name": "Natro-3.3.8-source.tar.gz",
+      "size": 34984939,
+      "sha256": "d0cde77e041bdca9351c81eb3fc48ec99197393a2d6e5460fa7242765b7cc829"
+    },
+    {
+      "id": 672326555,
+      "name": "natro-update.json",
+      "size": 426,
+      "sha256": "967b06ab71884f77b24c269290f0a3c8c4d0664a3577ff6a1a09146ef832505d"
+    },
+    {
+      "id": 672326552,
+      "name": "README_RU.md",
+      "size": 2431,
+      "sha256": "ded89f9109836c5895507116380216ba5d6c41c442de21e24820a1ac0d5b3b0e"
+    },
+    {
+      "id": 672326571,
+      "name": "release-report.json",
+      "size": 3528,
+      "sha256": "1b0318802ea34081aabd5ee6e1a1ebb5ddb8502445cdc2e89c7c9fef6df439ad"
+    },
+    {
+      "id": 672326553,
+      "name": "SHA256SUMS.txt",
+      "size": 523,
+      "sha256": "8d275ab7e47b9370f0f5bd9e76e363ffcb4a52886ef7481bd3899f86c0bb3275"
+    },
+    {
+      "id": 672326574,
+      "name": "signature-verification.txt",
+      "size": 2341,
+      "sha256": "64e2120c2d8b27ca604ab56544853b36687e6b327c2c94b2b4c5c4e33b47f9c9"
+    }
+  ],
+  "fieldAcceptance": "OPEN: Alice voice/background/window, music finish+2s, cold boot, install-over; native ANR root cause unknown"
+}

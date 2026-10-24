@@ -37,3 +37,11 @@ PUBLISH OPEN до publisher readback всех7assets; последующий с�
 Источники и ограничения: [Алиса](../../geely-kx11/ALICE_2026_10_24_RU.md),
 [журнал boot](../../geely-kx11/BOOT_2026_10_24_RU.md). Android ANR в журнале
 подтверждён, его стек отсутствует: причина зависания не объявляется исправленной.
+
+## 24.10.2026 16:22 МСК — публикация завершена
+
+[Stable/latest natro-v3.3.8](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.8),
+release422746080. Publisher40097813509/job120883640002 SUCCESS: все7assets
+скачаны и побайтно сверены до публикации. SOURCE/TEST/APK/PUBLISH PASS в указанном
+объёме, FIELD остаётся OPEN. [Протокол публикации](publication-verification.json).
+Оба подписанных APK переданы пользователю; Navigator приватно. Helper прежний.

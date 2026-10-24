@@ -5673,3 +5673,12 @@ SHA256 ee7294017a970ed9eb640a87fc1c46bd9a34a4376f5fa5954de4ec656f482d95.
 ALICE-338-R2/MUSIC-ALICE-338/BOOT-338 SOURCE/TEST/APK PASS в объёме
 [матрицы](docs/releases/3.3.8/README_RU.md); PUBLISH OPEN до7asset readback.
 FIELD фона/голоса/окна/finish+2s/boot/install-over OPEN; native ANR причина OPEN.
+
+## 24.10.2026 16:22 МСК — 3.3.8 PUBLISH PASS
+
+Stable/latest natro-v3.3.8, release422746080. Publisher40097813509/job120883640002
+SUCCESS: источник52069153bee7afd9447a88ef6a5ab803bf7fcfe8, точный CI40096694911,
+7assets downloaded/byte-compared before publication. Обе APK сохранены для передачи,
+Navigator приватно, прежний Helper. [Протокол](docs/releases/3.3.8/publication-verification.json).
+SOURCE/TEST/APK/PUBLISH PASS в матрице3.3.8; FIELD голоса/фона/окна/finish+2s,
+cold boot/install-over остаётся OPEN. Причина native ANR не установлена.
