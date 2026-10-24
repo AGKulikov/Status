@@ -968,3 +968,10 @@ explicit/unknown/effective значения сохраняются;334/367 и so
 сохранены. Пересмотрен fingerprint только BackupDefaultsMigration после review.
 Запись DIM использует ранее рассмотренную архивную diagnostics, не автозапуск
 после restore. Физическая приёмка backup/restore OPEN.
+
+
+Review24.10: media_like/navigator_alice — два новых значения существующего
+shortcut target, без новых prefs/files/defaults. LauncherShortcutStore хранит
+их прежним JSON, полный adapter сохраняет неизвестные/новые target. Проверены
+изменения LauncherMediaController и LauncherHomeSurface: новый путь вызова,
+новых persistent данных нет. Runtime backup FIELD OPEN.

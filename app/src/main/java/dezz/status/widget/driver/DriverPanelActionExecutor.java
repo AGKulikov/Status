@@ -229,6 +229,12 @@ public final class DriverPanelActionExecutor {
             case MEDIA_NEXT:
                 mediaKey(KeyEvent.KEYCODE_MEDIA_NEXT);
                 return;
+            case MEDIA_LIKE:
+                dezz.status.widget.launcher.MediaExtraActions.like(context, preferences);
+                return;
+            case NAVIGATOR_ALICE:
+                dezz.status.widget.launcher.MediaExtraActions.alice(context);
+                return;
             case HWGPS_FIND_ME:
                 if (!HwgpsIntegration.requestFindMe(context)) {
                     toast("HWGPS не установлен или недоступен");

@@ -245,6 +245,8 @@ public final class LauncherShortcutStore {
         MEDIA_PLAY_PAUSE("media_play_pause", "Пауза / Играть", "media"),
         MEDIA_PREVIOUS("media_previous", "Предыдущий трек", "media_previous"),
         MEDIA_NEXT("media_next", "Следующий трек", "media_next"),
+        MEDIA_LIKE("media_like", "Лайк / убрать лайк", "favorite"),
+        NAVIGATOR_ALICE("navigator_alice", "Алиса в Навигаторе", "media"),
         HWGPS_FIND_ME("hwgps_find_me", "HWGPS · найти меня", "wrong_location"),
         EDIT_HOME("edit_home", "Изменить HOME", "edit"),
         HOME_SETTINGS("home_settings", "Настройки HOME", "settings"),

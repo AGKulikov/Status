@@ -5539,3 +5539,15 @@ LauncherShortcutStore.Builtin пока не содержат Like, то есть
 редактор физических кнопок назначить его сейчас нельзя. Поддержка зависит
 от MediaSession/notification action плеера. Это ответ о текущей доступности,
 не утверждение добавленного назначения и не аппаратная проверка лайков.
+
+
+## 24.10.2026 — готовые действия лайка и Алисы
+
+USER разрешил добавить «Лайк / убрать лайк» и вызов Алисы именно в Навигаторе.
+Добавлены стабильные builtin keys media_like/navigator_alice в общий каталог,
+обработчики HOME и DriverPanelActionExecutor (включая физические назначения).
+Лайк использует общий LauncherMediaController.like; неподдерживаемый плеер
+даёт явное сообщение. Алиса: адресный ACTION_VIEW yandexnavi://ask_alice,
+ru.yandex.yandexnavi; без mNavi и принудительной смены режима окна.
+Новые builtin keys сохраняются прежним shortcut JSON, backup adapter прежний.
+SOURCE candidate; Android TEST/APK/FIELD OPEN. Выпущенная3.3.6 не изменяется.

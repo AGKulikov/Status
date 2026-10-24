@@ -4764,6 +4764,8 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
             case MEDIA_PLAY_PAUSE: mediaController.playPause(); break;
             case MEDIA_PREVIOUS: mediaController.previous(); break;
             case MEDIA_NEXT: mediaController.next(); break;
+            case MEDIA_LIKE: dezz.status.widget.launcher.MediaExtraActions.like(this, preferences); break;
+            case NAVIGATOR_ALICE: dezz.status.widget.launcher.MediaExtraActions.alice(this); break;
             case HWGPS_FIND_ME:
                 if (!HwgpsIntegration.requestFindMe(this)) {
                     Toast.makeText(this, "HWGPS не установлен или недоступен",

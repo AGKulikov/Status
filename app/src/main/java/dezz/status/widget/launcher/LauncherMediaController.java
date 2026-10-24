@@ -717,6 +717,10 @@ public final class LauncherMediaController {
      * captured Like action from that player's live media notification. No mSaver-private
      * broadcast is emitted.
      */
+    public static boolean likeCurrent(Context context, Preferences preferences) {
+        return shared(context, preferences).engine.like();
+    }
+
     public boolean like() {
         if (shared != null) return shared.engine.like();
         String targetPackage = seekTargetPackage();
