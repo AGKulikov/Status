@@ -18,9 +18,6 @@ import dezz.status.widget.phone.PhoneConnectionJournal;
 
 /** Bootstraps Yandex through its exported MediaBrowser service without opening any UI. */
 final class YandexMusicBrowserStarter {
-    private static final ComponentName SERVICE = new ComponentName(
-            "ru.yandex.music",
-            "ru.yandex.music.common.media.mediabrowser.MusicBrowserService");
     /** mSaver leaves the exact bind alive; this guard only retires a genuinely wedged callback. */
     private static final long CONNECTION_TIMEOUT_MS = 20_000L;
     private static final Handler WORKER = createWorker();
@@ -60,15 +57,11 @@ final class YandexMusicBrowserStarter {
     private static String request(Context context, boolean playRequested, BooleanSupplier permit) {
         Context app = context.getApplicationContext();
         if (app == null) app = context;
-        try {
-            ServiceInfo service = app.getPackageManager().getServiceInfo(SERVICE, 0);
-            if (!service.enabled || !service.exported) return "service_not_exported";
-        } catch (PackageManager.NameNotFoundException | RuntimeException unavailable) {
-            return "service_unavailable";
-        }
+        ComponentName service = YandexBrowserServiceResolver.resolve(app.getPackageManager());
+        if (service == null) return "service_unavailable";
         Context exactApp = app;
         try {
-            return WORKER.post(() -> startOrJoin(exactApp, playRequested, permit))
+            return WORKER.post(() -> startOrJoin(exactApp, service, playRequested, permit))
                     ? (playRequested ? "bootstrap_scheduled" : "warmup_scheduled")
                     : "schedule_rejected";
         } catch (RuntimeException rejected) {
@@ -82,18 +75,19 @@ final class YandexMusicBrowserStarter {
         return requestBootstrap(context);
     }
 
-    private static void startOrJoin(@NonNull Context context, boolean playRequested, BooleanSupplier permit) {
+    private static void startOrJoin(@NonNull Context context, ComponentName service, boolean playRequested, BooleanSupplier permit) {
         if (current != null && !current.completed) {
             current.request(playRequested, permit);
             return;
         }
-        current = new Connection(context, playRequested, permit);
+        current = new Connection(context, service, playRequested, permit);
         current.start();
     }
 
     private static final class Connection extends MediaBrowser.ConnectionCallback
             implements Runnable {
         private final Context context;
+        private final ComponentName service;
         private final long startedAt = SystemClock.elapsedRealtime();
         private MediaBrowser browser;
         private boolean completed;
@@ -102,12 +96,13 @@ final class YandexMusicBrowserStarter {
         private BooleanSupplier permit;
         private final int retry;
 
-        Connection(@NonNull Context context, boolean playRequested, BooleanSupplier permit) {
-            this(context, playRequested, permit, 0);
+        Connection(@NonNull Context context, ComponentName service, boolean playRequested, BooleanSupplier permit) {
+            this(context, service, playRequested, permit, 0);
         }
 
-        Connection(Context context, boolean playRequested, BooleanSupplier permit, int retry) {
+        Connection(Context context, ComponentName service, boolean playRequested, BooleanSupplier permit, int retry) {
             this.context = context;
+            this.service = service;
             this.playRequested = playRequested;
             this.permit = permit;
             this.retry = retry;
@@ -123,7 +118,7 @@ final class YandexMusicBrowserStarter {
         void start() {
             if (completed) return;
             try {
-                browser = new MediaBrowser(context, SERVICE, this, (Bundle) null);
+                browser = new MediaBrowser(context, service, this, (Bundle) null);
                 browser.connect();
                 WORKER.postDelayed(this, CONNECTION_TIMEOUT_MS);
                 journal("connect_started", "none");
@@ -168,7 +163,7 @@ final class YandexMusicBrowserStarter {
             if (completed) return;
             MediaResumeCommand.DispatchTrace trace =
                     MediaAutoResumeController.guardedBrowserDispatch(context, permit,
-                            () -> MediaResumeCommand.playExactSessionOnly(context, SERVICE.getPackageName()));
+                            () -> MediaResumeCommand.playExactSessionOnly(context, service.getPackageName()));
             if (trace == null) { finish("play_cancelled", "plan_or_manual_change"); return; }
             boolean retryBind = trace.result == MediaResumeCommand.Result.NO_TARGET;
             boolean warmupOnly = trace.result == MediaResumeCommand.Result.SESSION_COMMAND
@@ -185,7 +180,7 @@ final class YandexMusicBrowserStarter {
                     if (!permit.getAsBoolean()) { current = null; return; }
                     // STATE_NONE accepted a PLAY but never became usable in the field log.
                     // Rebind may wake its service; it must not issue that PLAY a second time.
-                    current = new Connection(context, next == YandexBrowserRetryPolicy.Retry.PLAY,
+                    current = new Connection(context, service, next == YandexBrowserRetryPolicy.Retry.PLAY,
                             permit, retry + 1);
                     current.start();
                 }, retry == 0 ? 1_000L : 3_000L);
@@ -199,9 +194,9 @@ final class YandexMusicBrowserStarter {
                     context, permit, () -> {
                         try {
                             return MediaResumeCommand.playBrowserSession(
-                                    context, browser.getSessionToken(), SERVICE.getPackageName());
+                                    context, browser.getSessionToken(), service.getPackageName());
                         } catch (RuntimeException failure) {
-                            return MediaResumeCommand.playExactSessionOnly(context, SERVICE.getPackageName());
+                            return MediaResumeCommand.playExactSessionOnly(context, service.getPackageName());
                         }
                     });
             if (trace == null) { finish("play_cancelled", "plan_or_manual_change"); return; }
@@ -227,6 +222,7 @@ final class YandexMusicBrowserStarter {
         private void journal(@NonNull String event, @NonNull String error) {
             PhoneConnectionJournal.append("media-auto-resume",
                     "trace event=yandex_media_browser_" + event
+                            + ", service=" + service.flattenToShortString()
                             + ", error=" + error
                             + ", elapsedMs="
                             + Math.max(0L, SystemClock.elapsedRealtime() - startedAt));

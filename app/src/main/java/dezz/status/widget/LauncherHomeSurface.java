@@ -817,6 +817,10 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
     public void onStart() {
         if (launcherDisplayRejected) return;
         activityStarted = true;
+        if (automaticNavigatorStartedAt >= 0) {
+            navigationUiHandler.removeCallbacks(automaticNavigatorCheck);
+            navigationUiHandler.post(automaticNavigatorCheck);
+        }
         applyPendingLauncherBootstrapAfterFirstDraw();
         if (launcherBootstrapReady && !panelsInitialized) {
             navigationUiHandler.removeCallbacks(panelInitializationStep);
@@ -837,7 +841,9 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
     }
 
     public void onStop() {
-        cancelAutomaticNavigatorRecovery();
+        // Starting Navigator itself stops HOME. Retain this bounded observation so an ANR
+        // before its first window can be recovered when HOME becomes focused again.
+        navigationUiHandler.removeCallbacks(automaticNavigatorCheck);
         if (pendingAutomaticNavigatorLaunch) traceAutomaticNavigator("home_stopped_pending");
         activityStarted = false;
         // If HOME lost foreground before its first traversal (or between onDraw and its posted
@@ -1237,6 +1243,10 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
 
     public void onWindowFocusChanged(boolean hasFocus) {
         automaticNavigatorHomeFocused = hasFocus;
+        if (hasFocus && activityStarted && automaticNavigatorStartedAt >= 0) {
+            navigationUiHandler.removeCallbacks(automaticNavigatorCheck);
+            navigationUiHandler.post(automaticNavigatorCheck);
+        }
         // Focus is the reliable close signal for the ECARX freeform task: HOME may be RESUMED
         // underneath Navigator, but it regains window focus only after that window is gone.
         if (!isPassengerLauncherProfile()) StatusBarSurfaceContext.setLauncherHomeForeground(hasFocus);

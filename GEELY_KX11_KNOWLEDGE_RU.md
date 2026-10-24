@@ -3093,3 +3093,7 @@ SOURCE/TEST: анализ и CRC; runtime без изменений. APK: без
 STATIC: mNavi broadcast dd.call_alice; наш Navigator3.1.4 такого receiver не имеет.
 Нужна пара APK. Public native entry и dedicated Alice router найдены в30.3.0;
 сохранение окна/голос в фоне/finish+2s FIELD OPEN. Новых vehicle IDs нет.
+
+24.10 FIELD3.3.7: [boot отказ музыки/Навигатора](docs/geely-kx11/BOOT_2026_10_24_RU.md).
+Navigator dispatch12s→ANR/killed31s; music exact receiver14s→browser unavailable→24waits.
+Причина ANR неизвестна, старый crash3.1.3 не текущий. Recovery SOURCE, FIELD OPEN.

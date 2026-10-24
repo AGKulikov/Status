@@ -147,3 +147,5 @@ QNX отказал до handshake; каталог/mappings остаются BLOC
 - 24.10.2026: [Серии/удержание MEDIA, исходные XSF edges и подтверждение маршрута](geely-kx11/MEDIA_GESTURES_2026_10_24_RU.md). STATIC/SOURCE,10 новых replay PASS; Android/APK/FIELD OPEN.
 
 - 24.10.2026: [mNavi/наш Navigator: Алиса, ACK и возврат музыки](geely-kx11/ALICE_2026_10_24_RU.md). STATIC/SOURCE, TEST/APK/FIELD OPEN.
+
+- 24.10.2026: [FIELD3.3.7: boot music и Navigator ANR](geely-kx11/BOOT_2026_10_24_RU.md). Команды отправлены, готовность не достигнута; bounded recovery SOURCE, FIELD OPEN.

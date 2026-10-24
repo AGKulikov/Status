@@ -989,3 +989,11 @@ BackupDefaultsMigration335…370→371 и same371 рассмотрены: explic
 сохранены,334/372 отклоняются. Новая отдельная regression, прежние сохранены.
 Fingerprints пересмотрены только этих двух owners после diff review.
 Статический inventory не является FIELD полной резервной копии/restore.
+
+Review BOOT-338: yandexReceiverAttempts(int,0) добавлен в прежний
+launcher_media_auto_resume_state, reset при новом capture/plan; не разрешает
+восстановление старого plan/foreign token. Общий prefs adapter включает ключ;
+историческое runtime state после restore не запускает команды. Остальные
+ключи/defaults/target/manual guard прежние. LauncherHomeSurface/MediaResumeCommand/
+Browser resolver не добавляют storage roots. Fingerprint MediaAutoResumeController
+пересмотрен повторно по diff; FIELD backup OPEN.

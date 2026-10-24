@@ -20,7 +20,7 @@ public class NavigatorAliceRequestTest {
   public void failure(String reason){failure=reason;}
   void advance(long until){
    while(true){Event next=events.stream().min(Comparator.comparingLong(e->e.at)).orElse(null);
-    if(next==null||next.at>until)break;events.remove(next);time=next.at;next.run();}
+    if(next==null||next.at>until)break;events.remove(next);time=next.at;next.run.run();}
    time=until;
   }
   NavigatorAliceRequest start(){NavigatorAliceRequest r=new NavigatorAliceRequest(this,10000);r.start();return r;}

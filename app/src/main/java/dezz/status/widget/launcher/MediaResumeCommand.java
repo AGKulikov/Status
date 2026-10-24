@@ -103,9 +103,17 @@ final class MediaResumeCommand {
                                        boolean requestYandexBrowserBootstrap,
                                        boolean yandexColdStartRouteRequested,
                                        boolean yandexSessionPlayAttempted) {
+        return playWithTrace(context, targetPackage, coldStartEscalation,
+                requestYandexBrowserBootstrap, yandexColdStartRouteRequested,
+                yandexSessionPlayAttempted, false);
+    }
+
+    static DispatchTrace playWithTrace(Context context, String targetPackage, boolean coldStartEscalation,
+            boolean requestYandexBrowserBootstrap, boolean yandexColdStartRouteRequested,
+            boolean yandexSessionPlayAttempted, boolean retryReceiverIfBrowserUnavailable) {
         return sendWithTrace(context, targetPackage, Command.PLAY, coldStartEscalation,
                 requestYandexBrowserBootstrap, yandexColdStartRouteRequested,
-                yandexSessionPlayAttempted);
+                yandexSessionPlayAttempted, retryReceiverIfBrowserUnavailable);
     }
 
     @NonNull
@@ -240,6 +248,15 @@ final class MediaResumeCommand {
                                                boolean requestYandexBrowserBootstrap,
                                                boolean yandexColdStartRouteRequested,
                                                boolean yandexSessionPlayAttempted) {
+        return sendWithTrace(context, targetPackage, command, coldStartEscalation,
+                requestYandexBrowserBootstrap, yandexColdStartRouteRequested,
+                yandexSessionPlayAttempted, false);
+    }
+
+    private static DispatchTrace sendWithTrace(Context context, String targetPackage,
+            Command command, boolean coldStartEscalation, boolean requestYandexBrowserBootstrap,
+            boolean yandexColdStartRouteRequested, boolean yandexSessionPlayAttempted,
+            boolean retryReceiverIfBrowserUnavailable) {
         String target = targetPackage.trim();
         if (target.isEmpty()) return trace(Result.NO_TARGET, "target=empty");
         String targetProcessState = processState(context, target);
@@ -355,7 +372,10 @@ final class MediaResumeCommand {
             } else {
                 yandexBootstrap = "already_requested";
             }
-            return trace(Result.WAITING_FOR_SESSION,
+            if (!retryReceiverIfBrowserUnavailable
+                    || !("service_unavailable".equals(yandexBootstrap)
+                    || "service_not_exported".equals(yandexBootstrap)))
+                return trace(Result.WAITING_FOR_SESSION,
                     "route=waiting_for_exact_session, process=" + targetProcessState
                             + ", activeSessions=" + activeSessionCount
                             + ", sessions=" + sessionInventory

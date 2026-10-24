@@ -5619,3 +5619,17 @@ launch только после полного доказательства от�
 SOURCE candidate; новые receiver/protocol/music/lifecycle/defaults tests добавлены,
 TEST/APK/PUBLISH OPEN. FIELD исходного отказа3.3.7 FAILED; новые FIELD gates OPEN.
 [Источники, SHA, ограничения и приёмка](docs/geely-kx11/ALICE_2026_10_24_RU.md).
+
+
+## 24.10.2026 — BOOT-338: журнал3.3.7 и восстановление после неудачного запуска
+
+USER прислал архив4383534399580358213 и сообщил: музыка/Навигатор не стартуют
+при загрузке. FIELD отказ принят. [Разбор с SHA/временами](docs/geely-kx11/BOOT_2026_10_24_RU.md):
+команды отправлены, Navigator ANR/killed31s, music browser unavailable и24ожидания
+без повторного receiver. Не считать своевременный dispatch успешным запуском.
+SOURCE: точный service discovery + bounded receiver retries; HOME stop сохраняет
+ограниченный recovery до возврата focus. Не менять фон/окно ради Алисы.
+Старый PatternSyntaxException3.1.3 не относится к этому boot; причина ANR OPEN.
+TEST: первый CI40093562045 остановлен компилятором из-за опечатки в новом тестовом
+планировщике (next.run→next.run.run), production скомпилирован; опечатка исправлена.
+Полный повторный CI/APK/PUBLISH OPEN; новый FIELD gate OPEN.

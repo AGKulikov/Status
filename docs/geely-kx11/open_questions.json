@@ -2072,6 +2072,19 @@
         "ALICE_2026_10_24_RU.md"
       ],
       "last_reviewed": "2026-10-24"
+    },
+    {
+      "id": "BOOT_MUSIC_NAVIGATOR_338",
+      "priority": "P1",
+      "function": "Автозапуск после cold boot3.3.7",
+      "status": "OPEN",
+      "known": "Receiver music отправлен14s, browser unavailable,24waits. Navigator handoff12s, ANR/killed31s, позднее окно138s.",
+      "missing_evidence": "ANR stack Navigator; exported MediaBrowser endpoint установленной Music; повторный FIELD нового recovery.",
+      "next_step": "Полный CI3.3.8 и парный APK, затем cold-boot verification; ANR первопричина не объявляется исправленной.",
+      "sources": [
+        "BOOT_2026_10_24_RU.md"
+      ],
+      "last_reviewed": "2026-10-24"
     }
   ],
   "revision_history": [
