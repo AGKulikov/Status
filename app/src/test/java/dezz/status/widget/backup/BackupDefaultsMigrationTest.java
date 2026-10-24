@@ -13,6 +13,25 @@ import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=28,application=Application.class)
 public class BackupDefaultsMigrationTest {
+    @Test public void mediaActions338PreservesDefaults() throws Exception {
+        for (int source = 208021335; source <= 208021371; source++) {
+            Map<String,Object> defaults = new LinkedHashMap<>(); defaults.put("old-default", 7);
+            JSONObject metadata = new JSONObject().put("sourceVersionCode", source).put("defaultsSchema", source)
+                    .put("declaredMainDefaults", BackupPreferencesXml.encode(defaults));
+            File snapshot = new File(RuntimeEnvironment.getApplication().getCacheDir(), "338-" + source);
+            File main = BackupFiles.child(snapshot, "de_prefs/example_preferences.xml");
+            Map<String,Object> values = new LinkedHashMap<>(); values.put("unknown-key", "preserved");
+            BackupPreferencesXml.write(main, values);
+            BackupDefaultsMigration.materialize(snapshot, "example", metadata, 208021371);
+            if (source != 208021371) values.put("old-default", 7);
+            assertEquals(values, BackupPreferencesXml.read(main));
+        }
+        for (int invalid : new int[]{208021334, 208021372}) {
+            JSONObject metadata = new JSONObject().put("sourceVersionCode", invalid).put("defaultsSchema", invalid)
+                    .put("declaredMainDefaults", BackupPreferencesXml.encode(Collections.emptyMap()));
+            try { BackupDefaultsMigration.validate(metadata, 208021371); fail(); } catch (IOException expected) {}
+        }
+    }
     @Test public void mediaActions337PreservesDefaults() throws Exception {
         for (int source = 208021335; source <= 208021370; source++) {
             Map<String,Object> defaults = new LinkedHashMap<>(); defaults.put("old-default", 7);

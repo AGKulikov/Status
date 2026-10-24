@@ -5602,3 +5602,20 @@ Natro использует адресный broadcast; полное shell ps п�
 Очередь ограничена поколением и10s deadline; холодный запуск ждёт1500ms.
 SOURCE candidate; TEST/APK OPEN. FIELD3.3.7 Alice FAILED по сообщению
 пользователя; FIELD нового вызова и сохранения окна OPEN.
+
+
+## 24.10.2026 — ALICE-338-R2 / MUSIC-ALICE-338
+
+USER требует проверить приём intent нашим Навигатором; дополнительно если музыка
+играла перед вызовом, возобновить её через2s после окончания Алисы.
+ALICE-338 fixed1500ms и предположение наличия receiver ЗАМЕНЕНЫ этим уточнением:
+в последнем APK3.1.4 receiver отсутствует, bare ask_alice требует text. Нужна
+новая пара APK. Probe/ACK + штатный public BUTTON entry; состояние окна не меняется,
+launch только после полного доказательства отсутствия процесса. STARTED/FINISHED
+подтверждаются родным Alice router, ABORTED не считается окончанием.
+Музыка снимается до cold launch; только исходный PLAYING token, PLAY через2000ms
+после FINISHED, initial paused/ручное управление/другой playing player не запускают
+старую музыку. Нет глобальных медиакнопок/запуска Activity плеера.
+SOURCE candidate; новые receiver/protocol/music/lifecycle/defaults tests добавлены,
+TEST/APK/PUBLISH OPEN. FIELD исходного отказа3.3.7 FAILED; новые FIELD gates OPEN.
+[Источники, SHA, ограничения и приёмка](docs/geely-kx11/ALICE_2026_10_24_RU.md).

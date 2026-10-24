@@ -980,3 +980,12 @@ Review3.3.7: разрешён явный переход335…369→370 при п
 Тест проверяет effective/unknown values и отклонение334/371; предыдущие тесты
 сохранены. Fingerprint обновлён только BackupDefaultsMigration после review.
 Новые actions сохраняются прежним shortcut JSON. Runtime restore FIELD OPEN.
+
+
+Review3.3.8: MediaAutoResumeController добавляет только отмену RAM-продолжения
+музыки после ручной команды; его prefs/keys/defaults/boot policy не меняются.
+Alice request/session tokens и таймер2s — толькоRAM, не backup/restore state.
+BackupDefaultsMigration335…370→371 и same371 рассмотрены: explicit/effective/unknown
+сохранены,334/372 отклоняются. Новая отдельная regression, прежние сохранены.
+Fingerprints пересмотрены только этих двух owners после diff review.
+Статический inventory не является FIELD полной резервной копии/restore.

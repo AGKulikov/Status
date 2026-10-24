@@ -2059,6 +2059,19 @@
         "PLAT_UI"
       ],
       "last_reviewed": "2026-10-17"
+    },
+    {
+      "id": "ALICE_BACKGROUND_AND_MUSIC_RESUME",
+      "priority": "P1",
+      "function": "Алиса в фоне/окне и возврат игравшей музыки через2s",
+      "status": "OPEN",
+      "known": "STATIC: dd.call_alice у mNavi, отсутствие receiver в нашем Navigator3.1.4. Проверен native BUTTON entry и отдельный Alice router30.3.0. SOURCE парный receiver/ACK/finish и exact-session music continuation.",
+      "missing_evidence": "FIELD голоса/сохранения фона и окна, точного момента окончания и возврата реального плеера.",
+      "next_step": "Полный Android CI, подпись/проверка пары APK3.3.8, затем FIELD матрица из отчёта.",
+      "sources": [
+        "ALICE_2026_10_24_RU.md"
+      ],
+      "last_reviewed": "2026-10-24"
     }
   ],
   "revision_history": [
@@ -2159,6 +2172,11 @@
       "date": "2026-10-18",
       "scope": "Navigation launch chain, software-only readback, negative callback and stateful writeback clarified; all prior evidence and OPEN gates preserved.",
       "source": "research-2026-10-18-wings/NAV_LAUNCH_CHAIN_RU.md"
+    },
+    {
+      "date": "2026-10-24",
+      "scope": "Alice intent/native lifecycle and2s music requirement; old no-receiver result preserved. FIELD remains OPEN.",
+      "source": "ALICE_2026_10_24_RU.md"
     }
   ]
 }

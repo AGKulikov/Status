@@ -102,6 +102,7 @@ public final class MediaAutoResumeController {
 
     /** User transport controls revoke queued boot PLAY, including a late browser callback. */
     public static void onManualTransportControl(@NonNull Context context) {
+        NavigatorAliceAction.onManualTransportControl();
         long manual = MANUAL_GENERATION.incrementAndGet();
         Context app = applicationContext(context);
         // Never wait for SharedPreferences disk loading on the physical MEDIA command lane.

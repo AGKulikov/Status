@@ -43,6 +43,7 @@ public final class NatroEntryPoint {
             controller.install();
             controller.consumeIntent(activity.getIntent());
             NavigationBridgeClient.attachActivity(activity);
+            NavigatorAliceReceiver.attach(activity);
         } catch (Throwable failure) {
             reportFailure("onActivityResumed", failure);
         }
@@ -94,6 +95,7 @@ public final class NatroEntryPoint {
 
     public static void onActivityDestroyed(Activity activity) {
         try {
+            NavigatorAliceReceiver.detach(activity);
             NavigationBridgeClient.detachActivity(activity);
             FloatingWindowController controller = CONTROLLERS.remove(activity);
             synchronized (MOVABLE_MAP_ACTIVITIES) {

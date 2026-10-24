@@ -358,7 +358,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "cc78cce651a516165296bc7624d3610bfe1743686726ece139815baa5806ebb5",
+      "sha256": "7f6902bf0b73314fa02d54f9ef2d408f066790fb6294cc6d259a93929ca23741",
       "access_kinds": [
         "files"
       ]
@@ -504,7 +504,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/launcher/MediaAutoResumeController.java": {
-      "sha256": "a2cf6fd7b279ac87a014abc43eac5ed37cb7ba54f8f625606e0e27cd7f1cd5a5",
+      "sha256": "7d99457f31881a81fc17c0ab94d0471507133c2b26d5576cb237e133714af616",
       "access_kinds": [
         "preferences"
       ]

@@ -176,3 +176,16 @@ dependencies {
     // real implementation so auth/catalog/event compatibility is tested on every CI build.
     testImplementation 'org.json:json:20240303'
 }
+
+// Test the exact proprietary-free receiver source in the Android 9 simulator.
+def navigatorAliceTestSources = layout.buildDirectory.dir("generated/navigator-alice-test")
+def prepareNavigatorAliceTests = tasks.register("prepareNavigatorAliceTests", Copy) {
+    from(rootProject.file("navigator-mod/src/main/java")) {
+        include "ru/natro/navigation/NavigatorAlice*.java"
+    }
+    into(navigatorAliceTestSources)
+}
+android.sourceSets.test.java.srcDir(navigatorAliceTestSources)
+tasks.withType(JavaCompile).configureEach {
+    if (name.contains("UnitTest")) dependsOn(prepareNavigatorAliceTests)
+}

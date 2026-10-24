@@ -92,6 +92,9 @@
     <permission android:name="${applicationId}.permission.BACKUP_INTERNAL" android:protectionLevel="signature" />
     <uses-permission android:name="${applicationId}.permission.BACKUP_INTERNAL" />
 
+    <permission android:name="${applicationId}.permission.CALL_NAVIGATOR_ALICE" android:protectionLevel="signature" />
+    <uses-permission android:name="${applicationId}.permission.CALL_NAVIGATOR_ALICE" />
+
     <application
         android:name=".StatusWidgetApplication"
         android:allowBackup="true"
