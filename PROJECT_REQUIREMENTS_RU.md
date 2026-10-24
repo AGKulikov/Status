@@ -5551,3 +5551,13 @@ USER разрешил добавить «Лайк / убрать лайк» и �
 ru.yandex.yandexnavi; без mNavi и принудительной смены режима окна.
 Новые builtin keys сохраняются прежним shortcut JSON, backup adapter прежний.
 SOURCE candidate; Android TEST/APK/FIELD OPEN. Выпущенная3.3.6 не изменяется.
+
+
+## 24.10.2026 — MEDIA-ACTIONS-337: сборка после Android проверки
+
+USER: «Ну так продолжай». SOURCE c14edd9a254e5f7c76df1c9d74d8156c5b615409,
+Android CI40079391509 SUCCESS, включая две новые проверки каталога/intent.
+Готовится3.3.7/code208021370 с install-over фактической3.3.6, прежним signer.
+Добавлена явная defaults migration335…369→370 и отдельная regression;
+новых storage roots/defaults нет. Полный release CI/APK/PUBLISH OPEN.
+FIELD: лайк/снятие лайка в реальном плеере и голосовой интерфейс Алисы OPEN.

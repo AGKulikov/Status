@@ -975,3 +975,8 @@ shortcut target, без новых prefs/files/defaults. LauncherShortcutStore �
 их прежним JSON, полный adapter сохраняет неизвестные/новые target. Проверены
 изменения LauncherMediaController и LauncherHomeSurface: новый путь вызова,
 новых persistent данных нет. Runtime backup FIELD OPEN.
+
+Review3.3.7: разрешён явный переход335…369→370 при прежних keys/types/defaults.
+Тест проверяет effective/unknown values и отклонение334/371; предыдущие тесты
+сохранены. Fingerprint обновлён только BackupDefaultsMigration после review.
+Новые actions сохраняются прежним shortcut JSON. Runtime restore FIELD OPEN.
