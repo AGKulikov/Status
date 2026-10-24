@@ -1,0 +1,82 @@
+{
+  "verifiedAt": "2026-10-24T08:38:14.876Z",
+  "release": {
+    "id": 422602052,
+    "tag": "natro-v3.3.6",
+    "url": "https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.6",
+    "publishedAt": "2026-10-24T08:11:46Z",
+    "draft": false,
+    "prerelease": false,
+    "isLatest": true,
+    "sourceCommit": "dd1a2b78fd86e6dadfffdfc1db2343ba42a987cf"
+  },
+  "build": {
+    "runId": 40076243146,
+    "jobId": 120820086874,
+    "conclusion": "success",
+    "unitTests": 2194,
+    "toolTests": 279,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "publisher": {
+    "runId": 40077041237,
+    "jobId": 120822527435,
+    "conclusion": "success",
+    "commit": "4346f54de9be1ccdf4283b16ee9764870fea8952",
+    "allSevenAssetsDownloadedAndByteCompared": true,
+    "tagPointsToExactSource": true
+  },
+  "assets": [
+    {
+      "name": "Natro-3.3.6-signed.apk",
+      "sha256": "8fb5419e039ba90b0377344e7c684d0178cec9db3ad4ff7352c45fffe0dd8372",
+      "size": 29821536,
+      "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.3.6/Natro-3.3.6-signed.apk"
+    },
+    {
+      "name": "Natro-3.3.6-source.tar.gz",
+      "sha256": "74a00293d446d87b94996fc2c9cc0ff089a6d15b5a81b81c0f690a7f519352b7",
+      "size": 34567186,
+      "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.3.6/Natro-3.3.6-source.tar.gz"
+    },
+    {
+      "name": "natro-update.json",
+      "sha256": "98f1487d01e00a76b7778d8c8b42c2968289d63f1c2e85c2b756f00d0a0db6c3",
+      "size": 426,
+      "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.3.6/natro-update.json"
+    },
+    {
+      "name": "README_RU.md",
+      "sha256": "52378f19f9b59da8b0866acc34cb8a99f201718e9fa96b6e6e219d9f83fbb5f7",
+      "size": 1693,
+      "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.3.6/README_RU.md"
+    },
+    {
+      "name": "release-report.json",
+      "sha256": "0bc4a46331cb52522194da10e27439bd060ad53d2a5f7de877e71291c67f4d8e",
+      "size": 3556,
+      "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.3.6/release-report.json"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "sha256": "9ca9ff88788e37d50766c325b3b66d55ca20f0635cac490d3b1a4244ba44f2f3",
+      "size": 523,
+      "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.3.6/SHA256SUMS.txt"
+    },
+    {
+      "name": "signature-verification.txt",
+      "sha256": "64e2120c2d8b27ca604ab56544853b36687e6b327c2c94b2b4c5c4e33b47f9c9",
+      "size": 2341,
+      "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.3.6/signature-verification.txt"
+    }
+  ],
+  "physicalKx11Verification": "pending",
+  "independentPublicReadback": {
+    "allSevenAssets": true,
+    "sha256AndSize": true,
+    "checksumsFile": true,
+    "manifest": true
+  }
+}

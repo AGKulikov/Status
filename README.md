@@ -2,8 +2,8 @@
 
 Разработка3.3.6: `feature/media-gestures-20261024` —
 [одиночные/двойные/тройные/длинные MEDIA](docs/geely-kx11/MEDIA_GESTURES_2026_10_24_RU.md).
-Подписанная3.3.6 готова: [отчёт](docs/releases/3.3.6/README_RU.md), CI40076243146 PASS
-(2194Android/279tool), source `dd1a2b78fd86e6dadfffdfc1db2343ba42a987cf`. Публикация канала выполняется; FIELD OPEN.
+**3.3.6 опубликована в канале обновлений:** [отчёт](docs/releases/3.3.6/README_RU.md), CI40076243146 PASS
+(2194Android/279tool), source `dd1a2b78fd86e6dadfffdfc1db2343ba42a987cf`. [Скачать обновление](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.6). FIELD OPEN.
 
 
 **Natro 3.3.5 / 208021368 подписана и проверена.** Ветка `release/natro-3.3.5`,

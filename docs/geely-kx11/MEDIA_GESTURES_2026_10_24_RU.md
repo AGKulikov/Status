@@ -92,3 +92,24 @@ stable/latest выполняется через draft/readback всех7assets; 
 PUBLISH OPEN. Физическая установка/сохранение данных иMEDIA-GESTURES-336,
 GATE-079/095 остаются FIELD OPEN: ни повторяемость на руле, ни фактический
 отклик под нагрузкой без аппаратной трассы не объявлены подтверждёнными.
+
+## 24.10.2026 11:11 МСК — 3.3.6 опубликована
+
+Stable/latest: release422602052, natro-v3.3.6, draft=false/prerelease=false.
+Publisher40077041237/job120822527435 SUCCESS; tag указывает на source
+`dd1a2b78fd86e6dadfffdfc1db2343ba42a987cf`. Все7assets скачаны и побайтно
+сверены publisher; затем независимо скачаны по публичным ссылкам и проверены
+по SHA256/размеру/SHA256SUMS. Манифест содержит3.3.6/code208021369 и SHA
+`8fb5419e039ba90b0377344e7c684d0178cec9db3ad4ff7352c45fffe0dd8372`.
+SOURCE/TEST/APK/PUBLISH PASS в указанном объёме. FIELD MEDIA-GESTURES-336,
+GATE-079/095 и фактический install-over с сохранением настроек остаются OPEN.
+Временные приватные копии комплекта подписи удалены; постоянный резерв сохранён.
+
+## Дополнительный вопрос: лайк
+
+В3.3.6 LauncherMediaController.like() обслуживает экранное сердце, с
+переключением текущего USER_RATING/notification-state и резервом через
+предоставленное плеером notification action. Отдельного ButtonAction или
+LauncherShortcutStore.Builtin для лайка нет. Перенос в каталог физических
+назначений ещё не выполнен; ответ пользователя о требуемом добавлении
+не подменяется заявлением о готовой функции. Это SOURCE, FIELD не выполнялся.

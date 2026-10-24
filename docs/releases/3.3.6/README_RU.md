@@ -1,4 +1,18 @@
-# Natro3.3.6 — жесты медиакнопок
+# Natro 3.3.6 — жесты медиакнопок
+
+## 24.10.2026 11:11 МСК — 3.3.6 опубликована
+
+Stable/latest: release422602052, natro-v3.3.6, draft=false/prerelease=false.
+Publisher40077041237/job120822527435 SUCCESS; tag указывает на source
+`dd1a2b78fd86e6dadfffdfc1db2343ba42a987cf`. Все7assets скачаны и побайтно
+сверены publisher; затем независимо скачаны по публичным ссылкам и проверены
+по SHA256/размеру/SHA256SUMS. Манифест содержит3.3.6/code208021369 и SHA
+`8fb5419e039ba90b0377344e7c684d0178cec9db3ad4ff7352c45fffe0dd8372`.
+SOURCE/TEST/APK/PUBLISH PASS в указанном объёме. FIELD MEDIA-GESTURES-336,
+GATE-079/095 и фактический install-over с сохранением настроек остаются OPEN.
+Временные приватные копии комплекта подписи удалены; постоянный резерв сохранён.
+
+[Подтверждение публикации](publication-verification.json).
 
 В «Кнопки → MEDIA» добавлены1×/2×/3×/длительное для previous/play-pause/next.
 Используются общие распознаватель, каталог действий, Apply/Cancel иполная копия.
@@ -30,7 +44,7 @@ GATE-079/095 остаются FIELD OPEN: ни повторяемость на �
 | SOURCE | Публичные commit/tree выше; изменение от всей3.3.5 | PASS |
 | TEST |2194Android/279tool; новый replay, draft/Apply/Cancel, migration335…368→369| PASS |
 | APK |[release-report.json](release-report.json), [подпись](signature-verification.txt)| PASS |
-| PUBLISH |[канал](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.6), readback всехassets| OPEN до успешного publisher |
+| PUBLISH |[канал](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.6), readback всехassets| PASS; см. publication-verification.json |
 | FIELD |Все три кнопки/жесты; OFF/default/SRC; звонок/DIM/gallery; reboot/update/backup;3×30мин| OPEN |
 
 [Исследование и ограничения](../../geely-kx11/MEDIA_GESTURES_2026_10_24_RU.md).
