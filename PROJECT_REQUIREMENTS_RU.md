@@ -5633,3 +5633,16 @@ SOURCE: точный service discovery + bounded receiver retries; HOME stop с�
 TEST: первый CI40093562045 остановлен компилятором из-за опечатки в новом тестовом
 планировщике (next.run→next.run.run), production скомпилирован; опечатка исправлена.
 Полный повторный CI/APK/PUBLISH OPEN; новый FIELD gate OPEN.
+
+
+## 24.10.2026 — BOOT-338 / ALICE-338: полный CI и уточнение причин
+
+USER: «Нашел все причины?» Подтверждены dispatch→Navigator ANR/process kill и
+music browser unavailable→ожидание без повторной receiver-команды. Первопричина
+нативного ANR не установлена: стек отсутствует; не заявлять её устранённой.
+CI40094274695:2222 Android tests,5failed. Один реальный дефект — allowlist
+backup migration не включал source370; исправлен. Четыре старых source-contract
+assertions зависели от перенесённого service literal/имени SERVICE и старого
+one-shot требования, заменённого BOOT-338. Обновлены на resolver + bounded policy,
+сохранены запреты player UI/global dispatch/прямого startService. Новые runtime
+resolver/protocol/music tests прошли в этом CI; полный TEST/APK/PUBLISH ещё OPEN.

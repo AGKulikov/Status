@@ -98,9 +98,14 @@ public final class Natro236NotificationMediaRecoveryContractTest {
         assertTrue(command.contains("route=waiting_for_exact_session"));
         assertFalse(command.contains("SystemClock.sleep"));
         assertTrue(command.contains("FLAG_RECEIVER_FOREGROUND"));
-        assertTrue(controller.contains("exact foreground receiver is intentionally one-shot"));
+        // BOOT-338 permits bounded receiver retries only when no browser/session command exists.
+        assertTrue(controller.contains("YandexColdSessionPolicy.retryReceiver("));
+        assertTrue(read("app/src/main/java/dezz/status/widget/launcher/"
+                + "YandexColdSessionPolicy.java").contains("attempts < 5"));
         assertTrue(controller.contains("YANDEX_FAST_SESSION_POLL_ATTEMPTS"));
-        assertTrue(browser.contains("MusicBrowserService"));
+        assertTrue(browser.contains("YandexBrowserServiceResolver.resolve(app.getPackageManager())"));
+        assertTrue(read("app/src/main/java/dezz/status/widget/launcher/"
+                + "YandexBrowserServiceResolver.java").contains("MusicBrowserService"));
         assertFalse(controller.contains("YandexMusicBrowserStarter.requestWarmup(app)"));
         assertTrue(browser.contains("playBrowserSession"));
         assertFalse(browser.contains("startService("));

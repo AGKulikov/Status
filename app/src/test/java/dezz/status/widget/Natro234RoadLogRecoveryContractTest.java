@@ -46,7 +46,8 @@ public final class Natro234RoadLogRecoveryContractTest {
         assertTrue(command.contains("route=waiting_for_exact_session"));
         assertTrue(command.contains("isUsablePlaySession"));
         assertFalse(browser.contains("startService("));
-        assertTrue(browser.contains("new MediaBrowser(context, SERVICE"));
+        assertTrue(browser.contains("new MediaBrowser(context, service"));
+        assertTrue(browser.contains("YandexBrowserServiceResolver.resolve(app.getPackageManager())"));
         assertFalse(controller.contains("MediaAppLauncher.launchPackage"));
         assertFalse(command.contains("dispatchMediaKeyEvent"));
     }

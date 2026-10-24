@@ -36,7 +36,9 @@ public final class Natro2218RoadStabilityContractTest {
         assertTrue(command.contains("YANDEX_PLAY_KEY_UP_DELAY_MS = 100L"));
         assertTrue(command.contains("YandexMusicBrowserStarter.requestGuardedPlay(context,"));
         assertTrue(command.contains("MediaAutoResumeController.browserPlayPermit(context, boot)"));
-        assertTrue(browser.contains("MusicBrowserService"));
+        assertTrue(browser.contains("YandexBrowserServiceResolver.resolve(app.getPackageManager())"));
+        assertTrue(read("app/src/main/java/dezz/status/widget/launcher/"
+                + "YandexBrowserServiceResolver.java").contains("MusicBrowserService"));
         assertTrue(browser.contains("playExactSessionOnly"));
         assertTrue(browser.contains("MediaAutoResumeController.guardedBrowserDispatch("));
         assertFalse(browser.contains("new Handler(Looper.getMainLooper())"));

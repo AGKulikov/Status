@@ -997,3 +997,9 @@ launcher_media_auto_resume_state, reset при новом capture/plan; не р�
 ключи/defaults/target/manual guard прежние. LauncherHomeSurface/MediaResumeCommand/
 Browser resolver не добавляют storage roots. Fingerprint MediaAutoResumeController
 пересмотрен повторно по diff; FIELD backup OPEN.
+
+
+Review3.3.8 CI40094274695: migration regression выявила отсутствующий source370
+в явном allowlist (target371 уже был). Добавлен только335…370→371, формат/keys
+не меняются, будущие схемы по-прежнему запрещены. Fingerprint пересмотрен
+после проверки условия; прежние migration tests остаются обязательными.

@@ -78,7 +78,8 @@ public final class Natro232RoadLogRecoveryContractTest {
         assertFalse(command.contains("MediaAppLauncher"));
         assertFalse(command.contains("dispatchMediaKeyEvent"));
         assertFalse(browser.contains("startService("));
-        assertTrue(browser.contains("new MediaBrowser(context, SERVICE"));
+        assertTrue(browser.contains("new MediaBrowser(context, service"));
+        assertTrue(browser.contains("YandexBrowserServiceResolver.resolve(app.getPackageManager())"));
     }
 
     @Test public void overlayLifetimesLteGrowthAndSprutSlashAreCovered() throws Exception {
