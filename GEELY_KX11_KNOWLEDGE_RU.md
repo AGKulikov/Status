@@ -6,7 +6,8 @@
 InputImpl cookie0 pressed/released. Готовые media85/87/88 не измеряют hold;
 long next/prev даёт90/89, R play/pause —85. Общий распознаватель расширен,
 но действие допускается только после NEDIA того же press (call/DIM/gallery
-не равны media). 10 новых replay и7 прежних PASS; CI/APK/FIELD OPEN.
+не равны media). 10 новых replay и7 прежних PASS; полный CI40076243146 (2194Android/279tool)
+и подписанный APK3.3.6 PASS. FIELD OPEN.
 Native LCFG может дать подтверждение позже1000мс, fallback1500мс.
 [Полный разбор и источники](docs/geely-kx11/MEDIA_GESTURES_2026_10_24_RU.md).
 

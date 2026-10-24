@@ -676,7 +676,7 @@
         {
           "date": "2026-10-24",
           "level": "STATIC_SOURCE_PORTABLE_TEST",
-          "finding": "MEDIA-GESTURES-336: raw R200085/87/88 cookie0 + mandatory NEDIA qualification; common1/2/3/long,600/1000ms, bounded reset. Native LCFG fallback1500ms can delay confirmation. 10 new and7 existing replay pass. Android/APK/FIELD open.",
+          "finding": "MEDIA-GESTURES-336: raw R200085/87/88 cookie0 + mandatory NEDIA qualification; common1/2/3/long,600/1000ms, bounded reset. Native LCFG fallback1500ms can delay confirmation. 10 new and7 existing replay pass. Android/APK/FIELD open.; SOURCE dd1a2b78, CI40076243146 2194Android/279tool иAPK3.3.6 verified; FIELD OPEN.",
           "source": "MEDIA_GESTURES_2026_10_24_RU.md"
         }
       ],

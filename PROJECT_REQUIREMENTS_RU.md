@@ -5491,3 +5491,25 @@ USER: «3.3.5 уже же есть». GitHub release421672927/natro-v3.3.5 оп�
 База дополнена всей release/natro-3.3.5, прежний выпуск не перезаписывается.
 Install-over и payload сравниваются с реально опубликованным APK3.3.5,
 SHA cbd4bf5fa474bbf0c13d5c3d12ea56d9030d777ab3d5dd3a4bc8b0f716510768.
+
+
+## 24.10.2026 — 3.3.6: SOURCE/TEST/APK проверены, FIELD OPEN
+
+SOURCE `dd1a2b78fd86e6dadfffdfc1db2343ba42a987cf`, tree `22a7d0e908fc84af69698926066c15d7c65db623` опубликованы в
+feature/media-gestures-20261024; удалённое дерево совпадает с локальным.
+CI [40076243146](https://github.com/AGKulikov/Status/actions/runs/40076243146)
+SUCCESS:2194 Android-теста /429 XML suites и279 tool/replay tests,
+failures/errors/skipped0. Settings audit48/253/3017 иbackup inventory92 PASS.
+
+APK3.3.6/code208021369,29821536bytes, SHA256 `8fb5419e039ba90b0377344e7c684d0178cec9db3ad4ff7352c45fffe0dd8372`.
+Один прежний signer, v2/v3/точныйAPI28, package/label/non-debug/zipalign16KiB,
+versionCode+1 против фактической3.3.5 и1517 неизменных CI payload entries PASS.
+Navigator classes19.dex имеет прежний SHA710af1b6…; Helper не менялся.
+Дополнительная установка Navigator/Helper для этого обновления не требуется.
+Публичный signature-only handoff не содержит ключа/пароля. Публикация
+stable/latest выполняется через draft/readback всех7assets; до её результата
+PUBLISH OPEN. Физическая установка/сохранение данных иMEDIA-GESTURES-336,
+GATE-079/095 остаются FIELD OPEN: ни повторяемость на руле, ни фактический
+отклик под нагрузкой без аппаратной трассы не объявлены подтверждёнными.
+
+[Отчёт выпуска](docs/releases/3.3.6/README_RU.md).
