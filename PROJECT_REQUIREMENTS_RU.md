@@ -5651,3 +5651,9 @@ MUSIC-ALICE-338 review: закрыто окно отмены между invoke �
 поколение ручного transport фиксируется до async capture/проверки процесса и
 повторно проверяется непосредственно перед PLAY. Ручная пауза в этот период
 теперь также запрещает поздний возврат музыки. Только RAM, новый regression.
+
+CI40096031603: Android2222/0failed, release build и Navigator DEX PASS;
+tool suite279 остановлена одним compile error в standalone ManualReplay:
+fixture не содержала новый NavigatorAliceAction adapter. Добавлен узкий fake с
+проверкой немедленной отмены продолжения; прежние no-I/O/manual-generation
+assertions сохранены. Локальный targeted replay PASS2. Новый полный CI требуется.

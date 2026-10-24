@@ -44,6 +44,7 @@ import java.util.*;
 import java.util.concurrent.atomic.AtomicLong;
 public class ManualReplay {
  static class Context {}
+ static class NavigatorAliceAction {static int cancellations;static void onManualTransportControl(){cancellations++;}}
  static Context applicationContext(Context c){return c;}
  static AtomicLong MANUAL_GENERATION=new AtomicLong(); static long captureManualGeneration;
  static List<Runnable> jobs=new ArrayList<>(); static java.util.concurrent.Executor EXACT_TIMER=jobs::add;
@@ -55,6 +56,7 @@ public class ManualReplay {
  public static void main(String[] args){
   Context c=new Context();onManualTransportControl(c);
   if(reads!=0 || MANUAL_GENERATION.get()!=1)throw new AssertionError("I/O on command lane");
+  if(NavigatorAliceAction.cancellations!=1)throw new AssertionError("Alice continuation not cancelled");
   jobs.remove(0).run(); if(completed!=1)throw new AssertionError("did not stop old autoresume");
   onManualTransportControl(c);captureManualGeneration=MANUAL_GENERATION.get();
   jobs.remove(0).run();if(completed!=1)throw new AssertionError("cancelled new boot capture");
