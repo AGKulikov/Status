@@ -5561,3 +5561,22 @@ Android CI40079391509 SUCCESS, включая две новые проверки
 Добавлена явная defaults migration335…369→370 и отдельная regression;
 новых storage roots/defaults нет. Полный release CI/APK/PUBLISH OPEN.
 FIELD: лайк/снятие лайка в реальном плеере и голосовой интерфейс Алисы OPEN.
+
+
+## 24.10.2026 — MEDIA-ACTIONS-337: SOURCE/TEST/APK PASS
+
+В «Действия Natro» добавлены «Лайк / убрать лайк» и «Алиса в Навигаторе».
+Назначаются на физические кнопки/жесты, в меню водителя и HOME.
+Лайк использует MediaSession/notification action выбранного плеера; поддержка
+зависит от плеера. Алиса вызывается через yandexnavi://ask_alice адресно
+в ru.yandex.yandexnavi без принудительных window extras.
+
+
+Source cfcabac4dd2627943e7653076a0c1974a2f71a26; tree a4995218a6f4237ae5b09a4134874da0d10727c6.
+CI40081126066 SUCCESS2197Android/279tool,0failures/errors/skips.
+APK3.3.7/code208021370 подписан и проверен: прежний signer/v2/v3/exactAPI28,
+zipalign16KiB, +1 против3.3.6 и1517 неизменных payload entries.
+SHA25649bd6878eac273300194440f79aec7fba164cf77b6f3fa2c8afd16bdf871554a.
+Navigator patch прежний, Helper не менялся. PUBLISH OPEN до readback.
+FIELD лайк/Алиса/физические назначения и прежние MEDIA gates OPEN.
+[Отчёт](docs/releases/3.3.7/README_RU.md).
