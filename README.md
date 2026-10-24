@@ -1,6 +1,6 @@
 # Natro
 
-Разработка3.3.8: `fix/navigator-alice-20261024` — [исправление Алисы, сохранение окна и возврат музыки через2s](docs/geely-kx11/ALICE_2026_10_24_RU.md). [Boot music/Navigator recovery](docs/geely-kx11/BOOT_2026_10_24_RU.md) по журналу3.3.7. Нужен новый парный Navigator. SOURCE candidate; CI/APK/FIELD OPEN.
+Natro3.3.8 и парный Navigator подписаны и проверены: [протокол выпуска](docs/releases/3.3.8/README_RU.md). Ветки `release/natro-3.3.8` / `fix/navigator-alice-20261024`; source `52069153bee7afd9447a88ef6a5ab803bf7fcfe8`. CI40096694911 PASS2223Android/279tool. Алиса, finish+2s и recovery music/Navigator при boot. Для Алисы нужен новый Navigator. PUBLISH OPEN до readback; FIELD OPEN, причина ANR не установлена.
 
 Разработка3.3.7: `feature/media-actions-20261024` — готовые действия
 «Лайк / убрать лайк» и «Алиса в Навигаторе». Android CI40079391509 PASS;

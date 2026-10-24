@@ -3097,3 +3097,5 @@ STATIC: mNavi broadcast dd.call_alice; наш Navigator3.1.4 такого receiv
 24.10 FIELD3.3.7: [boot отказ музыки/Навигатора](docs/geely-kx11/BOOT_2026_10_24_RU.md).
 Navigator dispatch12s→ANR/killed31s; music exact receiver14s→browser unavailable→24waits.
 Причина ANR неизвестна, старый crash3.1.3 не текущий. Recovery SOURCE, FIELD OPEN.
+
+24.10.2026: [пара3.3.8](docs/releases/3.3.8/README_RU.md) SOURCE/TEST/APK PASS: CI40096694911,2223Android/279tool. New receiver dd.call_alice и native router completion включены в подписанный Navigator; только classes19.dex изменён. FIELD голоса/фона/окна/музыки/boot OPEN; ANR stack по-прежнему отсутствует.

@@ -5657,3 +5657,19 @@ tool suite279 остановлена одним compile error в standalone Manu
 fixture не содержала новый NavigatorAliceAction adapter. Добавлен узкий fake с
 проверкой немедленной отмены продолжения; прежние no-I/O/manual-generation
 assertions сохранены. Локальный targeted replay PASS2. Новый полный CI требуется.
+
+
+## 24.10.2026 — 3.3.8: SOURCE/TEST/APK PASS, FIELD OPEN
+
+Source 52069153bee7afd9447a88ef6a5ab803bf7fcfe8, tree e9693676836ae6e88dd62c4c5ef8ac460f62618e; CI40096694911/job120880395196 SUCCESS.
+2223 Android tests/436XML suites,279tool и108Java cases,0failures/errors/skips.
+Settings48/253/3017 иbackup92 PASS. Natro3.3.8/code208021371: прежний signer,
+v2/v3/exactAPI28/zipalign16KiB,+1 против3.3.7,1517CI payload entries unchanged.
+SHA256 ee7294017a970ed9eb640a87fc1c46bd9a34a4376f5fa5954de4ec656f482d95.
+Нужен новый парный Navigator SHA25647484bb4a1fff020d1426638ea8c65e19bb828b544c7f78910e3787521e5c5cd;
+только CI classes19.dex (SHA3644ab9af503975b6d129f6a924634ae532ec3f4585eec0dc96fe94644a967f6) заменён,17226payload unchanged.
+Прежний Navigator3.1.4 совпадает с закреплённым baseline за пределами classes19.
+Оба APK подписаны и проверены, приватные копии ключа удалены. Helper прежний.
+ALICE-338-R2/MUSIC-ALICE-338/BOOT-338 SOURCE/TEST/APK PASS в объёме
+[матрицы](docs/releases/3.3.8/README_RU.md); PUBLISH OPEN до7asset readback.
+FIELD фона/голоса/окна/finish+2s/boot/install-over OPEN; native ANR причина OPEN.

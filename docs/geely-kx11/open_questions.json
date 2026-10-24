@@ -2065,9 +2065,9 @@
       "priority": "P1",
       "function": "Алиса в фоне/окне и возврат игравшей музыки через2s",
       "status": "OPEN",
-      "known": "STATIC: dd.call_alice у mNavi, отсутствие receiver в нашем Navigator3.1.4. Проверен native BUTTON entry и отдельный Alice router30.3.0. SOURCE парный receiver/ACK/finish и exact-session music continuation.",
+      "known": "STATIC: dd.call_alice у mNavi, отсутствие receiver в нашем Navigator3.1.4. Проверен native BUTTON entry и отдельный Alice router30.3.0. SOURCE парный receiver/ACK/finish и exact-session music continuation. CI40096694911:2223Android/279tool PASS; подписанная пара3.3.8 с прежним signer/API28 проверена.",
       "missing_evidence": "FIELD голоса/сохранения фона и окна, точного момента окончания и возврата реального плеера.",
-      "next_step": "Полный Android CI, подпись/проверка пары APK3.3.8, затем FIELD матрица из отчёта.",
+      "next_step": "FIELD матрица подписанной пары3.3.8: cold boot, голос/фон/окно и finish+2s; при повторном ANR нужен его конкретный стек.",
       "sources": [
         "ALICE_2026_10_24_RU.md"
       ],
@@ -2078,9 +2078,9 @@
       "priority": "P1",
       "function": "Автозапуск после cold boot3.3.7",
       "status": "OPEN",
-      "known": "Receiver music отправлен14s, browser unavailable,24waits. Navigator handoff12s, ANR/killed31s, позднее окно138s.",
+      "known": "Receiver music отправлен14s, browser unavailable,24waits. Navigator handoff12s, ANR/killed31s, позднее окно138s. CI40096694911:2223Android/279tool PASS; подписанная пара3.3.8 с прежним signer/API28 проверена.",
       "missing_evidence": "ANR stack Navigator; exported MediaBrowser endpoint установленной Music; повторный FIELD нового recovery.",
-      "next_step": "Полный CI3.3.8 и парный APK, затем cold-boot verification; ANR первопричина не объявляется исправленной.",
+      "next_step": "FIELD матрица подписанной пары3.3.8: cold boot, голос/фон/окно и finish+2s; при повторном ANR нужен его конкретный стек.",
       "sources": [
         "BOOT_2026_10_24_RU.md"
       ],

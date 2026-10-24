@@ -1,0 +1,39 @@
+{
+  "sourceCommit": "52069153bee7afd9447a88ef6a5ab803bf7fcfe8",
+  "sourceTree": "e9693676836ae6e88dd62c4c5ef8ac460f62618e",
+  "ciRunId": "40096694911",
+  "pairVersion": "3.3.8",
+  "apk": "Navigator-30.3.0-Natro-3.3.8-signed.apk",
+  "sha256": "47484bb4a1fff020d1426638ea8c65e19bb828b544c7f78910e3787521e5c5cd",
+  "size": 156587626,
+  "package": "ru.yandex.yandexnavi",
+  "versionName": "30.3.0",
+  "versionCode": 739564630,
+  "baselineSha256": "b224bed5268469f620ab4bff3fec382aece868b9372450ff05f1f9176631280a",
+  "patchSha256": "3644ab9af503975b6d129f6a924634ae532ec3f4585eec0dc96fe94644a967f6",
+  "changedPayloadEntries": [
+    "classes19.dex"
+  ],
+  "unchangedPayloadEntries": 17226,
+  "manifestResourcesAndNativeLibrariesUnchanged": true,
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "signatureV2": true,
+  "signatureV3": true,
+  "zipalign16KiB": true,
+  "physicalKx11Verification": "pending",
+  "signingScriptSha256": "c3005ff7921a2f7de8a2c45863dcf6225064c36b2f195f2a0d33b88b981ebaa7",
+  "exactAndroidApi28SignatureVerified": true,
+  "comparedAgainstLastIssuedNavigator": {
+    "version": "30.3.0-Natro-3.1.4",
+    "sha256": "a2246263b1749c2511f8d361f9b68e0581e4a81fd29c9bb308db34ce57e470f0",
+    "payloadDifferenceFromPinnedBaseline": [
+      "classes19.dex"
+    ]
+  },
+  "aliceProtocol": {
+    "action": "dd.call_alice",
+    "compiledReceiverIncluded": true,
+    "receiverAndSessionTests": "PASS in Android CI40096694911",
+    "nativeVoiceAndBackgroundFieldAcceptance": "OPEN"
+  }
+}
