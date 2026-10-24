@@ -15,7 +15,7 @@ import dezz.status.widget.launcher.ShortcutActionPicker;
 import dezz.status.widget.media.*;
 import dezz.status.widget.settings.SettingsBackNavigation;
 
-/** All physical groups; the MEDIA tab retains only its original two switches. */
+/** Physical button groups share the same gesture/action editor and Apply lifecycle. */
 public final class MediaButtonsSettingsActivity extends dezz.status.widget.settings.SettingsActivity {
     private VehicleButtonController buttons;
     private MediaButtonController media;
@@ -78,7 +78,25 @@ public final class MediaButtonsSettingsActivity extends dezz.status.widget.setti
                 else VehicleButtonController.get(app).setDisableDefault(tab,value,callback);
             });
         }); body.addView(disable); body.addView(status);
-        if (tab == VehicleButton.MEDIA) return;
+        if (tab == VehicleButton.MEDIA) {
+            body.addView(text("Назначения работают при включённых MEDIA и «Отключить действие по умолчанию». "
+                    + "Серия нажатий — 600 мс, удержание — от 1 секунды. Ожидание следующего клика добавляется только при его назначении.", 15));
+            String[] groups = {"mediaPrevious", "mediaPlayPause", "mediaNext"};
+            String[] titles = {"Предыдущий трек", "Пуск / пауза", "Следующий трек"};
+            for (int i = 0; i < groups.length; i++) {
+                String group = groups[i], title = titles[i];
+                body.addView(text(title, 18));
+                LinearLayout row = new LinearLayout(this);
+                for (String gesture : new String[]{"1", "2", "3", "long"}) {
+                    String label = "long".equals(gesture) ? "Длинный" : gesture + "X";
+                    row.addView(button(bindingLabel(label, group, gesture),
+                            () -> editBinding(group, gesture, title + " · " + label)));
+                }
+                body.addView(horizontal(row));
+            }
+            body.addView(button("Параметры действий…", this::actionOptions));
+            return;
+        }
         LinearLayout gestures = new LinearLayout(this);
         if (tab == VehicleButton.DM) {
             for (String item : new String[]{"L-1X", "L-2X", "L-3X", "R-3X", "R-2X", "R-1X"}) {
@@ -97,6 +115,7 @@ public final class MediaButtonsSettingsActivity extends dezz.status.widget.setti
         LinearLayout fields = column(); fields.setPadding(20, 12, 20, 12);
         List<Object> actions = new ArrayList<>();
         for (ButtonAction action : ButtonAction.values()) {
+            if (action == ButtonAction.MEDIA_DEFAULT && VehicleButton.mediaCode(group) == 0) continue;
             if (DriveSelectorButtonPreset.fromAction(action) != null) continue;
             // MConfig kp/vj.gi/ro excludes source cycling from SRC 1X only.
             if (action == ButtonAction.SOURCE && group.equals("src") && gesture.equals("1")) continue;

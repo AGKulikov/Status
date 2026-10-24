@@ -27,7 +27,7 @@ public final class ButtonSettingsDraft {
     public int volumeSteps(){return integer("volume_steps",1);}
     public ButtonBinding binding(String group,String gesture){
         String key="binding."+group+"."+gesture+".";
-        return new ButtonBinding(integer(key+"action",0),string(key+"app"),string(key+"command"),string(key+"package"),string(key+"shortcut"));
+        return new ButtonBinding(integer(key+"action",VehicleButton.defaultAction(group,gesture)),string(key+"app"),string(key+"command"),string(key+"package"),string(key+"shortcut"));
     }
     public void setEnabled(VehicleButton button,boolean enabled){
         if(button==VehicleButton.MEDIA){media.edit().putBoolean("enabled",enabled).commit();changed();}

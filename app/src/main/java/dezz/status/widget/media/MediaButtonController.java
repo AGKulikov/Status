@@ -84,6 +84,12 @@ public final class MediaButtonController {
                     if (event.getAction() == KeyEvent.ACTION_DOWN && event.getRepeatCount() == 0) {
                         dezz.status.widget.launcher.MediaAutoResumeController.onManualTransportControl(context);
                     }
+                    if (MediaKeyPolicy.NATRO.equals(intent.getAction()) && enabled && isDisableDefault()
+                            && VehicleButtonController.get(context).consumeMediaEvent(event.getKeyCode(),
+                                    event.getAction(), event.getEventTime())) {
+                        record(event, "gesture_owned", received, started);
+                        return;
+                    }
                     if (route == MediaKeyPolicy.Route.AUDIO_MANAGER) {
                         AudioManager audio = context.getSystemService(AudioManager.class);
                         if (audio == null) throw new IllegalStateException("AudioManager unavailable");
@@ -150,6 +156,7 @@ public final class MediaButtonController {
         status = routeVerified ? "Маршрут MEDIA проверен; готовность физической кнопки требует проверки"
                 : "Не удалось восстановить маршрут MEDIA";
         reconcileReceiver();
+        VehicleButtonController.get(context).mediaRouteChanged();
         DiagnosticJournal.infoAsync("media-buttons", status);
     }
 
@@ -158,7 +165,8 @@ public final class MediaButtonController {
     public boolean isReady() { return ready; }
     /** Route changes remain separate explicit operations; applying the editor only reloads enable. */
     public void reloadEnabledSetting() {
-        control(()->{synchronized(this){enabled=preferences.getBoolean("enabled",false);generation++;reconcileReceiver();}});
+        control(()->{synchronized(this){enabled=preferences.getBoolean("enabled",false);generation++;reconcileReceiver();}
+            VehicleButtonController.get(context).mediaRouteChanged();});
     }
     public void whenReady(Runnable callback) {
         control(() -> new Handler(context.getMainLooper()).post(callback));
@@ -174,12 +182,43 @@ public final class MediaButtonController {
         generation++;
         control(() -> RuntimePreferenceWriter.put(preferences, "enabled", value));
         reconcileReceiver();
+        VehicleButtonController.get(context).mediaRouteChanged();
     }
 
     private synchronized void setDefaultSource(boolean value) {
         defaultSource = value;
         generation++;
         RuntimePreferenceWriter.put(preferences, "default_source", value);
+        VehicleButtonController.get(context).mediaRouteChanged();
+    }
+
+    /** The recognized single/assigned ordinary action preserves the selected media source. */
+    void dispatchGestureDefault(int code, java.util.function.BooleanSupplier valid) {
+        final long owner = generation, queued = SystemClock.uptimeMillis();
+        try {
+            commands.execute(() -> {
+                try {
+                    if (owner != generation || !enabled || !isDisableDefault() || !valid.getAsBoolean()
+                            || SystemClock.uptimeMillis() - queued > 750) return;
+                    long time = SystemClock.uptimeMillis();
+                    AudioManager audio = context.getSystemService(AudioManager.class);
+                    if (!defaultSource && audio == null) throw new IllegalStateException("AudioManager unavailable");
+                    for (int action : new int[]{KeyEvent.ACTION_DOWN, KeyEvent.ACTION_UP}) {
+                        KeyEvent event = new KeyEvent(time, time, action, code, 0);
+                        policy.admit(code, action, 0, time, time, event.getDeviceId(), event.getScanCode(), event.getSource());
+                        if (defaultSource) context.sendBroadcast(new Intent(Intent.ACTION_MEDIA_BUTTON)
+                                .addFlags(0x01000020).addCategory(Intent.CATEGORY_DEFAULT)
+                                .putExtra(Intent.EXTRA_KEY_EVENT, event));
+                        else audio.dispatchMediaKeyEvent(event);
+                    }
+                    DiagnosticJournal.infoAsync("media-gestures", "ordinary_action code=" + code + ", audio_output=unobserved");
+                } catch (RuntimeException failed) {
+                    DiagnosticJournal.warn("media-gestures", "ordinary_action_failed=" + failed.getClass().getSimpleName());
+                }
+            });
+        } catch (RejectedExecutionException full) {
+            DiagnosticJournal.warn("media-gestures", "ordinary_action_queue_full");
+        }
     }
 
     /** Internal mode changed only by action 20; this is not a third MEDIA settings switch. */
@@ -232,6 +271,7 @@ public final class MediaButtonController {
                     status = "Не удалось изменить путь кнопок: " + shortError(error, output);
                 }
                 reconcileReceiver();
+                VehicleButtonController.get(context).mediaRouteChanged();
                 DiagnosticJournal.infoAsync("media-buttons", status);
                 callback.done(success, status);
             }

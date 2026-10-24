@@ -1,9 +1,14 @@
 # Natro
 
+Разработка3.3.6: `feature/media-gestures-20261024` —
+[одиночные/двойные/тройные/длинные MEDIA](docs/geely-kx11/MEDIA_GESTURES_2026_10_24_RU.md).
+SOURCE,17 профильных replay PASS; Android CI/APK/FIELD ожидаются.
+
+
 **Natro 3.3.5 / 208021368 подписана и проверена.** Ветка `release/natro-3.3.5`,
 [протокол и матрица](docs/releases/3.3.5/README_RU.md). Полный CI 39904116513 PASS:
 2192 Android-теста и 269 tool/replay tests. Прежний сертификат, v2/v3/API 28,
-версия +1 и точный CI payload подтверждены. Публикация stable/latest выполняется;
+версия +1 и точный CI payload подтверждены. [Stable/latest опубликован 23.10.2026](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.5);
 FIELD устранения задержки медиакнопок и GATE-079 остаются OPEN.
 Navigator и Helper переустанавливать для этого выпуска не требуется.
 

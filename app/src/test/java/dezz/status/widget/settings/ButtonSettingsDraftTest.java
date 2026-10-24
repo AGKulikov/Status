@@ -13,6 +13,34 @@ import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=28,application=Application.class,qualifiers="w1760dp-h656dp-land-mdpi")
 public class ButtonSettingsDraftTest {
+    @Test public void mediaAssignmentsHaveOrdinarySingleDefaultsAndUseApplyCancel(){
+        SharedPreferences disk=RuntimeEnvironment.getApplication().createDeviceProtectedStorageContext().getSharedPreferences("vehicle_buttons",0);
+        String[] groups={"mediaPrevious","mediaPlayPause","mediaNext"};
+        try(ActivityController<MediaButtonsSettingsActivity> c=Robolectric.buildActivity(MediaButtonsSettingsActivity.class).setup()){
+            ButtonSettingsDraft draft=new ButtonSettingsDraft(c.get());
+            for(String group:groups){
+                assertEquals(ButtonAction.MEDIA_DEFAULT,draft.binding(group,"1").action);
+                for(String gesture:new String[]{"2","3","long"})assertEquals(ButtonAction.NONE,draft.binding(group,gesture).action);
+                draft.saveBinding(group,"2",new ButtonBinding(ButtonAction.HOME.id,"","","",""));
+                assertFalse(disk.contains("binding."+group+".2.action"));
+            }
+            SettingsEditSession.find(c.get()).cancel(c.get());
+            for(String group:groups)assertFalse(disk.contains("binding."+group+".2.action"));
+        }
+        try(ActivityController<MediaButtonsSettingsActivity> c=Robolectric.buildActivity(MediaButtonsSettingsActivity.class).setup()){
+            ButtonSettingsDraft draft=new ButtonSettingsDraft(c.get());
+            for(String group:groups){
+                draft.saveBinding(group,"1",new ButtonBinding(ButtonAction.NONE.id,"","","",""));
+                draft.saveBinding(group,"long",new ButtonBinding(ButtonAction.BACK.id,"","","",""));
+            }
+            assertTrue(SettingsEditSession.find(c.get()).apply(c.get()));
+            for(String group:groups){
+                assertEquals(0,disk.getInt("binding."+group+".1.action",-1));
+                assertEquals(ButtonAction.BACK.id,disk.getInt("binding."+group+".long.action",-1));
+            }
+            assertFalse(disk.getBoolean("media.enabled",false));
+        }
+    }
     @Test public void inactiveAssignmentsAndUnknownRuntimeValuesSurviveApplyAndCancel(){
         SharedPreferences disk=RuntimeEnvironment.getApplication().createDeviceProtectedStorageContext().getSharedPreferences("vehicle_buttons",0);
         disk.edit().putInt("drive.selected",3).putString("future-setting","preserve").commit();

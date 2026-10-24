@@ -1,0 +1,333 @@
+{
+  "sourceApkSha256": "c4e380408d952298370ce8f9df177e902233c2a24825f15a02c1dbf371fccc14",
+  "dexSha256": "1fe7c6ea33b89881247d9930d454ab015a76dbd8a3000b0a05220ce74b534cfd",
+  "evidence": "STATIC metadata only; no physical acceptance",
+  "declarations": [
+    {
+      "class": "Lcom/ecarx/xui/adaptapi/input/InputImpl$KeyEventListenerStub;",
+      "access": 0,
+      "parent": "Lecarx/car/IKeyEventListener$Stub;",
+      "fields": [
+        {
+          "name": "this$0",
+          "type": "Lcom/ecarx/xui/adaptapi/input/InputImpl;",
+          "access": 4112
+        }
+      ],
+      "methods": [
+        {
+          "name": "<init>",
+          "signature": "(Lcom/ecarx/xui/adaptapi/input/InputImpl;)V",
+          "access": 65538,
+          "code_sha256": "ab7468e000fad69c43fcffccfbcb334f065e4460b1d5056becc8490f470adbe2",
+          "code_offset": 2639252
+        },
+        {
+          "name": "<init>",
+          "signature": "(Lcom/ecarx/xui/adaptapi/input/InputImpl;Lcom/ecarx/xui/adaptapi/input/InputImpl$1;)V",
+          "access": 69632,
+          "code_sha256": "2bf72fe7ceb2dac4875056d463494a1200c01bfd541e02d921b5f2aee647c04b",
+          "code_offset": 2639280
+        },
+        {
+          "name": "onKeyPressed",
+          "signature": "(I)Z",
+          "access": 1,
+          "code_sha256": "73d31cbb8fcfad4c0ef4517fbda8a9066a99d3d71713ba93c313810806dc4207",
+          "code_offset": 2639304
+        },
+        {
+          "name": "onKeyReleased",
+          "signature": "(I)Z",
+          "access": 1,
+          "code_sha256": "a8c082ab84022b49d15c934e1fd5fb45097be73e9169a67d6ecd8d4a6b2e85cf",
+          "code_offset": 2639468
+        }
+      ]
+    },
+    {
+      "class": "Lecarx/xsf/inputservice/key/ECarXRMediaLongPressAction;",
+      "access": 1025,
+      "parent": "Lecarx/xsf/inputservice/key/ECarXKeyActionBase;",
+      "fields": [
+        {
+          "name": "ADJUST_INTERVAL",
+          "type": "I",
+          "access": 26
+        },
+        {
+          "name": "mDownTime",
+          "type": "J",
+          "access": 0
+        },
+        {
+          "name": "mHandler",
+          "type": "Landroid/os/Handler;",
+          "access": 2
+        },
+        {
+          "name": "mLongPress",
+          "type": "Z",
+          "access": 2
+        },
+        {
+          "name": "mRepeat",
+          "type": "I",
+          "access": 0
+        }
+      ],
+      "methods": [
+        {
+          "name": "<init>",
+          "signature": "()V",
+          "access": 65537,
+          "code_sha256": "c673ef5c75db30dccea5d94e63fc6d4aa89f19c02546c6514adf8052ca59b393",
+          "code_offset": 3840964
+        },
+        {
+          "name": "adjustLongPress",
+          "signature": "()Z",
+          "access": 1025
+        },
+        {
+          "name": "handleMessage",
+          "signature": "(Landroid/os/Message;)Z",
+          "access": 1,
+          "code_sha256": "b5a82dfb463f5cb139a1fe888567deedfffe5419cb4a6345b5088a7afed93340",
+          "code_offset": 3841008
+        },
+        {
+          "name": "onHoldingPressStarted",
+          "signature": "()Z",
+          "access": 1,
+          "code_sha256": "2f5c27d95fa19af3e28e51fd197ffc31418d6430281dc5c72f95b6d5191b9fbd",
+          "code_offset": 3841068
+        },
+        {
+          "name": "onHoldingPressStopped",
+          "signature": "()Z",
+          "access": 1,
+          "code_sha256": "81c9a554c7a0f42968d8f1c55d8ee54255efc201352c9b608c1188956910bbb9",
+          "code_offset": 3841156
+        }
+      ]
+    },
+    {
+      "class": "Lecarx/xsf/inputservice/key/ECarXRMediaNextAction;",
+      "access": 1,
+      "parent": "Lecarx/xsf/inputservice/key/ECarXRMediaLongPressAction;",
+      "fields": [
+        {
+          "name": "GALLERY_NEXT_ACTION",
+          "type": "Ljava/lang/String;",
+          "access": 26
+        }
+      ],
+      "methods": [
+        {
+          "name": "<init>",
+          "signature": "()V",
+          "access": 65537,
+          "code_sha256": "fbf6549dac6ae249bccb6ce910c780cffcbc2915007eea0f58d3b8e593ae357c",
+          "code_offset": 3841212
+        },
+        {
+          "name": "sendGalleryNextAction",
+          "signature": "(I)V",
+          "access": 2,
+          "code_sha256": "025ad41deb73c58442083f5810d045b86247354159fd824e963a38cc4955d31c",
+          "code_offset": 3841236
+        },
+        {
+          "name": "adjustLongPress",
+          "signature": "()Z",
+          "access": 1,
+          "code_sha256": "7121fae3d3a5426c72291c38e037ca12fab7a1cf87f5d1a9c7e0134df5d9ba11",
+          "code_offset": 3841332
+        },
+        {
+          "name": "getKeyCode",
+          "signature": "()I",
+          "access": 1,
+          "code_sha256": "7851ac69b37896f5006190176dce0119028cb0ba33107628d10f7270fdacc9a8",
+          "code_offset": 3841672
+        },
+        {
+          "name": "onHoldingPressStarted",
+          "signature": "()Z",
+          "access": 1,
+          "code_sha256": "b579cc4d65477978527ab25c00250cb1f34ed24860a61fcd8df6197a1361d77c",
+          "code_offset": 3841696
+        },
+        {
+          "name": "onHoldingPressStopped",
+          "signature": "()Z",
+          "access": 1,
+          "code_sha256": "15bc24ec2a86c400f57c922236e59dca654ce8622401de19b3e0f15a616d9a7a",
+          "code_offset": 3841972
+        },
+        {
+          "name": "onKeyDown",
+          "signature": "()Z",
+          "access": 1,
+          "code_sha256": "2282ca16cfabf785f9f54556929fde6b15529566569135227c661edd19f23927",
+          "code_offset": 3842292
+        },
+        {
+          "name": "onKeyUp",
+          "signature": "()Z",
+          "access": 1,
+          "code_sha256": "2730584a1be49a36bc2d1f1899905966357f0c49cec4bee4eec0f8f6a825ba8b",
+          "code_offset": 3842464
+        },
+        {
+          "name": "onShortClick",
+          "signature": "()Z",
+          "access": 1,
+          "code_sha256": "91294bdf5fe630b987e0e3a45fc01443de0f24858a10a068b9b394d8436fdea2",
+          "code_offset": 3842636
+        }
+      ]
+    },
+    {
+      "class": "Lecarx/xsf/inputservice/key/ECarXRMediaPlayPauseAction;",
+      "access": 1,
+      "parent": "Lecarx/xsf/inputservice/key/ECarXKeyActionBase;",
+      "fields": [
+        {
+          "name": "GALLERY_PLAY_PAUSE_ACTION",
+          "type": "Ljava/lang/String;",
+          "access": 26
+        }
+      ],
+      "methods": [
+        {
+          "name": "<init>",
+          "signature": "()V",
+          "access": 65537,
+          "code_sha256": "6669a46b8d269ce48338e4b19a2a393c9371567b11d71dd686f670a271d018d9",
+          "code_offset": 3843112
+        },
+        {
+          "name": "sendGalleryPlayPauseAction",
+          "signature": "()V",
+          "access": 2,
+          "code_sha256": "4e9f1654b7af2ffcf8e240108f78353fb327c0edb3174991b4914089a60296ca",
+          "code_offset": 3843136
+        },
+        {
+          "name": "getKeyCode",
+          "signature": "()I",
+          "access": 1,
+          "code_sha256": "e41952c15f64296ff8f016eb60e90284325a93b89273c5ce588cfbc140430030",
+          "code_offset": 3843236
+        },
+        {
+          "name": "onKeyDown",
+          "signature": "()Z",
+          "access": 1,
+          "code_sha256": "aedcf8e6fa483156641575e2106631b60c77ada0bbd535d66aaab0256e468884",
+          "code_offset": 3843260
+        },
+        {
+          "name": "onKeyUp",
+          "signature": "()Z",
+          "access": 1,
+          "code_sha256": "0e3302c57bcad1eb452db1017e8adbb166676a6fa78fb2a012cc2797b7b5f968",
+          "code_offset": 3843360
+        },
+        {
+          "name": "onLongPressTriggered",
+          "signature": "()Z",
+          "access": 1,
+          "code_sha256": "afd247da3eb1d5ef5dde87ffaa93e6c5a01187be95fd5a299a85ee22b6e775ed",
+          "code_offset": 3843460
+        },
+        {
+          "name": "onShortClick",
+          "signature": "()Z",
+          "access": 1,
+          "code_sha256": "b21a39142c82a03161cbaa39feec02bf97eb925723ba9d81b9c967d761ba0d71",
+          "code_offset": 3843872
+        }
+      ]
+    },
+    {
+      "class": "Lecarx/xsf/inputservice/key/ECarXRMediaPreviousAction;",
+      "access": 1,
+      "parent": "Lecarx/xsf/inputservice/key/ECarXRMediaLongPressAction;",
+      "fields": [
+        {
+          "name": "GALLERY_PREVIOUS_ACTION",
+          "type": "Ljava/lang/String;",
+          "access": 26
+        }
+      ],
+      "methods": [
+        {
+          "name": "<init>",
+          "signature": "()V",
+          "access": 65537,
+          "code_sha256": "fbf6549dac6ae249bccb6ce910c780cffcbc2915007eea0f58d3b8e593ae357c",
+          "code_offset": 3844284
+        },
+        {
+          "name": "sendGalleryPreviousAction",
+          "signature": "(I)V",
+          "access": 2,
+          "code_sha256": "5f2db0ace05d82421682248d5c19aa75d66e8aa1ae1abceb6762c168297dd59c",
+          "code_offset": 3844308
+        },
+        {
+          "name": "adjustLongPress",
+          "signature": "()Z",
+          "access": 1,
+          "code_sha256": "6b6c1978386e1a1508522aed1ab295d1cb7baf5958c5fe271d00873867443103",
+          "code_offset": 3844404
+        },
+        {
+          "name": "getKeyCode",
+          "signature": "()I",
+          "access": 1,
+          "code_sha256": "d8435383edc6a427cb123bfd6d712131d68f6e7000ed9ba41d4be8b182dbf6d2",
+          "code_offset": 3844656
+        },
+        {
+          "name": "onHoldingPressStarted",
+          "signature": "()Z",
+          "access": 1,
+          "code_sha256": "34e5b5a0b3b53126ce78d3d96acd88f56faa13086bf620009298e4adb317ce3b",
+          "code_offset": 3844680
+        },
+        {
+          "name": "onHoldingPressStopped",
+          "signature": "()Z",
+          "access": 1,
+          "code_sha256": "2be7caed23a699b011d76e557c3d1f0e4766a3d49dc11aacda9d44271b7702f3",
+          "code_offset": 3844956
+        },
+        {
+          "name": "onKeyDown",
+          "signature": "()Z",
+          "access": 1,
+          "code_sha256": "b5d419a0c2443e2913ede14295a351a96fc48da1b62f19d69349461fc0e1ca98",
+          "code_offset": 3845276
+        },
+        {
+          "name": "onKeyUp",
+          "signature": "()Z",
+          "access": 1,
+          "code_sha256": "2d716d96d0526f92baaa75d1220e76efe9414b1d75585f573d2c6c8e39e32b84",
+          "code_offset": 3845448
+        },
+        {
+          "name": "onShortClick",
+          "signature": "()Z",
+          "access": 1,
+          "code_sha256": "3c52270701ddf9e858c6150bef076cc74d8101f9b7f1f2be9c05be48ecfe6366",
+          "code_offset": 3845620
+        }
+      ]
+    }
+  ]
+}

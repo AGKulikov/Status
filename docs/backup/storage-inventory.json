@@ -33,7 +33,7 @@
     },
     {
       "name": "vehicle_buttons",
-      "contents": "Все остальные физические кнопки, жесты, параметры действий, DM и громкость.",
+      "contents": "Назначения всех физических кнопок, включая MEDIA previous/play-pause/next, жесты, параметры действий, DM и громкость.",
       "source": "app/src/main/java/dezz/status/widget/media/VehicleButtonController.java",
       "historical_restore_policy_to_implement": "Нет. Включить все назначения и связи.",
       "restore_policy": "Все настройки, включая неактивные назначения; импортированные system patch flags требуют отдельного явного применения каждого маршрута."
@@ -358,7 +358,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "c31cce36a06c57376d098ecb8797d28c3d01f95099f523526770d8fc912b3e91",
+      "sha256": "9ef69dfa79343b2a69fed90e108b7eb66b26a8148fd1e6a74292dc0da09d60ed",
       "access_kinds": [
         "files"
       ]
@@ -548,13 +548,13 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/media/ButtonSettingsDraft.java": {
-      "sha256": "580a373e3991f7f730c3f6cec23d57649c3b5cbba9861cf0bd3a5b7ed1a12c26",
+      "sha256": "394198130dc8eba58c4b08572df4c57ddffbe488a3ec2dddb4ab23cf4c7691c7",
       "access_kinds": [
         "preferences"
       ]
     },
     "app/src/main/java/dezz/status/widget/media/MediaButtonController.java": {
-      "sha256": "4641f61a6881a196ffaf0896ea238c33dd4c8535f47cb0c538bbc754b0dd2f9a",
+      "sha256": "8d89d34418801b785161989117fc667ca597abb7a260bd681b4dfdf8903f7a1e",
       "access_kinds": [
         "preferences"
       ]
@@ -566,7 +566,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/media/VehicleButtonController.java": {
-      "sha256": "2b048e8e4eb4d4644af0616df454e617fa3eed8b7bff94ae2995941704420acc",
+      "sha256": "dd0aca880de90d7188e8fc1d7b8d177fe5a64806ef84c2f95c38daa4ec54c778",
       "access_kinds": [
         "preferences"
       ]

@@ -1,5 +1,24 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review24.10.2026 — MEDIA gestures / 3.3.6
+
+Рассмотрены ButtonSettingsDraft, VehicleButtonController, MediaButtonController:
+новые binding.mediaPrevious/mediaPlayPause/mediaNext.{1,2,3,long} используют
+прежний DE vehicle_buttons и те же типизированные поля action/app/command/
+package/shortcut. Полный prefs adapter включает их автоматически. Новые
+namespace/files/секреты отсутствуют. Single отсутствует→109 ordinary; явный0
+остаётсяNONE, остальные отсутствуют→0. Старые prefs не переписываются; при всех
+исходных defaults новая обработка выключена. Черновик/Apply/Cancel общий,
+таймеры/физические edges/native-qualification толькоRAM, restore их не возобновляет.
+Прежний media_buttons/disable_default и installation-bound restore review gate
+не меняются. Автоматического применения системного патча из backup нет.
+BackupDefaultsMigration разрешает335…368→369 иsame369; explicit/unknown/effective
+сохраняются;334/370 отклоняются. Новые поля — target-only defaults, не изменение
+прежних эффективных значений. Fingerprints четырёх owners пересмотрены по diff;
+новые Android draft/migration tests добавлены, их полный CI ожидается.
+Static inventory не доказывает физическое восстановление KX11.
+
+
 ### Review3.3.5 — release defaults
 
 Defaults335…367→368 рассмотрены при неизменных keys/defaults/roots.

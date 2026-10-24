@@ -30,7 +30,8 @@ public enum ButtonAction {
     DRIVE_NEXT_1(105, "Режимы вождения: вперёд на 1"),
     DRIVE_NEXT_2(106, "Режимы вождения: вперёд на 2"),
     DRIVE_NEXT_3(107, "Режимы вождения: вперёд на 3"),
-    NATRO_PASSENGER_HOME(108, "Домой пассажир");
+    NATRO_PASSENGER_HOME(108, "Домой пассажир"),
+    MEDIA_DEFAULT(109, "Обычное действие медиакнопки");
     public enum Parameter { NONE, APP, BROADCAST, ACTIVITY, COMMAND, PHONE, SHORTCUT }
     public final int id;
     public final String title;

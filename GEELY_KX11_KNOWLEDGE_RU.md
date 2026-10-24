@@ -1,5 +1,16 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 24.10.2026 — MEDIA gestures, STATIC/SOURCE; FIELD OPEN
+
+В XSF c4e38040 подтверждены физические R коды200085/200087/200088 и
+InputImpl cookie0 pressed/released. Готовые media85/87/88 не измеряют hold;
+long next/prev даёт90/89, R play/pause —85. Общий распознаватель расширен,
+но действие допускается только после NEDIA того же press (call/DIM/gallery
+не равны media). 10 новых replay и7 прежних PASS; CI/APK/FIELD OPEN.
+Native LCFG может дать подтверждение позже1000мс, fallback1500мс.
+[Полный разбор и источники](docs/geely-kx11/MEDIA_GESTURES_2026_10_24_RU.md).
+
+
 ## 23.10.2026 — media delivery, SOURCE candidate / FIELD OPEN
 
 Лог21.10:26 stale-событий с age26.9–30.2s; до отказа вырос поток светофоров.

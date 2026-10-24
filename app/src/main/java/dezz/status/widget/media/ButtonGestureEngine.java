@@ -32,6 +32,10 @@ public final class ButtonGestureEngine {
         this.scheduler = scheduler; this.bindings = bindings; this.output = output;
     }
     public void input(int code, boolean pressed) {
+        input(code, pressed, 0);
+    }
+    /** For timestamped MEDIA edges: DOWN age or the completed physical hold duration. */
+    public void input(int code, boolean pressed, long elapsedMillis) {
         VehicleButton button = VehicleButton.fromCode(code);
         if (button == null) return;
         State state = states.get(code);
@@ -40,8 +44,12 @@ public final class ButtonGestureEngine {
             if (state.down) { output.diagnostic(code, "down", "duplicate_down"); return; } // Repeated DOWN must not restart long/10-second timers.
             final State held = state;
             held.down = true; held.longFired = false;
+            // A second press owns the series until its release/hold; the previous click
+            // must not fire halfway through that hold.
+            cancel(held.clickTimer); held.clickTimer = null;
             cancel(held.longTimer); cancel(held.starTimer);
-            if (button.longPress) held.longTimer = scheduler.after(LONG_PRESS_MS, () -> {
+            long delay = button == VehicleButton.MEDIA ? Math.max(0, LONG_PRESS_MS - elapsedMillis) : LONG_PRESS_MS;
+            if (button.longPress) held.longTimer = scheduler.after(delay, () -> {
                 if (!held.down || held.longFired) return;
                 held.longFired = true;
                 cancel(held.clickTimer); held.clickTimer = null; held.clicks = 0;
@@ -55,6 +63,11 @@ public final class ButtonGestureEngine {
         state.down = false;
         cancel(state.longTimer); cancel(state.starTimer);
         state.longTimer = state.starTimer = null;
+        if (button == VehicleButton.MEDIA && elapsedMillis >= LONG_PRESS_MS && !state.longFired) {
+            state.longFired = true; state.clicks = 0;
+            cancel(state.clickTimer); state.clickTimer = null;
+            dispatch(code, "long");
+        }
         if (state.longFired) { output.diagnostic(code, "up", "long_already_dispatched"); return; }
         if (button == VehicleButton.DM) {
             int direction = code == 300001 ? -1 : 1;
@@ -80,6 +93,14 @@ public final class ButtonGestureEngine {
                 if (clicks > 0) dispatch(code, String.valueOf(clicks));
             });
         }
+    }
+    /** Timestamped sources can expire a series before a later DOWN reaches the looper. */
+    public void flushClicks(int code) {
+        State state = states.get(code);
+        if (state == null || state.down || state.clicks == 0) return;
+        cancel(state.clickTimer); state.clickTimer = null;
+        int count = state.clicks; state.clicks = 0;
+        dispatch(code, String.valueOf(count));
     }
     private void dispatch(int code, String gesture) {
         VehicleButton button = VehicleButton.fromCode(code);

@@ -672,9 +672,15 @@
           "level": "FIELD_ARCHIVE_AND_SOURCE",
           "finding": "User IMG_8804/8805 shows overlapping HOME media frames. SOURCE defect: blank proxy FIT area consumed DOWN; whole-cell buttons/progress interception.3.2.9 admits visible content, preserves gesture owner and editor geometry. Not attributed to steering latency; FIELD repeat pending.",
           "source": "research-2026-10-17-white-bar/FIELD_1911_1915_RU.md"
+        },
+        {
+          "date": "2026-10-24",
+          "level": "STATIC_SOURCE_PORTABLE_TEST",
+          "finding": "MEDIA-GESTURES-336: raw R200085/87/88 cookie0 + mandatory NEDIA qualification; common1/2/3/long,600/1000ms, bounded reset. Native LCFG fallback1500ms can delay confirmation. 10 new and7 existing replay pass. Android/APK/FIELD open.",
+          "source": "MEDIA_GESTURES_2026_10_24_RU.md"
         }
       ],
-      "last_reviewed": "2026-10-23"
+      "last_reviewed": "2026-10-24"
     },
     {
       "id": "SHADE_OWNER",

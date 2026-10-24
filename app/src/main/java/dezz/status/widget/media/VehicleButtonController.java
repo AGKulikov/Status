@@ -39,6 +39,7 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
     private final ThreadPoolExecutor actions = new ThreadPoolExecutor(0, 1, 30,
             TimeUnit.SECONDS, new ArrayBlockingQueue<>(24), r -> new Thread(r, "natro-button-actions"));
     private final ButtonGestureEngine engine;
+    private final MediaGestureGate mediaGestures;
     private SharedPreferences storage;
     private volatile Map<String, ?> values = Collections.emptyMap();
     private volatile boolean ready, driveMenu;
@@ -69,26 +70,39 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
         main = new Handler(context.getMainLooper());
         HandlerThread thread = new HandlerThread("natro-button-input"); thread.start();
         input = new Handler(thread.getLooper());
-        engine = new ButtonGestureEngine(new ButtonGestureEngine.Scheduler() {
+        ButtonGestureEngine.Scheduler scheduler = new ButtonGestureEngine.Scheduler() {
             @Override public Object after(long ms, Runnable r) {
                 long epoch = inputEpoch.get();
                 String inputId = currentInput;
                 Runnable guarded = () -> {
                     String previous = currentInput; currentInput = inputId;
-                    try { if (epoch == inputEpoch.get()) r.run(); else { inputDrop("timer_epoch_changed", -1, inputId); engine.reset(); } }
+                    try { if (epoch == inputEpoch.get()) r.run(); else inputDrop("timer_epoch_changed", -1, inputId); }
                     finally { currentInput = previous; }
                 };
                 input.postDelayed(guarded, ms); return guarded;
             }
             @Override public void cancel(Object token) { input.removeCallbacks((Runnable) token); }
-        }, this, new ButtonGestureEngine.Output() {
+        };
+        mediaGestures = new MediaGestureGate(scheduler, new MediaGestureGate.Output() {
+            @Override public void confirmed(String group, String gesture) {
+                if (!mediaGesturesEnabled() || !mediaConfigured(group)) return;
+                dispatchBinding(group, gesture);
+            }
+            @Override public void diagnostic(String group, String outcome) {
+                if ("overflow_reset".equals(outcome)) resetInputState();
+                DiagnosticJournal.infoAsync("media-gestures", "group=" + group + ", outcome=" + outcome);
+            }
+        });
+        engine = new ButtonGestureEngine(scheduler, this, new ButtonGestureEngine.Output() {
             @Override public void diagnostic(int code, String gesture, String outcome) {
                 DiagnosticJournal.infoAsync("vehicle-buttons", "input=" + currentInput + ", code=" + code
                         + ", gesture=" + gesture + ", outcome=" + outcome + ", epoch=" + inputEpoch.get());
+                if (VehicleButton.fromCode(code) == VehicleButton.MEDIA
+                        && ("no_assignment".equals(outcome) || "disabled".equals(outcome))) mediaGestures.discard(code);
             }
             @Override public void action(String group, String gesture) {
-                ButtonBinding binding = binding(group, gesture);
-                submit(() -> actionExecutor().execute(binding), group + ":" + gesture + ":" + binding.action.id);
+                if (VehicleButton.mediaCode(group) != 0) mediaGestures.recognized(group, gesture);
+                else dispatchBinding(group, gesture);
             }
             @Override public void stockSrc() {
                 submit(() -> context.sendBroadcast(new Intent("ecarx.intent.action.ECARX_KEY_RSRC_EVENT")
@@ -148,6 +162,54 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
         if (executor == null) executor = new ButtonActionExecutor(context, this);
         return executor;
     }
+    private void dispatchBinding(String group, String gesture) {
+        ButtonBinding binding = binding(group, gesture);
+        if (binding.action == ButtonAction.MEDIA_DEFAULT) {
+            int code = VehicleButton.mediaCode(group);
+            long owner = generation, epoch = inputEpoch.get();
+            if (code != 0) MediaButtonController.get(context).dispatchGestureDefault(code,
+                    () -> owner == generation && epoch == inputEpoch.get() && mediaGesturesEnabled() && mediaConfigured(group));
+        } else submit(() -> {
+            if (VehicleButton.mediaCode(group) == 0 || (mediaGesturesEnabled() && mediaConfigured(group)))
+                actionExecutor().execute(binding);
+        }, group + ":" + gesture + ":" + binding.action.id);
+    }
+    private void resetInputState() { engine.reset(); mediaGestures.reset(); gestureInputs.clear(); }
+    private boolean mediaGesturesEnabled() {
+        MediaButtonController media = MediaButtonController.get(context);
+        return ready && media.isEnabled() && media.isDisableDefault();
+    }
+    public boolean mediaConfigured(String group) {
+        if (VehicleButton.mediaCode(group) == 0) return false;
+        for (String gesture : new String[]{"1", "2", "3", "long"})
+            if (actionId(group, gesture) != VehicleButton.defaultAction(group, gesture)) return true;
+        return false;
+    }
+    /** Settings/route changes invalidate physical edges, qualification and delayed gestures. */
+    void mediaRouteChanged() {
+        input.post(() -> { generation++; inputEpoch.incrementAndGet(); resetInputState(); reconcile(); });
+    }
+    /** Reserve only configured keys on the isolated NEDIA route. Unassigned keys pass through. */
+    boolean consumeMediaEvent(int code, int action, long eventUptime) {
+        int physicalCode = VehicleButton.mediaPhysicalCode(code);
+        String group = VehicleButton.bindingGroup(physicalCode);
+        if (!mediaGesturesEnabled() || !mediaConfigured(group)) return false;
+        long epoch = inputEpoch.get(), owner = generation;
+        if (action == 0) {
+            if (pendingInputs.incrementAndGet() > 64) {
+                pendingInputs.decrementAndGet(); invalidateInput(); return true;
+            }
+            boolean posted = input.post(() -> {
+                pendingInputs.decrementAndGet();
+                if (epoch != inputEpoch.get() || owner != generation || !mediaGesturesEnabled()) return;
+                long now = SystemClock.uptimeMillis();
+                if (!MediaKeyPolicy.freshAt(eventUptime, now)) { invalidateInput(); return; }
+                mediaGestures.nativeMedia(code, eventUptime, now);
+            });
+            if (!posted) { pendingInputs.decrementAndGet(); invalidateInput(); }
+        }
+        return true; // Original synthetic UP/repeat must not escape the gesture owner.
+    }
     void whenInputReady(Runnable callback) { input.post(callback); }
     public void whenReady(Runnable callback) { input.post(() -> main.post(callback)); }
     public boolean ready() { return ready; }
@@ -157,12 +219,14 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
         input.post(()->{
             Map<String,?> stored=storage.getAll();Map<String,Object> next=new HashMap<>(values);
             for(String key:requested){if(stored.containsKey(key))next.put(key,stored.get(key));else next.remove(key);}
-            values=Collections.unmodifiableMap(next);generation++;engine.reset();reconcile();
+            values=Collections.unmodifiableMap(next);generation++;inputEpoch.incrementAndGet();resetInputState();reconcile();
             if(executor!=null||needed()||bool("drive.restore"))submit(()->actionExecutor().settingsChanged(),null);
         });
     }
     public String status() { return status; }
-    @Override public boolean enabled(VehicleButton button) { return bool(button.key + ".enabled"); }
+    @Override public boolean enabled(VehicleButton button) {
+        return button == VehicleButton.MEDIA ? mediaGesturesEnabled() : bool(button.key + ".enabled");
+    }
     public boolean disabledDefault(VehicleButton button) { return Boolean.TRUE.equals(verifiedDefault.get(button)); }
     public String defaultStatus(VehicleButton button) {
         String detail = defaultDetails.get(button);
@@ -196,7 +260,7 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
     public String string(String key) { Object value = values.get(key); return value instanceof String ? (String) value : ""; }
     public ButtonBinding binding(String group, String gesture) {
         String key = "binding." + group + "." + gesture + ".";
-        return new ButtonBinding(integer(key + "action", 0), string(key + "app"),
+        return new ButtonBinding(integer(key + "action", VehicleButton.defaultAction(group, gesture)), string(key + "app"),
                 string(key + "command"), string(key + "package"), string(key + "shortcut"));
     }
     public void setEnabled(VehicleButton button, boolean enabled) { put(button.key + ".enabled", enabled); }
@@ -221,8 +285,9 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
     public java.util.List<ButtonBinding> driverMenuBindings() {
         java.util.List<ButtonBinding> result = new java.util.ArrayList<>();
         for (VehicleButton button : VehicleButton.values()) {
-            if (button == VehicleButton.MEDIA || !enabled(button)) continue;
-            String[] groups = button == VehicleButton.DM ? new String[]{"knobLeft", "knobRight"} : new String[]{button.key};
+            if (!enabled(button)) continue;
+            String[] groups = button == VehicleButton.MEDIA ? new String[]{"mediaPrevious", "mediaPlayPause", "mediaNext"}
+                    : button == VehicleButton.DM ? new String[]{"knobLeft", "knobRight"} : new String[]{button.key};
             for (String group : groups) for (String gesture : new String[]{"1", "2", "3", "long"}) {
                 if (gesture.equals("long") && !button.longPress) continue;
                 ButtonBinding binding = binding(group, gesture);
@@ -242,10 +307,12 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
         values = Collections.unmodifiableMap(next);
         RuntimePreferenceWriter.put(storage, changed);
         if (!settingsChanged) return;
-        generation++; engine.reset(); reconcile();
+        generation++; inputEpoch.incrementAndGet(); resetInputState(); reconcile();
         if (executor != null || needed() || bool("drive.restore")) submit(() -> actionExecutor().settingsChanged(), null);
     }
     private boolean needed() {
+        if (mediaGesturesEnabled() && (mediaConfigured("mediaPrevious") || mediaConfigured("mediaPlayPause")
+                || mediaConfigured("mediaNext"))) return true;
         for (VehicleButton button : VehicleButton.values())
             if (button != VehicleButton.MEDIA && enabled(button)) return true;
         return knobVolume();
@@ -253,7 +320,7 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
     /** Recreate input ownership without replaying buffered pre-update events. */
     void reconnectAfterUpdate(String reason) {
         input.post(() -> {
-            logGeneration++; listening = false; inputEpoch.incrementAndGet(); engine.reset();
+            logGeneration++; listening = false; inputEpoch.incrementAndGet(); resetInputState();
             permissionAttempts = 0;
             Process old = logProcess; logProcess = null;
             if (old != null) old.destroy();
@@ -265,7 +332,7 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
 
     private void reconcile() {
         if (!needed()) {
-            logGeneration++; listening = false; engine.reset();
+            logGeneration++; listening = false; resetInputState();
             Process process = logProcess; logProcess = null; if (process != null) process.destroy();
             status = "Обработка дополнительных кнопок выключена"; return;
         }
@@ -316,12 +383,18 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
                     if (!key.find()) continue;
                     int code = Integer.parseInt(key.group(1));
                     if (VehicleButton.fromCode(code) == null) continue;
+                    boolean mediaEdge = VehicleButton.fromCode(code) == VehicleButton.MEDIA;
+                    // XSF owns cookie0. HMI's cookie1 copy must not become another click.
+                    if (mediaEdge && (!body.matches(".*\\bcookie=0\\s.*")
+                            || !mediaGesturesEnabled() || !mediaConfigured(VehicleButton.bindingGroup(code)))) continue;
                     String eventId = CausalDiagnostics.session() + "/input-" + inputSequence.incrementAndGet();
                     long eventAge = (long) (System.currentTimeMillis() - eventSeconds * 1000);
+                    if (mediaEdge && eventAge < -5) { invalidateInput(); inputDrop("source_clock_changed", code, eventId); continue; }
                     DiagnosticJournal.infoAsync("vehicle-buttons", "input=" + eventId + ", phase=received, code=" + code
                             + ", down=" + down + ", source_age_ms=" + eventAge + ", log_owner=" + owner);
                     if (eventAge > 750) { inputDrop("source_stale", code, eventId); invalidateInput(); continue; }
                     long received = SystemClock.uptimeMillis();
+                    final long sourceUptime = received - Math.max(0, eventAge);
                     long epoch = inputEpoch.get();
                     if (pendingInputs.incrementAndGet() > 64) {
                         pendingInputs.decrementAndGet();
@@ -339,7 +412,19 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
                         String group = VehicleButton.bindingGroup(code);
                         if (down) gestureInputs.put(group, eventId);
                         currentInput = gestureInputs.getOrDefault(group, eventId);
-                        try { engine.input(code, down); }
+                        try {
+                            if (mediaEdge) {
+                                if (!mediaGesturesEnabled() || !mediaConfigured(group)) return;
+                                long now = SystemClock.uptimeMillis();
+                                if (!MediaKeyPolicy.freshAt(sourceUptime, now)) { invalidateInput(); return; }
+                                long pressedAt = mediaGestures.downAt(code);
+                                long lastRelease = mediaGestures.lastRelease(code);
+                                if (down && lastRelease > 0 && sourceUptime - lastRelease > ButtonGestureEngine.MULTI_CLICK_MS)
+                                    engine.flushClicks(code);
+                                if (mediaGestures.physical(code, down, sourceUptime, now))
+                                    engine.input(code, down, down ? now - sourceUptime : Math.max(0, sourceUptime - pressedAt));
+                            } else engine.input(code, down);
+                        }
                         finally { currentInput = "none"; }
                         DiagnosticJournal.infoAsync("vehicle-buttons", "input=" + eventId + ", phase=processed, code=" + code
                                 + ", down=" + down + ", queue_ms=" + (SystemClock.uptimeMillis() - received));
@@ -361,7 +446,7 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
             input.post(() -> {
                 if (owner != logGeneration) return;
                 DiagnosticJournal.warn("vehicle-buttons", "input_reader_closed owner=" + owner + ", reconnect_ms=5000");
-                logProcess = null; listening = false; engine.reset();
+                logProcess = null; listening = false; inputEpoch.incrementAndGet(); resetInputState();
                 status = "Ожидание подключения кнопок";
                 input.postDelayed(() -> { if (owner == logGeneration) reconcile(); }, 5000);
             });
@@ -370,7 +455,7 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
     private void invalidateInput() {
         inputEpoch.incrementAndGet();
         if (inputResetPending.compareAndSet(false, true)) input.postAtFrontOfQueue(() -> {
-            engine.reset(); inputResetPending.set(false);
+            resetInputState(); inputResetPending.set(false);
         });
     }
     private void inputDrop(String reason, int code, String eventId) {
