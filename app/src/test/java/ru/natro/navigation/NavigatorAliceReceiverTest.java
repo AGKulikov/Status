@@ -18,6 +18,21 @@ public class NavigatorAliceReceiverTest {
  private Intent request(boolean probe){return new Intent("dd.call_alice")
   .putExtra("natro_alice_id","test-request").putExtra("natro_alice_deadline",10000L)
   .putExtra("natro_alice_probe",probe).putExtra("natro_alice_callback",new ResultReceiver(null));}
+ @Test public void malformedLazyExtrasCannotCrashReceiverOrStartAlice(){
+  Target target=new Target();NavigatorAliceReceiver receiver=new NavigatorAliceReceiver(target);
+  Intent malformed=new Intent("dd.call_alice") {
+   @Override public long getLongExtra(String name,long fallback) {
+    throw new android.os.BadParcelableException("ClassNotFoundException when unmarshalling callback");
+   }
+  };
+  assertEquals(33803,receiver.receive(malformed,1000));assertEquals(0,target.calls);
+  assertEquals(33802,receiver.receive(request(false),1000));assertEquals(1,target.calls);
+ }
+ @Test public void wrongParcelableTypeIsRejectedWithoutLaunching(){
+  Target target=new Target();NavigatorAliceReceiver receiver=new NavigatorAliceReceiver(target);
+  Intent wrong=request(false).putExtra("natro_alice_callback",new android.os.Bundle());
+  assertEquals(33803,receiver.receive(wrong,1000));assertEquals(0,target.calls);
+ }
  @Test public void receivesOneAddressedCommandWithoutStartingAnActivity(){
   Target target=new Target();NavigatorAliceReceiver receiver=new NavigatorAliceReceiver(target);
   assertEquals(33801,receiver.receive(request(true),1000));assertEquals(0,target.calls);

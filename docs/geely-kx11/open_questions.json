@@ -2065,26 +2065,27 @@
       "priority": "P1",
       "function": "Алиса в фоне/окне и возврат игравшей музыки через2s",
       "status": "OPEN",
-      "known": "STATIC: dd.call_alice у mNavi, отсутствие receiver в нашем Navigator3.1.4. Проверен native BUTTON entry и отдельный Alice router30.3.0. SOURCE парный receiver/ACK/finish и exact-session music continuation. CI40096694911:2223Android/279tool PASS; подписанная пара3.3.8 с прежним signer/API28 проверена.",
+      "known": "STATIC: dd.call_alice у mNavi, отсутствие receiver в нашем Navigator3.1.4. Проверен native BUTTON entry и отдельный Alice router30.3.0. SOURCE парный receiver/ACK/finish и exact-session music continuation. CI40096694911:2223Android/279tool PASS; подписанная пара3.3.8 с прежним signer/API28 проверена. FIELD3.3.8 FAILED: три process_died после команды, видео без ACK. SOURCE3.3.9: framework ResultReceiver proxy и guarded decode.",
       "missing_evidence": "FIELD голоса/сохранения фона и окна, точного момента окончания и возврата реального плеера.",
-      "next_step": "FIELD матрица подписанной пары3.3.8: cold boot, голос/фон/окно и finish+2s; при повторном ANR нужен его конкретный стек.",
+      "next_step": "Полный CI3.3.9, подпись пары и FIELD фон/окно/голос/finish+2s; точный exception ещё отсутствует.",
       "sources": [
-        "ALICE_2026_10_24_RU.md"
+        "ALICE_2026_10_24_RU.md",
+        "ALICE_2026_10_25_RU.md"
       ],
-      "last_reviewed": "2026-10-24"
+      "last_reviewed": "2026-10-25"
     },
     {
       "id": "BOOT_MUSIC_NAVIGATOR_338",
       "priority": "P1",
       "function": "Автозапуск после cold boot3.3.7",
       "status": "OPEN",
-      "known": "Receiver music отправлен14s, browser unavailable,24waits. Navigator handoff12s, ANR/killed31s, позднее окно138s. CI40096694911:2223Android/279tool PASS; подписанная пара3.3.8 с прежним signer/API28 проверена.",
+      "known": "Receiver music отправлен14s, browser unavailable,24waits. Navigator handoff12s, ANR/killed31s, позднее окно138s. CI40096694911:2223Android/279tool PASS; подписанная пара3.3.8 с прежним signer/API28 проверена. ZIP25.10: music waits до apk_verified3.3.8 в той же загрузке; не новый cold boot3.3.8.",
       "missing_evidence": "ANR stack Navigator; exported MediaBrowser endpoint установленной Music; повторный FIELD нового recovery.",
       "next_step": "FIELD матрица подписанной пары3.3.8: cold boot, голос/фон/окно и finish+2s; при повторном ANR нужен его конкретный стек.",
       "sources": [
         "BOOT_2026_10_24_RU.md"
       ],
-      "last_reviewed": "2026-10-24"
+      "last_reviewed": "2026-10-25"
     }
   ],
   "revision_history": [

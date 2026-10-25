@@ -50,6 +50,17 @@ public final class NavigatorAliceReceiver extends BroadcastReceiver {
         if (isOrderedBroadcast()) setResultCode(result);
     }
     int receive(Intent intent, long now) {
+        try {
+            return receiveChecked(intent, now);
+        } catch (RuntimeException failure) {
+            // Bundle extras are lazy: even reading the deadline can decode a bad callback.
+            // An incompatible sender must not terminate the Navigator process.
+            android.util.Log.w("NatroNavigatorAlice", "Rejected command: "
+                    + failure.getClass().getSimpleName());
+            return NOT_READY;
+        }
+    }
+    private int receiveChecked(Intent intent, long now) {
         if (intent == null || !ACTION.equals(intent.getAction())) return NOT_READY;
         long until = intent.getLongExtra("natro_alice_deadline", 0);
         String id = intent.getStringExtra("natro_alice_id");

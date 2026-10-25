@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.Parcel;
 import android.os.ResultReceiver;
 import android.os.Handler;
 import android.os.Looper;
@@ -60,7 +61,7 @@ public final class NavigatorAliceAction {
                                         "Алиса не подтвердила завершение диалога", Toast.LENGTH_LONG).show();
                             }
                         };
-                        broadcast(command(id, deadline, false).putExtra("natro_alice_callback", callback), reply);
+                        broadcast(command(id, deadline, callback), reply);
                     }
                 }
                 private void broadcast(Intent intent, IntConsumer reply) {
@@ -123,6 +124,19 @@ public final class NavigatorAliceAction {
     static BooleanSupplier musicResumePermit() {
         long generation = MANUAL_GENERATION.get();
         return () -> generation == MANUAL_GENERATION.get();
+    }
+
+    /** Send only a framework Parcelable; the local subclass does not exist in Navigator. */
+    static Intent command(String id, long deadline, ResultReceiver callback) {
+        Parcel parcel = Parcel.obtain();
+        try {
+            callback.writeToParcel(parcel, 0);
+            parcel.setDataPosition(0);
+            ResultReceiver remote = ResultReceiver.CREATOR.createFromParcel(parcel);
+            return command(id, deadline, false).putExtra("natro_alice_callback", remote);
+        } finally {
+            parcel.recycle();
+        }
     }
 
     static Intent command(String id, long deadline, boolean probe) {

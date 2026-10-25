@@ -5682,3 +5682,17 @@ SUCCESS: источник52069153bee7afd9447a88ef6a5ab803bf7fcfe8, точный 
 Navigator приватно, прежний Helper. [Протокол](docs/releases/3.3.8/publication-verification.json).
 SOURCE/TEST/APK/PUBLISH PASS в матрице3.3.8; FIELD голоса/фона/окна/finish+2s,
 cold boot/install-over остаётся OPEN. Причина native ANR не установлена.
+
+
+## 25.10.2026 — ALICE-339: FIELD3.3.8 FAILED, исправить IPC
+
+USER: «Ну так исправляй». Видео/ZIP подтверждают три process_died через
+656/1647/1072ms после вызова; карта исчезает, нет ACK. Точного exception нет.
+SOURCE: anonymous ResultReceiver заменён framework proxy через Parcel/CREATOR;
+весь receiver decode защищён от malformed extras. Вызов native BUTTON/фон/окно
+и launch-only-if-absent сохранены; playing-before и FINISHED+2000ms прежние.
+Новые API28 foreign-loader/обратный callback/malformed regressions и migration
+335…371→372. Готовится3.3.9/code208021372; stable подпись/install-over обязательны.
+TEST/APK/PUBLISH OPEN; FIELD3.3.8 FAILED, новая FIELD OPEN. BOOT-338 не закрыт:
+новые boot music waits сняты до обновления до3.3.8. Исторические gates сохранены.
+[Источники/разбор/пределы](docs/geely-kx11/ALICE_2026_10_25_RU.md).

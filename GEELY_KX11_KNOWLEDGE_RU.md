@@ -3099,3 +3099,14 @@ Navigator dispatch12s→ANR/killed31s; music exact receiver14s→browser unavail
 Причина ANR неизвестна, старый crash3.1.3 не текущий. Recovery SOURCE, FIELD OPEN.
 
 24.10.2026: [пара3.3.8](docs/releases/3.3.8/README_RU.md) SOURCE/TEST/APK PASS: CI40096694911,2223Android/279tool. New receiver dd.call_alice и native router completion включены в подписанный Navigator; только classes19.dex изменён. FIELD голоса/фона/окна/музыки/boot OPEN; ANR stack по-прежнему отсутствует.
+
+
+## 25.10.2026 — Алиса3.3.8: FIELD отказ и Parcel
+
+[Разбор с SHA](docs/geely-kx11/ALICE_2026_10_25_RU.md): три вызова →
+process_died через656/1647/1072ms; видео показывает потерю карты и нет ACK.
+SOURCE дефект: в Intent передавался подкласс ResultReceiver, отсутствующий
+в Navigator; AOSP Parcel требует его загрузки. Заменён framework proxy,
+защищён полный lazy decode. Точный FIELD exception отсутствует; исправление
+не доказывает устранение всех native сбоев/ANR. TEST/APK/FIELD3.3.9 OPEN.
+Music boot waits в новом ZIP относятся к периоду до установки3.3.8.

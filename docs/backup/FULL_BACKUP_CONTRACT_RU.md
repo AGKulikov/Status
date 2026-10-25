@@ -1003,3 +1003,12 @@ Review3.3.8 CI40094274695: migration regression выявила отсутств�
 в явном allowlist (target371 уже был). Добавлен только335…370→371, формат/keys
 не меняются, будущие схемы по-прежнему запрещены. Fingerprint пересмотрен
 после проверки условия; прежние migration tests остаются обязательными.
+
+
+## Review3.3.9 — callback Алисы и defaults
+
+Callback proxy/Parcel и защита receiver существуют только RAM, новых owners,
+keys/defaults/roots нет. Рассмотрена явная совместимость335…371→372; same372,
+explicit/unknown/effective сохраняются,334/373 отвергаются новой регрессией.
+Прежние migration tests сохранены. Пересмотрен только fingerprint
+BackupDefaultsMigration после diff review; FIELD backup/restore OPEN.
