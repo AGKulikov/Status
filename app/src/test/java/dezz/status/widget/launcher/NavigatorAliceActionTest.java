@@ -10,7 +10,7 @@ import static org.junit.Assert.*;
 public class NavigatorAliceActionTest {
  // Robolectric's default ShadowResultReceiver.send calls onReceiveResult directly on
  // the proxy and bypasses its Binder. Exercise the real Android implementation.
- @org.robolectric.annotation.Implements(value=android.os.ResultReceiver.class,callThroughByDefault=true)
+ @org.robolectric.annotation.Implements(value=android.os.ResultReceiver.class)
  public static class RealResultReceiver {}
 
  // A Navigator process can load Android classes, but cannot load Natro classes.
