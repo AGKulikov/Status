@@ -1,6 +1,6 @@
 # Natro
 
-**Natro3.3.9 и парный Navigator подписаны и проверены.** Ветки `fix/alice-parcel-20261025` / `release/natro-3.3.9`. Source `7a10536ae572f425d82d29bca37d9e3478998ffa`, CI40171265473 SUCCESS2228Android/279tool. Исправлен callback Алисы между приложениями. [Матрица и установка](docs/releases/3.3.9/README_RU.md). Публикация stable/latest выполняется; FIELD новой пары OPEN, прежний3.3.8 FAILED.
+**Natro3.3.9 и парный Navigator подписаны и проверены.** Ветки `fix/alice-parcel-20261025` / `release/natro-3.3.9`. Source `7a10536ae572f425d82d29bca37d9e3478998ffa`, CI40171265473 SUCCESS2228Android/279tool. Исправлен callback Алисы между приложениями. [Матрица и установка](docs/releases/3.3.9/README_RU.md). [Опубликована stable/latest](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.9), publisher40171787487 SUCCESS,7assets readback PASS; FIELD новой пары OPEN, прежний3.3.8 FAILED.
 
 Natro3.3.8 и парный Navigator подписаны и проверены: [протокол выпуска](docs/releases/3.3.8/README_RU.md). Ветки `release/natro-3.3.8` / `fix/navigator-alice-20261024`; source `52069153bee7afd9447a88ef6a5ab803bf7fcfe8`. CI40096694911 PASS2223Android/279tool. Алиса, finish+2s и recovery music/Navigator при boot. Для Алисы нужен новый Navigator. [Опубликована stable/latest](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.8), publisher40097813509 PASS: все7assets сверены. FIELD OPEN, причина ANR не установлена.
 

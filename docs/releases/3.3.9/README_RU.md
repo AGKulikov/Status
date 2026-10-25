@@ -30,3 +30,13 @@ PUBLISH OPEN до draft/readback7assets/stable/latest. Исторический 
 FAILED; точный exception в исходном ZIP отсутствует. Не объявлять исправленным
 любой native ANR только на основании теста IPC.
 [Разбор и пределы](../../geely-kx11/ALICE_2026_10_25_RU.md).
+
+
+## 25.10.2026 10:11 МСК — 3.3.9 PUBLISH PASS
+
+Stable/latest natro-v3.3.9, release423206375. Publisher40171787487/
+job121103962418 SUCCESS; все7assets скачаны и побайтно сверены до публикации.
+Tag/source7a10536ae572f425d82d29bca37d9e3478998ffa; CI40171265473 PASS.
+Оба подписанных APK сохранены для передачи, Navigator приватно; Helper прежний.
+SOURCE/TEST/APK/PUBLISH PASS в указанном объёме. FIELD новой пары OPEN;
+прежний отказ3.3.8 сохранён. Временные приватные копии ключей удалены.
