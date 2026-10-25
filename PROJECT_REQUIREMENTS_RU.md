@@ -5700,3 +5700,19 @@ TEST/APK/PUBLISH OPEN; FIELD3.3.8 FAILED, новая FIELD OPEN. BOOT-338 не �
 ALICE-339 TEST: CI40169664446:2228/1failed. Обнаружен обход Binder в стандартном
 Robolectric ShadowResultReceiver; test использует реальную Android реализацию,
 не снимает assertions. Повторный CI/APK/FIELD OPEN.
+
+
+## 25.10.2026 — ALICE-339: SOURCE/TEST/APK PASS
+
+Source 7a10536ae572f425d82d29bca37d9e3478998ffa, tree 4f9f053ca280c42492fab771c8708509a6b593b9; CI40171265473 SUCCESS:
+2228Android/279tool/108Java,0failures/errors/skips,settings48/253/3017,backup92.
+Воспроизведён отказ прежнего subclass и проверен новый framework proxy/реальный
+Binder callback. Две промежуточные ошибки тестовой среды разобраны в отчёте.
+Natro3.3.9/code208021372 SHA dcddcaedec1b3e9bd9be8c2f0e8f0d3b4a528f9c84026d8f7b3f66a8a29ac1cd;
+Navigator pair3.3.9 SHA 52736b41714bba696cd54442804816741e2834b57a0d880702560667106a89dc, толькоclasses19.dex,
+17226прочих payload entries unchanged. Stable signer/v2/v3/exactAPI28/zipalign,
++1 и1517CI payload entries PASS. Helper прежний, временные ключи удалены.
+ALICE-339/ALICE-338-R2/MUSIC-ALICE-338 SOURCE/TEST/APK PASS в объёме матрицы;
+PUBLISH OPEN до readback; FIELD новой пары OPEN, прежний3.3.8 FAILED.
+BOOT-338 FIELD OPEN: music waits до apk_verified3.3.8, не новая cold boot проверка.
+[Матрица выпуска](docs/releases/3.3.9/README_RU.md).

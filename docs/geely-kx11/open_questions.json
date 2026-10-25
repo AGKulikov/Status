@@ -2065,9 +2065,9 @@
       "priority": "P1",
       "function": "Алиса в фоне/окне и возврат игравшей музыки через2s",
       "status": "OPEN",
-      "known": "STATIC: dd.call_alice у mNavi, отсутствие receiver в нашем Navigator3.1.4. Проверен native BUTTON entry и отдельный Alice router30.3.0. SOURCE парный receiver/ACK/finish и exact-session music continuation. CI40096694911:2223Android/279tool PASS; подписанная пара3.3.8 с прежним signer/API28 проверена. FIELD3.3.8 FAILED: три process_died после команды, видео без ACK. SOURCE3.3.9: framework ResultReceiver proxy и guarded decode.",
+      "known": "STATIC: dd.call_alice у mNavi, отсутствие receiver в нашем Navigator3.1.4. Проверен native BUTTON entry и отдельный Alice router30.3.0. SOURCE парный receiver/ACK/finish и exact-session music continuation. CI40096694911:2223Android/279tool PASS; подписанная пара3.3.8 с прежним signer/API28 проверена. FIELD3.3.8 FAILED: три process_died после команды, видео без ACK. SOURCE3.3.9: framework ResultReceiver proxy и guarded decode. CI40171265473:2228Android/279tool/108Java PASS, новая пара3.3.9 подписана/exactAPI28/payload проверены.",
       "missing_evidence": "FIELD голоса/сохранения фона и окна, точного момента окончания и возврата реального плеера.",
-      "next_step": "Полный CI3.3.9, подпись пары и FIELD фон/окно/голос/finish+2s; точный exception ещё отсутствует.",
+      "next_step": "FIELD3.3.9: голос, фон/окно, FINISHED+2s, initial paused/manual cancel; при сбое точный exception.",
       "sources": [
         "ALICE_2026_10_24_RU.md",
         "ALICE_2026_10_25_RU.md"

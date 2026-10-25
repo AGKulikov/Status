@@ -3110,3 +3110,8 @@ SOURCE дефект: в Intent передавался подкласс ResultRec
 защищён полный lazy decode. Точный FIELD exception отсутствует; исправление
 не доказывает устранение всех native сбоев/ANR. TEST/APK/FIELD3.3.9 OPEN.
 Music boot waits в новом ZIP относятся к периоду до установки3.3.8.
+
+25.10.2026: [ALICE-339](docs/releases/3.3.9/README_RU.md) SOURCE/TEST/APK PASS:
+CI40171265473:2228Android/279tool/108Java; подписанная пара, точный API28.
+Foreign-loader negative/real Binder round-trip подтверждены; FIELD голоса/окна
+и finish+2s OPEN. Предыдущий FIELD3.3.8 остаётся FAILED.
