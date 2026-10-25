@@ -5696,3 +5696,7 @@ SOURCE: anonymous ResultReceiver заменён framework proxy через Parce
 TEST/APK/PUBLISH OPEN; FIELD3.3.8 FAILED, новая FIELD OPEN. BOOT-338 не закрыт:
 новые boot music waits сняты до обновления до3.3.8. Исторические gates сохранены.
 [Источники/разбор/пределы](docs/geely-kx11/ALICE_2026_10_25_RU.md).
+
+ALICE-339 TEST: CI40169664446:2228/1failed. Обнаружен обход Binder в стандартном
+Robolectric ShadowResultReceiver; test использует реальную Android реализацию,
+не снимает assertions. Повторный CI/APK/FIELD OPEN.

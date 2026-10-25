@@ -6,8 +6,13 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.annotation.Config;
 import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class)
-@Config(sdk=28,application=Application.class)
+@Config(sdk=28,application=Application.class,shadows=NavigatorAliceActionTest.RealResultReceiver.class)
 public class NavigatorAliceActionTest {
+ // Robolectric's default ShadowResultReceiver.send calls onReceiveResult directly on
+ // the proxy and bypasses its Binder. Exercise the real Android implementation.
+ @org.robolectric.annotation.Implements(value=android.os.ResultReceiver.class,callThroughByDefault=true)
+ public static class RealResultReceiver {}
+
  // A Navigator process can load Android classes, but cannot load Natro classes.
  private ClassLoader foreignLoader() {
   return new ClassLoader(getClass().getClassLoader()) {
