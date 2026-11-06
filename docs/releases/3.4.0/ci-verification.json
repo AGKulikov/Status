@@ -1,0 +1,39 @@
+{
+  "sourceCommit": "f974c09df69350a48fa7ada2889bb7d727146d5c",
+  "sourceTree": "7619314ef00579b9a53fd615ec88502c49d9a365",
+  "runId": 42271336453,
+  "jobId": 128076371826,
+  "status": "completed",
+  "conclusion": "success",
+  "androidTests": {
+    "tests": 2258,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "toolTests": {
+    "tests": 280,
+    "failures": 0,
+    "errors": 0
+  },
+  "backupStorageOwners": 98,
+  "settings": {
+    "editors": 48,
+    "formMethods": 253,
+    "fieldLabels": 3017
+  },
+  "unsignedSha256": "6bebbbd33a2b07729b1180618dcf6bc29f48e266a801203dd87f10f889e1daeb",
+  "artifactDigests": {
+    "offline-signing-2": "d28d431cb7060b6e58ef2b15e8097a7fb1737ea74e4b21288bdd11aa0527f3c3",
+    "signing-tools-2": "2110ddcb9e5a5f13b17d867f66d0f202492042bcd2d4c109a919fda9943db9fc"
+  },
+  "xmlRecountVerified": true,
+  "nativeUiRender": {
+    "width": 1760,
+    "height": 656,
+    "file": "file-manager-kx11.png",
+    "fixtureData": true,
+    "visuallyReviewed": true
+  },
+  "fieldStatus": "OPEN: real Yandex account, KX11 WebView/USB, transfer interruption and backup restore"
+}

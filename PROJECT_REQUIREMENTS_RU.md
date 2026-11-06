@@ -1,5 +1,21 @@
 # Единый реестр требований Natro
 
+## 06.11.2026 — FILES-001…003: SOURCE/TEST/APK подтверждены для3.4.0
+
+Source `f974c09df69350a48fa7ada2889bb7d727146d5c`, tree `7619314ef00579b9a53fd615ec88502c49d9a365` опубликованы.
+CI42271336453/job128076371826 SUCCESS:2258Android/280tool,0errors/failures/skips.
+98storage owners/48editors/253forms/3017labels PASS. Native UI1760×656 просмотрен;
+все29новых file manager тестов и defaults migration проходят в общем прогоне.
+Natro3.4.0/code208021373, 29952608bytes,
+SHA256 `b11462f99824478df39b486b46f4932dd300492cbb04f112b0bd05dcd8a6afce`. Прежний signer, v2/v3/exactAPI28,
+zipalign16KiB, identity/+1 против3.3.9 и1517неизменных CI payload entries PASS.
+Источник, отчёты и README опубликованы; APK передаётся отдельно. Stable/latest
+не меняется этой задачей. Private key не публикуется. Navigator patch exact3.3.9,
+Helper прежний. FILES FIELD остаётся OPEN: реальный вход/двунаправленная передача,
+KX11 WebView/USB/обрыв/low-space/restore. Прежние автомобильные gates не закрыты.
+[Итоговый протокол](docs/releases/3.4.0/README_RU.md). История первого CI ниже сохранена.
+
+
 ### 06.11.2026 — FILES: полный CI выявил интеграционные контракты
 
 CI42270390165/00d3b7ce:2255tests,3failed. Старые проверки сохранены:

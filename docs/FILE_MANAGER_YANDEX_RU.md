@@ -1,5 +1,9 @@
 # Файловый менеджер Natro и Яндекс Диск
 
+Итог: SOURCE/TEST/APK PASS для3.4.0, CI42271336453 —2258Android/280tool,
+в том числе29проверок нового менеджера. [Подпись, SHA и установка](releases/3.4.0/README_RU.md).
+Реальный аккаунт Яндекса, USB и KX11 FIELD OPEN. Ниже сохранены этапы исследования.
+
 Дата:06.11.2026. База: release/natro-3.3.9, commit55dfd27f.
 Референс: переданный пользователем YD Browser0.5, package zblackat.ydbrowser,
 SHA256 `853e33a76c52e82d56e2288913ee2ebc123520cdac3f5437a14c8c55f51bc0e8`.
