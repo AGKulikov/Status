@@ -23,7 +23,6 @@ public final class NavigatorAliceAction {
     static final String PACKAGE = "ru.yandex.yandexnavi";
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static volatile NavigatorAliceRequest current;
-    private static volatile AliceMusicResume music;
     private static final AtomicLong MANUAL_GENERATION = new AtomicLong();
     private NavigatorAliceAction() {}
 
@@ -31,8 +30,7 @@ public final class NavigatorAliceAction {
         Context app = context.getApplicationContext();
         BooleanSupplier manualPermit = musicResumePermit();
         MAIN.post(() -> {
-            if ((current != null && current.active()) || (music != null && music.active())) return;
-            if (music != null) music.cancel();
+            if ((current != null && current.active()) || NativeAliceCoordinator.active()) return;
             long deadline = SystemClock.elapsedRealtime() + 10000;
             String id = UUID.randomUUID().toString();
             final NavigatorAliceRequest[] holder = new NavigatorAliceRequest[1];
@@ -44,23 +42,11 @@ public final class NavigatorAliceAction {
                     if (!holder[0].active()) return;
                     if (probe) { broadcast(command(id, deadline, true), reply); return; }
                     {
-                        android.media.session.MediaController playing = previous[0];
                         if (!holder[0].active()) return;
-                        final AliceMusicResume[] continuation = new AliceMusicResume[1];
-                        continuation[0] = new AliceMusicResume((delay, task) -> MAIN.postDelayed(task, delay),
-                                playing == null ? null : () -> AliceMediaPlayback.resume(app, playing,
-                                        () -> manualPermit.getAsBoolean() && music == continuation[0]
-                                                && continuation[0].mayResume()));
-                        music = continuation[0];
-                        MAIN.postDelayed(continuation[0]::cancel, 31 * 60 * 1000);
-                        ResultReceiver callback = new ResultReceiver(MAIN) {
-                            @Override protected void onReceiveResult(int result, Bundle data) {
-                                if (music != continuation[0] || !continuation[0].active()) return;
-                                continuation[0].event(result);
-                                if (result == 33806) Toast.makeText(app,
-                                        "Алиса не подтвердила завершение диалога", Toast.LENGTH_LONG).show();
-                            }
-                        };
+                        NativeAliceCoordinator.rememberLaunch(id, previous[0], manualPermit, deadline);
+                        // The native open hook owns music for every entry point, including the
+                        // Navigator button. Router callbacks acknowledge launch only.
+                        ResultReceiver callback = new ResultReceiver(MAIN);
                         broadcast(command(id, deadline, callback), reply);
                     }
                 }
@@ -89,10 +75,10 @@ public final class NavigatorAliceAction {
                     } catch (RuntimeException failure) { return false; }
                 }
                 public void failure(String reason) {
-                    if (music != null) music.cancel();
+                    NativeAliceCoordinator.forgetLaunch(id);
                     Log.w("NatroNavigatorAlice", "request=" + id + " result=" + reason);
                     String message = "receiver_unavailable".equals(reason)
-                            ? "Навигатор не готов к вызову Алисы. Нужен патч Natro 3.3.8"
+                            ? "Навигатор не готов к вызову Алисы. Нужен Навигатор с патчем Natro 3.4.1"
                             : "state_unknown".equals(reason)
                             ? "Не удалось проверить запуск Навигатора; его окно не изменено"
                             : "Не удалось вызвать Алису: Навигатор не подтвердил команду";
@@ -116,8 +102,7 @@ public final class NavigatorAliceAction {
     /** A manual transport command supersedes the pending automatic continuation. */
     public static void onManualTransportControl() {
         MANUAL_GENERATION.incrementAndGet();
-        AliceMusicResume pending = music;
-        if (pending != null) pending.cancel();
+        NativeAliceCoordinator.cancel();
     }
 
     /** Created before asynchronous capture/launch so a manual pause cannot be forgotten. */
@@ -142,7 +127,7 @@ public final class NavigatorAliceAction {
     static Intent command(String id, long deadline, boolean probe) {
         return new Intent("dd.call_alice").setPackage(PACKAGE)
                 .putExtra("natro_alice_id", id).putExtra("natro_alice_deadline", deadline)
-                .putExtra("natro_alice_probe", probe);
+                .putExtra("natro_alice_probe", probe).putExtra("natro_alice_engine_protocol", 1);
     }
 
     static int processState(String output) {

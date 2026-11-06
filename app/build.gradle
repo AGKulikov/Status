@@ -182,6 +182,7 @@ def navigatorAliceTestSources = layout.buildDirectory.dir("generated/navigator-a
 def prepareNavigatorAliceTests = tasks.register("prepareNavigatorAliceTests", Copy) {
     from(rootProject.file("navigator-mod/src/main/java")) {
         include "ru/natro/navigation/NavigatorAlice*.java"
+        include "ru/natro/navigation/NativeAliceBridge.java"
     }
     into(navigatorAliceTestSources)
 }

@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 import re
 import zipfile
+import os
+import tempfile
 
 try:
     from .sign_natro_candidate import CERT, payload_hashes, run, sha256, signature_entry
@@ -17,22 +19,31 @@ except ImportError:
 BASELINE_SHA256 = "b224bed5268469f620ab4bff3fec382aece868b9372450ff05f1f9176631280a"
 
 
-def replace_bridge(baseline, patch, output):
+def replace_bridge(baseline, patch, output, native=None):
     """Keep every payload entry and its ZIP metadata; discard only obsolete JAR signatures."""
+    native = native or {}
+    if native and set(native) != {"classes11.dex", "classes15.dex"}:
+        raise ValueError("Only the two reviewed native Alice lanes may change")
     before = payload_hashes(baseline)
     if "classes19.dex" not in before:
         raise ValueError("Pinned baseline has no bridge DEX")
     dex = patch.read_bytes()
     if dex[:4] != b"dex\n" or dex[7:8] != b"\0" or not dex[4:7].isdigit() or int(dex[4:7]) > 39:
         raise ValueError("Bridge must be a DEX compatible with API 28")
+    replacements = {"classes19.dex": dex}
+    for name, path in native.items():
+        raw = path.read_bytes()
+        if name not in before or raw[:4] != b"dex\n" or raw[4:7] not in (b"035", b"037", b"038", b"039"):
+            raise ValueError("Invalid native Alice DEX")
+        replacements[name] = raw
     with zipfile.ZipFile(baseline) as source, zipfile.ZipFile(output, "w") as target:
         target.comment = source.comment
         for entry in source.infolist():
             if signature_entry(entry.filename):
                 continue
-            target.writestr(copy.copy(entry), dex if entry.filename == "classes19.dex" else source.read(entry))
+            target.writestr(copy.copy(entry), replacements.get(entry.filename, source.read(entry)))
     expected = dict(before)
-    expected["classes19.dex"] = sha256(patch)
+    expected.update({name: __import__("hashlib").sha256(raw).hexdigest() for name, raw in replacements.items()})
     if payload_hashes(output) != expected:
         raise ValueError("Repacked Navigator payload differs outside the bridge")
     return before, expected
@@ -56,10 +67,13 @@ def main():
         if manifest.get(key) != value:
             raise ValueError("Candidate source identity mismatch: " + key)
     nav = manifest["navigator"]
-    if not nav.get("pairRequired") or nav.get("allowedPayloadChanges") != ["classes19.dex"]:
-        raise ValueError("This candidate does not authorize one bridge replacement")
-    if nav.get("baselineSha256") != BASELINE_SHA256 or sha256(args.baseline) != BASELINE_SHA256:
-        raise ValueError("Navigator baseline is not the reviewed 2.9.8 APK")
+    hooks = nav.get("nativeEngineHooks") is True
+    baseline_sha = "52736b41714bba696cd54442804816741e2834b57a0d880702560667106a89dc" if hooks else BASELINE_SHA256
+    allowed = ["classes11.dex", "classes15.dex", "classes19.dex"] if hooks else ["classes19.dex"]
+    if not nav.get("pairRequired") or nav.get("allowedPayloadChanges") != allowed:
+        raise ValueError("Candidate does not authorize the reviewed payload lanes")
+    if nav.get("baselineSha256") != baseline_sha or sha256(args.baseline) != baseline_sha:
+        raise ValueError("Navigator baseline hash mismatch")
     patch = candidate / "classes19.dex"
     if sha256(patch) != nav["patchSha256"]:
         raise ValueError("CI bridge checksum mismatch")
@@ -77,7 +91,26 @@ def main():
     aligned = args.output / "navigator-bridge-aligned.apk"
     if any(path.exists() for path in (signed, unsigned, aligned)):
         raise FileExistsError("Output already exists")
-    before, expected = replace_bridge(args.baseline, patch, unsigned)
+    native = {}
+    if hooks:
+        tool = candidate / "alice-focus-tool"
+        recorded = nav.get("nativeToolSha256", {})
+        if not recorded or set(recorded) != {p.name for p in tool.iterdir() if p.is_file()}:
+            raise ValueError("Native patch tool inventory mismatch")
+        for name, digest in recorded.items():
+            if Path(name).name != name or sha256(tool / name) != digest: raise ValueError("Native tool hash mismatch")
+        cp = os.pathsep.join([str(tool)] + [str(p) for p in sorted(tool.glob("*.jar"))])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with zipfile.ZipFile(args.baseline) as original:
+                for name, lane in (("classes11.dex", "alicekit"), ("classes15.dex", "quark")):
+                    base = root / name; base.write_bytes(original.read(name))
+                    target = root / ("patched-" + name)
+                    run("java", "-cp", cp, "PatchAliceFocus", base, target, lane)
+                    native[name] = target
+            before, expected = replace_bridge(args.baseline, patch, unsigned, native)
+    else:
+        before, expected = replace_bridge(args.baseline, patch, unsigned)
     run(align, "-f", "-P", "16", "4", unsigned, aligned)
     run(signer, "sign", "--ks", args.keystore, "--ks-key-alias", "status-widget-ha",
         "--ks-pass", "file:" + str(args.password_file), "--v1-signing-enabled", "true",
@@ -91,14 +124,16 @@ def main():
     if after != expected:
         raise ValueError("Signed Navigator differs from the reviewed payload")
     changed = sorted(name for name in before if before[name] != after[name])
-    if changed != ["classes19.dex"]:
-        raise ValueError("Exactly one bridge DEX must change")
+    if changed != allowed:
+        raise ValueError("Only the reviewed DEX lanes must change")
     report = {
         "sourceCommit": args.source_commit, "sourceTree": args.source_tree,
         "ciRunId": manifest["ciRunId"], "pairVersion": args.version,
         "apk": signed.name, "sha256": sha256(signed), "size": signed.stat().st_size,
         "package": "ru.yandex.yandexnavi", "versionName": "30.3.0", "versionCode": 739564630,
-        "baselineSha256": BASELINE_SHA256, "patchSha256": sha256(patch),
+        "baselineSha256": baseline_sha,
+        "nativeEngineHooks": hooks, "nativeToolSha256": nav.get("nativeToolSha256"),
+        "changedEntryHashes": {name: after[name] for name in changed}, "patchSha256": sha256(patch),
         "changedPayloadEntries": changed, "unchangedPayloadEntries": len(after) - len(changed),
         "manifestResourcesAndNativeLibrariesUnchanged": True,
         "certificateSha256": CERT, "signatureV2": True, "signatureV3": True,

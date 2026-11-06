@@ -32,11 +32,15 @@ public final class NavigationConfigurationProvider extends ContentProvider {
                                  @Nullable Bundle extras) {
         Context context = getContext();
         if (context == null
-                || !NavigationBridgeContract.CONFIGURATION_PROVIDER_METHOD.equals(method)
                 || !NavigationBridgeCallerVerifier.isTrustedNavigator(
                         context, Binder.getCallingUid())) {
             return new Bundle();
         }
+        if ("alice_prepare_v1".equals(method)) {
+            dezz.status.widget.launcher.NativeAliceCoordinator.prepare(context, argument, extras);
+            return new Bundle();
+        }
+        if (!NavigationBridgeContract.CONFIGURATION_PROVIDER_METHOD.equals(method)) return new Bundle();
         String raw = new Preferences(context).navigationIntegrationConfigJson.get();
         Bundle result = new Bundle();
         if (raw != null && raw.length() <= NavigationHudEndpointService.MAX_CONFIGURATION_CHARS

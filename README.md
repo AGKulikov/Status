@@ -1,3 +1,7 @@
+> В разработке3.4.1: единое окончание голосовой сессии Алисы, включая wake-word.
+> Ветка `feature/alice-engine-20261106`; [статус парного выпуска](docs/releases/3.4.1/README_RU.md).
+> Stable3.4.0 ниже — предыдущий выпущенный APK;3.4.1 пока не выдана.
+
 # Natro
 
 **06.11.2026: Natro3.4.0 опубликована в stable/latest.** Release436867441, publisher42274377501/job128086794811 SUCCESS; все7assets скачаны и побайтно сверены. Публичный APK и natro-update.json проверены отдельно:29952608bytes, SHA256 b11462f99824478df39b486b46f4932dd300492cbb04f112b0bd05dcd8a6afce. Source f974c09df69350a48fa7ada2889bb7d727146d5c; build CI42271336453 PASS2258Android/280tool. FIELD остаётся OPEN. Прежние записи об отсутствии публикации ниже — история.

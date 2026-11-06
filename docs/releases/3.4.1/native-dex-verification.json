@@ -1,0 +1,35 @@
+[
+  {
+    "lane": 11,
+    "classes": 13712,
+    "changedClasses": [
+      "com/google/android/material/button/c.smali",
+      "com/google/android/material/internal/h.smali",
+      "com/google/gson/Gson.smali",
+      "com/google/protobuf/f.smali",
+      "com/scottyab/rootbeer/RootBeerNative.smali",
+      "com/yandex/alice/audio/d.smali",
+      "com/yandex/alice/io/listening/d.smali",
+      "com/yandex/alice/oknyx/o.smali",
+      "com/yandex/alicekit/core/views/u.smali",
+      "com/yandex/attachments/imageviewer/s.smali",
+      "com/yandex/datasync/DatabaseManagerFactory.smali",
+      "com/yandex/div/internal/widget/j.smali",
+      "df/a.smali",
+      "gi/i.smali",
+      "lk/z0.smali",
+      "th/l.smali"
+    ],
+    "oldSha256": "453ed7d7e92c7d69b7eddeb08a1302ce63d9060a60757ef4db0b18785e710d23",
+    "newSha256": "333f940ad8156545644c7ddbbdcbc977d670a30ccb4c755fabd5f4eb000db445"
+  },
+  {
+    "lane": 15,
+    "classes": 13316,
+    "changedClasses": [
+      "com/yandex/quark/audio/internal/d.smali"
+    ],
+    "oldSha256": "eff5ff91eeb3d9d6c819487fe7b3962988147c9fc49fbb97f543f2bca7c16344",
+    "newSha256": "aac286e3fe694ad9fb4144b6736bb5ca9a22f26d138dcbb0f2385dd19fa81388"
+  }
+]

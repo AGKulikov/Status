@@ -11,7 +11,7 @@ public class NavigatorAliceRequestTest {
   static class Event { long at; Runnable run; Event(long a,Runnable r){at=a;run=r;} }
   public long now(){return time;}
   public void send(boolean probe,IntConsumer reply){
-   if(probe) reply.accept(++probes>readyAfter?33801:33803);
+   if(probe) reply.accept(++probes>readyAfter?34111:33803);
    else {commands++;reply.accept(commandReply);}
   }
   public void inspect(IntConsumer reply){inspections++;reply.accept(state);}

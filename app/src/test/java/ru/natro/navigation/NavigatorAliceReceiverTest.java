@@ -53,4 +53,9 @@ public class NavigatorAliceReceiverTest {
   Target target=new Target();NavigatorAliceReceiver receiver=new NavigatorAliceReceiver(target);
   Intent i=request(false);i.removeExtra("natro_alice_callback");assertEquals(33803,receiver.receive(i,1000));assertEquals(0,target.calls);
  }
+ @Test public void nativeEngineCapabilityIsExplicitWhileLegacyProbeStaysCompatible(){
+  Target t=new Target();NavigatorAliceReceiver r=new NavigatorAliceReceiver(t);
+  assertEquals(34111,r.receive(request(true).putExtra("natro_alice_engine_protocol",1),1000));
+  assertEquals(33801,r.receive(request(true),1000));assertEquals(0,t.calls);
+ }
 }

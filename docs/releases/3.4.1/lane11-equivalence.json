@@ -1,0 +1,27 @@
+{
+  "classes": 13712,
+  "expectedHookClasses": [
+    "com/yandex/alice/audio/d.smali",
+    "com/yandex/alice/io/listening/d.smali"
+  ],
+  "allOtherCodeAndDeclarationsEquivalent": true,
+  "canonicalizedDeclarationsOrAlignment": [
+    "com/google/android/material/button/c.smali",
+    "com/google/android/material/internal/h.smali",
+    "com/google/gson/Gson.smali",
+    "com/google/protobuf/f.smali",
+    "com/scottyab/rootbeer/RootBeerNative.smali",
+    "com/yandex/alice/audio/d.smali",
+    "com/yandex/alice/io/listening/d.smali",
+    "com/yandex/alice/oknyx/o.smali",
+    "com/yandex/alicekit/core/views/u.smali",
+    "com/yandex/attachments/imageviewer/s.smali",
+    "com/yandex/datasync/DatabaseManagerFactory.smali",
+    "com/yandex/div/internal/widget/j.smali",
+    "df/a.smali",
+    "gi/i.smali",
+    "lk/z0.smali",
+    "th/l.smali"
+  ],
+  "normalization": "Blank lines, NOP alignment, explicit default zero/null static values only"
+}

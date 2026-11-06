@@ -41,3 +41,20 @@ class NavigationPatchSigningTest(unittest.TestCase):
                 with self.assertRaisesRegex(ValueError, 'compatible with API 28'):
                     replace_bridge(base, dex, out)
                 self.assertFalse(out.exists())
+
+    def test_native_hook_lanes_preserve_every_other_payload(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp); base=root/'base.apk'; out=root/'out.apk'
+            paths={}
+            with zipfile.ZipFile(base,'w') as z:
+                for name in ('classes11.dex','classes15.dex','classes19.dex','classes4.dex','AndroidManifest.xml'):
+                    z.writestr(name,b'original '+name.encode())
+            for name in ('classes11.dex','classes15.dex','classes19.dex'):
+                paths[name]=root/name;paths[name].write_bytes(b'dex\n039\0'+name.encode())
+            before,after=replace_bridge(base,paths['classes19.dex'],out,
+                {name:paths[name] for name in ('classes11.dex','classes15.dex')})
+            self.assertEqual(['classes11.dex','classes15.dex','classes19.dex'],sorted(n for n in before if before[n]!=after[n]))
+            self.assertEqual(before['AndroidManifest.xml'],after['AndroidManifest.xml'])
+            self.assertEqual(before['classes4.dex'],after['classes4.dex'])
+            with self.assertRaisesRegex(ValueError,'reviewed native'):
+                replace_bridge(base,paths['classes19.dex'],root/'bad.apk',{'classes4.dex':paths['classes11.dex']})

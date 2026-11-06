@@ -5794,3 +5794,21 @@ STATIC: в Navigator3.3.9 IO listener отправляет native FINISHED пр�
 окончанию разговора. Quark/runtime backend остаётся OPEN.
 SOURCE нового адаптера/TEST/APK/FIELD OPEN, исправление не выпущено.
 [Доказательства, SHA и дальнейшие проверки](docs/geely-kx11/ALICE_2026_11_06_RU.md).
+
+## 06.11.2026 — ALICE-VOICE-END-341: единая сессия независимо от источника запуска
+
+USER: исправлять; возвращать музыку через2s и при штатной кнопке Навигатора,
+и при голосовом вызове. Отслеживать сам голосовой модуль, не перечисление триггеров.
+Заменяет ограничение MUSIC-ALICE-338 только нашими вызовами. Загрузка модуля
+не означает активный разговор: ожидание wake-word может быть постоянным.
+SOURCE candidate3.4.1/code208021374: native engine-idle stream для AliceKit/Quark,
+снимок PLAYING до нативного requestAudioFocus, отмена/перезапуск2s при активности,
+lease heartbeat против смерти Навигатора, прежние exact-session/manual guards.
+Для глобального pre-focus hook требуются точечные изменения classes11.dex и
+classes15.dex сверх classes19.dex на pinned Navigator3.3.9. Это замена прежнего
+ограничения bridge-only для данной пары, а не разрешение иных изменений: manifest,
+resources, native libs и все прочие payload entries должны остаться побайтно прежними.
+Правки делаются воспроизводимым собственным Dexlib2-патчером; proprietary baseline
+и декомпиляция не публикуются. SHA и отчёт структуры обязательны перед APK.
+Native pre-focus handoff ограничен300ms; при недоступном/опоздавшем снимке Алиса
+продолжает штатно без автоматического PLAY. TEST/APK/FIELD пока OPEN.

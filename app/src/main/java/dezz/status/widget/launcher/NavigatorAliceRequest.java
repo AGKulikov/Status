@@ -5,7 +5,7 @@ import java.util.function.IntConsumer;
 
 /** One bounded command: probe first, launch only on a complete absence proof, execute once. */
 final class NavigatorAliceRequest {
-    static final int READY = 33801, ACCEPTED = 33802;
+    static final int READY = 34111, ACCEPTED = 33802;
     interface Backend {
         long now();
         void send(boolean probe, IntConsumer reply);

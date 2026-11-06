@@ -95,6 +95,17 @@ def main():
         "helperChanged": os.environ.get("HELPER_CHANGED") == "true",
         "physicalKx11Verification": "pending", "browserVisualVerification": "pending",
     }
+    if os.environ.get("ALICE_ENGINE_HOOKS") == "true":
+        if compatible_pair is not None: raise ValueError("Native hooks require a new Navigator pair")
+        native = Path("build/alice-focus-tool")
+        if not (native / "PatchAliceFocus.class").is_file(): raise ValueError("Native hook tool not built")
+        shutil.copytree(native, out / "alice-focus-tool")
+        manifest["navigator"].update(
+            baselineVersion="30.3.0-Natro-3.3.9",
+            baselineSha256="52736b41714bba696cd54442804816741e2834b57a0d880702560667106a89dc",
+            allowedPayloadChanges=["classes11.dex", "classes15.dex", "classes19.dex"],
+            nativeEngineHooks=True,
+            nativeToolSha256={p.name: sha256(p) for p in native.iterdir() if p.is_file()})
     (out / "candidate.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(json.dumps({"candidate": str(out), "unitTests": counts}))
 

@@ -39,19 +39,33 @@ final class AliceMediaPlayback {
         }); } catch (RuntimeException busy) { reply.accept(null); }
     }
     static void resume(Context context, MediaController original, BooleanSupplier permitted) {
+        resume(context, original, permitted, ignored -> {});
+    }
+    static void resume(Context context, MediaController original, BooleanSupplier permitted,
+                       Consumer<Boolean> completion) {
         try { WORKER.execute(() -> {
-            if (!permitted.getAsBoolean()) return;
-            MediaController exact = null;
-            for (MediaController controller : sessions(context)) {
-                // A player already resumed, or the user started another player: do not interrupt it.
-                if (state(controller) == PlaybackState.STATE_PLAYING) return;
-                if (original.getSessionToken().equals(controller.getSessionToken())) exact = controller;
+            boolean played = false;
+            try { played = resumeOnWorker(context, original, permitted); }
+            finally {
+                boolean result = played;
+                MAIN.post(() -> completion.accept(result));
             }
-            // A destroyed/replaced session is never bootstrapped. No toggle: PLAY only.
-            if (exact == null || state(exact) != PlaybackState.STATE_PAUSED || !permitted.getAsBoolean()) return;
-            try { exact.getTransportControls().play(); }
-            catch (RuntimeException failure) { Log.w("NatroNavigatorAlice", "Music resume unavailable", failure); }
-        }); } catch (RuntimeException busy) { Log.w("NatroNavigatorAlice", "Music worker busy"); }
+        }); } catch (RuntimeException busy) {
+            Log.w("NatroNavigatorAlice", "Music worker busy"); completion.accept(false);
+        }
+    }
+    private static boolean resumeOnWorker(Context context, MediaController original, BooleanSupplier permitted) {
+        if (!permitted.getAsBoolean()) return false;
+        MediaController exact = null;
+        for (MediaController controller : sessions(context)) {
+            if (state(controller) == PlaybackState.STATE_PLAYING) return false;
+            if (original.getSessionToken().equals(controller.getSessionToken())) exact = controller;
+        }
+        if (exact == null || state(exact) != PlaybackState.STATE_PAUSED || !permitted.getAsBoolean()) return false;
+        try { exact.getTransportControls().play(); return true; }
+        catch (RuntimeException failure) {
+            Log.w("NatroNavigatorAlice", "Music resume unavailable", failure); return false;
+        }
     }
     private static int state(MediaController controller) {
         try { PlaybackState state = controller.getPlaybackState(); return state == null ? -1 : state.getState(); }

@@ -3125,3 +3125,7 @@ FIELD USER опровергает прежнюю эквивалентность 
 NoSpeech тоже FINISHED; TTS complete отдельно; Quark и runtime timing OPEN.
 Новая реализация ещё не выпущена, нужен native listener с отменой PLAY при
 повторном разговоре в течение2s и сохранением прежних media guards.
+
+06.11 SOURCE3.4.1: глобальный pre-focus hook AliceKit/Quark и native idle stream
+вместо списка триггеров. Голосовой вызов включён в контракт. [Точки и ограничения](docs/geely-kx11/ALICE_2026_11_06_RU.md).
+TEST/APK/FIELD на данном checkpoint OPEN.

@@ -19,6 +19,8 @@ public final class NavigatorAliceReceiver extends BroadcastReceiver {
     public static final String PERMISSION = "ru.natro.statuswidget.permission.CALL_NAVIGATOR_ALICE";
     public static final int READY = 33801, ACCEPTED = 33802, NOT_READY = 33803;
     private static NavigatorAliceReceiver instance;
+    private static String launchId;
+    static String takeLaunchId() { String value = launchId; launchId = null; return value; }
     private static WeakReference<Activity> activity = new WeakReference<>(null);
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     interface Target { boolean ready(); boolean start(); int state(); }
@@ -29,6 +31,7 @@ public final class NavigatorAliceReceiver extends BroadcastReceiver {
 
     static void attach(Activity value) {
         activity = new WeakReference<>(value);
+        NativeAliceBridge.attach(value);
         if (instance != null) return;
         NavigatorAliceReceiver receiver = new NavigatorAliceReceiver(new Target() {
             private NavigatorAliceHost host() { return new NavigatorAliceHost(activity.get()); }
@@ -43,6 +46,7 @@ public final class NavigatorAliceReceiver extends BroadcastReceiver {
     static void detach(Activity value) {
         if (activity.get() != value) return;
         activity.clear();
+        NativeAliceBridge.detach(value);
         if (instance != null && instance.session != null) instance.session.abort();
     }
     @Override public void onReceive(Context context, Intent intent) {
@@ -67,7 +71,8 @@ public final class NavigatorAliceReceiver extends BroadcastReceiver {
         if (id == null || id.isEmpty() || id.length() > 80 || until <= now || until - now > 15000) return NOT_READY;
         if (consumed.containsKey(id)) return consumed.get(id);
         if ((session != null && session.active()) || !target.ready()) return NOT_READY;
-        if (intent.getBooleanExtra("natro_alice_probe", false)) return READY;
+        if (intent.getBooleanExtra("natro_alice_probe", false))
+            return intent.getIntExtra("natro_alice_engine_protocol", 0) == 1 ? 34111 : READY;
         ResultReceiver callback = intent.getParcelableExtra("natro_alice_callback");
         if (callback == null) return NOT_READY;
         consumed.put(id, NOT_READY);
@@ -79,6 +84,7 @@ public final class NavigatorAliceReceiver extends BroadcastReceiver {
             public void event(int result) { callback.send(result, null); }
         });
         try {
+            launchId = id;
             if (!target.start()) { session.abort(); return NOT_READY; }
             consumed.put(id, ACCEPTED);
             MAIN.post(session::poll);
