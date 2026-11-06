@@ -26,7 +26,7 @@ class CandidateStagingTest(unittest.TestCase):
             "RUNNER_TEMP": str(self.root), "ANDROID_HOME": str(self.root / "sdk"),
             "GITHUB_SHA": "a" * 40, "GITHUB_RUN_ID": "123",
             "REUSE_NAVIGATOR_300": "false", "REUSE_NAVIGATOR_302": "false",
-            "REUSE_NAVIGATOR_339": "false",
+            "REUSE_NAVIGATOR_339": "false", "ALICE_ENGINE_HOOKS": "false",
             "HELPER_CHANGED": "false",
         })
         self.environment.start()
@@ -132,6 +132,22 @@ class CandidateStagingTest(unittest.TestCase):
             self.stage()
         manifest = json.loads((self.out / "candidate.json").read_text())
         self.assertTrue(manifest["helperChanged"])
+
+    def test_native_engine_pair_records_exact_tool_and_payload_scope(self):
+        native=self.root/'build/alice-focus-tool';native.mkdir()
+        (native/'PatchAliceFocus.class').write_bytes(b'compiled fixture')
+        with patch.dict(os.environ, {"ALICE_ENGINE_HOOKS": "true"}): self.stage()
+        nav=json.loads((self.out/'candidate.json').read_text())['navigator']
+        self.assertTrue(nav['nativeEngineHooks'])
+        self.assertEqual(['classes11.dex','classes15.dex','classes19.dex'],nav['allowedPayloadChanges'])
+        self.assertEqual('52736b41714bba696cd54442804816741e2834b57a0d880702560667106a89dc',nav['baselineSha256'])
+        self.assertEqual(hashlib.sha256(b'compiled fixture').hexdigest(),nav['nativeToolSha256']['PatchAliceFocus.class'])
+        self.assertEqual(b'compiled fixture',(self.out/'alice-focus-tool/PatchAliceFocus.class').read_bytes())
+
+    def test_native_engine_without_compiled_hook_tool_is_rejected(self):
+        with patch.dict(os.environ, {"ALICE_ENGINE_HOOKS": "true"}):
+            with self.assertRaisesRegex(ValueError,'Native hook tool not built'): self.stage()
+        self.assertFalse((self.out/'candidate.json').exists())
 
     def test_streaming_hashes_support_python_310(self):
         payload = self.root / "hash-fixture"
