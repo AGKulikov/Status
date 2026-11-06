@@ -1,5 +1,8 @@
 # Natro
 
+**06.11.2026: Natro3.4.0 опубликована в stable/latest.** Release436867441, publisher42274377501/job128086794811 SUCCESS; все7assets скачаны и побайтно сверены. Публичный APK и natro-update.json проверены отдельно:29952608bytes, SHA256 b11462f99824478df39b486b46f4932dd300492cbb04f112b0bd05dcd8a6afce. Source f974c09df69350a48fa7ada2889bb7d727146d5c; build CI42271336453 PASS2258Android/280tool. FIELD остаётся OPEN. Прежние записи об отсутствии публикации ниже — история.
+
+
 **Natro3.4.0: файловый менеджер с Яндекс Диском, APK готов.** Две панели, локальные/USB/cloud операции, поиск/закладки/ZIP. [Установка и отчёт](docs/releases/3.4.0/README_RU.md). Source [`f974c09d`](https://github.com/AGKulikov/Status/commit/f974c09df69350a48fa7ada2889bb7d727146d5c), [CI42271336453 SUCCESS](https://github.com/AGKulikov/Status/actions/runs/42271336453):2258Android/280tool. Прежняя подпись/exactAPI28/install-over metadata PASS. [Актуальная ветка](https://github.com/AGKulikov/Status/tree/feature/file-manager-yandex-20261106). APK выдан отдельно; stable/latest остаётся3.3.9. Реальный Яндекс/USB/KX11 FIELD OPEN.
 
 **Natro3.3.9 и парный Navigator подписаны и проверены.** Ветки `fix/alice-parcel-20261025` / `release/natro-3.3.9`. Source `7a10536ae572f425d82d29bca37d9e3478998ffa`, CI40171265473 SUCCESS2228Android/279tool. Исправлен callback Алисы между приложениями. [Матрица и установка](docs/releases/3.3.9/README_RU.md). [Опубликована stable/latest](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.9), publisher40171787487 SUCCESS,7assets readback PASS; FIELD новой пары OPEN, прежний3.3.8 FAILED.

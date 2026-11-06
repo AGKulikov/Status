@@ -1,5 +1,8 @@
 # Natro3.4.0 — файловый менеджер с Яндекс Диском
 
+**06.11.2026: Natro3.4.0 опубликована в stable/latest.** Release436867441, publisher42274377501/job128086794811 SUCCESS; все7assets скачаны и побайтно сверены. Публичный APK и natro-update.json проверены отдельно:29952608bytes, SHA256 b11462f99824478df39b486b46f4932dd300492cbb04f112b0bd05dcd8a6afce. Source f974c09df69350a48fa7ada2889bb7d727146d5c; build CI42271336453 PASS2258Android/280tool. FIELD остаётся OPEN. Прежние записи об отсутствии публикации ниже — история.
+
+
 APK готов к установке поверх3.3.9: versionCode208021373, 29952608bytes.
 [Возможности и инструкция](release-notes.md), [протокол Яндекса и ограничения](../../FILE_MANAGER_YANDEX_RU.md).
 
