@@ -153,3 +153,5 @@ QNX отказал до handshake; каталог/mappings остаются BLOC
 - 24.10.2026: [FIELD3.3.7: boot music и Navigator ANR](geely-kx11/BOOT_2026_10_24_RU.md). Команды отправлены, готовность не достигнута; bounded recovery SOURCE, FIELD OPEN.
 
 - 25.10.2026: [FIELD Алисы3.3.8 и исправление Parcel](geely-kx11/ALICE_2026_10_25_RU.md).
+
+- 06.11.2026: [Окончание голосовой сессии Алисы отдельно от закрытия окна](geely-kx11/ALICE_2026_11_06_RU.md). STATIC native FINISHED/IDLE и UI timer20s/7s; USER correction; SOURCE нового адаптера/TEST/APK/FIELD OPEN.

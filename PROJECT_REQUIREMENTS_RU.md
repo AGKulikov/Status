@@ -5781,3 +5781,16 @@ SOURCE/TEST/APK/PUBLISH PASS в указанном объёме. FIELD ново�
 USER: «Выкладывай». Разрешена публикация уже проверенного APK3.4.0
 в stable/latest, exact CI42271336453 и SHA b11462f99824478df39b486b46f4932dd300492cbb04f112b0bd05dcd8a6afce.
 Draft/readback всех7assets обязателен; FIELD остаётся OPEN.
+
+
+## 06.11.2026 — ALICE-VOICE-END-340: окончание разговора раньше закрытия UI
+
+USER: Natro поздно распознаёт окончание Алисы, окно ещё остаётся после разговора.
+Предыдущая эквивалентность router0=конец разговора (ALICE-338-R2/MUSIC-ALICE-338)
+ЗАМЕНЕНА этим уточнением; прежние требования+2s/тот же плеер/фон/окно сохраняются.
+STATIC: в Navigator3.3.9 IO listener отправляет native FINISHED при переходе IDLE,
+а cloud2 отдельно откладывает закрытие UI на20s или7s. NoSpeech также FINISHED;
+ошибки/повторная активность требуют отдельной обработки, TTS complete не равен
+окончанию разговора. Quark/runtime backend остаётся OPEN.
+SOURCE нового адаптера/TEST/APK/FIELD OPEN, исправление не выпущено.
+[Доказательства, SHA и дальнейшие проверки](docs/geely-kx11/ALICE_2026_11_06_RU.md).

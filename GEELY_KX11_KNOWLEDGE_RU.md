@@ -3115,3 +3115,13 @@ Music boot waits в новом ZIP относятся к периоду до у�
 CI40171265473:2228Android/279tool/108Java; подписанная пара, точный API28.
 Foreign-loader negative/real Binder round-trip подтверждены; FIELD голоса/окна
 и finish+2s OPEN. Предыдущий FIELD3.3.8 остаётся FAILED.
+
+
+## 06.11.2026 — Алиса: voice finish и задержка закрытия окна
+
+[Разбор актуального APK3.3.9](docs/geely-kx11/ALICE_2026_11_06_RU.md):
+STATIC IO IDLE → native FINISHED → cloud2 timer20s/7s → закрытие UI.
+FIELD USER опровергает прежнюю эквивалентность router0=конец разговора.
+NoSpeech тоже FINISHED; TTS complete отдельно; Quark и runtime timing OPEN.
+Новая реализация ещё не выпущена, нужен native listener с отменой PLAY при
+повторном разговоре в течение2s и сохранением прежних media guards.
