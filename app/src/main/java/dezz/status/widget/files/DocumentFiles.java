@@ -68,6 +68,11 @@ public final class DocumentFiles implements FileBackend {
         if(stat(path)!=null)throw new IOException("Папка уже существует");
         Uri made=DocumentsContract.createDocument(resolver,uri(FilePaths.parent(path)),DocumentsContract.Document.MIME_TYPE_DIR,FilePaths.leaf(path));
         if(made==null)throw new IOException("Не удалось создать папку");
+        List<Row> check=rows(made);
+        if(check.size()!=1||!check.get(0).directory||!check.get(0).name.equals(FilePaths.leaf(path))) {
+            DocumentsContract.deleteDocument(resolver,made);
+            throw new IOException("Провайдер изменил имя папки; операция остановлена");
+        }
     }
     @Override public void write(String path,InputStream input,long length,FileOperations.Control control)throws Exception {
         if(stat(path)!=null)throw new IOException("Файл уже существует");

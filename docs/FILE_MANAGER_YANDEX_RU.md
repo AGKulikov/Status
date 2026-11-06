@@ -36,7 +36,7 @@ SHA256 `853e33a76c52e82d56e2288913ee2ebc123520cdac3f5437a14c8c55f51bc0e8`.
 | Сохранение подключения | Cookie-сессия Диска в AES-GCM SecretStore; пароль не сохраняется |
 | Личный Диск | /client/disk → sk/idClient; models-v2 mpfs/resources, страницы40 с исключением parent |
 | Скачать | mpfs/url; поток HTTPS, whitelist доменов Яндекса, без Cookie в transfer-клиенте |
-| Загрузить | mpfs/store force=false → PUT upload_url → bulk-operation-status → проверка размера |
+| Загрузить | mpfs/store force=0 → PUT upload_url → bulk-operation-status → проверка размера |
 | Создать/удалить | mpfs/mkdir, bulk-async-delete с ожиданием результата |
 | Просроченный ключ | Один refresh при CKEY; повторная ошибка требует входа |
 | Публичные ссылки | Документированный REST public/resources и /download; только чтение |
@@ -54,7 +54,7 @@ Cookies ограничены доменом/путём/HTTPS, signed URLs не �
 
 ## Проверки и границы
 
-Локальные26тестов file manager PASS:15 filesystem/ZIP,6 Disk protocol,
+Первый локальный прогон26тестов file manager PASS:15 filesystem/ZIP,6 Disk protocol,
 2 Passport,3 Android28 UI/navigation-host. Native render1760×656 просмотрен:
 обе панели, контраст, строки и toolbar помещаются. Компактный720dp режим проверен.
 Это реальные production views с тестовыми файлами, не снимок KX11.
@@ -70,3 +70,12 @@ backup/restore. Тестовый сервер подтверждает обра�
 Между финальной проверкой и серверным delete возможны внешние изменения; полной
 транзакции между двумя независимыми хранилищами нет. Частичный результат виден
 в назначении и не объявляется завершённым при ошибке.
+
+Дополнительная сверка DEX: mkdir/store используют JSONObject.put(String,int)
+для force=0, а не Boolean. Wire-type исправлен; добавлены3теста upload/status/
+размера/отмены. Полный новый CI обязателен. SAF mkdir проверяет точное имя папки.
+
+CI42270390165 остановлен на3общих UI contracts из2255тестов. Новые экраны
+включены в прежний Back/safe-inset contract, long press использует общий звук,
+catalog содержит FileManager. Старые assertions не удалялись. UI-only изменения
+не меняют storage policy; fingerprint менеджера пересмотрен повторно.

@@ -792,7 +792,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/files/DocumentFiles.java": {
-      "sha256": "4dd0a8b202750f0152bcf76861c49c34d5454de22ce328b7fd10980a8208c064",
+      "sha256": "6ac2e8e09e77076ccb7e08e8a3d9e6bca290023c08eb74769854dfba39c7efd4",
       "access_kinds": [
         "external_resource"
       ]
@@ -804,7 +804,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/FileManagerActivity.java": {
-      "sha256": "fa9ca59a56b3ee76257a3d64a7897d67987c45c383ec2b946b36356a999d2b74",
+      "sha256": "8bf64e72cef45053a823428aace0e846d92fa2294a7e7693f607e7c908396179",
       "access_kinds": [
         "external_resource",
         "files",

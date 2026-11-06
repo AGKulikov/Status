@@ -52,6 +52,9 @@ public final class SettingsBackNavigationContractTest {
     };
 
     private static final String[][] EXPLICIT_JAVA_DETAILS = {
+            {"FileManagerActivity.java", "button(\"Назад\",this::finish)", "header.addView(button(\"Назад\",this::finish))"},
+            {"YandexDiskConnectActivity.java", "button(root,\"Назад\",this::finish)", "button(root,\"Назад\",this::finish)"},
+            {"YandexDiskLoginActivity.java", "back.setText(\"Назад\")", "back.setOnClickListener(v->finish())"},
             {"UpdateActivity.java", "button(\"← Назад\",this::finish)", "content.addView(button(\"← Назад\",this::finish))"},
             {"PhoneAppIconsActivity.java", "Button back = button(\"‹ Назад\")", "back.setOnClickListener(v -> finish())"},
             {"AdbSettingsActivity.java", "button(\"← Назад\", this::finish)", "header.addView(back)"},
@@ -102,6 +105,9 @@ public final class SettingsBackNavigationContractTest {
     };
 
     private static final String[] EXPLICIT_SAFE_INSET_DETAILS = {
+            "FileManagerActivity.java",
+            "YandexDiskConnectActivity.java",
+            "YandexDiskLoginActivity.java",
             "UpdateActivity.java",
             "AdbSettingsActivity.java",
             "LanTransferActivity.java",

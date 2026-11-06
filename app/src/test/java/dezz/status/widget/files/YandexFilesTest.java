@@ -56,4 +56,30 @@ public class YandexFilesTest {
             JSONArray a=new JSONArray();for(int i=0;i<40;i++)try{a.put(new JSONObject().put("path","/disk/repeated").put("type","file"));}catch(Exception e){throw new IOException(e);}return response(r,200,"{\"resources\":"+a+"}");}).build();
         assertThrows(IOException.class,()->new YandexFiles(client,"").list("/"));
     }
+    private YandexFiles uploadFixture(int reportedSize,AtomicInteger uploads,boolean failOperation){
+        OkHttpClient api=new OkHttpClient.Builder().addInterceptor(c->{Request r=c.request();
+            if(r.url().encodedPath().equals("/client/disk"))return response(r,200,"{\"sk\":\"s\"}");
+            try {
+                JSONObject envelope=requestBody(r),p=envelope.getJSONObject("requestParams");String method=envelope.getString("apiMethod");
+                if(method.equals("mpfs/store")||method.equals("mpfs/mkdir")){assertTrue(p.get("force") instanceof Number);assertEquals(0,p.getInt("force"));assertEquals("/disk/file",p.getString("path"));}
+                if(method.equals("mpfs/store")){assertEquals(4,p.getLong("size"));return response(r,200,"{\"upload_url\":\"https://uploader.disk.yandex.ru/upload\",\"oid\":\"op\"}");}
+                if(method.equals("mpfs/bulk-operation-status")){assertEquals("op",p.getJSONArray("oids").getString(0));return response(r,200,"{\"op\":{\"state\":\""+(failOperation?"FAILED":"DONE")+"\"}}");}
+                if(method.equals("mpfs/resources"))return response(r,200,"{\"resources\":[{\"path\":\"/disk/file\",\"type\":\"file\",\"meta\":{\"size\":"+reportedSize+"}}]}");
+                return response(r,200,"{}");
+            }catch(Exception e){throw new IOException(e);}
+        }).build();
+        OkHttpClient transfer=new OkHttpClient.Builder().addInterceptor(c->{Request r=c.request();assertEquals("PUT",r.method());assertNull(r.header("Cookie"));assertEquals("false",r.header("X-Disk-Uploader-Wait-Complete-Upload"));
+            okio.Buffer bytes=new okio.Buffer();r.body().writeTo(bytes);assertEquals("data",bytes.readUtf8());uploads.incrementAndGet();return response(r,201,"");}).build();
+        return new YandexFiles(api,transfer,"");
+    }
+    @Test public void uploadStreamsWithNumericNoOverwriteAndChecksCompletedSize()throws Exception {
+        AtomicInteger puts=new AtomicInteger();YandexFiles disk=uploadFixture(4,puts,false);disk.mkdir("/file");disk.write("/file",new ByteArrayInputStream("data".getBytes("UTF-8")),4,new FileOperations.Control(null));assertEquals(1,puts.get());
+    }
+    @Test public void uploadSizeMismatchAndServerFailureAreNotSuccess()throws Exception {
+        for(boolean failed:new boolean[]{false,true})assertThrows(IOException.class,()->uploadFixture(3,new AtomicInteger(),failed).write("/file",new ByteArrayInputStream("data".getBytes("UTF-8")),4,new FileOperations.Control(null)));
+    }
+    @Test public void cancelledUploadNeverStartsStoreOrPut()throws Exception {
+        AtomicInteger puts=new AtomicInteger();FileOperations.Control control=new FileOperations.Control(null);control.cancelled=true;
+        assertThrows(InterruptedIOException.class,()->uploadFixture(4,puts,false).write("/file",new ByteArrayInputStream(new byte[4]),4,control));assertEquals(0,puts.get());
+    }
 }

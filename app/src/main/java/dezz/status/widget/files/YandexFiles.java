@@ -31,10 +31,12 @@ public final class YandexFiles implements FileBackend {
                 .followRedirects(false).followSslRedirects(false).build(),publicKey);
     }
     YandexFiles(OkHttpClient client,String publicKey) {
-        api=client;
-        transfer=new OkHttpClient.Builder().connectTimeout(20,TimeUnit.SECONDS)
+        this(client,new OkHttpClient.Builder().connectTimeout(20,TimeUnit.SECONDS)
                 .readTimeout(60,TimeUnit.SECONDS).writeTimeout(60,TimeUnit.SECONDS)
-                .followRedirects(false).followSslRedirects(false).build();
+                .followRedirects(false).followSslRedirects(false).build(),publicKey);
+    }
+    YandexFiles(OkHttpClient client,OkHttpClient transferClient,String publicKey) {
+        api=client;transfer=transferClient;
         this.publicKey=publicKey==null?"":publicKey;
     }
     @Override public String identity(){return publicKey.isEmpty()?"yandex:personal":"yandex:public:"+publicKey;}
@@ -161,7 +163,7 @@ public final class YandexFiles implements FileBackend {
         }
         throw new IOException("Слишком много перенаправлений");
     }
-    @Override public void mkdir(String path)throws Exception {call("mpfs/mkdir",new JSONObject().put("path",disk(path)).put("force",false));}
+    @Override public void mkdir(String path)throws Exception {call("mpfs/mkdir",new JSONObject().put("path",disk(path)).put("force",0));}
     @Override public void delete(String path)throws Exception {
         delete(path,new FileOperations.Control(null));
     }
@@ -176,7 +178,7 @@ public final class YandexFiles implements FileBackend {
     @Override public void write(String path,InputStream input,long length,FileOperations.Control control)throws Exception {
         if(length<0)throw new IOException("Для загрузки на Диск нужен известный размер файла");
         control.check();
-        JSONObject store=call("mpfs/store",new JSONObject().put("path",disk(path)).put("force",false).put("size",length));
+        JSONObject store=call("mpfs/store",new JSONObject().put("path",disk(path)).put("force",0).put("size",length));
         HttpUrl url=checkedTransferUrl(store.getString("upload_url"));
         RequestBody body=new RequestBody() {
             @Override public MediaType contentType(){return MediaType.get("application/octet-stream");}

@@ -21,6 +21,9 @@ FileManagerActivity/FileLocation/LocalFiles/DocumentFiles/FileArchives расс�
 WebView — штатный provider store; собственный переносимый session blob зашифрован.
 Сырые Cookie/password/URL загрузки в диагностический журнал не пишутся.
 
+SAF mkdir дополнительно проверяет возвращённое имя/тип папки, иначе удаляет только
+созданный пустой объект и останавливает копирование. Это защищает от авто-переименования
+провайдером при конфликте; пользовательское существующее дерево не объединяется.
 Storage owners BackupDefaultsMigration и перечисленные новые классы пересмотрены
 по diff. Launcher builtin использует прежнюю схему IDs, старые shortcuts не меняет.
 Defaults335…372→373 и same373 рассмотрены: прежние effective/explicit/unknown

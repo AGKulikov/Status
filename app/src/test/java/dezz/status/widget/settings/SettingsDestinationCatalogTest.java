@@ -24,6 +24,7 @@ public final class SettingsDestinationCatalogTest {
     private static final Set<String> USER_FACING_ACTIVITIES = new HashSet<>(Arrays.asList(
             "dezz.status.widget.AboutActivity",
             "dezz.status.widget.FullBackupActivity",
+            "dezz.status.widget.FileManagerActivity",
             "dezz.status.widget.HudLcaPatchActivity",
             "dezz.status.widget.SettingsAppearanceActivity",
             "dezz.status.widget.MediaPanelSettingsActivity",
@@ -116,6 +117,7 @@ public final class SettingsDestinationCatalogTest {
         assertSearchContains("манёвр", "home_behavior");
         assertSearchContains("  РЕЗЕРВНАЯ   КОПИЯ ", "app_export");
         assertSearchContains("backup", "app_export");
+        assertSearchContains("Яндекс Диск", "file_manager");
         assertSearchContains("HOME ASSISTANT", "connector_ha");
         assertSearchContains("iphone", "connector_phone");
         assertSearchContains("sms", "connector_phone");

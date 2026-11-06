@@ -9,6 +9,7 @@ import android.webkit.*;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import dezz.status.widget.files.*;
+import dezz.status.widget.settings.SettingsBackNavigation;
 import java.util.concurrent.*;
 
 /** Credentials, QR and second-factor challenges stay on the real Yandex Passport page. */
@@ -26,10 +27,10 @@ public final class YandexDiskLoginActivity extends AppCompatActivity {
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);getWindow().addFlags(WindowManager.LayoutParams.FLAG_SECURE);
         LinearLayout root=new LinearLayout(this);root.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout bar=new LinearLayout(this);Button back=new Button(this);back.setText("Отмена");back.setOnClickListener(v->finish());bar.addView(back);
+        LinearLayout bar=new LinearLayout(this);Button back=new Button(this);back.setText("Назад");back.setOnClickListener(v->finish());bar.addView(back);
         status=new TextView(this);status.setText("Вход в Яндекс · passport.yandex.ru");status.setTextSize(18);bar.addView(status,new LinearLayout.LayoutParams(0,-2,1));
         Button done=new Button(this);done.setText("Проверить вход");done.setOnClickListener(v->checkSession());bar.addView(done);root.addView(bar);
-        web=new WebView(this);root.addView(web,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);
+        web=new WebView(this);root.addView(web,new LinearLayout.LayoutParams(-1,0,1));setContentView(root);SettingsBackNavigation.applySafeTopInset(this,root);
         WebSettings settings=web.getSettings();settings.setJavaScriptEnabled(true);settings.setDomStorageEnabled(true);
         settings.setAllowFileAccess(false);settings.setAllowContentAccess(false);settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setSaveFormData(false);settings.setSupportMultipleWindows(false);

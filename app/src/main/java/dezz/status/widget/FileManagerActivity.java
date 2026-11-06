@@ -19,6 +19,7 @@ import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.FileProvider;
 import dezz.status.widget.backup.BackupPreferences;
+import dezz.status.widget.settings.SettingsBackNavigation;
 import dezz.status.widget.files.*;
 import java.io.*;
 import java.text.DateFormat;
@@ -100,7 +101,7 @@ public final class FileManagerActivity extends AppCompatActivity {
         for(Pane pane:panes) {buildPane(pane);LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(0,-1,1);lp.setMargins(dp(4),dp(8),dp(4),dp(6));columns.addView(pane.box,lp);}
         root.addView(columns,new LinearLayout.LayoutParams(-1,0,1));
         operation=text("Готово к работе",15,MUTED);operation.setMinHeight(dp(36));operation.setGravity(Gravity.CENTER_VERTICAL);operation.setOnClickListener(v->{if(FileTaskService.busy)new AlertDialog.Builder(this).setTitle("Отменить текущую операцию?").setMessage("Уже завершённые файлы останутся в назначении.").setNegativeButton("Продолжить",null).setPositiveButton("Отменить",(d,w)->FileTaskService.cancel()).show();});root.addView(operation);
-        setContentView(root);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);
+        setContentView(root);SettingsBackNavigation.applySafeTopInset(this,root);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);
         activate(active);
         if(checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)!=PackageManager.PERMISSION_GRANTED)
             requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE,Manifest.permission.WRITE_EXTERNAL_STORAGE},STORAGE);
@@ -119,7 +120,7 @@ public final class FileManagerActivity extends AppCompatActivity {
             if(!pane.selected.isEmpty()){toggle(pane,item);return;}
             if(item.directory)navigate(pane,item.path);else openEntry(pane,item,false);
         });
-        pane.list.setOnItemLongClickListener((parent,view,position,id)->{activate(pane.index);toggle(pane,pane.visible.get(position));return true;});
+        pane.list.setOnItemLongClickListener((parent,view,position,id)->{LongPressFeedback.play(view);activate(pane.index);toggle(pane,pane.visible.get(position));return true;});
     }
     private Pane current(){return panes[active];}
     private void activate(int index){active=index;for(Pane pane:panes)if(pane!=null&&pane.box!=null){pane.box.setVisibility(compact&&pane.index!=active?View.GONE:View.VISIBLE);GradientDrawable bg=background(CARD);bg.setStroke(dp(pane.index==active?2:1),pane.index==active?ACCENT:0xff2c3a4c);pane.box.setBackground(bg);}}

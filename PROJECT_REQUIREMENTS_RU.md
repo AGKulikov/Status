@@ -1,5 +1,16 @@
 # Единый реестр требований Natro
 
+### 06.11.2026 — FILES: полный CI выявил интеграционные контракты
+
+CI42270390165/00d3b7ce:2255tests,3failed. Старые проверки сохранены:
+добавлены3новых экрана в явный Back/safe-inset contract и менеджер в canonical
+catalog; production включает SettingsBackNavigation и LongPressFeedback.
+Текущий локальный дополнительный прогон Disk upload/defaults PASS. По DEX
+референса force параметр — int0 (не Boolean); wire-type приведён точно,
+добавлены3теста PUT/completion/size/cancel. SAF mkdir валидирует возвращённое имя.
+Повтор полного CI обязателен; APK/FIELD пока не закрыты.
+
+
 ## 06.11.2026 — FILES-001…003: встроенный файловый менеджер с Яндекс Диском
 
 USER: «Добавь в наше приложение натро полноценный файловый менеджер, а так чтобы

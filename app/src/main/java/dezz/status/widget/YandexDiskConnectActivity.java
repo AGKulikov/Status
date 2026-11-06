@@ -8,6 +8,7 @@ import android.view.*;
 import android.widget.*;
 import androidx.appcompat.app.AppCompatActivity;
 import dezz.status.widget.files.*;
+import dezz.status.widget.settings.SettingsBackNavigation;
 import java.util.concurrent.*;
 
 /** Native login and optional web login, as in the reference app. No credentials in saved state. */
@@ -29,7 +30,7 @@ public final class YandexDiskConnectActivity extends AppCompatActivity {
         status=new TextView(this);status.setTextSize(18);root.addView(status);
         enter=button(root,"Войти",this::submit);
         webButton=button(root,"Открыть веб-вход Яндекса",()->startActivityForResult(new Intent(this,YandexDiskLoginActivity.class),1));
-        button(root,"Назад",this::finish);setContentView(scroll);
+        button(root,"Назад",this::finish);setContentView(scroll);SettingsBackNavigation.applySafeTopInset(this,scroll);
     }
     private EditText field(LinearLayout root,String hint,int type){EditText field=new EditText(this);field.setHint(hint);field.setTextSize(20);field.setSingleLine();field.setInputType(type);field.setSaveEnabled(false);field.setImportantForAutofill(View.IMPORTANT_FOR_AUTOFILL_NO);root.addView(field,new LinearLayout.LayoutParams(-1,(int)(64*getResources().getDisplayMetrics().density)));return field;}
     private Button button(LinearLayout root,String text,Runnable action){Button button=new Button(this);button.setAllCaps(false);button.setText(text);button.setTextSize(18);button.setOnClickListener(v->action.run());root.addView(button);return button;}
