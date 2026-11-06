@@ -5772,3 +5772,9 @@ Tag/source7a10536ae572f425d82d29bca37d9e3478998ffa; CI40171265473 PASS.
 Оба подписанных APK сохранены для передачи, Navigator приватно; Helper прежний.
 SOURCE/TEST/APK/PUBLISH PASS в указанном объёме. FIELD новой пары OPEN;
 прежний отказ3.3.8 сохранён. Временные приватные копии ключей удалены.
+
+## 06.11.2026 — публикация3.4.0
+
+USER: «Выкладывай». Разрешена публикация уже проверенного APK3.4.0
+в stable/latest, exact CI42271336453 и SHA b11462f99824478df39b486b46f4932dd300492cbb04f112b0bd05dcd8a6afce.
+Draft/readback всех7assets обязателен; FIELD остаётся OPEN.
