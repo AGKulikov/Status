@@ -108,6 +108,10 @@
              dashboard. They let the instrument task remain an independent DIM page. -->
         <meta-data android:name="eos_resizeableActivity" android:value="true" />
         <activity android:name=".SettingsAppearanceActivity" android:exported="false" />
+        <activity android:name=".FileManagerActivity" android:exported="false" />
+        <activity android:name=".YandexDiskLoginActivity" android:exported="false" />
+        <activity android:name=".YandexDiskConnectActivity" android:exported="false" />
+        <service android:name=".files.FileTaskService" android:exported="false" />
         <activity android:name=".HudLcaPatchActivity" android:exported="false" />
         <activity android:name=".FullBackupActivity" android:configChanges="orientation|screenSize|keyboardHidden" android:exported="false"
             android:process=":backup" android:excludeFromRecents="true" />

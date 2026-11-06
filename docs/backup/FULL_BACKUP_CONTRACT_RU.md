@@ -1,5 +1,34 @@
 # Полная личная копия Natro: контракт реализации
 
+### Review 06.11.2026 — файловый менеджер / 3.4.0
+
+Новый CE namespace `natro_file_manager_v1` открыт только через BackupPreferences:
+`pane0/pane1` (JSON локации), `sort` (0), `showHidden` (false), `bookmarks` (StringSet)
+и `yandexSession` (AES-GCM SecretStore, v1:). BackupStorage рекурсивно включает весь
+prefs XML и существующим PortableBackupSecrets раскрывает секрет только внутри
+защищённой личной копии, при restore шифрует новым локальным ключом. Пароль,
+email-code, Passport track/CSRF, transfer queue и cancellation находятся только RAM.
+Истёкшая сессия требует повторного входа, действительность аккаунта не гарантируется.
+
+FileManagerActivity/FileLocation/LocalFiles/DocumentFiles/FileArchives рассмотрены:
+общая память и SAF-деревья — явные пользовательские источники/назначения;
+произвольные выбранные файлы, облако и Download/Natro не становятся автоматически
+полной копией телефона. Закладки и URI сохраняются, SAF grants выдаёт Android,
+на новом устройстве их нужно выдать повторно. Для локальной записи временный
+.part находится в папке назначения; ZIP staging — app cache. Cleanup при обычной
+ошибке/отмене обязателен, после process death возможен orphan .part, безопасный
+повтор без автоматического удаления исходников. Выполненные действия не откатываются.
+WebView — штатный provider store; собственный переносимый session blob зашифрован.
+Сырые Cookie/password/URL загрузки в диагностический журнал не пишутся.
+
+Storage owners BackupDefaultsMigration и перечисленные новые классы пересмотрены
+по diff. Launcher builtin использует прежнюю схему IDs, старые shortcuts не меняет.
+Defaults335…372→373 и same373 рассмотрены: прежние effective/explicit/unknown
+значения сохраняются,334/374 отклоняются отдельной регрессией. Новые настройки
+не изменяют прежние defaults; backup inventory — статический контроль, FIELD
+переноса полной копии и USB grants остаётся OPEN.
+
+
 ### Review24.10.2026 — MEDIA gestures / 3.3.6
 
 Рассмотрены ButtonSettingsDraft, VehicleButtonController, MediaButtonController:

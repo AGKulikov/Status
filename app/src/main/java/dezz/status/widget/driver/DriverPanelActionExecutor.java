@@ -235,6 +235,9 @@ public final class DriverPanelActionExecutor {
             case NAVIGATOR_ALICE:
                 dezz.status.widget.launcher.MediaExtraActions.alice(context);
                 return;
+            case FILE_MANAGER:
+                dezz.status.widget.FileManagerActivity.launch(context);
+                return;
             case HWGPS_FIND_ME:
                 if (!HwgpsIntegration.requestFindMe(context)) {
                     toast("HWGPS не установлен или недоступен");

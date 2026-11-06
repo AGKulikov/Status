@@ -2231,7 +2231,7 @@
         },
         {
           "dialogs": 1,
-          "line": 5441,
+          "line": 5442,
           "method": "showAllApps",
           "numeric_controls": 0
         }
@@ -2429,7 +2429,7 @@
       ],
       "numeric_controls": 2,
       "path": "app/src/main/java/dezz/status/widget/LauncherHomeSurface.java",
-      "sha256": "4afa7d6b1203ba913202e7b33067f150ffe14cd0aff35eb6695c7ded1f9dee85"
+      "sha256": "6c9a74842e8c47a4d1c2250a199b8fbbc4d321d04173644231f5ac205a8c6529"
     },
     {
       "class": "dezz.status.widget.LauncherSettingsActivity",

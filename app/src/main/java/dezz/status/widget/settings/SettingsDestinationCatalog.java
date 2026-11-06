@@ -227,6 +227,11 @@ public final class SettingsDestinationCatalog {
                 "iphone", "айфон", "телефон", "bluetooth", "ancs", "уведомления",
                 "сообщения", "sms", "присутствие"));
 
+        values.add(activity("file_manager", Group.PHONE, "Файловый менеджер",
+                "Память устройства, USB / SD, Яндекс Диск и публичные ссылки",
+                "apps", "dezz.status.widget.FileManagerActivity",
+                "файлы", "папки", "диск", "яндекс диск", "usb", "sd", "загрузки", "копирование"));
+
         values.add(activity("automation_visual", Group.AUTOMATION, "Визуальные сценарии",
                 "Триггеры, условия и действия между всеми коннекторами",
                 "scenario", "dezz.status.widget.ScenarioSettingsActivity",

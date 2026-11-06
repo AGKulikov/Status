@@ -1,5 +1,7 @@
 # Natro
 
+**Разработка Natro3.4.0:** файловый менеджер и Яндекс Диск. Ветка [`feature/file-manager-yandex-20261106`](https://github.com/AGKulikov/Status/tree/feature/file-manager-yandex-20261106). [Функции и проверки](docs/releases/3.4.0/README_RU.md). SOURCE/26целевых tests PASS; полный CI/APK и FIELD ожидаются.
+
 **Natro3.3.9 и парный Navigator подписаны и проверены.** Ветки `fix/alice-parcel-20261025` / `release/natro-3.3.9`. Source `7a10536ae572f425d82d29bca37d9e3478998ffa`, CI40171265473 SUCCESS2228Android/279tool. Исправлен callback Алисы между приложениями. [Матрица и установка](docs/releases/3.3.9/README_RU.md). [Опубликована stable/latest](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.9), publisher40171787487 SUCCESS,7assets readback PASS; FIELD новой пары OPEN, прежний3.3.8 FAILED.
 
 Natro3.3.8 и парный Navigator подписаны и проверены: [протокол выпуска](docs/releases/3.3.8/README_RU.md). Ветки `release/natro-3.3.8` / `fix/navigator-alice-20261024`; source `52069153bee7afd9447a88ef6a5ab803bf7fcfe8`. CI40096694911 PASS2223Android/279tool. Алиса, finish+2s и recovery music/Navigator при boot. Для Алисы нужен новый Navigator. [Опубликована stable/latest](https://github.com/AGKulikov/Status/releases/tag/natro-v3.3.8), publisher40097813509 PASS: все7assets сверены. FIELD OPEN, причина ANR не установлена.
@@ -86,7 +88,7 @@ APK `Natro-3.2.3-signed.apk` передан отдельно. Navigator/Helper �
 Первый [дамп3.2.3](docs/geely-kx11/research-2026-10-16-qnx/DUMP_323_8283_RU.md): Android собран;
 QNX Connection refused до первого запроса. Ожидание после старта не помогло; маршрут проверен. В контроле13:07 получено QCONN, затем системный сбор дошёл до812 путей и выявил stat-parser defect на `/proc`. Повтор старого APK не нужен; дальнейшая проверка после выпуска исправления. [История соединения](docs/geely-kx11/research-2026-10-16-qnx/QNX_TERMINAL_20261017_RU.md).
 
-Актуальная ветка разработки и выпуска: [`release/natro-3.3.5`](https://github.com/AGKulikov/Status/tree/release/natro-3.3.5).
+Актуальная ветка разработки: [`feature/file-manager-yandex-20261106`](https://github.com/AGKulikov/Status/tree/feature/file-manager-yandex-20261106).
 Историческое дерево 3.3.2: [`fix/instrument-switch-332`](https://github.com/AGKulikov/Status/tree/fix/instrument-switch-332); документы 3.3.2: [`release/natro-3.3.2-verification`](https://github.com/AGKulikov/Status/tree/release/natro-3.3.2-verification).
 Ветка `main` содержит историческое состояние и не представляет текущую версию Natro.
 После каждого выпуска публикуются соответствующие исходники, README, описание

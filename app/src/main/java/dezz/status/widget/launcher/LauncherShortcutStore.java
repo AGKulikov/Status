@@ -236,6 +236,7 @@ public final class LauncherShortcutStore {
         RECENTS("recents", "Недавние приложения", "apps"),
         STOCK_CLIMATE("stock_climate", "Штатный климат", "climate"),
         ALL_APPS("all_apps", "Все приложения", "apps"),
+        FILE_MANAGER("file_manager", "Файловый менеджер", "apps"),
         FAVORITES("favorites", "Избранное", "work"),
         FAVORITE_ROUTE("favorite_route", "Избранная точка", "navigation"),
         MAPS_WINDOW("maps_window", "Карты в окне", "navigation"),

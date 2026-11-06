@@ -62,7 +62,8 @@ def main():
     shutil.copy2(patch, out / "classes19.dex")
     reuse_300 = os.environ.get("REUSE_NAVIGATOR_300") == "true"
     reuse_302 = os.environ.get("REUSE_NAVIGATOR_302") == "true"
-    if reuse_300 and reuse_302:
+    reuse_339 = os.environ.get("REUSE_NAVIGATOR_339") == "true"
+    if sum([reuse_300, reuse_302, reuse_339]) > 1:
         raise ValueError("Select exactly one verified Navigator for reuse")
     compatible_pair = None
     if reuse_300:
@@ -73,6 +74,10 @@ def main():
         if sha256(patch) != "342a80e3e03351828395e3a5603658e07a68fe5ae602e2159d13ea622b31079a":
             raise ValueError("Navigator reuse requires the exact verified 3.0.2 patch bytes")
         compatible_pair = "Natro 3.0.2 / Navigator 30.3.0"
+    if reuse_339:
+        if sha256(patch) != "1aa6f536cf9464a1b0d32da5abfc47d7a528e5b9d509417dad41acb619956490":
+            raise ValueError("Navigator reuse requires the exact verified 3.3.9 patch bytes")
+        compatible_pair = "Natro 3.3.9 / Navigator 30.3.0"
     manifest = {
         "versionName": version, "versionCode": code, "package": "ru.natro.statuswidget",
         "sourceCommit": os.environ["GITHUB_SHA"],

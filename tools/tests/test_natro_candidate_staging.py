@@ -26,6 +26,7 @@ class CandidateStagingTest(unittest.TestCase):
             "RUNNER_TEMP": str(self.root), "ANDROID_HOME": str(self.root / "sdk"),
             "GITHUB_SHA": "a" * 40, "GITHUB_RUN_ID": "123",
             "REUSE_NAVIGATOR_300": "false", "REUSE_NAVIGATOR_302": "false",
+            "REUSE_NAVIGATOR_339": "false",
             "HELPER_CHANGED": "false",
         })
         self.environment.start()
@@ -111,6 +112,12 @@ class CandidateStagingTest(unittest.TestCase):
     def test_302_reuse_refuses_a_different_navigator_patch(self):
         with patch.dict(os.environ, {"REUSE_NAVIGATOR_302": "true"}):
             with self.assertRaisesRegex(ValueError, "exact verified 3.0.2 patch"):
+                self.stage()
+        self.assertFalse((self.out / "candidate.json").exists())
+
+    def test_339_reuse_refuses_a_different_navigator_patch(self):
+        with patch.dict(os.environ, {"REUSE_NAVIGATOR_339": "true"}):
+            with self.assertRaisesRegex(ValueError, "exact verified 3.3.9 patch"):
                 self.stage()
         self.assertFalse((self.out / "candidate.json").exists())
 

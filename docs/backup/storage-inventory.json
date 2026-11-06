@@ -2,8 +2,14 @@
   "schema_version": 1,
   "status": "SOURCE_IMPLEMENTED_LOCAL_RUNTIME_TESTED_KX11_GATES_PENDING",
   "baseline_commit": "c4d3ffc121a0a69ba21094abe2987f889926505c",
-  "scope": "3.2.8 QNX-first collector reviewed in FULL_BACKUP_CONTRACT_RU.md; same cache/exports and settings. Defaults335..360 to361 reviewed. Static fingerprints do not certify runtime/device restore.",
+  "scope": "3.4.0 file manager owners reviewed in FULL_BACKUP_CONTRACT_RU.md; complete CE prefs plus rewrapped v1 encrypted Yandex session. User-selected files/cloud and system SAF grants are not app-owned backup data. Runtime/device restore remains separate.",
   "shared_preferences": [
+    {
+      "name": "natro_file_manager_v1",
+      "contents": "CE pane0/pane1 JSON, sort0, showHidden false, bookmarks StringSet, encrypted v1 yandexSession; no password or transfer replay.",
+      "source": "app/src/main/java/dezz/status/widget/FileManagerActivity.java; YandexDiskSession.java",
+      "restore_policy": "Full prefs adapter, v1 secrets rewrapped by existing PortableBackupSecrets. Restore locations/bookmarks; SAF grants require reconnection on a new installation, expired cloud session requires login."
+    },
     {
       "name": "natro_lan_trust_v1",
       "contents": "CE hashes StringSet (empty), auto_start/remote_commands Boolean (false); installation-bound LAN trust, no plaintext bearer.",
@@ -358,7 +364,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "f28cd862cc4953ecaa38435f97e0ac03d63d979e2063b241630dc757749492d4",
+      "sha256": "04cd0435d5ae7fe58c10c9eb48eaba2632955ce6814b63934d673181022f3f4b",
       "access_kinds": [
         "files"
       ]
@@ -768,6 +774,45 @@
     },
     "app/src/main/java/dezz/status/widget/diagnostics/DimUartRecording.java": {
       "sha256": "98fa1f9fbada8c763ab2bfee1d6e80f90c74badc764be889484230dc499e7000",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/YandexDiskSession.java": {
+      "sha256": "831b0ab5f64661de26daa5acf500eef826e33a71781d19f56c2745c76b8597da",
+      "access_kinds": [
+        "keystore",
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/files/FileLocation.java": {
+      "sha256": "6cba8f38c71147a7713018fc2011e84e55ba02c4ec71acecaff50e2475f7f1f0",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/files/DocumentFiles.java": {
+      "sha256": "4dd0a8b202750f0152bcf76861c49c34d5454de22ce328b7fd10980a8208c064",
+      "access_kinds": [
+        "external_resource"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/files/FileArchives.java": {
+      "sha256": "3c348b4d75eda753be2717bbee48abb0b02b080903784cc396f97648c37d7584",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/FileManagerActivity.java": {
+      "sha256": "fa9ca59a56b3ee76257a3d64a7897d67987c45c383ec2b946b36356a999d2b74",
+      "access_kinds": [
+        "external_resource",
+        "files",
+        "preferences"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/files/LocalFiles.java": {
+      "sha256": "3d4c9e4298e7353e32b4c70e257ecfe2eb51ddfaafdc10a5fee145616d9daefb",
       "access_kinds": [
         "files"
       ]
