@@ -164,3 +164,5 @@ QNX отказал до handshake; каталог/mappings остаются BLOC
 - [07.11.2026 — FIELD3.4.3: ANR main stack, Music timeout/reservation](geely-kx11/BOOT_343_FIELD_2026_11_07_RU.md). Автозапуск FAILED; SOURCE анализ, исправление/APK OPEN.
 
 07.11: [продолжение3.4.4 SOURCE](geely-kx11/BOOT_343_FIELD_2026_11_07_RU.md),8host Music replays PASS; Android/APK/FIELD pending.
+
+- [FIELD3.4.4: два boot и Music endpoint_timeout](geely-kx11/BOOT_344_FIELD_2026_11_07_RU.md).

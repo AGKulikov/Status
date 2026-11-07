@@ -3161,3 +3161,6 @@ Navigator fresh-evidence wakeup с прежними guards. Native I/O root caus
 
 3.4.4 опубликована07.11:2281Android/285tool PASS,7assets readback PASS.
 Cold-boot FIELD и native I/O остаются OPEN; [протокол](docs/releases/3.4.4/README_RU.md).
+
+07.11 FIELD3.4.4: Navigator2boot успешны по USER; Music3prepare/boot → endpoint_timeout.
+[Причина выбора сервиса ещё OPEN](docs/geely-kx11/BOOT_344_FIELD_2026_11_07_RU.md).

@@ -5946,3 +5946,14 @@ Release437459199/tag natro-v3.4.4 stable/latest; publisher42358341071/job1283612
 APK побайтно совпадает с проверенным signed3.4.4. SOURCE/TEST/APK/PUBLISH PASS
 в описанном объёме; FIELD холодного запуска и исходная причина I/O OPEN.
 [Машинное подтверждение](docs/releases/3.4.4/publication-verification.json).
+
+
+## 07.11.2026 — FIELD3.4.4: Navigator два запуска успешны, Music FAILED
+
+USER дважды перезапустил магнитолу. Архив5451097757875713262: в обеих сессиях
+3prepare accepted → remote_endpoint_timeout, token/PLAY отсутствуют. Повторы
+работают; причина теперь локализована в выборе endpoint нашего Music provider,
+но0 или несколько кандидатов журнал не различает. Нужен Music fix, не новый
+таймаут Natro. Navigator успешен по USER, recovery отменён onUserInteraction;
+успех не доказывает работу recovery. [Разбор](docs/geely-kx11/BOOT_344_FIELD_2026_11_07_RU.md).
+SOURCE analysis, новый TEST/APK OPEN; MUSIC-BOOT-MOD-342 FIELD FAILED.
