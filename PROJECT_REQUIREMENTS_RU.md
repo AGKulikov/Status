@@ -5812,3 +5812,24 @@ resources, native libs и все прочие payload entries должны ос�
 и декомпиляция не публикуются. SHA и отчёт структуры обязательны перед APK.
 Native pre-focus handoff ограничен300ms; при недоступном/опоздавшем снимке Алиса
 продолжает штатно без автоматического PLAY. TEST/APK/FIELD пока OPEN.
+
+
+## 07.11.2026 — ALICE-VOICE-END-341: завершить и опубликовать пару
+
+USER: «Ну так доделывай и публикуй». Разрешена публикация проверенного Natro3.4.1
+в stable/latest; парный Navigator3.4.1 передаётся отдельно. Это завершение
+ALICE-VOICE-END-340/341, сохраняет MUSIC-ALICE-338 и ALICE-338-R2/339 guards.
+SOURCE deb16c7682b3030b52da5878fd6bf2ca3fba9001/tree b34889d9e5fb341290043206eb71e85621e10bf4;
+CI42280645665/job128108584147 SUCCESS:2269Android,38Alice,283tool;0failed/errors/skips.
+APK оба восстановлены из сохранённых файлов и независимо сверены с CI:
+Natro SHA d23e5fe64f5984289de031c80693efcc4ca87ab0059605c62bd42338e32e2eb2,
+Navigator SHA 014ceef56df04c4a71a0ef02a8a60b35893cbfa591f7519dff86bf816485a6f4.
+Stable single signer/v2/v3/exactAPI28/zipalign/identity/versionCode+1 PASS;
+Natro1517payload unchanged, Navigator17224entries unchanged, только3разрешённых
+DEX. Новый native патчер повторён на pinned3.3.9; обе DEX совпали побайтно,
+classes19 exact CI. Helper прежний. Новые storage owners отсутствуют.
+Публичный handoff содержит только Natro ZIP/signature headers, без ключей.
+SOURCE/TEST/APK PASS в объёме матрицы3.4.1; PUBLISH OPEN до7asset readback;
+FIELD голоса/кнопки/руля, звука+2s, фона/окна/install-over остаётся OPEN.
+Исторические SOURCE-only статусы06.11 выше заменены этим протоколом,
+аппаратные gates не ослаблены. [Матрица и отчёты](docs/releases/3.4.1/README_RU.md).

@@ -3129,3 +3129,6 @@ NoSpeech тоже FINISHED; TTS complete отдельно; Quark и runtime timi
 06.11 SOURCE3.4.1: глобальный pre-focus hook AliceKit/Quark и native idle stream
 вместо списка триггеров. Голосовой вызов включён в контракт. [Точки и ограничения](docs/geely-kx11/ALICE_2026_11_06_RU.md).
 TEST/APK/FIELD на данном checkpoint OPEN.
+
+
+07.11.2026 ALICE-VOICE-END-341: SOURCE/TEST/APK пары3.4.1 подтверждены, native DEX повторены точным патчером; все прочие Navigator payload unchanged. CI2269Android/38Alice/283tool PASS. Голос/кнопка/руль, время звука и Quark runtime FIELD OPEN. [Матрица](docs/releases/3.4.1/README_RU.md).

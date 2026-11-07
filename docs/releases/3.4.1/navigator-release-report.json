@@ -1,0 +1,38 @@
+{
+  "sourceCommit": "deb16c7682b3030b52da5878fd6bf2ca3fba9001",
+  "sourceTree": "b34889d9e5fb341290043206eb71e85621e10bf4",
+  "ciRunId": "42280645665",
+  "package": "ru.yandex.yandexnavi",
+  "versionCode": 739564630,
+  "versionName": "30.3.0",
+  "signedApk": "Navigator-30.3.0-Natro-3.4.1-signed.apk",
+  "signedSha256": "014ceef56df04c4a71a0ef02a8a60b35893cbfa591f7519dff86bf816485a6f4",
+  "sizeBytes": 156546666,
+  "baselineSha256": "52736b41714bba696cd54442804816741e2834b57a0d880702560667106a89dc",
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "signatureV2": true,
+  "signatureV3": true,
+  "exactApi28Verified": true,
+  "signerCount": 1,
+  "zipalign16KiB": true,
+  "badgingUnchanged": true,
+  "unchangedPayloadEntries": 17224,
+  "changedEntries": {
+    "classes11.dex": {
+      "before": "453ed7d7e92c7d69b7eddeb08a1302ce63d9060a60757ef4db0b18785e710d23",
+      "after": "333f940ad8156545644c7ddbbdcbc977d670a30ccb4c755fabd5f4eb000db445"
+    },
+    "classes15.dex": {
+      "before": "eff5ff91eeb3d9d6c819487fe7b3962988147c9fc49fbb97f543f2bca7c16344",
+      "after": "aac286e3fe694ad9fb4144b6736bb5ca9a22f26d138dcbb0f2385dd19fa81388"
+    },
+    "classes19.dex": {
+      "before": "1aa6f536cf9464a1b0d32da5abfc47d7a528e5b9d509417dad41acb619956490",
+      "after": "d5e5759e66acbb871266d816017972ac9c703de8872582a01cc9b1abb52d3cc1"
+    }
+  },
+  "nativePatcherReproduced": true,
+  "exactCiBridge": true,
+  "installOverMetadataVerified": true,
+  "physicalKx11Verification": "pending"
+}

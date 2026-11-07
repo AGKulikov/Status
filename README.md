@@ -1,8 +1,14 @@
-> В разработке3.4.1: единое окончание голосовой сессии Алисы, включая wake-word.
-> Ветка `feature/alice-engine-20261106`; [статус парного выпуска](docs/releases/3.4.1/README_RU.md).
-> Stable3.4.0 ниже — предыдущий выпущенный APK;3.4.1 пока не выдана.
-
 # Natro
+
+**07.11.2026: пара Natro 3.4.1 / Navigator 3.4.1 проверена; публикация stable выполняется.**
+Завершение голосовой сессии Алисы и возврат музыки через2s для штатной кнопки,
+голосового вызова и команд Natro. Нужны оба APK, Helper прежний.
+[Протокол и установка](docs/releases/3.4.1/README_RU.md).
+Source `deb16c7682b3030b52da5878fd6bf2ca3fba9001`, CI42280645665 PASS2269Android/283tool.
+[Разработка](https://github.com/AGKulikov/Status/tree/feature/alice-engine-20261106),
+[ветка выпуска](https://github.com/AGKulikov/Status/tree/release/natro-3.4.1).
+FIELD KX11 остаётся OPEN; предыдущая stable3.4.0. Следующие записи — история выпусков.
+
 
 **06.11.2026: Natro3.4.0 опубликована в stable/latest.** Release436867441, publisher42274377501/job128086794811 SUCCESS; все7assets скачаны и побайтно сверены. Публичный APK и natro-update.json проверены отдельно:29952608bytes, SHA256 b11462f99824478df39b486b46f4932dd300492cbb04f112b0bd05dcd8a6afce. Source f974c09df69350a48fa7ada2889bb7d727146d5c; build CI42271336453 PASS2258Android/280tool. FIELD остаётся OPEN. Прежние записи об отсутствии публикации ниже — история.
 
