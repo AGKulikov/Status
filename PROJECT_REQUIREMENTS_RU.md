@@ -5834,3 +5834,20 @@ ru.yandex.music2026.10.2 #169gpr/code24026521/minSDK28. В fm7.invoke обнар
 динамическое переключение MusicBrowserService/Media3LibraryService. Это STATIC,
 не доказательство состояния компонентов установленной версии. Мод ещё OPEN.
 [Исследование и следующие проверки](docs/geely-kx11/ALICE_MUSIC_2026_11_07_RU.md).
+
+
+### 07.11.2026 — MUSIC-BOOT-MOD-342: отдельный bootstrap переданной Музыки
+USER повторно поручил продолжить до готовности. Предыдущая отправка исходников
+разрешена явно в этом диалоге. CI42348909773 SUCCESS для6b9b64a: целевые Alice
+тесты/компиляция Navigator PASS; полный APK/FIELD OPEN.
+SOURCE candidate: signature-authenticated ContentProvider внутри ru.yandex.music
+запускает только собственный MediaBrowser, возвращает точный framework token Natro.
+PLAY остаётся в guardedBrowserDispatch с прежними manual/boot permits. Нет UI
+плеера/глобальных медиаклавиш/обхода подписок. Подписанный мод требует стабильной
+подписи пары; сертификат исходного APKa4590f… отличается от Natro — install-over
+исходного мода нельзя обещать. Самостоятельно удалять приложение/данные запрещено.
+Native DEX/resources остаются прежними; добавляются classes7.dex, provider и
+идентификатор мода в manifest. Бинарный XML diff проверен с независимым parser.
+В FIELD установлен старый DebugMediaButtonReceiver; присланная база имеет новый
+MusicMediaButtonReceiver. Переключение Media3 не объявляется причиной старого лога.
+Новые TEST/APK/FIELD OPEN; native очередь/готовность и холодный старт требуют проверки.

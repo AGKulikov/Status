@@ -17,10 +17,14 @@ jobs:
           distribution: temurin
           java-version: '21'
       - run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
-      - run: ./gradlew testGeelyDebugUnitTest --tests '*NativeAliceCoordinatorTest' --tests '*AliceMusicResumeTest' --tests '*AliceVoiceContinuationTest' --no-daemon --no-configuration-cache
+      - run: ./gradlew testGeelyDebugUnitTest --tests '*NativeAliceCoordinatorTest' --tests '*AliceMusicResumeTest' --tests '*AliceVoiceContinuationTest' --tests '*BootstrapProviderTest' --tests '*MediaResumeCommandTest' --tests '*YandexBrowserServiceResolverTest' --no-daemon --no-configuration-cache
       - run: bash tools/build_navigation_patch_dex.sh
+      - run: bash tools/build_music_patch_dex.sh
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: alice-repeat-tests
-          path: app/build/test-results/**
+          path: |
+            app/build/test-results/**
+            build/music-mod/classes7.dex
+            build/navigation-mod/classes19.dex

@@ -354,6 +354,12 @@ final class MediaResumeCommand {
 
         boolean yandexColdPlay = coldStartEscalation
                 && YANDEX_MUSIC_PACKAGE.equals(target) && command == Command.PLAY;
+        if (yandexColdPlay && !yandexSessionPlayAttempted && NatroMusicBootstrap.available(context)) {
+            String bootstrap = NatroMusicBootstrap.request(context,
+                    MediaAutoResumeController.browserPlayPermit(context, true));
+            return trace("bootstrap_scheduled".equals(bootstrap) ? Result.BROWSER_BOOTSTRAP : Result.DISPATCH_FAILED,
+                    "route=paired_music_bootstrap, status=" + bootstrap);
+        }
         String yandexBootstrap = "not_requested";
         if (yandexColdPlay && yandexColdStartRouteRequested) {
             // Give the one-shot foreground receiver time to create the exact MediaSession. The

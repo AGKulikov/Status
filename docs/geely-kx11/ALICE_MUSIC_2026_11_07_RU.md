@@ -41,3 +41,17 @@ TEST/APK/FIELD OPEN. Принятие: повторные разговоры в�
 
 Локальный Gradle не стартовал: download gradle8.14.2 — Network is unreachable.
 Добавлен целевой CI без выпуска APK; результат ожидается.
+
+## Продолжение SOURCE
+
+6b9b64a / CI42348909773 PASS: targeted Alice + NavigatorDEX. Полная аппаратная
+приёмка не закрыта. Новый MusicBootstrapProvider использует own-app UID
+(разрешённый native проверкой Libs.g), возвращает session token только клиенту
+ru.natro.statuswidget с совпадающей подписью. Не заменяет native очередь или
+проверки аккаунта. Natro проверяет identity provider и session package; ручная
+команда и deadline запрещают поздний PLAY.
+В manifest добавляется один provider/version identity, все существующие элементы
+сверены независимым AXMLParser. Следующий CI проверяет security gates и DEX.
+Подпись исходного YM:a4590f0a8ad6c6a30b87900289a918be0fd6b036f82d2ec4551f3caf2d910892.
+Она не совпадает с общей подписью Natro. Новый мод нельзя обещать установить
+поверх исходного без его ключа; данные на устройстве не удалялись.
