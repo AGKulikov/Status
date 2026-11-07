@@ -5897,3 +5897,17 @@ REL publication PASS: release437441783/tag natro-v3.4.3, publisher42355757026/jo
 совпадают с offline-проверенными. Ветка release/natro-3.4.3/85eab366 содержит исходники
 и отчёты; APK source a9bb7c0. FIELD и native root cause остаются OPEN.
 [Проверка публикации](docs/releases/3.4.3/publication-verification.json).
+
+
+## 07.11.2026 — BOOT-338 / ANR-343 / MUSIC-BOOT-MOD-342: FIELD3.4.3 FAILED
+
+USER: «Музыка и навигатор не запустились при холодном запуске». Архив1887387747792294962,
+SHA256 f6a83c1f9e6c4094cb0922dbc5ae7e7747e8e6508ecc84eb010532dc45920e5a;
+9каналов manifest PASS. Navigator main блокируется на open при загрузке Firebase
+Crashlytics до Application.onCreate completion;40% iowait. Это место блокировки,
+не доказанная причина задержек накопителя. ANR report получен: ANR-343 один FIELD
+сценарий подтверждён. Автозапуск FIELD FAILED, нового исправления/APK нет.
+Music prepare истёк15s, legacy browser flag блокирует повтор paired bootstrap;
+STATIC цепочка подтверждена. Navigator recovery attempt2 отсутствует; HOME resumed
+951ms, затем paused; точный gate неизвестен. Не снимать manual/foreground guards.
+[Доказательства, ограничения, открытые проверки](docs/geely-kx11/BOOT_343_FIELD_2026_11_07_RU.md).

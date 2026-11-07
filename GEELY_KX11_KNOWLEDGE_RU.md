@@ -3149,3 +3149,9 @@ FIELD и native root cause остаются OPEN. Совместимый Navigat
 07.11.2026 11:31:05 МСК:3.4.3 опубликована stable/latest, publisher42355757026 SUCCESS.
 Все7публичных файлов проверены; [протокол](docs/releases/3.4.3/publication-verification.json).
 Это подтверждение выпуска/подписи, не FIELD устранения native ANR.
+
+
+07.11.2026: [FIELD3.4.3 холодный запуск](docs/geely-kx11/BOOT_343_FIELD_2026_11_07_RU.md) FAILED.
+ANR main stack впервые сохранён: native library open во время Firebase init;40% iowait.
+Music paired bootstrap timeout не освобождает legacy browser reservation.
+Причина I/O задержек и gate отсутствующего Navigator retry OPEN; исправление не выпущено.

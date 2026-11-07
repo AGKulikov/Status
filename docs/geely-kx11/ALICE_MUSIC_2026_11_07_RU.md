@@ -59,3 +59,11 @@ ru.natro.statuswidget с совпадающей подписью. Не заме�
 ## Итог SOURCE/TEST/APK 3.4.2
 
 Предыдущие отметки OPEN по сборке — история. Source b2434a5, CI42351315865 SUCCESS2275Android/283tool и targeted42351315843 PASS23. Три подписанных APK, exactAPI28/v2/v3/zipalign и payload проверки PASS; [протокол](../releases/3.4.2/README_RU.md). Повтор bind в моде ограничен исходным deadline и запрещён после token. FIELD и установочная/аккаунтная проверка мода Музыки OPEN.
+
+
+## FIELD3.4.3 07.11.2026: cold boot FAILED
+
+[Новый архив и STATIC цепочка](BOOT_343_FIELD_2026_11_07_RU.md): paired Music prepare
+истёк15s; BROWSER_BOOTSTRAP сохраняет legacy reservation, блокирующую повтор
+paired bootstrap. Причина отсутствия первого token неизвестна; process=not_running
+не соответствует доказанному отсутствию процесса. Новый fix/APK OPEN.

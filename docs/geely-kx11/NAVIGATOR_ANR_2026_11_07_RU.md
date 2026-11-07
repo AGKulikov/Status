@@ -53,3 +53,11 @@ fallback remains. The APK is recovery/evidence improvement, not a proven native
 ANR root-cause fix. Device gates above remain OPEN.
 Signed3.4.3/API28/v2/v3/zipalign/install-over metadata and unchanged CI payload PASS.
 [Release reports and acceptance matrix](../releases/3.4.3/README_RU.md).
+
+
+## FIELD3.4.3 07.11.2026
+
+[Новый архив](BOOT_343_FIELD_2026_11_07_RU.md) подтверждает получение main stack,
+но автозапуск FAILED. Место блокировки: open native library при Firebase init,
+40% iowait. Причина I/O и отсутствие retry ещё OPEN. Прежний UNKNOWN уточнён
+местом блокировки, не заменён заявлением об устранённой первопричине.
