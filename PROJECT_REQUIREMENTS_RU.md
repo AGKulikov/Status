@@ -6066,3 +6066,7 @@ schema5classes/11fields, manifest version-only diff, backup/settings inventories
 и workflow в публичный AGKulikov/Status; обход не выполнялся. Требуется явное
 разрешение этой публикации. FIELD новой пары OPEN, прежний FAILED сохраняется.
 [Доказательства и ограничения](docs/geely-kx11/BOOT_345_FIELD_2026_11_07_RU.md).
+
+## 07.11.2026 — разрешение и сборка 3.4.6
+
+USER явно разрешил публикацию исходников, CI и выпуск APK. SOURCE d0cf73374a6fc5c41a784a801443113f8fd59b08 опубликован; CI42375796537 SUCCESS,2292 Android теста. TEST/APK PASS; прежний signer, code+1, native payload Music сохранён. Navigator3.4.2 повторно используется по совпавшим patch/tool hashes. PUBLISH выполняется; FIELD OPEN. См. docs/releases/3.4.6.

@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "channel": "stable",
+  "package": "ru.natro.statuswidget",
+  "versionCode": 208021379,
+  "versionName": "3.4.6",
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "sha256": "2b020926c0056ed4285b1ea09e1f179e2a7de55814dfaade247dd8388f5034f6",
+  "size": 29973088,
+  "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.4.6/Natro-3.4.6-signed.apk"
+}

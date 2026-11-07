@@ -1,3 +1,5 @@
+> Natro 3.4.6 + Music Natro 3: SOURCE/TEST/APK PASS; FIELD OPEN. [Выпуск](docs/releases/3.4.6/README_RU.md).
+
 > Текущая разработка и кандидат: `release/natro-3.4.6`, Natro3.4.6 + MusicNatro3.
 > Новый FIELD3.4.5 отрицательный. [Разбор и границы исправления](docs/geely-kx11/BOOT_345_FIELD_2026_11_07_RU.md). Сборка/проверка выполняются.
 
