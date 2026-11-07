@@ -166,3 +166,5 @@ QNX отказал до handshake; каталог/mappings остаются BLOC
 07.11: [продолжение3.4.4 SOURCE](geely-kx11/BOOT_343_FIELD_2026_11_07_RU.md),8host Music replays PASS; Android/APK/FIELD pending.
 
 - [FIELD3.4.4: два boot и Music endpoint_timeout](geely-kx11/BOOT_344_FIELD_2026_11_07_RU.md).
+
+- [07.11.2026 — пересечение подготовки Music Natro 2 и PLAY](geely-kx11/MUSIC_PREPARE_PLAY_RACE_2026_11_07_RU.md): Natro3.4.5 SOURCE/TEST/APK PASS; Music2 совместима; FIELD нового порядка OPEN.

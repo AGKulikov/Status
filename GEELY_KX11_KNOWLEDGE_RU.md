@@ -3164,3 +3164,13 @@ Cold-boot FIELD и native I/O остаются OPEN; [протокол](docs/rel
 
 07.11 FIELD3.4.4: Navigator2boot успешны по USER; Music3prepare/boot → endpoint_timeout.
 [Причина выбора сервиса ещё OPEN](docs/geely-kx11/BOOT_344_FIELD_2026_11_07_RU.md).
+
+
+## 07.11.2026 — Music Natro 2 / Natro 3.4.5: подготовка перед PLAY
+
+Источник: Natro-diagnostics-1100753096801331388.zip, Music code24026523, Android9
+ECARX KX11. ANR Main/onGetRoot и Media3Looper/onPlay совпадает с преждевременным
+exact_session_play до bootstrap token. SOURCE/replay подтверждают путь и барьер
+на стороне Natro; native deadlock cause полностью не доказана. В3.4.5 SOURCE/
+TEST/APK PASS, FIELD OPEN. Music2/protocol1 остаётся совместимой без нового APK.
+[Подробности и ограничения](docs/geely-kx11/MUSIC_PREPARE_PLAY_RACE_2026_11_07_RU.md).

@@ -6023,3 +6023,21 @@ TEST: production host replay дополнен pending/expired/manual/token gates
 APK Natro3.4.5 готовится; MusicNatro2 остаётся прежним. Полная причина native
 future требует отдельной проверки; FIELD нового порядка OPEN. Не выдавать ANR
 subject PushJobService за доказанную причину — стек блокируется в onGetRoot.
+
+
+## 07.11.2026 — завершить Natro 3.4.5 и проверить необходимость новой Музыки
+
+USER: «Доделывай натро. А под 3.4.5 не нудна новая версия музыки?» Продолжаются
+ранее разрешённые подпись и публикация APK в существующем stable/latest.
+MUSIC-BOOT-MOD-342 / BOOT-338: runtime SOURCE a2c6f974e2382684b8bdbd3822bf8d143fd19353,
+tree 9fd54e44d760ec9df6145cac3a081732d1a6813c; CI42361490968/job128370646674 SUCCESS.
+TEST:2283 Android /445 suites,285 tool/replay,0failure/error/skip; pending/expired/
+manual/token guards проверены production replay. APK3.4.5/code208021378,
+29973088bytes,SHA256db92b0995856620cfa3d738248672e0a3ca61cac46399bc32487a67453864f18. Один прежний signer,v2/v3,
+exactAPI28,zipalign16KiB,+1 против3.4.4,1517payload entries после подписи PASS.
+Новый барьер найден в фактическом DEX. Новая Музыка НЕ требуется: `music-mod`
+идентичен runtime b04f768 Natro2/code24026523, provider/protocol/callback прежние.
+Navigator3.4.2 повторно используется: patch/native tool hashes неизменны; Helper прежний.
+PUBLISH подготовлен, результат записывается отдельно после фактической проверки.
+FIELD нового порядка cold boot OPEN; прежний Music2/Natro3.4.4 FAILED не отменяется.
+[Матрица, установка и доказательства](docs/releases/3.4.5/README_RU.md).

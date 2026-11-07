@@ -1,0 +1,38 @@
+{
+  "source": "a2c6f974e2382684b8bdbd3822bf8d143fd19353",
+  "tree": "9fd54e44d760ec9df6145cac3a081732d1a6813c",
+  "run": "42361490968",
+  "job": 128370646674,
+  "result": "success",
+  "androidTests": {
+    "tests": 2283,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "xmlSuites": 445,
+  "toolTests": 285,
+  "musicHostReplayScenarios": 8,
+  "newBarrierInSignedDex": true,
+  "companionCompatibility": {
+    "music": {
+      "version": "2026.10.2 #169gpr Natro 2",
+      "versionCode": 24026523,
+      "runtimeSource": "b04f768e55477934d786fdfbed475f553a3757c0",
+      "protocol": 1,
+      "sourceIdentical": true,
+      "newApkRequired": false
+    },
+    "navigator": {
+      "version": "30.3.0-Natro-3.4.2",
+      "patchSha256": "81d37552019e321e1f807874b040a22dff81de2949d613d5f6c82035ad1ebae0",
+      "nativeToolHashesUnchanged": true,
+      "newApkRequired": false
+    },
+    "helper": {
+      "changed": false,
+      "newApkRequired": false
+    }
+  },
+  "physicalColdBoot": "pending"
+}

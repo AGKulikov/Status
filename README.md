@@ -1,15 +1,6 @@
-> Текущая разработка: `fix/music-endpoints-20261107`, ветка `release/yandex-music-natro-2`. Music Natro 2: 25 целевых тестов, подпись и совместимость обновления по метаданным PASS; упаковщик и отчёты опубликованы, remote commit проверен. [Протокол](docs/releases/music-natro-2/README_RU.md). Natro 3.4.4 остаётся установленной; FIELD автозапуска Музыки пока FAILED для Natro 1 и OPEN для нового мода.
-
-> Natro 3.4.4 SOURCE/TEST/APK проверены (2281 Android / 285 tool); опубликована в stable/latest. [Состояние проверок](docs/releases/3.4.4/README_RU.md).
-
-> **3.4.3 опубликована в stable/latest 07.11.2026.** Все 7 файлов скачаны и проверены; [результат публикации](docs/releases/3.4.3/publication-verification.json).
-> Восстановление Навигатора после подтверждённого завершения процесса и сохранение сведений об ANR.
-> [Ветка выпуска](https://github.com/AGKulikov/Status/tree/release/natro-3.4.3), [установка и доказательства](docs/releases/3.4.3/README_RU.md).
-> 2279 тестов приложения, полный CI и 7 дополнительных сценариев PASS; FIELD OPEN. Уже установленный Navigator3.4.2 переустанавливать не нужно.
-
-> **3.4.2: подписанный комплект готов; FIELD OPEN.** 2275Android/283tool tests PASS.
-> [Ветка выпуска](https://github.com/AGKulikov/Status/tree/release/natro-3.4.2), [проверки и установка](docs/releases/3.4.2/README_RU.md).
-> Требуются парный Navigator3.4.2 и отдельный мод Музыки для нового bootstrap. История выпусков ниже.
+> Текущая разработка: `fix/music-prepare-play-20261107`; выпуск `release/natro-3.4.5`.
+> **Natro 3.4.5: SOURCE/TEST/APK PASS, публикация завершается.** 2283 Android / 285 tool tests, прежняя подпись и exact API 28 проверены. [Установка и матрица](docs/releases/3.4.5/README_RU.md).
+> Обновляется только Natro: Яндекс Музыка Natro 2, Навигатор Natro 3.4.2 и Helper совместимы. FIELD холодного запуска OPEN; отрицательный результат Music 2 с прежним Natro сохранён в [разборе](docs/geely-kx11/MUSIC_PREPARE_PLAY_RACE_2026_11_07_RU.md). Старые состояния ниже — история.
 
 # Natro
 
