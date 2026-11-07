@@ -3158,3 +3158,6 @@ Music paired bootstrap timeout не освобождает legacy browser reserv
 
 3.4.4 SOURCE candidate: ограниченные повторные Music prepare после cold provider acquisition;
 Navigator fresh-evidence wakeup с прежними guards. Native I/O root cause/FIELD OPEN.
+
+3.4.4 опубликована07.11:2281Android/285tool PASS,7assets readback PASS.
+Cold-boot FIELD и native I/O остаются OPEN; [протокол](docs/releases/3.4.4/README_RU.md).

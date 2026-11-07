@@ -5937,3 +5937,12 @@ stable signer/v2/v3/exactAPI28/zipalign/+1/1517payload entries PASS. Navigator3.
 patch/native hashes прежние, Music/Helper прежние. PUBLISH выполняется сreadback7assets.
 BOOT-338/MUSIC-BOOT-MOD-342 FIELD OPEN: native I/O причина не объявляется исправленной.
 [Протокол](docs/releases/3.4.4/README_RU.md). Временные приватные ключи удалены.
+
+
+### 07.11.2026 12:07:46 МСК — 3.4.4 PUBLISH PASS
+
+Release437459199/tag natro-v3.4.4 stable/latest; publisher42358341071/job128361211723 SUCCESS.
+Все7assets прошли publisher readback и независимое скачивание/SHA256; публичный
+APK побайтно совпадает с проверенным signed3.4.4. SOURCE/TEST/APK/PUBLISH PASS
+в описанном объёме; FIELD холодного запуска и исходная причина I/O OPEN.
+[Машинное подтверждение](docs/releases/3.4.4/publication-verification.json).

@@ -18,7 +18,9 @@ SHA2569dc7d907eb2a2a972de10f7ccb6fa08b2b059f2beafa3e7975f25f73c575577b.
 [Отчёт](release-report.json), [CI](ci-verification.json), [подпись](signature-verification.txt).
 
 Navigator3.4.2 classes19/native tool hashes совпадают; новый Navigator не требуется.
-Music/Helper не менялись. SOURCE/TEST/APK PASS в этом объёме, PUBLISH pending.
+Music/Helper не менялись. SOURCE/TEST/APK PASS в этом объёме, PUBLISH PASS: stable/latest release437459199, publisher42358341071 SUCCESS.
+Все7assets независимо скачаны и сверены, APK побайтно совпадает.
+[Подтверждение](publication-verification.json).
 FIELD повторных cold boots/музыки/окна/сохранения данных OPEN. Устранение native
 I/O задержек/Firebase ANR не заявляется: исправлены координация и восстановление.
 [Источники, гипотезы, ограничения](../../geely-kx11/BOOT_343_FIELD_2026_11_07_RU.md).

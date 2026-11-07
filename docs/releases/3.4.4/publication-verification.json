@@ -1,0 +1,47 @@
+{
+  "releaseId": 437459199,
+  "tag": "natro-v3.4.4",
+  "publishedAt": "2026-11-07T09:07:46Z",
+  "publisherRun": 42358341071,
+  "publisherJob": 128361211723,
+  "publisherConclusion": "success",
+  "sourceCommit": "dffc9dea7e4458dfaae96bbde09d5722af033a71",
+  "publicReadbackVerified": true,
+  "assets": [
+    {
+      "name": "Natro-3.4.4-signed.apk",
+      "bytes": 29973088,
+      "sha256": "9dc7d907eb2a2a972de10f7ccb6fa08b2b059f2beafa3e7975f25f73c575577b"
+    },
+    {
+      "name": "Natro-3.4.4-source.tar.gz",
+      "bytes": 36120038,
+      "sha256": "e5c28be33ead0d4d3316053d4dce230b3984a61015aabbd500b25802c4390dc2"
+    },
+    {
+      "name": "README_RU.md",
+      "bytes": 1698,
+      "sha256": "5ef571fdd37bc2652df9af3a41d024caadb3c9eb9d034c3ff5a0149200b7b81f"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "bytes": 523,
+      "sha256": "b775ddb4edd8c0c5af4fbcd4578113fe7f2696fff1eef6c8a5edd38ec05b872a"
+    },
+    {
+      "name": "natro-update.json",
+      "bytes": 426,
+      "sha256": "0c805b3bed163513ab6b66d63868b3ce478eeaa61cb50d23e5e4986717409ef7"
+    },
+    {
+      "name": "release-report.json",
+      "bytes": 3257,
+      "sha256": "2f5d3c9ad0a95e01743640feba32f390876d606fdb6c721921d9b2ab87b67bc8"
+    },
+    {
+      "name": "signature-verification.txt",
+      "bytes": 2341,
+      "sha256": "64e2120c2d8b27ca604ab56544853b36687e6b327c2c94b2b4c5c4e33b47f9c9"
+    }
+  ]
+}
