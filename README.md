@@ -1,3 +1,18 @@
+# Natro — актуальная разработка
+
+**Natro 3.4.3 опубликована в stable/latest 7 ноября 2026 года.**
+
+- [Готовый APK и исходники выпуска](https://github.com/AGKulikov/Status/releases/tag/natro-v3.4.3).
+- [Актуальная ветка `release/natro-3.4.3`](https://github.com/AGKulikov/Status/tree/release/natro-3.4.3).
+- [Установка, совместимость и проверка выпуска](https://github.com/AGKulikov/Status/blob/release/natro-3.4.3/docs/releases/3.4.3/README_RU.md).
+- APK source `a9bb7c0fcbe1866570024df419bf962af1cacf7b`; [CI](https://github.com/AGKulikov/Status/actions/runs/42354372942) прошёл 2279 тестов приложения и 283 проверки инструментов.
+
+Сохранена прежняя подпись. Уже установленный Navigator 3.4.2 повторно устанавливать не требуется.
+Работа на ECARX KX11 и внутренняя причина ANR остаются предметом аппаратной проверки.
+Исходники в `main` исторические; текущая разработка и отчёты находятся в указанной ветке.
+
+---
+
 # Виджет информации (Status Widget)
 
 Плавающий статус-виджет для **Android-головных устройств в автомобилях**.
