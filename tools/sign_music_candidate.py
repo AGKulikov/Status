@@ -9,16 +9,19 @@ from sign_natro_candidate import CERT, payload_hashes, run, sha256, signature_en
 from verify_kx11_navigation_pair import verify_signer, verify_zipalign
 
 BASELINE = '7018cb5ba63248a3b33973d5a32d380b7dfaa287c9a416d072754f2670f47f81'
+PREVIOUS = '0ff7d3fceb0a7abb12f98917dcf9f649996368b6c2c23c8fa9b6725fba5ab371'
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    for name in ('baseline', 'dex', 'sdk', 'keystore', 'password-file', 'output'):
+    for name in ('baseline', 'previous-apk', 'dex', 'sdk', 'keystore', 'password-file', 'output'):
         p.add_argument('--' + name, type=Path, required=True)
-    for name in ('dex-sha256', 'source-commit', 'ci-run'):
+    for name in ('dex-sha256', 'source-commit', 'source-tree', 'packaging-commit', 'ci-run'):
         p.add_argument('--' + name, required=True)
     a = p.parse_args()
     if sha256(a.baseline) != BASELINE or sha256(a.dex) != a.dex_sha256:
         raise ValueError('Baseline or CI DEX checksum mismatch')
+    if sha256(a.previous_apk) != PREVIOUS:
+        raise ValueError('Previous Music APK checksum mismatch')
     if not a.dex.read_bytes().startswith(b'dex\n'):
         raise ValueError('Invalid DEX header')
     before = payload_hashes(a.baseline)
@@ -27,7 +30,7 @@ def main():
     a.output.mkdir(parents=True, exist_ok=True)
     unsigned = a.output / 'music-unsigned.apk'
     aligned = a.output / 'music-aligned.apk'
-    signed = a.output / 'Yandex-Music-2026.10.2-Natro-1-signed.apk'
+    signed = a.output / 'Yandex-Music-2026.10.2-Natro-2-signed.apk'
     if any(x.exists() for x in (unsigned, aligned, signed)):
         raise FileExistsError('Output already exists')
     with zipfile.ZipFile(a.baseline) as src, zipfile.ZipFile(unsigned, 'w') as dst:
@@ -45,6 +48,24 @@ def main():
     if [n for n in before if before[n] != expected[n]] != ['AndroidManifest.xml']:
         raise ValueError('Native payload changed')
     signer, align, aapt = [a.sdk / n for n in ('apksigner', 'zipalign', 'aapt')]
+    previous_verification = verify_signer(signer, a.previous_apk, ('v2', 'v3'))
+    previous_identity = run(aapt, 'dump', 'badging', a.previous_apk).stdout.splitlines()[0]
+    if "name='ru.yandex.music' versionCode='24026522' versionName='2026.10.2 #169gpr Natro 1'" not in previous_identity:
+        raise ValueError('Unexpected previous identity: ' + previous_identity)
+    previous_payload = payload_hashes(a.previous_apk)
+    if set(previous_payload) != set(expected):
+        raise ValueError('Payload inventory changed from Music Natro 1')
+    changed_from_previous = sorted(n for n in previous_payload if previous_payload[n] != expected[n])
+    if changed_from_previous != ['AndroidManifest.xml', 'classes7.dex']:
+        raise ValueError('Unexpected payload changes from Music Natro 1')
+    previous_manifest = run(aapt, 'dump', 'xmltree', a.previous_apk, 'AndroidManifest.xml').stdout
+    new_manifest = run(aapt, 'dump', 'xmltree', unsigned, 'AndroidManifest.xml').stdout
+    expected_manifest = previous_manifest.replace(
+        'android:versionCode(0x0101021b)=(type 0x10)' + hex(24026522),
+        'android:versionCode(0x0101021b)=(type 0x10)' + hex(24026523)).replace(
+        '2026.10.2 #169gpr Natro 1', '2026.10.2 #169gpr Natro 2')
+    if new_manifest != expected_manifest:
+        raise ValueError('Manifest changes exceed versionCode/versionName update')
     run(align, '-f', '-P', '16', '4', unsigned, aligned)
     run(signer, 'sign', '--ks', a.keystore, '--ks-key-alias', 'status-widget-ha',
         '--ks-pass', 'file:' + str(a.password_file), '--v1-signing-enabled', 'true',
@@ -55,17 +76,23 @@ def main():
     if payload_hashes(signed) != expected:
         raise ValueError('Signing changed payload')
     identity = run(aapt, 'dump', 'badging', signed).stdout.splitlines()[0]
-    if "name='ru.yandex.music' versionCode='24026522' versionName='2026.10.2 #169gpr Natro 1'" not in identity:
+    if "name='ru.yandex.music' versionCode='24026523' versionName='2026.10.2 #169gpr Natro 2'" not in identity:
         raise ValueError('Unexpected identity: ' + identity)
     report = dict(apk=signed.name, sha256=sha256(signed), size=signed.stat().st_size,
-                  sourceCommit=a.source_commit, ciRun=a.ci_run, baselineSha256=BASELINE,
+                  sourceCommit=a.source_commit, sourceTree=a.source_tree,
+                  packagingCommit=a.packaging_commit, ciRun=a.ci_run, baselineSha256=BASELINE,
                   dexSha256=a.dex_sha256, certificateSha256=CERT, signatureV2=True,
                   signatureV3=True, exactApi28=True, zipalign16KiB=True,
                   unchangedNativeEntries=len(before)-1, changedEntries=['AndroidManifest.xml'],
                   addedEntries=['classes7.dex'], installOverOriginal=False,
+                  previousApk=a.previous_apk.name, previousSha256=PREVIOUS,
+                  changedFromPrevious=changed_from_previous, versionCode=24026523,
+                  previousVersionCode=24026522, installOverNatro1MetadataVerified=True,
+                  manifestSemanticsOnlyVersionChanged=True,
                   physicalKx11Verification='pending')
     (a.output/'music-release-report.json').write_text(json.dumps(report, indent=2)+'\n')
-    (a.output/'music-signature-verification.txt').write_text(verification)
+    (a.output/'music-signature-verification.txt').write_text(
+        'Music Natro 2:\n'+verification+'\nMusic Natro 1:\n'+previous_verification)
     unsigned.unlink(); aligned.unlink(); Path(str(signed)+'.idsig').unlink(missing_ok=True)
     print(json.dumps(report, indent=2))
 

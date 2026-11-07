@@ -1,0 +1,43 @@
+{
+  "apk": "Yandex-Music-2026.10.2-Natro-2-signed.apk",
+  "sha256": "c2de4f60d5ef2d5019bf0bed57c4a6cf1e48ecae0ff0845c482ff4e2be9de812",
+  "size": 63564601,
+  "sourceCommit": "b04f768e55477934d786fdfbed475f553a3757c0",
+  "sourceTree": "d38dd5474d22c0d39960eef473bbfe0ec806d8dd",
+  "packagingCommit": "7fd8bb36bab5f4dd17d7b8fec4bc5dcbafbf0206",
+  "ciRun": "42359529024",
+  "baselineSha256": "7018cb5ba63248a3b33973d5a32d380b7dfaa287c9a416d072754f2670f47f81",
+  "dexSha256": "32c6fe5a2523ae3feaa8770690a2118ee955051a1a1d72b448d9ff4f2635c3e6",
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "signatureV2": true,
+  "signatureV3": true,
+  "exactApi28": true,
+  "zipalign16KiB": true,
+  "unchangedNativeEntries": 4725,
+  "changedEntries": [
+    "AndroidManifest.xml"
+  ],
+  "addedEntries": [
+    "classes7.dex"
+  ],
+  "installOverOriginal": false,
+  "previousApk": "Yandex-Music-2026.10.2-Natro-1-signed.apk",
+  "previousSha256": "0ff7d3fceb0a7abb12f98917dcf9f649996368b6c2c23c8fa9b6725fba5ab371",
+  "changedFromPrevious": [
+    "AndroidManifest.xml",
+    "classes7.dex"
+  ],
+  "versionCode": 24026523,
+  "previousVersionCode": 24026522,
+  "installOverNatro1MetadataVerified": true,
+  "manifestSemanticsOnlyVersionChanged": true,
+  "physicalKx11Verification": "pending",
+  "badgingUnchangedExceptVersion": true,
+  "publication": {
+    "status": "blocked",
+    "reason": "Automatic approval review rejected public GitHub push as not authorized by the current user request.",
+    "runtimeSourcePublished": true,
+    "packagingSourcePublished": false,
+    "physicalInstallTest": "not_performed"
+  }
+}

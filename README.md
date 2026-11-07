@@ -1,4 +1,6 @@
-> Текущая разработка: `fix/cold-boot-344`, 3.4.4 SOURCE/TEST/APK проверены (2281Android/285tool); опубликована в stable/latest. Холодный запуск3.4.3 не прошёл FIELD; [разбор](docs/geely-kx11/BOOT_343_FIELD_2026_11_07_RU.md), [состояние проверок](docs/releases/3.4.4/README_RU.md).
+> Текущая разработка: `fix/music-endpoints-20261107`, ветка `release/yandex-music-natro-2`. Music Natro 2: 25 целевых тестов, подпись и совместимость обновления по метаданным PASS; публикация упаковщика и отчётов разрешена пользователем. [Протокол](docs/releases/music-natro-2/README_RU.md). Natro 3.4.4 остаётся установленной; FIELD автозапуска Музыки пока FAILED для Natro 1 и OPEN для нового мода.
+
+> Natro 3.4.4 SOURCE/TEST/APK проверены (2281 Android / 285 tool); опубликована в stable/latest. [Состояние проверок](docs/releases/3.4.4/README_RU.md).
 
 > **3.4.3 опубликована в stable/latest 07.11.2026.** Все 7 файлов скачаны и проверены; [результат публикации](docs/releases/3.4.3/publication-verification.json).
 > Восстановление Навигатора после подтверждённого завершения процесса и сохранение сведений об ANR.

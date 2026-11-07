@@ -1,0 +1,55 @@
+{
+  "run": 42359529024,
+  "job": 128364737506,
+  "source": "b04f768e55477934d786fdfbed475f553a3757c0",
+  "tree": "d38dd5474d22c0d39960eef473bbfe0ec806d8dd",
+  "result": "success",
+  "scope": "targeted Android tests and compilation; not a full Natro regression run",
+  "summary": {
+    "tests": 25,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "suites": [
+    {
+      "suite": "dezz.status.widget.launcher.AliceMusicResumeTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "dezz.status.widget.launcher.AliceVoiceContinuationTest",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "dezz.status.widget.launcher.NativeAliceCoordinatorTest",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "dezz.status.widget.launcher.YandexBrowserServiceResolverTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "ru.natro.music.BootstrapProviderTest",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "artifactId": 13568483826,
+  "artifactSha256": "fba3ee88e36ac69c55888c80384812827837e2d9e5ef50e8eade27b3f85beeec",
+  "dexSha256": "32c6fe5a2523ae3feaa8770690a2118ee955051a1a1d72b448d9ff4f2635c3e6",
+  "physicalColdBoot": "pending"
+}

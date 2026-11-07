@@ -5965,3 +5965,41 @@ native endpoints с enabled override, дедупликация и последо
 внутри прежнего deadline. Старые callbacks/таймеры изолированы generation.
 Не меняются component enabled/native queue/account/PLAY permits.
 TEST/APK/FIELD pending; не считать выпуском или доказанным исправлением.
+
+## 07.11.2026 — Music Natro 2: завершить упаковку после проверки CI
+
+USER: «Новая сборка Яндекс музыки готова?» Продолжение ранее порученного исправления.
+MUSIC-BOOT-MOD-342 SOURCE b04f768e55477934d786fdfbed475f553a3757c0,
+tree d38dd5474d22c0d39960eef473bbfe0ec806d8dd; CI42359529024/job128364737506
+SUCCESS: 25 целевых tests, failures/errors/skipped 0. Получен classes7.dex
+SHA25632c6fe5a2523ae3feaa8770690a2118ee955051a1a1d72b448d9ff4f2635c3e6.
+Готовится отдельный Yandex-Music-2026.10.2-Natro-2-signed.apk/code24026523
+поверх Natro 1/code24026522; package, signer, provider/protocol и native payload
+сохраняются. Изменения manifest независимо проверены aapt: только versionCode
+и versionName относительно Natro 1. Повторная установка Natro/Навигатора не требуется.
+Упаковщик дополнен pinned previous APK, полной сверкой payload и manifest;
+REL-005…011/015 обязательны. APK/signature/install-over metadata до выполнения OPEN.
+FIELD холодной загрузки остаётся OPEN; прежняя отрицательная приёмка не отменяется.
+[Состав и матрица доказательств](docs/releases/music-natro-2/README_RU.md).
+
+### 07.11.2026 — Music Natro 2: локальный APK PASS, публикация BLOCKED
+
+Упаковщик commit7fd8bb36bab5f4dd17d7b8fec4bc5dcbafbf0206 использует точный DEX
+успешного CI42359529024. Подписанный кандидат63564601bytes,
+SHA256c2de4f60d5ef2d5019bf0bed57c4a6cf1e48ecae0ff0845c482ff4e2be9de812.
+Stable signer/один подписант/v2/v3/exactAPI28/zipalign16KiB/code+1 PASS.
+Native4725entries сохранены; manifest семантически меняет только версию против
+Natro1; label/SDK/permissions/features/ABI также прежние. Реальная установка
+и холодный старт НЕ выполнялись, FIELD OPEN. Natro3.4.4/Navigator3.4.2 подходят.
+Автоматическая проверка отклонила push в публичный GitHub: текущий запрос
+не принят как разрешение на публикацию. Remote release-ветка отсутствует;
+обход/повторная отправка не выполнялись. Runtime-source опубликован ранее,
+упаковщик и итоговые отчёты пока локальные. REL-007/009/010 publication gate
+OPEN; проверочный APK не означает завершённый публичный выпуск.
+
+## 07.11.2026 — Music Natro 2: публикация прямо разрешена
+
+USER: «Разрешаю» в ответ на запрос опубликовать подготовленные изменения и отчёты
+в публичный AGKulikov/Status. Прежний отказ сохранён как история. Публикуется
+проверенное дерево упаковщика и отчётов; APK/ключи в Git не добавляются.
+Runtime b04f768 и CI42359529024 прежние; FIELD холодного запуска OPEN.
