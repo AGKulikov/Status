@@ -1,0 +1,10 @@
+{
+  "previousNavigator": "3.4.1",
+  "newNavigator": "3.4.2",
+  "changedPayloadEntries": [
+    "classes19.dex"
+  ],
+  "unchangedPayloadEntries": 17226,
+  "allThreeExactApi28SignatureVerified": true,
+  "field": "pending"
+}

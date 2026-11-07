@@ -3129,3 +3129,7 @@ NoSpeech тоже FINISHED; TTS complete отдельно; Quark и runtime timi
 06.11 SOURCE3.4.1: глобальный pre-focus hook AliceKit/Quark и native idle stream
 вместо списка триггеров. Голосовой вызов включён в контракт. [Точки и ограничения](docs/geely-kx11/ALICE_2026_11_06_RU.md).
 TEST/APK/FIELD на данном checkpoint OPEN.
+
+## 07.11.2026 — Алиса / запуск Музыки
+
+Кандидат3.4.2: повторный pre-focus handshake и отмена при потере heartbeat; native idle +2s сохраняется. Мод Music2026.10.2 использует own-app MediaBrowser UID, подпись/пакет клиента проверяются, PLAY остаётся в Natro. Полный CI2275Android/283tool PASS, три APK подписаны, FIELD OPEN. Логи3.4.1 не доказывают точный момент завершения диалога и источник PLAY; не выдавать найденный source defect за однозначно подтверждённую причину каждого отказа. [Доказательства](docs/geely-kx11/ALICE_MUSIC_2026_11_07_RU.md), [выпуск](docs/releases/3.4.2/README_RU.md).

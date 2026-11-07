@@ -1,0 +1,23 @@
+{
+  "apk": "Yandex-Music-2026.10.2-Natro-1-signed.apk",
+  "sha256": "0ff7d3fceb0a7abb12f98917dcf9f649996368b6c2c23c8fa9b6725fba5ab371",
+  "size": 63564601,
+  "sourceCommit": "b2434a5804071cf21390c312bb0cf20e5861cec0",
+  "ciRun": "42351315843",
+  "baselineSha256": "7018cb5ba63248a3b33973d5a32d380b7dfaa287c9a416d072754f2670f47f81",
+  "dexSha256": "addf950ee8fe38e5d0f4dc7e7fe585e2f0ef745c1fb3424f4f9d345a31d2d802",
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "signatureV2": true,
+  "signatureV3": true,
+  "exactApi28": true,
+  "zipalign16KiB": true,
+  "unchangedNativeEntries": 4725,
+  "changedEntries": [
+    "AndroidManifest.xml"
+  ],
+  "addedEntries": [
+    "classes7.dex"
+  ],
+  "installOverOriginal": false,
+  "physicalKx11Verification": "pending"
+}

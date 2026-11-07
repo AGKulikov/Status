@@ -1,6 +1,6 @@
-> В разработке3.4.1: единое окончание голосовой сессии Алисы, включая wake-word.
-> Ветка `feature/alice-engine-20261106`; [статус парного выпуска](docs/releases/3.4.1/README_RU.md).
-> Stable3.4.0 ниже — предыдущий выпущенный APK;3.4.1 пока не выдана.
+> **3.4.2: подписанный комплект готов; FIELD OPEN.** 2275Android/283tool tests PASS.
+> [Ветка выпуска](https://github.com/AGKulikov/Status/tree/release/natro-3.4.2), [проверки и установка](docs/releases/3.4.2/README_RU.md).
+> Требуются парный Navigator3.4.2 и отдельный мод Музыки для нового bootstrap. История выпусков ниже.
 
 # Natro
 

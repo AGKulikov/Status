@@ -5857,3 +5857,7 @@ MusicMediaButtonReceiver. Переключение Media3 не объявляе�
 SOURCE: исправлена привязка Request.this в асинхронном callback Музыки; добавлена полная сборка 3.4.2 / 208021375. TEST: первый прогон нового bootstrap остановился на компиляции, исправление ожидает повторной CI. Проверки Alice ранее PASS. APK/FIELD: OPEN; публикация обновления допустима только после полного build/test/signing gate.
 
 07.11 дополнение bootstrap: временный отказ bind до выдачи token повторяется через500ms только внутри исходного15s deadline. После token повтор запрещён. Целевой CI42350948501 прошёл21test; новый retry требует повторного CI. APK с предыдущим DEX не выдаётся как финальный.
+
+## 07.11.2026 — 3.4.2 SOURCE/TEST/APK
+
+SOURCE b2434a5804071cf21390c312bb0cf20e5861cec0 опубликован; полный CI42351315865 SUCCESS:2275Android/283tool,0fail/errors/skips; targeted42351315843:23tests. Три APK подписаны общим stable signer, exactAPI28/v2/v3/zipalign проверены. Natro+1 к3.4.1, payload точного CI сохранён; Navigator против3.4.1 меняет только classes19.dex. Music добавляет только provider/version в manifest и собственный DEX,4725native entries неизменны; original signer отличается, install-over исходного Music невозможно. Автоудаление не выполняется. FIELD повторных диалогов/finish+2s/холодной загрузки OPEN. Публикация Natro выполняется workflow release/natro-3.4.2 с readback; собственные исходники/отчёты опубликованы отдельно от проприетарных APK. [Протокол](docs/releases/3.4.2/README_RU.md).
