@@ -14,6 +14,21 @@ public class BootstrapProviderTest {
   p.applicationInfo=new ApplicationInfo();p.applicationInfo.packageName=name;p.applicationInfo.uid=uid;
   Shadows.shadowOf(RuntimeEnvironment.getApplication().getPackageManager()).installPackage(p);
  }
+ private void endpoints(boolean legacyEnabled,boolean modernEnabled){
+  PackageInfo p=new PackageInfo();p.packageName="ru.yandex.music";p.applicationInfo=new ApplicationInfo();
+  p.applicationInfo.packageName=p.packageName;p.applicationInfo.enabled=true;
+  p.services=new ServiceInfo[2];String[] names={"ru.yandex.music.common.media.mediabrowser.MusicBrowserService","com.yandex.music.shared.media.session.session.Media3LibraryService"};
+  for(int i=0;i<2;i++){ServiceInfo v=new ServiceInfo();v.packageName=p.packageName;v.name=names[i];v.enabled=i==0?legacyEnabled:modernEnabled;v.applicationInfo=p.applicationInfo;v.permission="same.uid.permission";p.services[i]=v;}
+  Shadows.shadowOf(RuntimeEnvironment.getApplication().getPackageManager()).installPackage(p);
+ }
+ @Test public void bothNativeServicesAreOrderedInsteadOfWaitingForOne(){
+  endpoints(true,true);java.util.List<android.content.ComponentName> found=BootstrapProvider.resolveEndpoints(RuntimeEnvironment.getApplication().getPackageManager());
+  assertEquals(2,found.size());assertTrue(found.get(0).getClassName().endsWith("Media3LibraryService"));
+ }
+ @Test public void disabledModernServiceLeavesLegacyUsable(){
+  endpoints(true,false);java.util.List<android.content.ComponentName> found=BootstrapProvider.resolveEndpoints(RuntimeEnvironment.getApplication().getPackageManager());
+  assertEquals(1,found.size());assertTrue(found.get(0).getClassName().endsWith("MusicBrowserService"));
+ }
  @Test public void onlyNamedClientWithMatchingSignatureMayPrepare(){
   install("ru.yandex.music",20001,"1234");install("ru.natro.statuswidget",20002,"1234");install("other.client",20003,"1234");
   assertTrue(BootstrapProvider.authorized(RuntimeEnvironment.getApplication(),20002));

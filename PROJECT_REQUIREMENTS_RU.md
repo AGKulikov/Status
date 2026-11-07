@@ -5957,3 +5957,11 @@ USER дважды перезапустил магнитолу. Архив5451097
 таймаут Natro. Navigator успешен по USER, recovery отменён onUserInteraction;
 успех не доказывает работу recovery. [Разбор](docs/geely-kx11/BOOT_344_FIELD_2026_11_07_RU.md).
 SOURCE analysis, новый TEST/APK OPEN; MUSIC-BOOT-MOD-342 FIELD FAILED.
+
+
+## 07.11.2026 — Music endpoint repair candidate
+USER: «Исправляй». SOURCE candidate: own-UID explicit discovery двух известных
+native endpoints с enabled override, дедупликация и последовательный fallback
+внутри прежнего deadline. Старые callbacks/таймеры изолированы generation.
+Не меняются component enabled/native queue/account/PLAY permits.
+TEST/APK/FIELD pending; не считать выпуском или доказанным исправлением.

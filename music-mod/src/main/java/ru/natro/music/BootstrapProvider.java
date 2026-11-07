@@ -42,31 +42,53 @@ public final class BootstrapProvider extends ContentProvider {
                     && pm.checkSignatures(PLAYER, CLIENT) == PackageManager.SIGNATURE_MATCH;
         } catch (RuntimeException e) { return false; }
     }
+    /** Own-UID discovery: named native endpoints first; no external-caller permission filter. */
+    static List<ComponentName> resolveEndpoints(PackageManager pm) {
+        LinkedHashSet<ComponentName> endpoints=new LinkedHashSet<>();
+        for(String name:new String[]{
+            "com.yandex.music.shared.media.session.session.Media3LibraryService",
+            "ru.yandex.music.common.media.mediabrowser.MusicBrowserService"}) {
+            ComponentName component=new ComponentName(PLAYER,name);
+            try { if(eligible(pm,pm.getServiceInfo(component,0)))endpoints.add(component); }
+            catch(PackageManager.NameNotFoundException ignored){}
+        }
+        List<ResolveInfo> found=pm.queryIntentServices(new Intent("android.media.browse.MediaBrowserService").setPackage(PLAYER),0);
+        if(found!=null)for(ResolveInfo item:found) {
+            ServiceInfo service=item==null?null:item.serviceInfo;
+            if(eligible(pm,service))endpoints.add(new ComponentName(service.packageName,service.name));
+        }
+        return new ArrayList<>(endpoints);
+    }
+    private static boolean eligible(PackageManager pm,ServiceInfo service) {
+        if(service==null || !PLAYER.equals(service.packageName) || service.name==null)return false;
+        int override=pm.getComponentEnabledSetting(new ComponentName(service.packageName,service.name));
+        return override==PackageManager.COMPONENT_ENABLED_STATE_ENABLED
+                || (override==PackageManager.COMPONENT_ENABLED_STATE_DEFAULT && service.enabled);
+    }
     final class Connection extends MediaBrowser.ConnectionCallback {
         final Context context; final String id; final long deadline; final ResultReceiver callback;
         MediaBrowser browser; boolean closed, delivered;
+        int generation, failures; String endpointEvidence="not_queried";
         Connection(Context c, String id, long deadline, ResultReceiver callback) {
             context=c;this.id=id;this.deadline=deadline;this.callback=callback;
         }
         void start() {
             if (closed) return;
-            if (SystemClock.elapsedRealtime() >= deadline) { close("endpoint_timeout"); return; }
+            if (SystemClock.elapsedRealtime() >= deadline) { close("endpoint_timeout:"+endpointEvidence); return; }
             try {
-                List<ResolveInfo> found=context.getPackageManager().queryIntentServices(
-                        new Intent("android.media.browse.MediaBrowserService").setPackage(PLAYER),0);
-                List<ComponentName> endpoints=new ArrayList<>();
-                for(ResolveInfo item:found) {
-                    ServiceInfo s=item.serviceInfo;
-                    if(s!=null && PLAYER.equals(s.packageName) && s.enabled
-                            && (s.permission==null || s.permission.isEmpty()))
-                        endpoints.add(new ComponentName(s.packageName,s.name));
-                }
-                // The native Application may still be switching legacy/Media3 components.
-                if(endpoints.size()!=1){main.postDelayed(this::start,250);return;}
-                browser=new MediaBrowser(context,endpoints.get(0),this,null);
+                List<ComponentName> endpoints=resolveEndpoints(context.getPackageManager());
+                endpointEvidence="count="+endpoints.size()+",candidates="+endpoints;
+                if(endpoints.isEmpty()){main.postDelayed(this::start,250);return;}
+                ComponentName selected=endpoints.get(failures % endpoints.size());
+                final int attempt=++generation;
+                browser=new MediaBrowser(context,selected,new MediaBrowser.ConnectionCallback(){
+                    @Override public void onConnected(){if(attempt==generation)Connection.this.onConnected();}
+                    @Override public void onConnectionFailed(){if(attempt==generation)Connection.this.onConnectionFailed();}
+                    @Override public void onConnectionSuspended(){if(attempt==generation)Connection.this.onConnectionSuspended();}
+                },null);
                 browser.connect();
-                main.postDelayed(()->{if(!delivered)close("connection_timeout");},
-                        Math.max(1,deadline-SystemClock.elapsedRealtime()));
+                main.postDelayed(()->{if(!closed && !delivered && attempt==generation)
+                    retryBeforeToken("connection_timeout");},Math.min(3000,Math.max(1,deadline-SystemClock.elapsedRealtime())));
             }catch(RuntimeException e){close("connect_"+e.getClass().getSimpleName());}
         }
         @Override public void onConnected() {
@@ -86,6 +108,7 @@ public final class BootstrapProvider extends ContentProvider {
             if(delivered || SystemClock.elapsedRealtime()>=deadline){close(reason);return;}
             // Cold Application startup can reject the first bind. Retry only preparation,
             // within the original deadline; a delivered token never authorizes another PLAY.
+            generation++;failures++;
             if(browser!=null)try{browser.disconnect();}catch(RuntimeException ignored){}
             browser=null;
             main.postDelayed(this::start,500);
