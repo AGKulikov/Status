@@ -3155,3 +3155,6 @@ FIELD и native root cause остаются OPEN. Совместимый Navigat
 ANR main stack впервые сохранён: native library open во время Firebase init;40% iowait.
 Music paired bootstrap timeout не освобождает legacy browser reservation.
 Причина I/O задержек и gate отсутствующего Navigator retry OPEN; исправление не выпущено.
+
+3.4.4 SOURCE candidate: ограниченные повторные Music prepare после cold provider acquisition;
+Navigator fresh-evidence wakeup с прежними guards. Native I/O root cause/FIELD OPEN.

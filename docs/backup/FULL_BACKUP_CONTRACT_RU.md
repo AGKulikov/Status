@@ -1055,3 +1055,14 @@ backup includes the historical evidence; restore must not restart capture or pla
 AnrEvidence uses RAM scheduling and the existing journal writer only. These two source
 owners were reviewed against the diff; fingerprints updated after this review.
 Hardware export, DropBox permission and full restore acceptance remain OPEN.
+
+
+### Review3.4.4 — defaults compatibility only
+
+BackupDefaultsMigration diff reviewed: explicit source whitelist extended with373…376,
+target whitelist374…377. No keys/default values/roots/secret adapters changed.
+Existing materialize merges declared defaults then explicit/unknown values unchanged;
+same-version no-op and source>target/future rejection retained. Added335…377→377
+regression with334/378 rejection; historical version tests unchanged. Runtime
+Music request/retry/listeners remain RAM and cannot be restored as pending playback.
+Fingerprint updated only for this reviewed owner; full Android test/restore FIELD pending.

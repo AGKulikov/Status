@@ -1,3 +1,5 @@
+> Текущая разработка: `fix/cold-boot-344`, кандидат3.4.4. Холодный запуск3.4.3 не прошёл FIELD; [разбор](docs/geely-kx11/BOOT_343_FIELD_2026_11_07_RU.md), [состояние проверок](docs/releases/3.4.4/README_RU.md).
+
 > **3.4.3 опубликована в stable/latest 07.11.2026.** Все 7 файлов скачаны и проверены; [результат публикации](docs/releases/3.4.3/publication-verification.json).
 > Восстановление Навигатора после подтверждённого завершения процесса и сохранение сведений об ANR.
 > [Ветка выпуска](https://github.com/AGKulikov/Status/tree/release/natro-3.4.3), [установка и доказательства](docs/releases/3.4.3/README_RU.md).

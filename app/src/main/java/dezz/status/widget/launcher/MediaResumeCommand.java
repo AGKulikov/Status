@@ -43,6 +43,7 @@ final class MediaResumeCommand {
         SESSION_COMMAND,
         RECEIVER_COMMAND,
         BROWSER_BOOTSTRAP,
+        PAIRED_BOOTSTRAP,
         WAITING_FOR_SESSION,
         DISPATCH_FAILED,
         NO_TARGET
@@ -357,7 +358,7 @@ final class MediaResumeCommand {
         if (yandexColdPlay && !yandexSessionPlayAttempted && NatroMusicBootstrap.available(context)) {
             String bootstrap = NatroMusicBootstrap.request(context,
                     MediaAutoResumeController.browserPlayPermit(context, true));
-            return trace("bootstrap_scheduled".equals(bootstrap) ? Result.BROWSER_BOOTSTRAP : Result.DISPATCH_FAILED,
+            return trace("bootstrap_scheduled".equals(bootstrap) ? Result.PAIRED_BOOTSTRAP : Result.WAITING_FOR_SESSION,
                     "route=paired_music_bootstrap, status=" + bootstrap);
         }
         String yandexBootstrap = "not_requested";

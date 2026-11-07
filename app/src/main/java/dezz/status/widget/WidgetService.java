@@ -831,6 +831,20 @@ public class WidgetService extends Service {
     private NavigatorWindowFramePolicy.State navigatorLaunchObservedState = NavigatorWindowFramePolicy.State.UNKNOWN;
     private long navigatorLaunchObservedAt = -1L, navigatorLaunchLastPresentAt = -1L;
 
+    private static final java.util.Set<Runnable> automaticNavigatorEvidenceListeners =
+            new java.util.concurrent.CopyOnWriteArraySet<>();
+    static void addAutomaticNavigatorEvidenceListener(Runnable listener) {
+        automaticNavigatorEvidenceListeners.add(listener);
+    }
+    static void removeAutomaticNavigatorEvidenceListener(Runnable listener) {
+        automaticNavigatorEvidenceListeners.remove(listener);
+    }
+    String automaticNavigatorEvidence() {
+        return "state="+navigatorLaunchObservedState+", observed="+navigatorLaunchObservedAt
+                +", last_present="+navigatorLaunchLastPresentAt+", failure="
+                +dezz.status.widget.diagnostics.SystemProcessDiagnostics.navigatorFailureAt();
+    }
+
     boolean shouldRetryAutomaticNavigator(long started, long dispatched, int attempts, boolean focused) {
         long now = SystemClock.elapsedRealtime();
         long failure = dezz.status.widget.diagnostics.SystemProcessDiagnostics.navigatorFailureAt();
@@ -7205,6 +7219,9 @@ public class WidgetService extends Service {
         if (result.state == NavigatorWindowFramePolicy.State.WINDOWED
                 || result.state == NavigatorWindowFramePolicy.State.FULLSCREEN)
             navigatorLaunchLastPresentAt = navigatorLaunchObservedAt;
+        // A freshly confirmed absence can arrive while HOME is focused for less than
+        // the periodic retry interval. Notify on every sample, not only state changes.
+        for (Runnable listener : automaticNavigatorEvidenceListeners) listener.run();
         NavigatorWindowSourcePolicy.VendorDecision decision =
                 NavigatorWindowSourcePolicy.decisionFor(
                         result, ecarxNavigatorOptimisticConfirmationPending,

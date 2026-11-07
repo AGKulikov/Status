@@ -538,13 +538,26 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
     private long automaticNavigatorStartedAt = -1L, automaticNavigatorDispatchedAt = -1L;
     private int automaticNavigatorAttempts;
     private final Runnable automaticNavigatorCheck = this::checkAutomaticNavigatorLaunch;
+    private long automaticNavigatorLastGateLog = -1;
+    private final Runnable automaticNavigatorFreshCheck = () -> checkAutomaticNavigatorLaunch(false);
+    private final Runnable automaticNavigatorEvidenceChanged = () -> {
+        navigationUiHandler.removeCallbacks(automaticNavigatorFreshCheck);
+        navigationUiHandler.post(automaticNavigatorFreshCheck);
+    };
 
     public void cancelAutomaticNavigatorRecovery() {
+        cancelAutomaticNavigatorRecovery("manual_interaction");
+    }
+    private void cancelAutomaticNavigatorRecovery(String reason) {
+        if (automaticNavigatorStartedAt >= 0) traceAutomaticNavigator("cancelled_"+reason);
         automaticNavigatorStartedAt = -1L;
         navigationUiHandler.removeCallbacks(automaticNavigatorCheck);
+        navigationUiHandler.removeCallbacks(automaticNavigatorFreshCheck);
+        WidgetService.removeAutomaticNavigatorEvidenceListener(automaticNavigatorEvidenceChanged);
     }
 
     private void dispatchAutomaticNavigator() {
+        WidgetService.addAutomaticNavigatorEvidenceListener(automaticNavigatorEvidenceChanged);
         dezz.status.widget.diagnostics.SystemProcessDiagnostics.observeLaunch(this);
         automaticNavigatorAttempts++;
         automaticNavigatorDispatchedAt = android.os.SystemClock.elapsedRealtime();
@@ -555,27 +568,36 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
         navigationUiHandler.postDelayed(automaticNavigatorCheck, 1_000);
     }
 
-    private void checkAutomaticNavigatorLaunch() {
+    private void checkAutomaticNavigatorLaunch() { checkAutomaticNavigatorLaunch(true); }
+    private void checkAutomaticNavigatorLaunch(boolean refreshEvidence) {
         long now = android.os.SystemClock.elapsedRealtime();
         if (automaticNavigatorStartedAt < 0 || !activityStarted || isFinishing() || isDestroyed()
                 || !preferences.launcherHomeOpensWindowedNavigator.get()
                 || now - automaticNavigatorStartedAt > 60_000) {
             traceAutomaticNavigator("observation_stopped");
-            cancelAutomaticNavigatorRecovery(); return;
+            cancelAutomaticNavigatorRecovery("observation_stopped"); return;
         }
         WidgetService service = WidgetService.getInstance();
         if (service != null) {
             if (service.navigatorWasPresentSince(automaticNavigatorStartedAt)) {
                 traceAutomaticNavigator("window_observed");
-                cancelAutomaticNavigatorRecovery(); return;
+                cancelAutomaticNavigatorRecovery("window_observed"); return;
             }
             if (service.shouldRetryAutomaticNavigator(automaticNavigatorStartedAt,
                     automaticNavigatorDispatchedAt, automaticNavigatorAttempts, automaticNavigatorHomeFocused)) {
                 traceAutomaticNavigator("retry_confirmed_absence");
                 dispatchAutomaticNavigator(); return;
             }
-            service.refreshAutomaticNavigatorEvidence();
+            if (automaticNavigatorLastGateLog < 0 || now-automaticNavigatorLastGateLog >= 5_000) {
+                automaticNavigatorLastGateLog=now;
+                DiagnosticJournal.infoAsync("launcher-navigation", "stage=recovery_wait, focused="
+                        +automaticNavigatorHomeFocused+", attempts="+automaticNavigatorAttempts
+                        +", started_at="+automaticNavigatorStartedAt+", dispatched_at="
+                        +automaticNavigatorDispatchedAt+", "+service.automaticNavigatorEvidence());
+            }
+            if (refreshEvidence) service.refreshAutomaticNavigatorEvidence();
         }
+        navigationUiHandler.removeCallbacks(automaticNavigatorCheck);
         navigationUiHandler.postDelayed(automaticNavigatorCheck, 1_000);
     }
     private final Runnable panelInitializationStep = this::continuePanelInitialization;
@@ -818,6 +840,8 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
         if (launcherDisplayRejected) return;
         activityStarted = true;
         if (automaticNavigatorStartedAt >= 0) {
+            WidgetService.addAutomaticNavigatorEvidenceListener(automaticNavigatorEvidenceChanged);
+            traceAutomaticNavigator("home_started_recovery");
             navigationUiHandler.removeCallbacks(automaticNavigatorCheck);
             navigationUiHandler.post(automaticNavigatorCheck);
         }
@@ -841,6 +865,9 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
     }
 
     public void onStop() {
+        WidgetService.removeAutomaticNavigatorEvidenceListener(automaticNavigatorEvidenceChanged);
+        navigationUiHandler.removeCallbacks(automaticNavigatorFreshCheck);
+        if (automaticNavigatorStartedAt >= 0) traceAutomaticNavigator("home_stopped_recovery");
         // Starting Navigator itself stops HOME. Retain this bounded observation so an ANR
         // before its first window can be recovered when HOME becomes focused again.
         navigationUiHandler.removeCallbacks(automaticNavigatorCheck);
@@ -1115,7 +1142,8 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
                 +", pending="+pendingAutomaticNavigatorLaunch+", started="+activityStarted
                 +", bootstrap="+launcherBootstrapReady+", first_draw="+launcherFirstDrawCompleted
                 +", finishing="+isFinishing()+", destroyed="+isDestroyed()
-                +", passenger="+isPassengerLauncherProfile());
+                +", passenger="+isPassengerLauncherProfile()+", recovery_started="+automaticNavigatorStartedAt
+                +", recovery_attempts="+automaticNavigatorAttempts+", focused="+automaticNavigatorHomeFocused);
     }
 
     private void scheduleVisibleIntegrationHostHandoff() {
@@ -1156,7 +1184,7 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
     }
 
     public void onDestroy() {
-        cancelAutomaticNavigatorRecovery();
+        cancelAutomaticNavigatorRecovery("home_destroyed");
         if (pendingAutomaticNavigatorLaunch) traceAutomaticNavigator("home_destroyed_pending");
         if(disposed)return;
         disposed=true;
@@ -1243,6 +1271,7 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
 
     public void onWindowFocusChanged(boolean hasFocus) {
         automaticNavigatorHomeFocused = hasFocus;
+        if (automaticNavigatorStartedAt >= 0) traceAutomaticNavigator(hasFocus?"focus_gained":"focus_lost");
         if (hasFocus && activityStarted && automaticNavigatorStartedAt >= 0) {
             navigationUiHandler.removeCallbacks(automaticNavigatorCheck);
             navigationUiHandler.post(automaticNavigatorCheck);

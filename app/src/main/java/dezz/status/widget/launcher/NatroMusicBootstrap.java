@@ -2,6 +2,7 @@
 package dezz.status.widget.launcher;
 
 import android.content.Context;
+import android.content.ContentProviderClient;
 import android.content.pm.PackageManager;
 import android.content.pm.ProviderInfo;
 import android.media.session.MediaSession;
@@ -28,18 +29,27 @@ final class NatroMusicBootstrap {
         }catch(RuntimeException e){return false;}
     }
     static synchronized String request(Context context,BooleanSupplier permit){
-        if(current!=null && current.active && current.permit.getAsBoolean()) return "bootstrap_scheduled";
-        Request next=new Request(context.getApplicationContext(),permit);current=next;
+        if (!permit.getAsBoolean()) return "permit_revoked";
+        Request previous=current;
+        if(previous!=null && previous.allowed()) return "bootstrap_scheduled";
+        int attempt=previous!=null && previous.permit.getAsBoolean()?previous.attempt+1:1;
+        if(attempt>3) return "attempt_limit";
+        // A blocked Binder cannot be interrupted safely. Do not queue expired requests behind it.
+        if(IPC.getActiveCount()!=0 || !IPC.getQueue().isEmpty()) return "worker_busy";
+        if(previous!=null)previous.finish("superseded");
+        Request next=new Request(context.getApplicationContext(),permit,attempt);current=next;
         try { IPC.execute(next::prepare); }
         catch(RuntimeException busy){next.finish("worker_busy");return "schedule_rejected";}
-        MAIN.postDelayed(()->next.finish("deadline"),15000);
+        MAIN.postDelayed(()->next.finish("deadline"),45000);
         return "bootstrap_scheduled";
     }
     private static final class Request {
         final Context context; final BooleanSupplier permit; final String id=UUID.randomUUID().toString();
-        final long deadline=SystemClock.elapsedRealtime()+15000;
+        final long started=SystemClock.elapsedRealtime();
+        final long deadline=started+45000;
+        final int attempt;
         volatile boolean active=true, delivered;
-        Request(Context c,BooleanSupplier p){context=c;permit=p;}
+        Request(Context c,BooleanSupplier p,int attempt){context=c;permit=p;this.attempt=attempt;}
         boolean allowed(){return active && current==this && permit.getAsBoolean() && SystemClock.elapsedRealtime()<deadline;}
         void prepare(){
             if(!allowed()){finish("cancelled_before_prepare");return;}
@@ -61,17 +71,26 @@ final class NatroMusicBootstrap {
                 }
             };
             Parcel parcel=Parcel.obtain();
+            ContentProviderClient client=null;
             try {
                 callback.writeToParcel(parcel,0);parcel.setDataPosition(0);
-                Bundle args=new Bundle();args.putLong("deadline",deadline);
+                journal("acquire_started");
+                client=context.getContentResolver().acquireUnstableContentProviderClient(Uri.parse("content://"+AUTHORITY));
+                if(!allowed()){finish("cancelled_after_acquire");return;}
+                if(client==null){finish("provider_unavailable");return;}
+                journal("acquired");
+                // Provider acquisition includes cold Application startup. Start its short
+                // preparation budget only now; never extend the overall request/boot permit.
+                Bundle args=new Bundle();args.putLong("deadline",Math.min(deadline,SystemClock.elapsedRealtime()+15000));
                 args.putParcelable("callback",ResultReceiver.CREATOR.createFromParcel(parcel));
                 journal("prepare");
-                Bundle response=context.getContentResolver().call(Uri.parse("content://"+AUTHORITY),"prepare_v1",id,args);
+                Bundle response=client.call("prepare_v1",id,args);
                 if(response==null || !response.getBoolean("accepted"))finish("prepare_rejected");
-            }catch(RuntimeException e){finish("prepare_"+e.getClass().getSimpleName());}
-            finally{parcel.recycle();}
+                else journal("prepare_accepted");
+            }catch(RemoteException | RuntimeException e){finish("prepare_"+e.getClass().getSimpleName());}
+            finally{parcel.recycle();if(client!=null)client.close();}
         }
-        void journal(String stage){DiagnosticJournal.infoAsync("music-bootstrap","request="+id+", stage="+stage);}
-        void finish(String reason){if(!active)return;active=false;journal(reason);}
+        void journal(String stage){DiagnosticJournal.infoAsync("music-bootstrap","request="+id+", attempt="+attempt+", elapsed_ms="+(SystemClock.elapsedRealtime()-started)+", stage="+stage);}
+        synchronized void finish(String reason){if(!active)return;active=false;journal(reason);}
     }
 }

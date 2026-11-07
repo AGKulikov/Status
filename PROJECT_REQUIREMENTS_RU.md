@@ -5911,3 +5911,17 @@ Music prepare истёк15s, legacy browser flag блокирует повтор
 STATIC цепочка подтверждена. Navigator recovery attempt2 отсутствует; HOME resumed
 951ms, затем paused; точный gate неизвестен. Не снимать manual/foreground guards.
 [Доказательства, ограничения, открытые проверки](docs/geely-kx11/BOOT_343_FIELD_2026_11_07_RU.md).
+
+
+## 07.11.2026 — исправить все выявленные отказы холодной загрузки (3.4.4 candidate)
+USER: «Исправляй все ошибки». BOOT-338/MUSIC-BOOT-MOD-342/ANR-343 сохраняются.
+SOURCE: paired Music bootstrap отделён от legacy reservation; до3попыток,
+45s общий request budget,15s подготовки после получения provider, без очереди
+за зависшим IPC; исходные boot/manual/PLAY permits сохраняются. Navigator получает
+fresh-evidence callback вместо ожидания следующего1s tick; ручная отмена,
+focus/ABSENT/60s/2attempt guards остаются. Причины отмены/ожидания журналируются.
+Firebase — компонент baseline Navigator; его удаление не выполнено и не объявлено
+решением I/O. Native root cause по-прежнему OPEN. Проверка defaults migration
+расширена до3.4.4 без новых настроек/изменений defaults.
+TEST:8production host replay сценариев Music PASS; полный Android CI pending.
+APK3.4.4/code208021377 pending, stable signer/install-over обязательны; FIELD OPEN.
