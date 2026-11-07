@@ -462,7 +462,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/DiagnosticBundle.java": {
-      "sha256": "d3e268c1cd348c33817af2537a32224baea96e928639c9661506b28b82e75668",
+      "sha256": "66c546a396f73d758edd52acdbf228f0c79849852abb9b850c1efa42576e8727",
       "access_kinds": [
         "files"
       ]
@@ -474,7 +474,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/DiagnosticJournal.java": {
-      "sha256": "a863b015e7c675c59271c94795cdbce636c6b9e3088d014de6afe5dde762fb86",
+      "sha256": "b16d9d08d567926b882600621fb9e3b64f313ea394e4d769cfdca1de79d6687a",
       "access_kinds": [
         "files"
       ]

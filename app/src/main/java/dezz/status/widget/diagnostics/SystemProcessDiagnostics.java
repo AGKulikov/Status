@@ -14,6 +14,8 @@ public final class SystemProcessDiagnostics {
     private static volatile long generation, nextStart, lastEvent;
     private static volatile String state="not_initialized";
     private static volatile long rateDropped;
+    private static volatile long navigatorFailureAt = -1;
+    public static long navigatorFailureAt(){return navigatorFailureAt;}
     private SystemProcessDiagnostics(){}
     public static void initialize(Context owner){context=owner.getApplicationContext();}
     public static void observeLaunch(Context owner){initialize(owner);poll();}
@@ -31,6 +33,7 @@ public final class SystemProcessDiagnostics {
     }
     private static void read(long expected){
         Process process=null;long rateAt=0;int count=0;
+        AnrLogContext anrContext=new AnrLogContext();
         try{
             // Startup may precede diagnostics initialization. Read a bounded current-boot tail.
             double started=(System.currentTimeMillis()-Math.min(SystemClock.elapsedRealtime(),120_000L))/1000d;
@@ -45,10 +48,21 @@ public final class SystemProcessDiagnostics {
                     String trimmed=line.trim();int space=trimmed.indexOf(' ');if(space<0)continue;
                     double at;try{at=Double.parseDouble(trimmed.substring(0,space));}catch(NumberFormatException ignored){continue;}
                     if(at<started)continue;
+                    String detail=anrContext.accept(line);
+                    if(detail!=null)DiagnosticJournal.warn("external-anr",detail);
                     String event=SystemProcessEvent.parse(line);if(event==null)continue;
+                    if(event.contains("event=process_killed"))
+                        DiagnosticJournal.warn("external-anr",event+", system_kill_detail="+line);
                     long now=SystemClock.uptimeMillis();if(now-rateAt>=1000){rateAt=now;count=0;}
                     if(++count>20){rateDropped++;continue;}
                     lastEvent=now;
+                    if(event.contains("package=ru.yandex.yandexnavi,") &&
+                            (event.contains("event=process_killed") || event.contains("event=process_died")))
+                        navigatorFailureAt=SystemClock.elapsedRealtime()-Math.max(0L,System.currentTimeMillis()-(long)(at*1000));
+                    if(event.contains("event=anr")) {
+                        String pkg=event.substring(event.indexOf("package=")+8).split(",")[0];
+                        AnrEvidence.capture(context,pkg,(long)(at*1000));
+                    }
                     DiagnosticJournal.warn("system-process",event+", source_wall_ms="+(long)(at*1000)+", source_age_ms="+(System.currentTimeMillis()-(long)(at*1000)));
                     if(!event.contains("event=process_start"))CausalDiagnostics.capture("external_process_lifecycle",false);
                 }

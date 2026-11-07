@@ -157,3 +157,6 @@ QNX отказал до handshake; каталог/mappings остаются BLOC
 - 06.11.2026: [Окончание голосовой сессии Алисы отдельно от закрытия окна](geely-kx11/ALICE_2026_11_06_RU.md). STATIC native FINISHED/IDLE и UI timer20s/7s; USER correction; SOURCE нового адаптера/TEST/APK/FIELD OPEN.
 
 - [07.11.2026 — Алиса3.4.1 и автозапуск Музыки](geely-kx11/ALICE_MUSIC_2026_11_07_RU.md): FIELD отказ, SOURCE candidate, TEST/APK OPEN.
+
+
+07.11.2026: [Navigator ANR/recovery candidate](../docs/geely-kx11/NAVIGATOR_ANR_2026_11_07_RU.md), branch fix/navigator-anr-20261107. SOURCE candidate; TEST/APK/FIELD OPEN; native root cause UNKNOWN.

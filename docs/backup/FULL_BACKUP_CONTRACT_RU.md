@@ -1044,3 +1044,14 @@ keys/defaults/roots нет. Рассмотрена явная совместим
 explicit/unknown/effective сохраняются,334/373 отвергаются новой регрессией.
 Прежние migration tests сохранены. Пересмотрен только fingerprint
 BackupDefaultsMigration после diff review; FIELD backup/restore OPEN.
+
+### Review 07.11.2026 — ANR evidence candidate
+
+DiagnosticJournal adds bounded anr.log/anr-hud.log under the existing files/diagnostics
+archive group; clear removes both channels. DiagnosticBundle adds these names to its
+fixed export allowlist, preserving per-channel hash/redaction/truncation reporting.
+No settings/defaults/credentials or new restore actions. Existing recursive diagnostics
+backup includes the historical evidence; restore must not restart capture or playback.
+AnrEvidence uses RAM scheduling and the existing journal writer only. These two source
+owners were reviewed against the diff; fingerprints updated after this review.
+Hardware export, DropBox permission and full restore acceptance remain OPEN.

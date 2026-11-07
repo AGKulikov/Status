@@ -368,8 +368,8 @@ public final class DiagnosticJournal {
             }
             if (file != null) {
                 String[] names = dezz.status.widget.AppProcessPolicy.isHudProcess()
-                        ? new String[]{"incidents-hud.log", "crash-hud.log", "operations-hud.log"}
-                        : new String[]{"incidents.log", "crash.log", "journal-hud.log", "incidents-hud.log", "crash-hud.log", "operations.log", "operations-hud.log"};
+                        ? new String[]{"incidents-hud.log", "crash-hud.log", "operations-hud.log", "anr-hud.log"}
+                        : new String[]{"anr.log", "incidents.log", "crash.log", "journal-hud.log", "incidents-hud.log", "crash-hud.log", "operations.log", "operations-hud.log"};
                 for (String name : names) { File old = new File(file.getParentFile(), name);
                     if (old.exists() && !old.delete()) { diskFailures.incrementAndGet(); lastDiskFailure="clear_failed"; }
                 }
@@ -439,6 +439,11 @@ public final class DiagnosticJournal {
         if (file == null) { diskFailures.incrementAndGet(); lastDiskFailure="destination_unavailable"; return; }
         rotateLocked(file);
         writeLine(file, level, component, rawMessage, timestamp, uptimeMs);
+        if ("external-anr".equals(component)) {
+            File evidence = new File(file.getParentFile(), processFile("anr"));
+            rotateLocked(evidence, 1_500_000, 1_000_000);
+            writeLine(evidence, level, component, rawMessage, timestamp, uptimeMs);
+        }
         if (retainsOperation(component)) {
             File operations = new File(file.getParentFile(), processFile("operations"));
             rotateLocked(operations, OPERATIONS_ROTATE_BYTES, OPERATIONS_KEEP_BYTES);

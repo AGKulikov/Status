@@ -832,9 +832,12 @@ public class WidgetService extends Service {
     private long navigatorLaunchObservedAt = -1L, navigatorLaunchLastPresentAt = -1L;
 
     boolean shouldRetryAutomaticNavigator(long started, long dispatched, int attempts, boolean focused) {
-        return NavigatorAutoLaunchPolicy.retry(SystemClock.elapsedRealtime(), started, dispatched,
+        long now = SystemClock.elapsedRealtime();
+        long failure = dezz.status.widget.diagnostics.SystemProcessDiagnostics.navigatorFailureAt();
+        boolean failed = failure >= dispatched && failure <= now;
+        return NavigatorAutoLaunchPolicy.retry(now, started, dispatched,
                 attempts, focused, navigatorLaunchObservedState == NavigatorWindowFramePolicy.State.ABSENT,
-                navigatorLaunchObservedAt, navigatorLaunchLastPresentAt);
+                navigatorLaunchObservedAt, navigatorLaunchLastPresentAt, failed);
     }
 
     boolean navigatorWasPresentSince(long started) { return navigatorLaunchLastPresentAt >= started; }

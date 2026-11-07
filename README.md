@@ -369,3 +369,6 @@ Wi-Fi, GPS и Bluetooth. Собирается «из кирпичиков» — 
 Сайт проекта: [dezzk.github.io/status-widget](https://dezzk.github.io/status-widget/).
 
 Исследование повторных сеансов Алисы и автозапуска музыки: `fix/alice-music-20261107`, [статус](docs/geely-kx11/ALICE_MUSIC_2026_11_07_RU.md). Это кандидат исходников, не новый релиз.
+
+
+07.11.2026: [Navigator ANR/recovery candidate](docs/geely-kx11/NAVIGATOR_ANR_2026_11_07_RU.md), branch fix/navigator-anr-20261107. SOURCE candidate; TEST/APK/FIELD OPEN; native root cause UNKNOWN.

@@ -3129,3 +3129,6 @@ NoSpeech тоже FINISHED; TTS complete отдельно; Quark и runtime timi
 06.11 SOURCE3.4.1: глобальный pre-focus hook AliceKit/Quark и native idle stream
 вместо списка триггеров. Голосовой вызов включён в контракт. [Точки и ограничения](docs/geely-kx11/ALICE_2026_11_06_RU.md).
 TEST/APK/FIELD на данном checkpoint OPEN.
+
+
+07.11.2026: [Navigator ANR/recovery candidate](docs/geely-kx11/NAVIGATOR_ANR_2026_11_07_RU.md), branch fix/navigator-anr-20261107. SOURCE candidate; TEST/APK/FIELD OPEN; native root cause UNKNOWN.

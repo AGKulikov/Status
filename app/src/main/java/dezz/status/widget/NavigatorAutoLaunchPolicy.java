@@ -6,8 +6,12 @@ final class NavigatorAutoLaunchPolicy {
     private NavigatorAutoLaunchPolicy() {}
     static boolean retry(long now, long started, long dispatched, int attempts,
                          boolean focused, boolean absent, long observed, long lastPresent) {
+        return retry(now,started,dispatched,attempts,focused,absent,observed,lastPresent,false);
+    }
+    static boolean retry(long now,long started,long dispatched,int attempts,
+                         boolean focused,boolean absent,long observed,long lastPresent,boolean failed) {
         return started >= 0 && attempts > 0 && attempts < 2 && focused && absent
-                && now >= dispatched && now - dispatched >= 30_000
+                && now >= dispatched && (failed || now - dispatched >= 30_000)
                 && now >= started && now - started <= 60_000
                 && observed >= dispatched && now >= observed && now - observed <= 3_000
                 && lastPresent < started;

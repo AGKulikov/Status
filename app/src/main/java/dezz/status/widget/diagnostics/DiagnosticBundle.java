@@ -44,7 +44,7 @@ public final class DiagnosticBundle {
                     .put("interpretation", "last observed state has explicit ages; external process cause and physical effect may remain unknown");
             JSONArray channels = new JSONArray();
             File diagnosticDirectory = new File(context.getFilesDir(), "diagnostics");
-            for (String name : new String[]{"journal.log", "journal-hud.log", "incidents.log", "incidents-hud.log", "crash.log", "crash-hud.log", "operations.log", "operations-hud.log"}) {
+            for (String name : new String[]{"anr.log", "anr-hud.log", "journal.log", "journal-hud.log", "incidents.log", "incidents-hud.log", "crash.log", "crash-hud.log", "operations.log", "operations-hud.log"}) {
                 JSONObject entry = new JSONObject().put("name", name);
                 File source = new File(diagnosticDirectory, name);
                 if (!source.isFile()) entry.put("state", "missing; never written, cleared, or process not started");
