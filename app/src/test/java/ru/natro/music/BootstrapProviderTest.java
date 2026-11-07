@@ -28,4 +28,20 @@ public class BootstrapProviderTest {
   install("ru.natro.statuswidget",20002,"1234");
   assertFalse(BootstrapProvider.authorized(RuntimeEnvironment.getApplication(),20002));
  }
+ @Test public void transientConnectionFailureRetriesOnlyUntilOriginalDeadline(){
+  BootstrapProvider provider=new BootstrapProvider();
+  BootstrapProvider.Connection c=provider.new Connection(RuntimeEnvironment.getApplication(),"boot",
+   android.os.SystemClock.elapsedRealtime()+1000,new android.os.ResultReceiver(null));
+  c.onConnectionFailed();assertFalse(c.closed);
+  Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(999));
+  assertFalse(c.closed);
+  Shadows.shadowOf(android.os.Looper.getMainLooper()).idleFor(java.time.Duration.ofMillis(1));
+  assertTrue(c.closed);
+ }
+ @Test public void deliveredTokenCannotStartAnotherPreparationOnDisconnect(){
+  BootstrapProvider provider=new BootstrapProvider();
+  BootstrapProvider.Connection c=provider.new Connection(RuntimeEnvironment.getApplication(),"boot",
+   android.os.SystemClock.elapsedRealtime()+1000,new android.os.ResultReceiver(null));
+  c.delivered=true;c.onConnectionSuspended();assertTrue(c.closed);
+ }
 }

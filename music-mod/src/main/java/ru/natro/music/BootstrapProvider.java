@@ -42,7 +42,7 @@ public final class BootstrapProvider extends ContentProvider {
                     && pm.checkSignatures(PLAYER, CLIENT) == PackageManager.SIGNATURE_MATCH;
         } catch (RuntimeException e) { return false; }
     }
-    private final class Connection extends MediaBrowser.ConnectionCallback {
+    final class Connection extends MediaBrowser.ConnectionCallback {
         final Context context; final String id; final long deadline; final ResultReceiver callback;
         MediaBrowser browser; boolean closed, delivered;
         Connection(Context c, String id, long deadline, ResultReceiver callback) {
@@ -79,8 +79,17 @@ public final class BootstrapProvider extends ContentProvider {
                 main.postDelayed(()->close("lease_complete"),60000);
             }catch(RuntimeException e){close("token_unavailable");}
         }
-        @Override public void onConnectionFailed(){close("connection_failed");}
-        @Override public void onConnectionSuspended(){close("connection_suspended");}
+        @Override public void onConnectionFailed(){retryBeforeToken("connection_failed");}
+        @Override public void onConnectionSuspended(){retryBeforeToken("connection_suspended");}
+        void retryBeforeToken(String reason){
+            if(closed)return;
+            if(delivered || SystemClock.elapsedRealtime()>=deadline){close(reason);return;}
+            // Cold Application startup can reject the first bind. Retry only preparation,
+            // within the original deadline; a delivered token never authorizes another PLAY.
+            if(browser!=null)try{browser.disconnect();}catch(RuntimeException ignored){}
+            browser=null;
+            main.postDelayed(this::start,500);
+        }
         void close(String reason){
             if(closed)return;closed=true;
             if(browser!=null)try{browser.disconnect();}catch(RuntimeException ignored){}
