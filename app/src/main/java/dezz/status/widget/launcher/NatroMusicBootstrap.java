@@ -20,6 +20,12 @@ final class NatroMusicBootstrap {
     private static final ThreadPoolExecutor IPC=new ThreadPoolExecutor(0,1,30,TimeUnit.SECONDS,
             new ArrayBlockingQueue<>(1),r->new Thread(r,"natro-music-bootstrap"),new ThreadPoolExecutor.AbortPolicy());
     private static volatile Request current;
+    static boolean blocksColdPlay() {
+        Request request = current;
+        // A visible native session is not proof that onGetRoot has returned.
+        // Expiry is not readiness either: stay closed until a fresh request returns a token.
+        return request != null && !request.delivered && request.permit.getAsBoolean();
+    }
     static boolean available(Context context){
         try {
             PackageManager pm=context.getPackageManager();

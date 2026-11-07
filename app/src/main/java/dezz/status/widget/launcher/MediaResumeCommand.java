@@ -261,6 +261,13 @@ final class MediaResumeCommand {
         String target = targetPackage.trim();
         if (target.isEmpty()) return trace(Result.NO_TARGET, "target=empty");
         String targetProcessState = processState(context, target);
+        if (coldStartEscalation && YANDEX_MUSIC_PACKAGE.equals(target)
+                && command == Command.PLAY && NatroMusicBootstrap.blocksColdPlay()) {
+            String preparation = NatroMusicBootstrap.request(context,
+                    MediaAutoResumeController.browserPlayPermit(context, true));
+            return trace(Result.WAITING_FOR_SESSION,
+                    "route=paired_prepare_barrier, status=" + preparation);
+        }
         String sessionError = "none";
         String sessionInventory = "[]";
         int activeSessionCount = -1;

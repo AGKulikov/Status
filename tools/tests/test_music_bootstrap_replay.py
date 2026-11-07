@@ -67,20 +67,24 @@ public class Replay {
    switch(a[0]){
     case "cold":
      req=request(1);context.resolver.acquire=()->SystemClock.now=30000;invoke(req,"prepare");
+     check(NatroMusicBootstrap.blocksColdPlay(),"native session must not bypass pending preparation");
      check(context.resolver.client.calls==1,"cold startup must still prepare");
      check(context.resolver.client.args.getLong("deadline")==45000,"fresh short budget, bounded overall");
      check(context.resolver.client.closed,"provider released");break;
     case "expired":
      req=request(1);context.resolver.acquire=()->SystemClock.now=45000;invoke(req,"prepare");
+     check(NatroMusicBootstrap.blocksColdPlay(),"expiry does not make the native session ready");
      check(context.resolver.client.calls==0,"expired acquisition cannot prepare");check(context.resolver.client.closed,"release late provider");break;
     case "manual":
      req=request(1);context.resolver.acquire=()->permit.set(false);invoke(req,"prepare");
+     check(!NatroMusicBootstrap.blocksColdPlay(),"manual cancellation releases the cold-start barrier");
      check(context.resolver.client.calls==0,"manual cancellation");break;
     case "late":
      req=request(1);invoke(req,"prepare");ContentProviderClient old=context.resolver.client;
      request(2);callback(old);Thread.sleep(30);check(MediaResumeCommand.plays==0,"old callback cannot play");break;
     case "duplicate":
      req=request(1);invoke(req,"prepare");callback(context.resolver.client);callback(context.resolver.client);
+     check(!NatroMusicBootstrap.blocksColdPlay(),"valid token releases preparation barrier");
      await(()->MediaResumeCommand.plays==1);Thread.sleep(30);check(MediaResumeCommand.plays==1,"duplicate PLAY");break;
     case "retry":
      req=request(1);finish(req);check(NatroMusicBootstrap.request(context,permit::get).equals("bootstrap_scheduled"),"retry admitted");

@@ -6010,3 +6010,16 @@ release/yandex-music-natro-2 указывает на6d4181f91c1a00c32e30a435632c
 tree1cd1cf4cb0eff5db068576b1575ccc5e6be2e466; ref считан обратно.
 Собственный упаковщик/исходники/отчёты доступны, proprietary APK и ключи не добавлялись.
 Прежний BLOCKED ниже/выше — история. FIELD холодной загрузки остаётся OPEN.
+
+## 07.11.2026 — Music Natro 2 FIELD FAILED: prepare/PLAY race
+USER: «Автовоспроизведение музыки так и не началось», затем «Исправляй».
+Архив1100753096801331388 содержит Music code24026523/Natro2 и ANR PID4902.
+Main ждёт g50.a из h7j.e/onGetRoot; Music:Media3Looper ждёт a7.get
+из session.i.u/onPlay. Natro отправляет exact_session_play во время
+prepare_accepted до token, затем45s deadline и24попытки без PLAYING.
+SOURCE: барьер перед поиском/PLAY сессии, пока paired prepare не выдал token;
+истечение срока не считается готовностью. Ручные команды и отмена permit сохранены.
+TEST: production host replay дополнен pending/expired/manual/token gates.
+APK Natro3.4.5 готовится; MusicNatro2 остаётся прежним. Полная причина native
+future требует отдельной проверки; FIELD нового порядка OPEN. Не выдавать ANR
+subject PushJobService за доказанную причину — стек блокируется в onGetRoot.
