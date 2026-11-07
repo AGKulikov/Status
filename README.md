@@ -1,4 +1,6 @@
-> Текущая разработка: `fix/music-endpoints-20261107`, ветка `release/yandex-music-natro-2`. Music Natro 2: 25 целевых тестов, подпись и совместимость обновления по метаданным PASS; упаковщик и отчёты опубликованы, remote commit проверен. [Протокол](docs/releases/music-natro-2/README_RU.md). Natro 3.4.4 остаётся установленной; FIELD автозапуска Музыки пока FAILED для Natro 1 и OPEN для нового мода.
+> Текущая разработка: [`fix/music-prepare-play-20261107`](https://github.com/AGKulikov/Status/tree/fix/music-prepare-play-20261107). Кандидат Natro3.4.5 устраняет ранний cold PLAY во время paired-подготовки Music2. Music2 FIELD FAILED; SOURCE/replay нового барьера PASS, полный CI/APK выполняются, FIELD3.4.5 OPEN. [Причина и ограничения](docs/geely-kx11/MUSIC_PREPARE_PLAY_RACE_2026_11_07_RU.md).
+
+> Предыдущая публикация: `fix/music-endpoints-20261107`, ветка `release/yandex-music-natro-2`. Music Natro 2: 25 целевых тестов, подпись и совместимость обновления по метаданным PASS; упаковщик и отчёты опубликованы, remote commit проверен. [Протокол](docs/releases/music-natro-2/README_RU.md). Natro 3.4.4 остаётся установленной; FIELD автозапуска Музыки пока FAILED для Natro 1 и OPEN для нового мода.
 
 > Natro 3.4.4 SOURCE/TEST/APK проверены (2281 Android / 285 tool); опубликована в stable/latest. [Состояние проверок](docs/releases/3.4.4/README_RU.md).
 

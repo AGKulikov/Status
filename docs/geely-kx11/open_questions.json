@@ -2080,13 +2080,22 @@
       "priority": "P1",
       "function": "Автозапуск после cold boot3.3.7",
       "status": "OPEN",
-      "known": "Receiver music отправлен14s, browser unavailable,24waits. Navigator handoff12s, ANR/killed31s, позднее окно138s. CI40096694911:2223Android/279tool PASS; подписанная пара3.3.8 с прежним signer/API28 проверена. ZIP25.10: music waits до apk_verified3.3.8 в той же загрузке; не новый cold boot3.3.8.",
-      "missing_evidence": "ANR stack Navigator; exported MediaBrowser endpoint установленной Music; повторный FIELD нового recovery.",
-      "next_step": "FIELD матрица подписанной пары3.3.8: cold boot, голос/фон/окно и finish+2s; при повторном ANR нужен его конкретный стек.",
+      "known": "Receiver music отправлен14s, browser unavailable,24waits. Navigator handoff12s, ANR/killed31s, позднее окно138s. CI40096694911:2223Android/279tool PASS; подписанная пара3.3.8 с прежним signer/API28 проверена. ZIP25.10: music waits до apk_verified3.3.8 в той же загрузке; не новый cold boot3.3.8. 07.11 Music Natro2 FIELD FAILED: main/onGetRoot ждёт player Handler, Media3/onPlay ждёт main future; точная цепь подтверждена native DEX. Natro3.4.5 добавляет барьер cold PLAY до paired token. Production host replay pending/expired/manual/token PASS.",
+      "missing_evidence": "FIELD нескольких холодных запусков Natro3.4.5 + MusicNatro2 с ready-token, PLAYING и отсутствием повторного ANR; чужие/внутренние PLAY не блокируются этим барьером.",
+      "next_step": "Завершить CI/APK3.4.5, затем проверить cold boots и ручную отмену. При повторном отказе анализировать новый main/Media3 stack.",
       "sources": [
-        "BOOT_2026_10_24_RU.md"
+        "BOOT_2026_10_24_RU.md",
+        "MUSIC_PREPARE_PLAY_RACE_2026_11_07_RU.md"
       ],
-      "last_reviewed": "2026-10-25"
+      "last_reviewed": "2026-11-07",
+      "history": [
+        {
+          "last_reviewed": "2026-10-25",
+          "known": "Receiver music отправлен14s, browser unavailable,24waits. Navigator handoff12s, ANR/killed31s, позднее окно138s. CI40096694911:2223Android/279tool PASS; подписанная пара3.3.8 с прежним signer/API28 проверена. ZIP25.10: music waits до apk_verified3.3.8 в той же загрузке; не новый cold boot3.3.8.",
+          "missing_evidence": "ANR stack Navigator; exported MediaBrowser endpoint установленной Music; повторный FIELD нового recovery.",
+          "next_step": "FIELD матрица подписанной пары3.3.8: cold boot, голос/фон/окно и finish+2s; при повторном ANR нужен его конкретный стек."
+        }
+      ]
     }
   ],
   "revision_history": [
@@ -2192,6 +2201,11 @@
       "date": "2026-10-24",
       "scope": "Alice intent/native lifecycle and2s music requirement; old no-receiver result preserved. FIELD remains OPEN.",
       "source": "ALICE_2026_10_24_RU.md"
+    },
+    {
+      "date": "2026-11-07",
+      "scope": "BOOT_MUSIC_NAVIGATOR_338: Music2 failure and native wait cycle; Natro3.4.5 source gate, FIELD OPEN.",
+      "source": "MUSIC_PREPARE_PLAY_RACE_2026_11_07_RU.md"
     }
   ]
 }

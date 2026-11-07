@@ -1,5 +1,8 @@
 # Natro — карта требований, исследований и открытых вопросов
 
+- [07.11: Music Natro2 FIELD FAILED, main/Media3 deadlock и барьер холодного PLAY](geely-kx11/MUSIC_PREPARE_PLAY_RACE_2026_11_07_RU.md). SOURCE/replay; FIELD3.4.5 OPEN.
+
+
 - [06.11.2026: файловый менеджер, протокол Яндекс Диска и границы проверки](FILE_MANAGER_YANDEX_RU.md).
 
 - [18.10: цепочка от запуска навигации до команды DIM](geely-kx11/research-2026-10-18-wings/NAV_LAUNCH_CHAIN_RU.md). STATIC: opcode14 предшествует Activity, getter читает Android Settings; дополнение20:03 — NaviInteraction обрабатывает callback7/data1 как разрешение, data2 как выход, отдельно от menu/data0. Дополнение20:08: проверены дополнительные consumers; AR renderer не найден, штатное меню переключает1/3, callback возможен от SettingsObserver. Дополнение20:11: проверены version/config/part-number кандидаты; паспорт внешнего DIM не найден. Получатель/renderer и независимое скрытие OPEN; QNX writeback не пассивный снимок.

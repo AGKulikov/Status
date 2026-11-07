@@ -1,5 +1,10 @@
 # Geely KX11 / ECARX — техническая база управления
 
+## 07.11.2026 — Music main/Media3 deadlock
+
+FIELD Music Natro2 + STATIC native DEX подтверждают взаимное ожидание main/onGetRoot и Media3/onPlay→main future на API28. Natro3.4.5 запрещает ранний cold PLAY до готового paired token. PushJobService в ANR subject не доказанная первопричина. [Разбор и ограничения](docs/geely-kx11/MUSIC_PREPARE_PLAY_RACE_2026_11_07_RU.md). FIELD нового порядка OPEN.
+
+
 ## 24.10.2026 — MEDIA gestures, STATIC/SOURCE; FIELD OPEN
 
 В XSF c4e38040 подтверждены физические R коды200085/200087/200088 и

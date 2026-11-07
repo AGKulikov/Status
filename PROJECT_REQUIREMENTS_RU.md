@@ -6023,3 +6023,10 @@ TEST: production host replay дополнен pending/expired/manual/token gates
 APK Natro3.4.5 готовится; MusicNatro2 остаётся прежним. Полная причина native
 future требует отдельной проверки; FIELD нового порядка OPEN. Не выдавать ANR
 subject PushJobService за доказанную причину — стек блокируется в onGetRoot.
+
+### 07.11.2026 — уточнение native future
+Прежний OPEN по назначению future выше закрыт STATIC анализом: i.u постит на
+main Handler и ждёт ответ; main ждёт player Handler в h7j.e/onGetRoot. НаAPI28
+конечная проверка вернула бы true, но не может выполниться при этом цикле.
+[Исследование](docs/geely-kx11/MUSIC_PREPARE_PLAY_RACE_2026_11_07_RU.md).
+Отказ Music2 FIELD сохраняется; FIELD3.4.5 пока OPEN.
