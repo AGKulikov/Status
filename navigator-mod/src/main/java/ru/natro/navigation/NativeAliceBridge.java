@@ -53,11 +53,11 @@ public final class NativeAliceBridge {
             if (host.getPackageManager().checkSignatures(host.getPackageName(), "ru.natro.statuswidget")
                     != android.content.pm.PackageManager.SIGNATURE_MATCH) return;
             if (monitor != null && !monitor.closed) {
-                if (!monitor.idle || SystemClock.elapsedRealtime() - monitor.idleSince < 2000) {
-                    monitor.state(Boolean.FALSE); // Cancel the pending two-second continuation now.
-                    return;
-                }
-                monitor.close(true);
+                // A new focus request needs a new handshake even if the engine stream
+                // already emitted ACTIVE. The previous continuation may have completed.
+                // Do not ABORT here: the coordinator carries an unfinished conversation's
+                // original player/permit across this handoff and cancels its old timer.
+                monitor.close(false);
             }
             Object injects = host.getClass().getMethod("u").invoke(host);
             Object launcher = injects.getClass().getField("d").get(injects);

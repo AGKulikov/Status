@@ -367,3 +367,5 @@ Wi-Fi, GPS и Bluetooth. Собирается «из кирпичиков» — 
 - **S. Ramazanov** — Telegram [@RamazanovS](https://t.me/RamazanovS)
 
 Сайт проекта: [dezzk.github.io/status-widget](https://dezzk.github.io/status-widget/).
+
+Исследование повторных сеансов Алисы и автозапуска музыки: `fix/alice-music-20261107`, [статус](docs/geely-kx11/ALICE_MUSIC_2026_11_07_RU.md). Это кандидат исходников, не новый релиз.

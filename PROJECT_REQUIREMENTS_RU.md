@@ -5812,3 +5812,25 @@ resources, native libs и все прочие payload entries должны ос�
 и декомпиляция не публикуются. SHA и отчёт структуры обязательны перед APK.
 Native pre-focus handoff ограничен300ms; при недоступном/опоздавшем снимке Алиса
 продолжает штатно без автоматического PLAY. TEST/APK/FIELD пока OPEN.
+
+
+## 07.11.2026 — ALICE-VOICE-END-341 повторные сеансы / BOOT-338
+
+USER: 3.4.1 возобновила музыку только один раз; повторял разные способы вызова,
+музыка перед каждым вызовом играла. FIELD повторных сеансов FAILED; прежние
+SOURCE/TEST не являются аппаратной приёмкой. Поручено исправить и сделать
+мод переданной Яндекс Музыки для устойчивого запуска после boot.
+Диагностика7455511269533111895: SHA всех каналов PASS; 09:31:47 МСК Navigator
+ANR/process_killed; 24попытки автомузыки за94304ms закончились
+attempt_limit_WAITING_FOR_SESSION, process=not_running/browser=service_unavailable.
+Точная причина ANR и связь с повторными сеансами не установлены.
+Лог Alice шёл только в logcat, события отсутствуют в штатном архиве.
+SOURCE candidate: новый pre-focus handshake вместо повторного использования
+старого Monitor, перенос разрешения только незавершённого разговора;
+истечение heartbeat освобождает launch guard; события coordinator в журнале.
+TEST/APK/FIELD новых правок OPEN. Не менять подпись/настройки стабильных APK.
+YM baseline SHA2567018cb5ba63248a3b33973d5a32d380b7dfaa287c9a416d072754f2670f47f81,
+ru.yandex.music2026.10.2 #169gpr/code24026521/minSDK28. В fm7.invoke обнаружено
+динамическое переключение MusicBrowserService/Media3LibraryService. Это STATIC,
+не доказательство состояния компонентов установленной версии. Мод ещё OPEN.
+[Исследование и следующие проверки](docs/geely-kx11/ALICE_MUSIC_2026_11_07_RU.md).

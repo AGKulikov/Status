@@ -26,12 +26,18 @@ public class NativeAliceCoordinatorTest {
  }
  @Test public void frameworkCallbackHandlesNativeVoiceAndTwoSecondEnd(){
   prepare();event(33804,id,SystemClock.elapsedRealtime());event(33805,id,SystemClock.elapsedRealtime());
-  Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1999));assertTrue(NativeAliceCoordinator.active());
+  Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1000));
+  event(33805,id,SystemClock.elapsedRealtime());
+  Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(999));assertTrue(NativeAliceCoordinator.active());
   Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(1));assertFalse(NativeAliceCoordinator.active());
  }
  @Test public void oldSessionCannotFinishCurrentConversation(){
   prepare();event(33804,id,SystemClock.elapsedRealtime());event(33805,"old-session",SystemClock.elapsedRealtime());
-  Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(3));assertTrue(NativeAliceCoordinator.active());
+  for(int i=0;i<3;i++){
+   Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1));
+   event(33804,id,SystemClock.elapsedRealtime());
+  }
+  assertTrue(NativeAliceCoordinator.active());
  }
  @Test public void futureOrDelayedEngineEventsRevokePermission(){
   prepare();event(33804,id,SystemClock.elapsedRealtime()+1);assertFalse(NativeAliceCoordinator.active());
@@ -42,5 +48,12 @@ public class NativeAliceCoordinatorTest {
  @Test public void manualCommandInvalidatesNativeContinuation(){
   prepare();event(33804,id,SystemClock.elapsedRealtime());NavigatorAliceAction.onManualTransportControl();
   Shadows.shadowOf(Looper.getMainLooper()).idle();assertFalse(NativeAliceCoordinator.active());
+ }
+ @Test public void navigatorDeathReleasesLaunchGuardAndAllowsFreshSession(){
+  prepare();event(33804,id,SystemClock.elapsedRealtime());
+  Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(2));
+  assertFalse(NativeAliceCoordinator.active());
+  events=null;id="after-restart";seq=0;prepare();
+  event(33804,id,SystemClock.elapsedRealtime());assertTrue(NativeAliceCoordinator.active());
  }
 }
