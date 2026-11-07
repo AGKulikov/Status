@@ -1,0 +1,54 @@
+{
+  "verified": true,
+  "releaseId": 437441783,
+  "releaseTag": "natro-v3.4.3",
+  "releaseUrl": "https://github.com/AGKulikov/Status/releases/tag/natro-v3.4.3",
+  "publishedAt": "2026-11-07T08:31:05Z",
+  "channel": "stable/latest",
+  "publisherRunId": 42355757026,
+  "publisherJobId": 128353392888,
+  "publisherConclusion": "success",
+  "sourceCommit": "a9bb7c0fcbe1866570024df419bf962af1cacf7b",
+  "publicationCommit": "85eab366b66c7cc8f8a7fbc9bd4fae096e39e6ad",
+  "allAssetsDownloadedAndHashed": [
+    {
+      "name": "Natro-3.4.3-signed.apk",
+      "size": 29968992,
+      "sha256": "90f547df99b5c8a10f96a206678fdcdaa445f803d6c36db012113b73a620df85"
+    },
+    {
+      "name": "Natro-3.4.3-source.tar.gz",
+      "size": 35706604,
+      "sha256": "a22186611f7f92c3bab38418bd89012d95418980652e5500c9bb557beb75ccdc"
+    },
+    {
+      "name": "natro-update.json",
+      "size": 426,
+      "sha256": "1f2191c93f7f1c3fcce1ab5be0cbb76b9b460682363acc1fa9792da0113c206f"
+    },
+    {
+      "name": "README_RU.md",
+      "size": 2435,
+      "sha256": "e560234cd65a432fa89b0bdb9701a8527c80806dfe25893ef5ee97c05337c0a8"
+    },
+    {
+      "name": "release-report.json",
+      "size": 3257,
+      "sha256": "a0d58e0e50bc5d0c772b4700a94395d7d1a7978cc76642c74929534ca54977f5"
+    },
+    {
+      "name": "SHA256SUMS.txt",
+      "size": 523,
+      "sha256": "4c3a264e12cc7816e675648ceaba5878d2feacd7550fd37bee7452e36ffd78c5"
+    },
+    {
+      "name": "signature-verification.txt",
+      "size": 2341,
+      "sha256": "64e2120c2d8b27ca604ab56544853b36687e6b327c2c94b2b4c5c4e33b47f9c9"
+    }
+  ],
+  "checksumsFileVerified": true,
+  "publicApkExactlyMatchesSavedApk": true,
+  "updateManifestExactlyMatchesVerifiedApk": true,
+  "physicalKx11Verification": "pending"
+}

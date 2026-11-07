@@ -20,5 +20,8 @@
   },
   "payloadEntriesUnchanged": 1517,
   "physicalKx11Verification": "pending",
-  "diagnosticsDisabledRecovery": "existing 30-second guarded fallback; accelerated path requires enabled diagnostics and observed lifecycle event"
+  "diagnosticsDisabledRecovery": "existing 30-second guarded fallback; accelerated path requires enabled diagnostics and observed lifecycle event",
+  "toolRegressionTests": 283,
+  "publisherRunId": "42355757026",
+  "publisherConclusion": "success"
 }

@@ -5888,3 +5888,12 @@ classes19/native tools идентичны, повторная установка
 не требуется. Helper/Music без изменений. FIELD холодной загрузки/DropBox/установки
 поверх данных OPEN. Публикация выполняется с readback всех7assets, исходники и
 отчёты в release/natro-3.4.3. [Матрица и доказательства](docs/releases/3.4.3/README_RU.md).
+
+
+### 07.11.2026 11:31:05 МСК — 3.4.3 stable/latest опубликована
+
+REL publication PASS: release437441783/tag natro-v3.4.3, publisher42355757026/job128353392888 SUCCESS.
+Все7публичных assets скачаны и проверены по SHA256/SHA256SUMS; APK и update manifest
+совпадают с offline-проверенными. Ветка release/natro-3.4.3/85eab366 содержит исходники
+и отчёты; APK source a9bb7c0. FIELD и native root cause остаются OPEN.
+[Проверка публикации](docs/releases/3.4.3/publication-verification.json).

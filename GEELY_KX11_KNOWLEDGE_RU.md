@@ -3144,3 +3144,8 @@ TEST/APK/FIELD на данном checkpoint OPEN.
 явны. 2279Android tests/полный tool suite и7host replay PASS, stable signer/API28
 проверены. READ_LOGS/журнал нужны для ускоренного пути; без них прежний30s fallback.
 FIELD и native root cause остаются OPEN. Совместимый Navigator3.4.2 не изменён.
+
+
+07.11.2026 11:31:05 МСК:3.4.3 опубликована stable/latest, publisher42355757026 SUCCESS.
+Все7публичных файлов проверены; [протокол](docs/releases/3.4.3/publication-verification.json).
+Это подтверждение выпуска/подписи, не FIELD устранения native ANR.
