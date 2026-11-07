@@ -2078,15 +2078,26 @@
     {
       "id": "BOOT_MUSIC_NAVIGATOR_338",
       "priority": "P1",
-      "function": "Автозапуск после cold boot3.3.7",
+      "function": "Автозапуск Музыки и Навигатора после холодной загрузки",
       "status": "OPEN",
-      "known": "Receiver music отправлен14s, browser unavailable,24waits. Navigator handoff12s, ANR/killed31s, позднее окно138s. CI40096694911:2223Android/279tool PASS; подписанная пара3.3.8 с прежним signer/API28 проверена. ZIP25.10: music waits до apk_verified3.3.8 в той же загрузке; не новый cold boot3.3.8.",
-      "missing_evidence": "ANR stack Navigator; exported MediaBrowser endpoint установленной Music; повторный FIELD нового recovery.",
-      "next_step": "FIELD матрица подписанной пары3.3.8: cold boot, голос/фон/окно и finish+2s; при повторном ANR нужен его конкретный стек.",
+      "known": "Receiver music отправлен14s, browser unavailable,24waits. Navigator handoff12s, ANR/killed31s, позднее окно138s. CI40096694911:2223Android/279tool PASS; подписанная пара3.3.8 с прежним signer/API28 проверена. ZIP25.10: music waits до apk_verified3.3.8 в той же загрузке; не новый cold boot3.3.8. 07.11 повторная проверка: FIELD3.4.1 dispatch13.598s→ANR33.206s/kill33.211s→новый HOME61.825s→WINDOWED68.077s; не подтверждён recovery. STATIC3.4.2: grace30s, HOME focus/lifecycle,2dispatch/60s, молчаливая отмена onUserInteraction; ANR/kill только диагностируется. Шесть выбранных launcher/diagnostic blobs совпадают с3.4.1. SHA/размер48каналов из6ZIP PASS; runtime не менялся.",
+      "missing_evidence": "Точный ANR reason/thread stack Navigator; причина отмены/ожидания recovery, focus и источник нового HOME; повторный cold FIELD3.4.2. Отдельная проверка endpoint/очереди установленной Музыки и bootstrap3.4.2 остаётся открытой.",
+      "next_step": "Собирать адресный ANR reason/stack автоматически при отказе и журналировать каждый guard/cancel. Отвязать наблюдение boot-плана от HOME lifecycle, ограниченно восстанавливать после доказанной смерти без захвата экрана/нарушения ручного выбора; не добавлять фиксированный стартовый таймер без причины. Затем FIELD холодных загрузок, окна/режима и Музыки; ANR первопричина OPEN.",
       "sources": [
-        "BOOT_2026_10_24_RU.md"
+        "BOOT_2026_10_24_RU.md",
+        "BOOT_2026_11_07_RU.md"
       ],
-      "last_reviewed": "2026-10-25"
+      "last_reviewed": "2026-11-07",
+      "evidence_updates": [
+        {
+          "date": "2026-11-07",
+          "previous_last_reviewed": "2026-10-25",
+          "previous_missing_evidence": "ANR stack Navigator; exported MediaBrowser endpoint установленной Music; повторный FIELD нового recovery.",
+          "previous_next_step": "FIELD матрица подписанной пары3.3.8: cold boot, голос/фон/окно и finish+2s; при повторном ANR нужен его конкретный стек.",
+          "finding": "ZIP7455511269533111895 / FIELD3.4.1: dispatch13.598s, ANR33.206s, kill33.211s, new explicit HOME61.825s, window68.077s. Earlier cold ANR confirmed21.10/3.3.4 and24.10/3.3.7. Six checked launcher/diagnostic blobs unchanged3.4.1→3.4.2. Exact ANR cause and final recovery cancellation not observable.",
+          "source": "BOOT_2026_11_07_RU.md"
+        }
+      ]
     }
   ],
   "revision_history": [
@@ -2192,6 +2203,11 @@
       "date": "2026-10-24",
       "scope": "Alice intent/native lifecycle and2s music requirement; old no-receiver result preserved. FIELD remains OPEN.",
       "source": "ALICE_2026_10_24_RU.md"
+    },
+    {
+      "date": "2026-11-07",
+      "scope": "BOOT_MUSIC_NAVIGATOR_338 only; previous question state preserved in evidence_updates",
+      "note": "Rechecked six existing diagnostics archives and selected3.4.1/3.4.2 source blobs; no runtime/APK changes and no claims about unrelated questions."
     }
   ]
 }

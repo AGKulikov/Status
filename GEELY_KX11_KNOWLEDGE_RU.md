@@ -3129,3 +3129,17 @@ NoSpeech тоже FINISHED; TTS complete отдельно; Quark и runtime timi
 06.11 SOURCE3.4.1: глобальный pre-focus hook AliceKit/Quark и native idle stream
 вместо списка триггеров. Голосовой вызов включён в контракт. [Точки и ограничения](docs/geely-kx11/ALICE_2026_11_06_RU.md).
 TEST/APK/FIELD на данном checkpoint OPEN.
+
+
+## 07.11.2026 — BOOT-338: Navigator ANR при холодной загрузке сохраняется
+
+[Разбор шести архивов и текущего recovery](docs/geely-kx11/BOOT_2026_11_07_RU.md). FIELD3.4.1:
+команда13.598s, ANR33.206s, kill33.211s, новый HOME61.825s, окно68.077s.
+Такой класс отказа есть21.10/3.3.4 и24.10/3.3.7; не приписывать его новым
+hooks Алисы3.4.1. Первопричина ANR не установлена: SystemProcessEvent сохраняет
+факт, но отбрасывает reason/stack. STATIC:30s grace, HOME focus/lifecycle,
+2dispatch/60s и молчаливая отмена onUserInteraction ограничивают recovery;
+какой guard окончательно остановил последний план, в журнале не записано.
+Шесть выбранных launcher/diagnostics blobs3.4.2 совпадают с3.4.1. Runtime не
+менялся; следующий шаг — точный ANR evidence и координатор boot-плана,
+сохранение пользовательского выбора/режима и ограниченные повторы. FIELD OPEN.
