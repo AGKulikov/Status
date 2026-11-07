@@ -1,6 +1,11 @@
-> В разработке3.4.1: единое окончание голосовой сессии Алисы, включая wake-word.
-> Ветка `feature/alice-engine-20261106`; [статус парного выпуска](docs/releases/3.4.1/README_RU.md).
-> Stable3.4.0 ниже — предыдущий выпущенный APK;3.4.1 пока не выдана.
+> **3.4.3: APK подписан и проверен; публикация stable/latest выполняется.**
+> Восстановление Навигатора после подтверждённого завершения процесса и сохранение сведений об ANR.
+> [Ветка выпуска](https://github.com/AGKulikov/Status/tree/release/natro-3.4.3), [установка и доказательства](docs/releases/3.4.3/README_RU.md).
+> 2279 тестов приложения, полный CI и 7 дополнительных сценариев PASS; FIELD OPEN. Уже установленный Navigator3.4.2 переустанавливать не нужно.
+
+> **3.4.2: подписанный комплект готов; FIELD OPEN.** 2275Android/283tool tests PASS.
+> [Ветка выпуска](https://github.com/AGKulikov/Status/tree/release/natro-3.4.2), [проверки и установка](docs/releases/3.4.2/README_RU.md).
+> Требуются парный Navigator3.4.2 и отдельный мод Музыки для нового bootstrap. История выпусков ниже.
 
 # Natro
 
@@ -371,4 +376,4 @@ Wi-Fi, GPS и Bluetooth. Собирается «из кирпичиков» — 
 Исследование повторных сеансов Алисы и автозапуска музыки: `fix/alice-music-20261107`, [статус](docs/geely-kx11/ALICE_MUSIC_2026_11_07_RU.md). Это кандидат исходников, не новый релиз.
 
 
-07.11.2026: [Navigator ANR/recovery candidate](docs/geely-kx11/NAVIGATOR_ANR_2026_11_07_RU.md), branch fix/navigator-anr-20261107. SOURCE candidate; TEST/APK/FIELD OPEN; native root cause UNKNOWN.
+Исторический checkpoint перед выпуском 07.11.2026: [Navigator ANR/recovery candidate](docs/geely-kx11/NAVIGATOR_ANR_2026_11_07_RU.md), branch fix/navigator-anr-20261107. SOURCE candidate; TEST/APK/FIELD OPEN; native root cause UNKNOWN.

@@ -1,0 +1,16 @@
+{
+  "verified": true,
+  "sourceCommit": "a9bb7c0fcbe1866570024df419bf962af1cacf7b",
+  "ciRunId": "42354372942",
+  "compatibleNavigator": "Navigator-30.3.0-Natro-3.4.2-signed.apk",
+  "sha256": "1e8e3ecaefcc3f205e06eff95d99bfca9a023bf7e9d41bbd7b60df472409f5bb",
+  "bridgeDexIdentical": true,
+  "nativePatchToolIdentical": true,
+  "nativePatchedDexMatchesVerified342": true,
+  "android9SignatureVerified": true,
+  "newNavigatorInstallRequiredIf342Installed": false,
+  "olderNavigatorRequires342": true,
+  "helperChanged": false,
+  "musicModChanged": false,
+  "physicalKx11Verification": "pending"
+}

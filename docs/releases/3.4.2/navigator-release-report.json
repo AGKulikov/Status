@@ -1,0 +1,40 @@
+{
+  "sourceCommit": "b2434a5804071cf21390c312bb0cf20e5861cec0",
+  "sourceTree": "9dc90daff513cc9c8c591e623e4cf0bef4aceed8",
+  "ciRunId": "42351315865",
+  "pairVersion": "3.4.2",
+  "apk": "Navigator-30.3.0-Natro-3.4.2-signed.apk",
+  "sha256": "1e8e3ecaefcc3f205e06eff95d99bfca9a023bf7e9d41bbd7b60df472409f5bb",
+  "size": 156546666,
+  "package": "ru.yandex.yandexnavi",
+  "versionName": "30.3.0",
+  "versionCode": 739564630,
+  "baselineSha256": "52736b41714bba696cd54442804816741e2834b57a0d880702560667106a89dc",
+  "nativeEngineHooks": true,
+  "nativeToolSha256": {
+    "smali-dexlib2-3.0.3.jar": "11cc5e7b75b23feb65e41e28e5c225b4a77dbf7210d6cedd4bdb3f04c1f6ea24",
+    "jsr305-3.0.2.jar": "766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7",
+    "PatchAliceFocus.class": "e10d869040ab176f7577b7b320d7ba62aeab96c0bee2b0d4eab235b9d0d5f4d3",
+    "PatchAliceFocusSelfTest.class": "69711cc30f2bd0e344ba0f8e336bd51bfaf05789df485bf1f728a1e995bebe0b",
+    "guava-32.0.1-jre.jar": "bd7fa227591fb8509677d0d1122cf95158f3b8a9f45653f58281d879f6dc48c5"
+  },
+  "changedEntryHashes": {
+    "classes11.dex": "333f940ad8156545644c7ddbbdcbc977d670a30ccb4c755fabd5f4eb000db445",
+    "classes15.dex": "aac286e3fe694ad9fb4144b6736bb5ca9a22f26d138dcbb0f2385dd19fa81388",
+    "classes19.dex": "81d37552019e321e1f807874b040a22dff81de2949d613d5f6c82035ad1ebae0"
+  },
+  "patchSha256": "81d37552019e321e1f807874b040a22dff81de2949d613d5f6c82035ad1ebae0",
+  "changedPayloadEntries": [
+    "classes11.dex",
+    "classes15.dex",
+    "classes19.dex"
+  ],
+  "unchangedPayloadEntries": 17224,
+  "manifestResourcesAndNativeLibrariesUnchanged": true,
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "signatureV2": true,
+  "signatureV3": true,
+  "zipalign16KiB": true,
+  "physicalKx11Verification": "pending",
+  "signingScriptSha256": "4232cbe6e815d5497e16b4250c144021211303d14b91a71e2e5097f74ebc0a32"
+}

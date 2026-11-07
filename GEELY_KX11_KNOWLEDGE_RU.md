@@ -3130,5 +3130,17 @@ NoSpeech тоже FINISHED; TTS complete отдельно; Quark и runtime timi
 вместо списка триггеров. Голосовой вызов включён в контракт. [Точки и ограничения](docs/geely-kx11/ALICE_2026_11_06_RU.md).
 TEST/APK/FIELD на данном checkpoint OPEN.
 
+## 07.11.2026 — Алиса / запуск Музыки
+
+Кандидат3.4.2: повторный pre-focus handshake и отмена при потере heartbeat; native idle +2s сохраняется. Мод Music2026.10.2 использует own-app MediaBrowser UID, подпись/пакет клиента проверяются, PLAY остаётся в Natro. Полный CI2275Android/283tool PASS, три APK подписаны, FIELD OPEN. Логи3.4.1 не доказывают точный момент завершения диалога и источник PLAY; не выдавать найденный source defect за однозначно подтверждённую причину каждого отказа. [Доказательства](docs/geely-kx11/ALICE_MUSIC_2026_11_07_RU.md), [выпуск](docs/releases/3.4.2/README_RU.md).
+
 
 07.11.2026: [Navigator ANR/recovery candidate](docs/geely-kx11/NAVIGATOR_ANR_2026_11_07_RU.md), branch fix/navigator-anr-20261107. SOURCE candidate; TEST/APK/FIELD OPEN; native root cause UNKNOWN.
+
+
+07.11.2026 — 3.4.3 SOURCE/TEST/APK: [матрица](docs/releases/3.4.3/README_RU.md).
+Подтверждённое завершение процесса может снять30s retry delay, но не guards.
+Системный Reason и доступный DropBox стек сохраняются отдельно; denied/missing
+явны. 2279Android tests/полный tool suite и7host replay PASS, stable signer/API28
+проверены. READ_LOGS/журнал нужны для ускоренного пути; без них прежний30s fallback.
+FIELD и native root cause остаются OPEN. Совместимый Navigator3.4.2 не изменён.

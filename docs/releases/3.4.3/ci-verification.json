@@ -1,0 +1,24 @@
+{
+  "sourceCommit": "a9bb7c0fcbe1866570024df419bf962af1cacf7b",
+  "sourceTree": "ccb8defb913488adb1de6ce54e2fb0b2840e585e",
+  "buildRunId": "42354372942",
+  "buildStatus": "completed",
+  "buildConclusion": "success",
+  "unitTests": {
+    "tests": 2279,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "toolRegressionSuite": "success",
+  "additionalHostReplay": {
+    "command": "python3 -m unittest tools.tests.test_anr_evidence_replay -v",
+    "unittestCases": 1,
+    "scenarios": 7,
+    "result": "PASS",
+    "limitations": "Android DropBox control flow fixtures; not physical permission or device acceptance"
+  },
+  "payloadEntriesUnchanged": 1517,
+  "physicalKx11Verification": "pending",
+  "diagnosticsDisabledRecovery": "existing 30-second guarded fallback; accelerated path requires enabled diagnostics and observed lifecycle event"
+}

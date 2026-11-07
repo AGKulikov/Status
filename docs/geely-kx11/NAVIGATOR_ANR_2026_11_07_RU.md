@@ -36,3 +36,20 @@ explicitly authorized; no CI started. Changes are a local candidate, not a relea
 Remaining review before release: diagnostic-disabled recovery behavior (current death
 observer requires enabled diagnostics), DropBox denied/missing/late report tests, exact
 APK signing and migration gates for the next version. No hardware claim is made.
+
+
+## Release verification 07.11.2026 — supersedes the earlier local blockers
+
+Remote source a9bb7c0fcbe1866570024df419bf962af1cacf7b, tree
+ccb8defb913488adb1de6ce54e2fb0b2840e585e; CI42354372942 SUCCESS:2279Android tests
+and full tool replay suite. The local Java runtime also exposes jdk.compiler via
+`java com.sun.tools.javac.Main` even when a javac launcher is absent.
+Seven host fixtures compiled the exact AnrEvidence source and passed denied,
+unavailable, missing-after-retries, disabled, correct-process/chunk-bound,
+out-of-incident-window and late-report cases. No physical Android permission claim.
+Diagnostic-disabled recovery reviewed: observer is opt-in; accelerated recovery is
+unavailable without enabled diagnostics/READ_LOGS, while the original30s guarded
+fallback remains. The APK is recovery/evidence improvement, not a proven native
+ANR root-cause fix. Device gates above remain OPEN.
+Signed3.4.3/API28/v2/v3/zipalign/install-over metadata and unchanged CI payload PASS.
+[Release reports and acceptance matrix](../releases/3.4.3/README_RU.md).

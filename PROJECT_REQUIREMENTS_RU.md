@@ -5858,6 +5858,10 @@ SOURCE: исправлена привязка Request.this в асинхронн
 
 07.11 дополнение bootstrap: временный отказ bind до выдачи token повторяется через500ms только внутри исходного15s deadline. После token повтор запрещён. Целевой CI42350948501 прошёл21test; новый retry требует повторного CI. APK с предыдущим DEX не выдаётся как финальный.
 
+## 07.11.2026 — 3.4.2 SOURCE/TEST/APK
+
+SOURCE b2434a5804071cf21390c312bb0cf20e5861cec0 опубликован; полный CI42351315865 SUCCESS:2275Android/283tool,0fail/errors/skips; targeted42351315843:23tests. Три APK подписаны общим stable signer, exactAPI28/v2/v3/zipalign проверены. Natro+1 к3.4.1, payload точного CI сохранён; Navigator против3.4.1 меняет только classes19.dex. Music добавляет только provider/version в manifest и собственный DEX,4725native entries неизменны; original signer отличается, install-over исходного Music невозможно. Автоудаление не выполняется. FIELD повторных диалогов/finish+2s/холодной загрузки OPEN. Публикация Natro выполняется workflow release/natro-3.4.2 с readback; собственные исходники/отчёты опубликованы отдельно от проприетарных APK. [Протокол](docs/releases/3.4.2/README_RU.md).
+
 
 ## 07.11.2026 — BOOT-338 / ANR-343: восстановление и причина зависания
 USER: «Исправляй все». Сохранять системную причину ANR и доступный стек сразу
@@ -5866,3 +5870,21 @@ USER: «Исправляй все». Сохранять системную пр�
 прежние ограничения владения окном/ручного вмешательства сохраняются.
 SOURCE candidate, TEST pending, APK/FIELD OPEN. Native root cause UNKNOWN.
 [Исследование и пределы](docs/geely-kx11/NAVIGATOR_ANR_2026_11_07_RU.md).
+
+
+## 07.11.2026 — продолжить до выпуска 3.4.3: BOOT-338 / ANR-343 / REL
+
+USER: «Продолжай, жду» после проверки статуса CI. Выпуск и публикация продолжаются
+в рамках ранее разрешённой работы. SOURCE a9bb7c0fcbe1866570024df419bf962af1cacf7b
+опубликован, build42354372942 SUCCESS: 2279 Android tests, 0 fail/error/skip,
+полный tool regression suite PASS. Дополнительно 7 host replay сценариев AnrEvidence
+PASS: denied/missing/unavailable/disabled/matching/bounds/late report; это не FIELD.
+APK3.4.3/code208021376 подписан stable signer: v2/v3, exactAPI28, zipalign,
+label/package, +1 к3.4.2 и1517неизменных payload entries PASS. Ускорение запуска
+требует включённого журнала/доступного lifecycle event; при выключенном остаётся
+прежний guarded30s fallback. Native ANR root cause UNKNOWN, не объявлена устранённой.
+Navigator3.4.2 повторно проверен: SHA2561e8e3ecaefcc3f205e06eff95d99bfca9a023bf7e9d41bbd7b60df472409f5bb,
+classes19/native tools идентичны, повторная установка при уже установленной3.4.2
+не требуется. Helper/Music без изменений. FIELD холодной загрузки/DropBox/установки
+поверх данных OPEN. Публикация выполняется с readback всех7assets, исходники и
+отчёты в release/natro-3.4.3. [Матрица и доказательства](docs/releases/3.4.3/README_RU.md).
