@@ -1,0 +1,18 @@
+{
+  "source": "dffc9dea7e4458dfaae96bbde09d5722af033a71",
+  "tree": "275fc1720efec82e17f5592cfd8ac87352690501",
+  "run": "42357581030",
+  "job": 128358946999,
+  "result": "success",
+  "androidTests": {
+    "tests": 2281,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "toolTests": 285,
+  "musicHostReplayScenarios": 8,
+  "navigatorReused": true,
+  "nativeHooksIdentical": true,
+  "physicalColdBoot": "pending"
+}

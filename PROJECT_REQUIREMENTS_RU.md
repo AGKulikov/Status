@@ -5925,3 +5925,15 @@ Firebase — компонент baseline Navigator; его удаление не
 расширена до3.4.4 без новых настроек/изменений defaults.
 TEST:8production host replay сценариев Music PASS; полный Android CI pending.
 APK3.4.4/code208021377 pending, stable signer/install-over обязательны; FIELD OPEN.
+
+
+### 07.11.2026 — 3.4.4 SOURCE/TEST/APK PASS
+
+SOURCE dffc9dea7e4458dfaae96bbde09d5722af033a71/tree275fc1720efec82e17f5592cfd8ac87352690501;
+CI42357581030/job128358946999 SUCCESS2281Android/285tool,0failure/error/skip.
+8production Music host сценариев PASS. Signed APK3.4.4/code208021377,
+29973088bytes,SHA2569dc7d907eb2a2a972de10f7ccb6fa08b2b059f2beafa3e7975f25f73c575577b;
+stable signer/v2/v3/exactAPI28/zipalign/+1/1517payload entries PASS. Navigator3.4.2
+patch/native hashes прежние, Music/Helper прежние. PUBLISH выполняется сreadback7assets.
+BOOT-338/MUSIC-BOOT-MOD-342 FIELD OPEN: native I/O причина не объявляется исправленной.
+[Протокол](docs/releases/3.4.4/README_RU.md). Временные приватные ключи удалены.
