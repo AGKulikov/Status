@@ -1,11 +1,11 @@
 # Natro — актуальная разработка
 
-**Natro 3.4.3 опубликована в stable/latest 7 ноября 2026 года.**
+**Natro 3.4.4 опубликована в stable/latest 7 ноября 2026 года.**
 
-- [Готовый APK и исходники выпуска](https://github.com/AGKulikov/Status/releases/tag/natro-v3.4.3).
-- [Актуальная ветка `release/natro-3.4.3`](https://github.com/AGKulikov/Status/tree/release/natro-3.4.3).
-- [Установка, совместимость и проверка выпуска](https://github.com/AGKulikov/Status/blob/release/natro-3.4.3/docs/releases/3.4.3/README_RU.md).
-- APK source `a9bb7c0fcbe1866570024df419bf962af1cacf7b`; [CI](https://github.com/AGKulikov/Status/actions/runs/42354372942) прошёл 2279 тестов приложения и 283 проверки инструментов.
+- [Готовый APK и исходники выпуска](https://github.com/AGKulikov/Status/releases/tag/natro-v3.4.4).
+- [Актуальная ветка `release/natro-3.4.4`](https://github.com/AGKulikov/Status/tree/release/natro-3.4.4).
+- [Установка, совместимость и проверка выпуска](https://github.com/AGKulikov/Status/blob/release/natro-3.4.4/docs/releases/3.4.4/README_RU.md).
+- APK source `dffc9dea7e4458dfaae96bbde09d5722af033a71`; [CI](https://github.com/AGKulikov/Status/actions/runs/42357581030) прошёл 2281 тестов приложения и 285 проверок инструментов.
 
 Сохранена прежняя подпись. Уже установленный Navigator 3.4.2 повторно устанавливать не требуется.
 Работа на ECARX KX11 и внутренняя причина ANR остаются предметом аппаратной проверки.
