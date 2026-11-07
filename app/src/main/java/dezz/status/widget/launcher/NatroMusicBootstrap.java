@@ -54,7 +54,7 @@ final class NatroMusicBootstrap {
                         IPC.execute(()->{
                             if(!allowed()){finish("cancelled_before_play");return;}
                             MediaResumeCommand.DispatchTrace trace=MediaAutoResumeController.guardedBrowserDispatch(
-                                    context,this::allowed,()->MediaResumeCommand.playBrowserSession(context,token,"ru.yandex.music"));
+                                    context,Request.this::allowed,()->MediaResumeCommand.playBrowserSession(context,token,"ru.yandex.music"));
                             finish(trace==null?"play_cancelled":"play_"+trace.result+":"+trace.detail);
                         });
                     }catch(RuntimeException e){finish("callback_"+e.getClass().getSimpleName());}
