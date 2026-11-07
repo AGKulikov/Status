@@ -6041,3 +6041,28 @@ Navigator3.4.2 повторно используется: patch/native tool hash
 PUBLISH подготовлен, результат записывается отдельно после фактической проверки.
 FIELD нового порядка cold boot OPEN; прежний Music2/Natro3.4.4 FAILED не отменяется.
 [Матрица, установка и доказательства](docs/releases/3.4.5/README_RU.md).
+
+
+## 07.11.2026 — FIELD3.4.5 FAILED: native Music binding / Navigator recovery
+
+USER: «Музыка так и не запускается сама и один раз опять навигатор не запустился».
+Архив6437764059328416449 SHA2567ade6ebb6369cabafb88ab2501d42c15b696183d6d6375bad540d39a6c7ef38b.
+MUSIC-BOOT-MOD-342: два холодных старта, по3 endpoint timeout; барьер3.4.5
+действует,48попыток не отправили PLAY. Прежняя гонка не объясняет новый отказ.
+BOOT-338: второй старт ANR при Runtime.loadLibrary/com.yandex.runtime.Runtime.init,
+95%TOTAL/28%iowait; это стек задержки, не доказанная первопричина накопителя.
+Оба recovery отменены общим onUserInteraction спустя96/540ms после dispatch;
+тип ввода старый журнал не сохраняет, реальное ручное касание не исключено.
+SOURCE candidate3.4.6/Music3: modern native bind без legacy onGetRoot, read-only
+проверенный adapter штатной сессии и асинхронное подтверждение её looper; PLAY
+остаётся адресным в Natro с прежними permit/deadline/manual guards. Навигатор:
+реальные touch/navigation DOWN отменяют recovery, UP/media/volume его не отменяют;
+причина и код ввода записываются. Условия focus/ABSENT/60s/2attempt прежние.
+TEST LOCAL PASS: 10 coordinator + 12 native provider сценариев, production Music
+Java source/target8 compile, Navigator input/recovery policies, pinned native
+schema5classes/11fields, manifest version-only diff, backup/settings inventories.
+Отложенный callback старой попытки не может очистить pending probe новой попытки.
+Полный Android CI/APK/PUBLISH pending: auto-review отклонил git push исходников
+и workflow в публичный AGKulikov/Status; обход не выполнялся. Требуется явное
+разрешение этой публикации. FIELD новой пары OPEN, прежний FAILED сохраняется.
+[Доказательства и ограничения](docs/geely-kx11/BOOT_345_FIELD_2026_11_07_RU.md).

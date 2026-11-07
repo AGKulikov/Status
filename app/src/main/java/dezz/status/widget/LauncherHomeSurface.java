@@ -548,7 +548,7 @@ public final class LauncherHomeSurface extends android.content.ContextWrapper im
     public void cancelAutomaticNavigatorRecovery() {
         cancelAutomaticNavigatorRecovery("manual_interaction");
     }
-    private void cancelAutomaticNavigatorRecovery(String reason) {
+    void cancelAutomaticNavigatorRecovery(String reason) {
         if (automaticNavigatorStartedAt >= 0) traceAutomaticNavigator("cancelled_"+reason);
         automaticNavigatorStartedAt = -1L;
         navigationUiHandler.removeCallbacks(automaticNavigatorCheck);

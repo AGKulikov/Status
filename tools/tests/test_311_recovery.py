@@ -80,6 +80,13 @@ class RecoveryReplay(unittest.TestCase):
         check(!NavigatorAutoLaunchPolicy.retry(31000,0,0,1,true,true,30900,10));
         check(!NavigatorAutoLaunchPolicy.retry(61000,0,0,1,true,true,60900,-1));
         check(!NavigatorAutoLaunchPolicy.retry(31000,-1,0,1,true,true,30900,-1));
+        for(int key:new int[]{24,25,79,85,86,87,88,89,90,91,126,127,164})
+          check(!NavigatorAutoLaunchPolicy.navigationKeyDown(0,key,0));
+        for(int key:new int[]{3,4,19,20,21,22,23,61,62,66,82,111})
+          check(NavigatorAutoLaunchPolicy.navigationKeyDown(0,key,0));
+        check(!NavigatorAutoLaunchPolicy.navigationKeyDown(1,4,0));
+        check(!NavigatorAutoLaunchPolicy.navigationKeyDown(0,66,1));
+        check(NavigatorAutoLaunchPolicy.retry(39340,13783,13783,1,true,true,39340,-1,true));
         }}'''},'dezz.status.widget.LaunchReplay')
 
     def test_gatt_disconnect_callback_loss_preserves_exact_owner_and_settle(self):

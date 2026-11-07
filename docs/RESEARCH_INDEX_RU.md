@@ -168,3 +168,7 @@ QNX отказал до handshake; каталог/mappings остаются BLOC
 - [FIELD3.4.4: два boot и Music endpoint_timeout](geely-kx11/BOOT_344_FIELD_2026_11_07_RU.md).
 
 - [07.11.2026 — пересечение подготовки Music Natro 2 и PLAY](geely-kx11/MUSIC_PREPARE_PLAY_RACE_2026_11_07_RU.md): Natro3.4.5 SOURCE/TEST/APK PASS; Music2 совместима; FIELD нового порядка OPEN.
+
+
+07.11.2026: [FIELD3.4.5 — Music timeout и native Navigator ANR](geely-kx11/BOOT_345_FIELD_2026_11_07_RU.md).
+FIELD FAILED; candidate3.4.6/Music3, повторная аппаратная проверка OPEN.

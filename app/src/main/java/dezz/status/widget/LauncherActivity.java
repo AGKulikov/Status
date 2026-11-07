@@ -7,6 +7,8 @@ import android.os.Bundle;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.view.KeyEvent;
+import android.view.MotionEvent;
 
 /** The driver's Android HOME task hosts the same renderer as the passenger overlay. */
 public class LauncherActivity extends LauncherProfileActivity implements LauncherHomeSurface.Host {
@@ -25,7 +27,18 @@ public class LauncherActivity extends LauncherProfileActivity implements Launche
     @Override protected void onStop(){if(surface!=null)surface.onStop();super.onStop();}
     @Override protected void onDestroy(){if(surface!=null)surface.onDestroy();super.onDestroy();}
     @Override public void onWindowFocusChanged(boolean focus){super.onWindowFocusChanged(focus);if(surface!=null)surface.onWindowFocusChanged(focus);}
-    @Override public void onUserInteraction(){super.onUserInteraction();if(surface!=null)surface.cancelAutomaticNavigatorRecovery();}
+    @Override public boolean dispatchTouchEvent(MotionEvent event) {
+        if(surface!=null && event.getActionMasked()==MotionEvent.ACTION_DOWN)
+            surface.cancelAutomaticNavigatorRecovery("touch_down:source="+event.getSource());
+        return super.dispatchTouchEvent(event);
+    }
+    @Override public boolean dispatchKeyEvent(KeyEvent event) {
+        if(surface!=null && NavigatorAutoLaunchPolicy.navigationKeyDown(
+                event.getAction(),event.getKeyCode(),event.getRepeatCount()))
+            surface.cancelAutomaticNavigatorRecovery("navigation_key_down:code="+event.getKeyCode()
+                    +", source="+event.getSource());
+        return super.dispatchKeyEvent(event);
+    }
     @Override public void onTrimMemory(int level){super.onTrimMemory(level);if(surface!=null)surface.onTrimMemory(level);}
     @Override public void onBackPressed(){if(surface==null)super.onBackPressed();else surface.onBackPressed();}
     @Override public Object onRetainCustomNonConfigurationInstance(){return surface==null?null:surface.onRetainCustomNonConfigurationInstance();}

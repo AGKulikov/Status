@@ -1066,3 +1066,13 @@ same-version no-op and source>target/future rejection retained. Added335…377�
 regression with334/378 rejection; historical version tests unchanged. Runtime
 Music request/retry/listeners remain RAM and cannot be restored as pending playback.
 Fingerprint updated only for this reviewed owner; full Android test/restore FIELD pending.
+
+
+### Review3.4.6 — native Music preparation, navigation input and defaults
+
+Native provider/session adapter and cancellation reasons are RAM-only, without new
+settings, keys, defaults, files, roots or restore actions. LauncherHomeSurface changes
+only method visibility; LauncherActivity distinguishes touch/navigation from media
+input. Reviewed migration335…378→379 and previously omitted target378; old tests stay.
+Explicit/unknown/effective values and future rejection remain unchanged. Only reviewed
+BackupDefaultsMigration/LauncherHomeSurface fingerprints are updated; FIELD restore OPEN.

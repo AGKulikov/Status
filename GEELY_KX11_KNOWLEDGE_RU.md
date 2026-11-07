@@ -3174,3 +3174,7 @@ exact_session_play до bootstrap token. SOURCE/replay подтверждают 
 на стороне Natro; native deadlock cause полностью не доказана. В3.4.5 SOURCE/
 TEST/APK PASS, FIELD OPEN. Music2/protocol1 остаётся совместимой без нового APK.
 [Подробности и ограничения](docs/geely-kx11/MUSIC_PREPARE_PLAY_RACE_2026_11_07_RU.md).
+
+
+07.11.2026: [FIELD3.4.5 — Music timeout и native Navigator ANR](docs/geely-kx11/BOOT_345_FIELD_2026_11_07_RU.md).
+FIELD FAILED; candidate3.4.6/Music3, повторная аппаратная проверка OPEN.

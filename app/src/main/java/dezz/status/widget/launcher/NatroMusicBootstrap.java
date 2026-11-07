@@ -62,11 +62,13 @@ final class NatroMusicBootstrap {
             ResultReceiver callback=new ResultReceiver(MAIN){
                 @Override protected void onReceiveResult(int code,Bundle data){
                     if(!allowed() || data==null || !id.equals(data.getString("id")))return;
+                    if(code==34200){journal("remote_"+data.getString("stage"));return;}
                     if(code!=34201){finish("remote_"+data.getString("stage"));return;}
-                    if(delivered)return;delivered=true;
+                    if(delivered)return;
                     try {
                         MediaSession.Token token=data.getParcelable("token");
                         if(token==null){finish("missing_token");return;}
+                        delivered=true;
                         IPC.execute(()->{
                             if(!allowed()){finish("cancelled_before_play");return;}
                             MediaResumeCommand.DispatchTrace trace=MediaAutoResumeController.guardedBrowserDispatch(
@@ -88,6 +90,7 @@ final class NatroMusicBootstrap {
                 // Provider acquisition includes cold Application startup. Start its short
                 // preparation budget only now; never extend the overall request/boot permit.
                 Bundle args=new Bundle();args.putLong("deadline",Math.min(deadline,SystemClock.elapsedRealtime()+15000));
+                args.putBoolean("progress_v2",true);
                 args.putParcelable("callback",ResultReceiver.CREATOR.createFromParcel(parcel));
                 journal("prepare");
                 Bundle response=client.call("prepare_v1",id,args);

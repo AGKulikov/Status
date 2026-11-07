@@ -1,3 +1,6 @@
+> Текущая разработка и кандидат: `release/natro-3.4.6`, Natro3.4.6 + MusicNatro3.
+> Новый FIELD3.4.5 отрицательный. [Разбор и границы исправления](docs/geely-kx11/BOOT_345_FIELD_2026_11_07_RU.md). Сборка/проверка выполняются.
+
 > Текущая разработка: `fix/music-prepare-play-20261107`; выпуск `release/natro-3.4.5`.
 > **Natro 3.4.5: SOURCE/TEST/APK PASS, публикация завершается.** 2283 Android / 285 tool tests, прежняя подпись и exact API 28 проверены. [Установка и матрица](docs/releases/3.4.5/README_RU.md).
 > Обновляется только Natro: Яндекс Музыка Natro 2, Навигатор Natro 3.4.2 и Helper совместимы. FIELD холодного запуска OPEN; отрицательный результат Music 2 с прежним Natro сохранён в [разборе](docs/geely-kx11/MUSIC_PREPARE_PLAY_RACE_2026_11_07_RU.md). Старые состояния ниже — история.

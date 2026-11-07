@@ -5,7 +5,7 @@ from pathlib import Path
 EXPECTED='4f8250f842f4cccbdc642fbca4467171acc70866a4821fe4a7ff13687d559512'
 PROVIDER='ru.natro.music.BootstrapProvider'
 AUTHORITY='ru.yandex.music.natro.bootstrap'
-VERSION='2026.10.2 #169gpr Natro 2'
+VERSION='2026.10.2 #169gpr Natro 3'
 U=0xffffffff
 
 def chunks(data):
@@ -58,7 +58,7 @@ def patch(data):
                 if name=='versionName':struct.pack_into('<I',b,off+8,version);struct.pack_into('<I',b,off+16,version);versions+=1
                 if name=='versionCode':
                     if struct.unpack_from('<I',b,off+16)[0]!=24026521:raise ValueError('Unexpected version')
-                    struct.pack_into('<I',b,off+16,24026523);versions+=1
+                    struct.pack_into('<I',b,off+16,24026524);versions+=1
             part=bytes(b)
         if kind==0x103 and strings[struct.unpack_from('<I',part,20)[0]]=='application':
             result.extend([opening,closing]);inserted+=1

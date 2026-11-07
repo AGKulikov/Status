@@ -17,6 +17,7 @@ class MusicBootstrapReplayTest(unittest.TestCase):
    'android/os/Bundle.java':'''package android.os; public class Bundle extends java.util.HashMap<String,Object> {
     public void putLong(String k,long v){put(k,v);} public long getLong(String k){return (Long)get(k);}
     public void putParcelable(String k,Object v){put(k,v);} public <T>T getParcelable(String k){return (T)get(k);}
+    public void putBoolean(String k,boolean v){put(k,v);}
     public String getString(String k){return (String)get(k);} public boolean getBoolean(String k){return Boolean.TRUE.equals(get(k));}}''',
    'android/os/Parcel.java':'package android.os; public class Parcel {Object value; public static Parcel obtain(){return new Parcel();} public void setDataPosition(int i){} public void recycle(){}}',
    'android/os/ResultReceiver.java':'''package android.os; public class ResultReceiver {
@@ -86,6 +87,15 @@ public class Replay {
      req=request(1);invoke(req,"prepare");callback(context.resolver.client);callback(context.resolver.client);
      check(!NatroMusicBootstrap.blocksColdPlay(),"valid token releases preparation barrier");
      await(()->MediaResumeCommand.plays==1);Thread.sleep(30);check(MediaResumeCommand.plays==1,"duplicate PLAY");break;
+    case "progress":
+     req=request(1);invoke(req,"prepare");Bundle progress=new Bundle();progress.put("id",context.resolver.client.id);progress.put("stage","native_bound");
+     ((ResultReceiver)context.resolver.client.args.getParcelable("callback")).send(34200,progress);
+     check(NatroMusicBootstrap.blocksColdPlay(),"progress is not readiness");
+     callback(context.resolver.client);await(()->MediaResumeCommand.plays==1);break;
+    case "missing_token":
+     req=request(1);invoke(req,"prepare");Bundle missing=new Bundle();missing.put("id",context.resolver.client.id);
+     ((ResultReceiver)context.resolver.client.args.getParcelable("callback")).send(34201,missing);
+     check(NatroMusicBootstrap.blocksColdPlay(),"missing token cannot release barrier");check(MediaResumeCommand.plays==0,"no token no play");break;
     case "retry":
      req=request(1);finish(req);check(NatroMusicBootstrap.request(context,permit::get).equals("bootstrap_scheduled"),"retry admitted");
      await(()->context.resolver.client.calls==1);break;
@@ -111,6 +121,6 @@ public class Replay {
  @classmethod
  def tearDownClass(cls):cls.tmp.cleanup()
  def test_replay(self):
-  for case in ['cold','expired','manual','late','duplicate','retry','limit','blocked']:
+  for case in ['cold','expired','manual','late','duplicate','progress','missing_token','retry','limit','blocked']:
    with self.subTest(case=case):
     subprocess.run(['java','-cp',str(self.root),'dezz.status.widget.launcher.Replay',case],check=True,capture_output=True,timeout=8)
