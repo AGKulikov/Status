@@ -11,4 +11,7 @@ Navigator 3.4.2 и Helper не требуют обновления: compiled pat
 Источник: d0cf73374a6fc5c41a784a801443113f8fd59b08, дерево 5a050bbaeaa2197f43a6334498dc1ae3c26b7225.
 Проверка на KX11 ещё не выполнена. Задержка native-библиотеки Навигатора остаётся открытым вопросом.
 
-SOURCE/TEST/APK PASS; PUBLISH выполняется; FIELD OPEN.
+SOURCE/TEST/APK PASS; PUBLISH BLOCKED; FIELD OPEN.
+
+Publisher42376540232 проверил подпись, SHA и source archive, затем GitHub отклонил создание release: HTTP403 Resource not accessible by integration. Stable канал не обновлён. APK доступны отдельно; для публикации нужен GitHub доступ к созданию релиза.
+
