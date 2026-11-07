@@ -24,7 +24,7 @@ DEX SHA256 `32c6fe5a2523ae3feaa8770690a2118ee955051a1a1d72b448d9ff4f2635c3e6`.
 | TEST | 25 целевых Android-тестов PASS; py_compile упаковщика PASS |
 | MANIFEST | Независимый aapt diff: относительно Natro 1 меняются только versionCode/versionName |
 | APK | PASS: stable signer, v2/v3, exact API28, zipalign16KiB, code +1, payload/manifest/label/SDK/ABI |
-| PUBLISH | Пользователь прямо разрешил публикацию упаковщика и новых отчётов; remote tree проверяется после записи |
+| PUBLISH | PASS: опубликован commit 6d4181f91c1a00c32e30a435632c298c3976ec3d, remote ref подтверждён; tree 1cd1cf4cb0eff5db068576b1575ccc5e6be2e466 |
 | FIELD | OPEN: повторный холодный запуск на реальной ECARX не выполнен |
 
 ## Установка и приёмка

@@ -34,10 +34,12 @@
   "physicalKx11Verification": "pending",
   "badgingUnchangedExceptVersion": true,
   "publication": {
-    "status": "blocked",
-    "reason": "Automatic approval review rejected public GitHub push as not authorized by the current user request.",
+    "status": "published",
+    "commit": "6d4181f91c1a00c32e30a435632c298c3976ec3d",
+    "tree": "1cd1cf4cb0eff5db068576b1575ccc5e6be2e466",
+    "branch": "release/yandex-music-natro-2",
     "runtimeSourcePublished": true,
-    "packagingSourcePublished": false,
+    "packagingSourcePublished": true,
     "physicalInstallTest": "not_performed"
   }
 }
