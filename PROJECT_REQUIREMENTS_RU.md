@@ -6075,3 +6075,6 @@ USER явно разрешил публикацию исходников, CI и 
 USER: после заданной задержки запускать музыку только при подключении Wi-Fi; если его нет, ждать и запускать сразу при подключении без повторного отсчёта. SOURCE: initial attempt zero waits without spending retries; callback executes the same guarded boot plan immediately; 5s fallback only covers missing callback/process restart. Connected Wi-Fi required, internet validation not required. Manual cancellation, disabled setting, superseded boot token remain authoritative. No persisted settings/defaults added. TEST pending CI; APK not built with this change; FIELD OPEN.
 
 MUSIC-WIFI-BOOT verification: SOURCE cc4357e8f3f6e471a675739a1a0b2c4bc195715c published in feature/music-wifi-gate. TEST CI42501515545 SUCCESS: production compilation and MediaAutoResume test selection, including four Wi-Fi runtime tests. APK not built for this change; FIELD OPEN.
+
+## 08.11.2026 — сборка 3.4.7
+USER: «Понял, собирай дальше». Готовится Natro3.4.7/code208021380 с MUSIC-WIFI-BOOT и миграцией backup3.4.6. Новая Музыка не нужна, остаётся Natro3. SOURCE candidate; полный CI/APK pending; FIELD OPEN.

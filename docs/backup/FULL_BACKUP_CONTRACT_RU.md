@@ -1079,3 +1079,6 @@ BackupDefaultsMigration/LauncherHomeSurface fingerprints are updated; FIELD rest
 
 ## 08.11.2026 — Wi-Fi boot playback gate review
 MediaAutoResumeController retains existing keys/defaults and retry state schema. No new persisted data. Initial attempt remains zero while waiting; network callback is RAM-only and is re-established by the existing timer after process restart. Manual cancellation and completion clear the subscription. Source fingerprint reviewed; runtime backup acceptance unchanged.
+
+## 3.4.7 release schema review
+Allow restores from3.4.6/code208021379 to3.4.7/code208021380 with unchanged settings/defaults. Existing unknown/explicit keys are preserved; added migration tests. Wi-Fi subscription remains transient. No new storage owner.
