@@ -6080,3 +6080,5 @@ MUSIC-WIFI-BOOT verification: SOURCE cc4357e8f3f6e471a675739a1a0b2c4bc195715c pu
 USER: «Понял, собирай дальше». Готовится Natro3.4.7/code208021380 с MUSIC-WIFI-BOOT и миграцией backup3.4.6. Новая Музыка не нужна, остаётся Natro3. SOURCE candidate; полный CI/APK pending; FIELD OPEN.
 
 3.4.7 full CI42502014072: Android tests/build passed, host manual-command replay exposed new synchronous watcher cleanup on button lane. Removed synchronous cleanup; MANUAL_GENERATION still revokes PLAY immediately, existing scheduled complete releases Wi-Fi subscription. Full rebuild required; prior APK not issued.
+
+3.4.7 SOURCE fc4aa436de4b37bf12356aa65b007a9c20c3319b published; CI42502815612 SUCCESS:2297 Android+286 tool tests. APK code208021380 SHA17121d6c6246cd36732c8bee7142462255321160fc04b0e993eca78484311a3c stable signer, v2/v3/zipalign and install-over metadata PASS. MUSIC-WIFI-BOOT FIELD OPEN; MusicNatro3/Nav3.4.2/Helper unchanged. Stable publication separate.

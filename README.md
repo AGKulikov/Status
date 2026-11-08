@@ -1,3 +1,5 @@
+> Natro3.4.7 собран: SOURCE/TEST/APK PASS; FIELD OPEN. [Выпуск](docs/releases/3.4.7/README_RU.md).
+
 > Текущий выпуск: release/natro-3.4.7 — Wi-Fi gate; полный CI/APK pending.
 
 > Доработка ожидания Wi-Fi: `feature/music-wifi-gate`. SOURCE опубликован; TEST CI42501515545 PASS; в APK 3.4.6 этого изменения нет.
