@@ -12,4 +12,4 @@ APK code208021380, прежний signer,v2/v3,zipalign16KiB;1517payload entries
 SHA25617121d6c6246cd36732c8bee7142462255321160fc04b0e993eca78484311a3c.
 FIELD OPEN: требуется холодный старт KX11 с Wi-Fi до/после задержки, ручная отмена.
 
-SOURCE/TEST/APK PASS; публикация stable выполняется отдельно.
+SOURCE/TEST/APK PASS; PUBLISH PASS: publisher42503483323 SUCCESS, stable/latest natro-v3.4.7; все 7 assets скачаны и побайтно сверены.
