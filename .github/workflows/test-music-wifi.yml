@@ -1,0 +1,29 @@
+name: Test Music Wi-Fi boot gate
+on:
+  push:
+    branches: ['feature/music-wifi-gate']
+    paths: ['app/**', '.github/workflows/test-music-wifi.yml']
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Android toolchain
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+      - name: Compile production and test startup network gate
+        run: |
+          python3 tools/check_backup_inventory.py
+          ./gradlew testGeelyDebugUnitTest --tests '*MediaAutoResume*' --no-daemon --no-configuration-cache --max-workers=2
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: always()
+        with:
+          name: music-wifi-tests
+          path: app/build/test-results/**

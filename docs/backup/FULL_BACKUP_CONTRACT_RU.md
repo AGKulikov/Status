@@ -1076,3 +1076,6 @@ only method visibility; LauncherActivity distinguishes touch/navigation from med
 input. Reviewed migration335…378→379 and previously omitted target378; old tests stay.
 Explicit/unknown/effective values and future rejection remain unchanged. Only reviewed
 BackupDefaultsMigration/LauncherHomeSurface fingerprints are updated; FIELD restore OPEN.
+
+## 08.11.2026 — Wi-Fi boot playback gate review
+MediaAutoResumeController retains existing keys/defaults and retry state schema. No new persisted data. Initial attempt remains zero while waiting; network callback is RAM-only and is re-established by the existing timer after process restart. Manual cancellation and completion clear the subscription. Source fingerprint reviewed; runtime backup acceptance unchanged.

@@ -103,6 +103,7 @@ public final class MediaAutoResumeController {
 
     /** User transport controls revoke queued boot PLAY, including a late browser callback. */
     public static void onManualTransportControl(@NonNull Context context) {
+        MediaAutoResumeWifi.stop();
         NavigatorAliceAction.onManualTransportControl();
         long manual = MANUAL_GENERATION.incrementAndGet();
         Context app = applicationContext(context);
@@ -182,6 +183,7 @@ public final class MediaAutoResumeController {
         }
 
         MediaPlaybackHistoryStore.Snapshot history = MediaPlaybackHistoryStore.read(app);
+        MediaAutoResumeWifi.stop();
         long captureToken = previousToken == Long.MAX_VALUE ? 1L : previousToken + 1L;
         captureManualGeneration = MANUAL_GENERATION.get();
         state.edit()
@@ -380,6 +382,16 @@ public final class MediaAutoResumeController {
         }
 
         long planned = state.getLong(KEY_TARGET_ELAPSED, executeAt);
+        // Initial startup only: delay has already elapsed before this method is dispatched.
+        // Keep attempt zero while offline; do not start the provider or consume retry budgets.
+        if(attempt==0 && !MediaAutoResumeWifi.connected(app)) {
+            schedule(app,bootToken,attempt,5_000L,"wifi_wait_fallback");
+            MediaAutoResumeWifi.await(app,()->EXACT_TIMER.execute(()->execute(app,bootToken,attempt)));
+            PhoneConnectionJournal.append("media-auto-resume",
+                    "trace event=waiting_for_wifi, token="+bootToken+", configured_delay_elapsed=true");
+            return;
+        }
+        MediaAutoResumeWifi.stop();
         long lateness = Math.max(0L, executeAt - planned);
         long dispatchStartedAt = SystemClock.elapsedRealtime();
         boolean yandexBootRecovery = YANDEX_MUSIC_PACKAGE.equals(target);
@@ -668,6 +680,7 @@ public final class MediaAutoResumeController {
     }
 
     private static void complete(@NonNull Context app, @NonNull String reason) {
+        MediaAutoResumeWifi.stop();
         SharedPreferences snapshot = state(app);
         long completedAt = SystemClock.elapsedRealtime();
         PhoneConnectionJournal.append("media-auto-resume",
@@ -683,6 +696,7 @@ public final class MediaAutoResumeController {
     }
 
     private static void cancel(@NonNull Context app) {
+        MediaAutoResumeWifi.stop();
         state(app).edit().putBoolean(KEY_COMPLETED, true).apply();
         cancelInProcessTimer();
         cancelAlarm(app);

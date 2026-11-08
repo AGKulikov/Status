@@ -1,3 +1,5 @@
+> Доработка ожидания Wi-Fi: `feature/music-wifi-gate`. SOURCE реализован; TEST ожидает CI; в APK 3.4.6 этого изменения нет.
+
 > Natro 3.4.6 + Music Natro 3: SOURCE/TEST/APK PASS; FIELD OPEN. [Выпуск](docs/releases/3.4.6/README_RU.md).
 
 > Текущая разработка и кандидат: `release/natro-3.4.6`, Natro3.4.6 + MusicNatro3.

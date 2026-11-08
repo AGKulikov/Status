@@ -6070,3 +6070,6 @@ schema5classes/11fields, manifest version-only diff, backup/settings inventories
 ## 07.11.2026 — разрешение и сборка 3.4.6
 
 USER явно разрешил публикацию исходников, CI и выпуск APK. SOURCE d0cf73374a6fc5c41a784a801443113f8fd59b08 опубликован; CI42375796537 SUCCESS,2292 Android теста. TEST/APK PASS; прежний signer, code+1, native payload Music сохранён. Navigator3.4.2 повторно используется по совпавшим patch/tool hashes. PUBLISH выполняется; FIELD OPEN. См. docs/releases/3.4.6.
+
+## 08.11.2026 — MUSIC-WIFI-BOOT: задержка и подключение Wi-Fi
+USER: после заданной задержки запускать музыку только при подключении Wi-Fi; если его нет, ждать и запускать сразу при подключении без повторного отсчёта. SOURCE: initial attempt zero waits without spending retries; callback executes the same guarded boot plan immediately; 5s fallback only covers missing callback/process restart. Connected Wi-Fi required, internet validation not required. Manual cancellation, disabled setting, superseded boot token remain authoritative. No persisted settings/defaults added. TEST pending CI; APK not built with this change; FIELD OPEN.
