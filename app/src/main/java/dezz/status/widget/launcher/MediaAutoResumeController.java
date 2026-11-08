@@ -103,7 +103,6 @@ public final class MediaAutoResumeController {
 
     /** User transport controls revoke queued boot PLAY, including a late browser callback. */
     public static void onManualTransportControl(@NonNull Context context) {
-        MediaAutoResumeWifi.stop();
         NavigatorAliceAction.onManualTransportControl();
         long manual = MANUAL_GENERATION.incrementAndGet();
         Context app = applicationContext(context);
