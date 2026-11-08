@@ -24,8 +24,9 @@ public class MediaAutoResumeWifiTest {
     }
     @After public void cleanup(){MediaAutoResumeWifi.stop();}
     void add(Network n,int type,int transport,boolean connected){
-        NetworkInfo info=new NetworkInfo(type,0,"test","");
-        info.setDetailedState(connected?NetworkInfo.DetailedState.CONNECTED:NetworkInfo.DetailedState.DISCONNECTED,null,null);
+        NetworkInfo info=org.robolectric.shadows.ShadowNetworkInfo.newInstance(
+                connected?NetworkInfo.DetailedState.CONNECTED:NetworkInfo.DetailedState.DISCONNECTED,
+                type,0,true,connected?NetworkInfo.State.CONNECTED:NetworkInfo.State.DISCONNECTED);
         shadow.addNetwork(n,info);
         NetworkCapabilities caps=new NetworkCapabilities();
         ReflectionHelpers.callInstanceMethod(caps,"addTransportType",ClassParameter.from(int.class,transport));
@@ -58,4 +59,3 @@ public class MediaAutoResumeWifiTest {
         shadow.getNetworkCallbacks().iterator().next().onAvailable(wifi);assertEquals(1,starts);
     }
 }
-
