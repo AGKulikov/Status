@@ -9,11 +9,14 @@ import org.robolectric.*;
 import org.robolectric.annotation.Config;
 import org.robolectric.shadows.ShadowConnectivityManager;
 import static org.junit.Assert.*;
+import org.robolectric.util.ReflectionHelpers;
+import org.robolectric.util.ReflectionHelpers.ClassParameter;
 
 @RunWith(RobolectricTestRunner.class) @Config(sdk=28,application=Application.class)
 public class MediaAutoResumeWifiTest {
     Context context; ConnectivityManager manager; ShadowConnectivityManager shadow;
-    Network wifi=new Network(41); int starts;
+    Network wifi=network(41); int starts;
+    static Network network(int id){return ReflectionHelpers.callConstructor(Network.class,ClassParameter.from(int.class,id));}
     @Before public void setup(){
         MediaAutoResumeWifi.stop();context=RuntimeEnvironment.getApplication();
         manager=context.getSystemService(ConnectivityManager.class);shadow=Shadows.shadowOf(manager);
@@ -24,10 +27,12 @@ public class MediaAutoResumeWifiTest {
         NetworkInfo info=new NetworkInfo(type,0,"test","");
         info.setDetailedState(connected?NetworkInfo.DetailedState.CONNECTED:NetworkInfo.DetailedState.DISCONNECTED,null,null);
         shadow.addNetwork(n,info);
-        shadow.setNetworkCapabilities(n,new NetworkCapabilities().addTransportType(transport));
+        NetworkCapabilities caps=new NetworkCapabilities();
+        ReflectionHelpers.callInstanceMethod(caps,"addTransportType",ClassParameter.from(int.class,transport));
+        shadow.setNetworkCapabilities(n,caps);
     }
     @Test public void ethernetAndDisconnectedWifiDoNotOpenGate(){
-        add(new Network(42),ConnectivityManager.TYPE_ETHERNET,NetworkCapabilities.TRANSPORT_ETHERNET,true);
+        add(network(42),ConnectivityManager.TYPE_ETHERNET,NetworkCapabilities.TRANSPORT_ETHERNET,true);
         add(wifi,ConnectivityManager.TYPE_WIFI,NetworkCapabilities.TRANSPORT_WIFI,false);
         assertFalse(MediaAutoResumeWifi.connected(context));
     }
@@ -53,3 +58,4 @@ public class MediaAutoResumeWifiTest {
         shadow.getNetworkCallbacks().iterator().next().onAvailable(wifi);assertEquals(1,starts);
     }
 }
+
