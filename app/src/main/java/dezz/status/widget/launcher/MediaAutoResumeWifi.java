@@ -13,6 +13,20 @@ final class MediaAutoResumeWifi {
     private static ConnectivityManager.NetworkCallback callback;
     private static Runnable ready;
 
+    /** Diagnostic snapshot only. It does not replace the user's connected-Wi-Fi gate. */
+    static String snapshot(Context context) {
+        try {
+            ConnectivityManager cm=context.getSystemService(ConnectivityManager.class);
+            Network active=cm==null?null:cm.getActiveNetwork();
+            NetworkCapabilities caps=active==null?null:cm.getNetworkCapabilities(active);
+            return "wifi_connected="+connected(context)+", active_network="+(active!=null)
+                    +", active_wifi="+(caps!=null && caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI))
+                    +", active_ethernet="+(caps!=null && caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET))
+                    +", internet_capability="+(caps!=null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET))
+                    +", validated="+(caps!=null && caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED));
+        } catch(RuntimeException error) { return "network_snapshot_error="+error.getClass().getSimpleName(); }
+    }
+
     static boolean connected(Context context) {
         try {
             ConnectivityManager cm=context.getSystemService(ConnectivityManager.class);

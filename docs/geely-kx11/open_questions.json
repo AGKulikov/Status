@@ -2096,6 +2096,13 @@
           "next_step": "FIELD матрица подписанной пары3.3.8: cold boot, голос/фон/окно и finish+2s; при повторном ANR нужен его конкретный стек.",
           "last_reviewed": "2026-10-25"
         }
+      ],
+      "evidence_updates": [
+        {
+          "date": "2026-11-12",
+          "source": "MUSIC_OFFLINE_2026_11_12_RU.md",
+          "finding": "3.4.7 repeats PLAY after accepted session command at NONE/BUFFERING. Observation-only patch candidate; offline root cause and FIELD remain OPEN."
+        }
       ]
     }
   ],

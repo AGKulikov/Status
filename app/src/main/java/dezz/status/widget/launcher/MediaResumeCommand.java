@@ -234,6 +234,36 @@ final class MediaResumeCommand {
         }
     }
 
+    /** Read-only verification after an accepted boot PLAY; never opens another route. */
+    static DispatchTrace observePlayback(Context context, String target) {
+        try {
+            MediaSessionManager manager = context.getSystemService(MediaSessionManager.class);
+            if (manager == null) return trace(Result.WAITING_FOR_SESSION,
+                    "route=observe_only, session=manager_unavailable, wave_mode=unknown");
+            List<MediaController> controllers = manager.getActiveSessions(
+                    new ComponentName(context, MediaNotificationListener.class));
+            if (controllers != null) for (MediaController controller : controllers) {
+                if (target.equals(controller.getPackageName()))
+                    return observePlaybackState(controller.getPlaybackState());
+            }
+            return trace(Result.WAITING_FOR_SESSION,
+                    "route=observe_only, session=absent, wave_mode=unknown");
+        } catch (RuntimeException error) {
+            return trace(Result.WAITING_FOR_SESSION, "route=observe_only, error="
+                    + error.getClass().getSimpleName() + ", wave_mode=unknown");
+        }
+    }
+
+    static DispatchTrace observePlaybackState(PlaybackState state) {
+        int value = state == null ? -1 : state.getState();
+        return trace(value == PlaybackState.STATE_PLAYING ? Result.ALREADY_PLAYING
+                        : Result.WAITING_FOR_SESSION,
+                "route=observe_only, playbackState=" + value
+                        + ", stateUpdatedElapsed=" + (state == null ? -1 : state.getLastPositionUpdateTime())
+                        + ", positionMs=" + (state == null ? -1 : state.getPosition())
+                        + ", wave_mode=unknown");
+    }
+
     private enum Command {
         PLAY,
         PLAY_PAUSE,

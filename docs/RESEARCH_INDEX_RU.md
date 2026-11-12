@@ -172,3 +172,5 @@ QNX отказал до handshake; каталог/mappings остаются BLOC
 
 07.11.2026: [FIELD3.4.5 — Music timeout и native Navigator ANR](geely-kx11/BOOT_345_FIELD_2026_11_07_RU.md).
 FIELD FAILED; candidate3.4.6/Music3, повторная аппаратная проверка OPEN.
+
+- [12.11.2026: офлайн-волна и повторные PLAY](geely-kx11/MUSIC_OFFLINE_2026_11_12_RU.md) — SOURCE candidate, TEST pending, FIELD OPEN.

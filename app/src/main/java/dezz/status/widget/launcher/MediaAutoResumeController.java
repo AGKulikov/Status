@@ -415,7 +415,12 @@ public final class MediaAutoResumeController {
                 && yandexReceiverCommandSent
                 && !yandexReceiverGraceActive
                 && !yandexBrowserBootstrapRequested;
-        MediaResumeCommand.DispatchTrace trace = MediaResumeCommand.playWithTrace(
+        // Once the exact session accepted PLAY, retries are observations only. In the
+        // 12-Nov trace the session remained NONE, then BUFFERING; neither authorizes
+        // a second PLAY or a switch to the media-button receiver.
+        MediaResumeCommand.DispatchTrace trace = yandexBootRecovery && yandexSessionPlayAttempted
+                ? MediaResumeCommand.observePlayback(app, target)
+                : MediaResumeCommand.playWithTrace(
                 app, target, yandexBootRecovery,
                 requestYandexBrowserBootstrap, yandexColdStartRouteRequested,
                 YandexColdSessionPolicy.unreadyPlayReserved(

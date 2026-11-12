@@ -3178,3 +3178,8 @@ TEST/APK PASS, FIELD OPEN. Music2/protocol1 остаётся совместим�
 
 07.11.2026: [FIELD3.4.5 — Music timeout и native Navigator ANR](docs/geely-kx11/BOOT_345_FIELD_2026_11_07_RU.md).
 FIELD FAILED; candidate3.4.6/Music3, повторная аппаратная проверка OPEN.
+
+## 12.11.2026 — Music3.4.7 boot observation
+Подтверждены повторные PLAY после session dispatch при NONE/BUFFERING.
+Offline root cause OPEN, отсутствие сети не доказано.
+[Разбор](docs/geely-kx11/MUSIC_OFFLINE_2026_11_12_RU.md).

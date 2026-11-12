@@ -71,6 +71,7 @@ final class NatroMusicBootstrap {
                         delivered=true;
                         IPC.execute(()->{
                             if(!allowed()){finish("cancelled_before_play");return;}
+                            journal("before_play,"+MediaAutoResumeWifi.snapshot(context));
                             MediaResumeCommand.DispatchTrace trace=MediaAutoResumeController.guardedBrowserDispatch(
                                     context,Request.this::allowed,()->MediaResumeCommand.playBrowserSession(context,token,"ru.yandex.music"));
                             finish(trace==null?"play_cancelled":"play_"+trace.result+":"+trace.detail);
@@ -82,7 +83,7 @@ final class NatroMusicBootstrap {
             ContentProviderClient client=null;
             try {
                 callback.writeToParcel(parcel,0);parcel.setDataPosition(0);
-                journal("acquire_started");
+                journal("acquire_started,"+MediaAutoResumeWifi.snapshot(context));
                 client=context.getContentResolver().acquireUnstableContentProviderClient(Uri.parse("content://"+AUTHORITY));
                 if(!allowed()){finish("cancelled_after_acquire");return;}
                 if(client==null){finish("provider_unavailable");return;}
@@ -92,7 +93,7 @@ final class NatroMusicBootstrap {
                 Bundle args=new Bundle();args.putLong("deadline",Math.min(deadline,SystemClock.elapsedRealtime()+15000));
                 args.putBoolean("progress_v2",true);
                 args.putParcelable("callback",ResultReceiver.CREATOR.createFromParcel(parcel));
-                journal("prepare");
+                journal("prepare,"+MediaAutoResumeWifi.snapshot(context));
                 Bundle response=client.call("prepare_v1",id,args);
                 if(response==null || !response.getBoolean("accepted"))finish("prepare_rejected");
                 else journal("prepare_accepted");

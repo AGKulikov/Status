@@ -383,3 +383,7 @@ Wi-Fi, GPS и Bluetooth. Собирается «из кирпичиков» — 
 
 
 Исторический checkpoint перед выпуском 07.11.2026: [Navigator ANR/recovery candidate](docs/geely-kx11/NAVIGATOR_ANR_2026_11_07_RU.md), branch fix/navigator-anr-20261107. SOURCE candidate; TEST/APK/FIELD OPEN; native root cause UNKNOWN.
+
+Development: `fix/music-observe-after-play` — наблюдение после session PLAY;
+[доказательства и ограничения](docs/geely-kx11/MUSIC_OFFLINE_2026_11_12_RU.md).
+Не новый APK; причина offline остаётся OPEN.

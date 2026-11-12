@@ -1082,3 +1082,9 @@ MediaAutoResumeController retains existing keys/defaults and retry state schema.
 
 ## 3.4.7 release schema review
 Allow restores from3.4.6/code208021379 to3.4.7/code208021380 with unchanged settings/defaults. Existing unknown/explicit keys are preserved; added migration tests. Wi-Fi subscription remains transient. No new storage owner.
+
+## 12.11.2026 — post-PLAY observation review
+MediaAutoResumeController diff reviewed: existing session-play-attempted boolean
+selects read-only observation. No added/removed preference key, namespace, default,
+serialization or adapter. Boot retry state remains transient operational data under
+the existing restore policy. Only this owner fingerprint updated. FIELD restore OPEN.
