@@ -3183,3 +3183,6 @@ FIELD FAILED; candidate3.4.6/Music3, повторная аппаратная п�
 Подтверждены повторные PLAY после session dispatch при NONE/BUFFERING.
 Offline root cause OPEN, отсутствие сети не доказано.
 [Разбор](docs/geely-kx11/MUSIC_OFFLINE_2026_11_12_RU.md).
+
+Music observation CI43243646046 PASS. Native prefetch-trigger can select
+offline separately from connectivity; no field reason captured. See report.

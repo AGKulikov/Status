@@ -6090,3 +6090,8 @@ PLAY через разные маршруты, но не причину offline.
 session PLAY только bounded observation; snapshots сети acquire/prepare/play.
 TEST CI pending; APK не выпущен; FIELD OPEN. Настройки/backup неизменны.
 [Разбор и ограничения](docs/geely-kx11/MUSIC_OFFLINE_2026_11_12_RU.md).
+
+MUSIC-BOOT-MOD-342 observation SOURCE6db5fb18 опубликован. Целевой CI43243646046
+SUCCESS; production+Android tests PASS, backup98owners PASS. APK не выпущен,
+полный release CI не выполнялся; FIELD offline OPEN. Native prefetch-trigger
+имеет самостоятельное решение SWITCHED/KEPT_ONLINE; причина в машине неизвестна.

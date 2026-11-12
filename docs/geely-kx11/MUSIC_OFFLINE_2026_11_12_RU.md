@@ -31,3 +31,20 @@ SOURCE: candidate. TEST: targeted Android CI pending. APK: не выпущен.
 FIELD: OPEN, устранение офлайн-режима и native-init side effects НЕ доказано.
 Следующий шаг: native wave state/transition instrumentation по pinned Music APK;
 не сбрасывать библиотеку и не перезапускать пользовательский playlist вслепую.
+
+## Проверка опубликованного исправления
+SOURCE 6db5fb18a01cf7b58793a3bdc97972f8adbe8665, tree90497316c1febcc787c940c3929cc35b104636f2.
+CI43243646046/job131270417809 SUCCESS: production compilation and targeted
+MediaAutoResume*, MediaResumeObservationTest, YandexColdSessionPolicyTest.
+Backup inventory98owners PASS after schema-neutral controller review.
+Это не полный release CI; APK не собран; FIELD OPEN.
+
+## Дополнительный статический разбор штатной Музыки
+Источник MusicNatro3 SHA25661be448f22cf3852a4a0ea12452b0e07adec60337dde5b8c1d423d459f1bbe9e.
+В kwg (OfflineWavePrefetchTrigger) решение SWITCHED/KEPT_ONLINE зависит от
+результата предварительной загрузки: PREFETCH_FAILED/LOW_RATIO и порогов.
+Это отдельный путь от простой проверки наличия Wi-Fi. flx пишет событие
+OFFLINEWAVE_START с reason; gbc перечисляет Prolongation, SkipToOffline,
+CreateQueueWithSeeds, CreateQueueWithPassiveSession. В журнале Natro этих
+событий нет. Не доказано, какой путь сработал в FIELD; сетевой успех телефона
+не эквивалентен успеху предзагрузки Музыки. Чужой исходник/DEX не публикуется.
