@@ -3189,3 +3189,5 @@ offline separately from connectivity; no field reason captured. See report.
 
 Native wave diagnostics candidate: decision/selection events intercepted at exact
 pinned telemetry/logger entries; journal export independent of boot. APK/FIELD OPEN.
+
+13.11: targeted CI43365616986 PASS. Observer tail-replay rate loss corrected; native reason/online-result hooks checked against pinned Music3. Native body canonical restoration is a packaging gate. Full3.4.8/Music4 APK and ECARX gates remain OPEN until the release report.

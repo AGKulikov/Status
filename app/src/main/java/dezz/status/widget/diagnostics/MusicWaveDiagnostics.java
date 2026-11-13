@@ -19,7 +19,7 @@ public final class MusicWaveDiagnostics {
     private static volatile long nextStart, dropped, captured, lastNativeElapsed=-1;
     private static volatile String status="not_initialized";
     private static final LinkedHashSet<String> seen=new LinkedHashSet<>();
-    private static long rateWindow;
+    private static long rateWindow=-1, ratePid=-1;
     private static int rateCount;
     private static final Pattern PAYLOAD=Pattern.compile(
         "v=1 pid=[0-9]+ elapsed=[0-9]+ seq=[0-9]+( wall=[0-9]+)? event="
@@ -33,9 +33,9 @@ public final class MusicWaveDiagnostics {
     public static void initialize(Context owner){context=owner.getApplicationContext();}
     public static String state(){return "state="+status+", running="+running.get()+", captured="+captured
             +", rate_dropped="+dropped+", last_native_elapsed_ms="+lastNativeElapsed
-            +", scope=native_music_hooks, tail_lines=2000, ring_rotation_loss_possible=true"
+            +", scope=native_music_hooks, tail_lines=2000, rate_limit=native_pid_second, ring_rotation_loss_possible=true"
             +", transport=logcat_not_authenticated, no_events_is_not_online=true";}
-    static void disabled(){generation.incrementAndGet();Process owner=process;if(owner!=null)owner.destroy();status="debug_disabled";}
+    static synchronized void disabled(){generation.incrementAndGet();Process owner=process;if(owner!=null)owner.destroy();status="debug_disabled";}
     static void poll(){
         Context owner=context;
         if(owner==null || !DiagnosticJournal.isEnabled() || SystemClock.uptimeMillis()<nextStart)return;
@@ -55,14 +55,21 @@ public final class MusicWaveDiagnostics {
     /** Exact production ingestion path, also exercised by the ZIP export test. */
     static synchronized boolean captureLine(String line,long expected){
         if(expected!=generation.get() || !DiagnosticJournal.isEnabled())return false;
-        String payload=parse(line);if(payload==null || !seen.add(payload))return false;
-        if(seen.size()>2048)seen.remove(seen.iterator().next());
-        long now=SystemClock.uptimeMillis();
-        if(now-rateWindow>=1000 || now<rateWindow){rateWindow=now;rateCount=0;}
-        if(++rateCount>20){dropped++;return false;}
+        String payload=parse(line);if(payload==null || seen.contains(payload))return false;
+        long nativeElapsed, pid;
         int start=payload.indexOf(" elapsed=")+9;
-        try{lastNativeElapsed=Long.parseLong(payload.substring(start,payload.indexOf(' ',start)));}
+        try{
+            nativeElapsed=Long.parseLong(payload.substring(start,payload.indexOf(' ',start)));
+            pid=Long.parseLong(payload.substring(8,payload.indexOf(" elapsed=")));
+        }
         catch(NumberFormatException ignored){return false;}
+        seen.add(payload);if(seen.size()>2048)seen.remove(seen.iterator().next());
+        // A logcat tail replays many seconds at once after boot/reconnect. Rate-limiting
+        // by arrival time used to discard the transition at the end of that tail.
+        long sourceWindow=nativeElapsed/1000;
+        if(sourceWindow!=rateWindow || pid!=ratePid){rateWindow=sourceWindow;ratePid=pid;rateCount=0;}
+        if(++rateCount>20){dropped++;return false;}
+        lastNativeElapsed=nativeElapsed;
         captured++;
         DiagnosticJournal.infoAsync("music-wave",payload);
         CausalDiagnostics.observe("music-wave",payload);

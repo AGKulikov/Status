@@ -6105,3 +6105,6 @@ Requires new Music4 and Natro pair; APK/SIGN/FIELD OPEN. See MUSIC_OFFLINE repor
 
 ## 13.11.2026 — завершить MUSIC-WAVE-DIAG
 USER: «Доделывай». Продолжить до проверенной пары Natro3.4.8/code208021381 и MusicNatro4/code24026525, с прежней подписью. Найден и добавлен отдельный grouped telemetry путь nz0.b, через который PREFETCH_TRIGGER обходит nz0.a. Добавляются исходные wall/elapsed clocks, threshold type, безопасная классификация исключений и тест реального приёма в ZIP. Ранее подготовленные два hook были недостаточны; старая запись сохранена как история. SOURCE candidate; TEST/APK/PUBLISH/FIELD OPEN до новых результатов.
+
+## 13.11.2026 — MUSIC-WAVE-DIAG: продолжить до установочной пары
+USER: «Ну так доделывай». Восстановлен опубликованный SOURCE fbc144d6 и успешный целевой CI43365616986. При ревизии обнаружена потеря отложенных событий: лимит20/с считался по времени чтения хвоста logcat. Исправлено на native PID/elapsed-second; новый replay включает40секунд истории и последующий ONLINE_RESULT_SELECTED. Отключение observer синхронизировано с приёмом. Упаковка Music4 проверяет восстановление полного канонического native DEX после удаления ровно3вставленных вызовов, version-only manifest и неизменность остальных payload entries. Готовится полный release CI3.4.8; APK/FIELD ещё OPEN.

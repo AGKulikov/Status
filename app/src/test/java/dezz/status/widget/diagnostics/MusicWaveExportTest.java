@@ -12,6 +12,21 @@ import java.util.zip.ZipFile;
 import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class) @Config(sdk=28,application=Application.class)
 public class MusicWaveExportTest {
+ @Test public void bufferedBootHistoryUsesSourceTimeInsteadOfArrivalTime()throws Exception {
+  Context context=RuntimeEnvironment.getApplication();DiagnosticJournal.initialize(context,true);
+  try {
+   long generation=MusicWaveDiagnostics.captureGeneration();
+   for(int i=0;i<40;i++)assertTrue(MusicWaveDiagnostics.captureLine(
+       "NatroMusicWave: v=1 pid=6003 elapsed="+(10000+i*1000)+" seq="+(100+i)
+       +" event=OFFLINEWAVE_START reason=Prolongation",generation));
+   assertTrue(MusicWaveDiagnostics.captureLine("NatroMusicWave: v=1 pid=6003 elapsed=51000 seq=140 event=ONLINE_RESULT_SELECTED reason=ONLINE_PROLONGATION_COMPLETED error_kind=UNKNOWN",generation));
+   assertTrue(DiagnosticJournal.awaitPendingWrites());
+   try(ZipFile zip=new ZipFile(DiagnosticBundle.create(context))){
+    String log=new String(zip.getInputStream(zip.getEntry("journal.log")).readAllBytes(),StandardCharsets.UTF_8);
+    assertTrue(log.contains("seq=139"));assertTrue(log.contains("seq=140"));
+   }
+  }finally{DiagnosticJournal.setEnabled(context,false);}
+ }
  @Test public void nativeEventReachesExportedJournalAndObserverManifest()throws Exception {
   Context context=RuntimeEnvironment.getApplication();
   DiagnosticJournal.initialize(context,true);
