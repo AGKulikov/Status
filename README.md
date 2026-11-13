@@ -1,3 +1,5 @@
+> Доработка Natro3.4.8 + MusicNatro4: `fix/music-observe-after-play`. Native offline diagnostics: SOURCE candidate, TEST/APK/FIELD OPEN. [Текущий разбор](docs/geely-kx11/MUSIC_OFFLINE_2026_11_12_RU.md).
+
 > Natro3.4.7 собран: SOURCE/TEST/APK PASS; FIELD OPEN. [Выпуск](docs/releases/3.4.7/README_RU.md).
 
 > Текущий выпуск: release/natro-3.4.7 — Wi-Fi gate; полный CI/APK pending.

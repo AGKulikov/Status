@@ -2,7 +2,7 @@ name: Test Music post-PLAY observation
 on:
   push:
     branches: ['fix/music-observe-after-play']
-    paths: ['app/**', '.github/workflows/test-music-observation.yml']
+    paths: ['app/**', 'music-mod/**', 'tools/**', '.github/workflows/test-music-observation.yml']
 permissions:
   contents: read
 jobs:
@@ -21,9 +21,14 @@ jobs:
       - name: Compile production and test startup network gate
         run: |
           python3 tools/check_backup_inventory.py
-          ./gradlew testGeelyDebugUnitTest --tests '*MediaAutoResume*' --tests '*MediaResumeObservationTest' --tests '*YandexColdSessionPolicyTest' --no-daemon --no-configuration-cache --max-workers=2
+          ./gradlew testGeelyDebugUnitTest --tests '*MediaAutoResume*' --tests '*MediaResumeObservationTest' --tests '*YandexColdSessionPolicyTest' --tests '*NativeWaveDiagnosticsTest' --tests '*MusicWaveDiagnosticsTest' --tests '*MusicWaveExportTest' --no-daemon --no-configuration-cache --max-workers=2
+      - run: python3 tools/build_alice_focus_tool.py
+      - run: bash tools/build_music_patch_dex.sh
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         if: always()
         with:
           name: music-observation-tests
-          path: app/build/test-results/**
+          path: |
+            app/build/test-results/**
+            build/music-mod/classes7.dex
+            build/alice-focus-tool/**

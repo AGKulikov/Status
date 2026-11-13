@@ -6095,3 +6095,13 @@ MUSIC-BOOT-MOD-342 observation SOURCE6db5fb18 опубликован. Целев
 SUCCESS; production+Android tests PASS, backup98owners PASS. APK не выпущен,
 полный release CI не выполнялся; FIELD offline OPEN. Native prefetch-trigger
 имеет самостоятельное решение SWITCHED/KEPT_ONLINE; причина в машине неизвестна.
+
+## 12.11.2026 — MUSIC-WAVE-DIAG: native transition reasons
+USER «Ну так доделывай»: record actual native offline decisions and return-online
+results, preserve into export after boot completion. SOURCE candidate: pinned
+2-method native hooks, privacy-filtered bridge and continuous Natro observer.
+Native hook fixture/actual DEX checks PASS; Android/export CI pending.
+Requires new Music4 and Natro pair; APK/SIGN/FIELD OPEN. See MUSIC_OFFLINE report.
+
+## 13.11.2026 — завершить MUSIC-WAVE-DIAG
+USER: «Доделывай». Продолжить до проверенной пары Natro3.4.8/code208021381 и MusicNatro4/code24026525, с прежней подписью. Найден и добавлен отдельный grouped telemetry путь nz0.b, через который PREFETCH_TRIGGER обходит nz0.a. Добавляются исходные wall/elapsed clocks, threshold type, безопасная классификация исключений и тест реального приёма в ZIP. Ранее подготовленные два hook были недостаточны; старая запись сохранена как история. SOURCE candidate; TEST/APK/PUBLISH/FIELD OPEN до новых результатов.

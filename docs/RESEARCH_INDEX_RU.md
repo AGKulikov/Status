@@ -176,3 +176,6 @@ FIELD FAILED; candidate3.4.6/Music3, повторная аппаратная п�
 - [12.11.2026: офлайн-волна и повторные PLAY](geely-kx11/MUSIC_OFFLINE_2026_11_12_RU.md) — SOURCE candidate, TEST pending, FIELD OPEN.
 
 12.11 Music observation: SOURCE6db5fb18 / targeted CI43243646046 PASS; APK/FIELD OPEN.
+
+MUSIC-WAVE-DIAG: native hook/observer implementation candidate; actual pinned DEX
+patch and synthetic fixture checks PASS; release and physical capture OPEN.

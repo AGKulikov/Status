@@ -21,8 +21,9 @@ def build():
   if hashlib.sha256(dest.read_bytes()).hexdigest() != digest: raise ValueError('Dependency hash mismatch: '+name)
  cp = os.pathsep.join(str(out/name) for name,_,_ in LIBS)
  subprocess.run(['javac','-encoding','UTF-8','-cp',cp,'-d',str(out),
-                 str(ROOT/'tools/alice/PatchAliceFocus.java'),str(ROOT/'tools/alice/PatchAliceFocusSelfTest.java')],check=True)
+                 str(ROOT/'tools/alice/PatchAliceFocus.java'),str(ROOT/'tools/alice/PatchAliceFocusSelfTest.java'),str(ROOT/'tools/music/PatchMusicWave.java'),str(ROOT/'tools/music/PatchMusicWaveSelfTest.java')],check=True)
  subprocess.run(['java','-cp',str(out)+os.pathsep+cp,'PatchAliceFocusSelfTest'],check=True)
+ subprocess.run(['java','-cp',str(out)+os.pathsep+cp,'PatchMusicWaveSelfTest'],check=True)
  print('Native Alice hook tool and positive/negative DEX fixtures PASS')
  return out
 if __name__=='__main__': build()

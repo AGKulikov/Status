@@ -10,6 +10,10 @@ class MusicBootstrapReplayTest(unittest.TestCase):
  def setUpClass(cls):
   cls.tmp=tempfile.TemporaryDirectory(); cls.root=Path(cls.tmp.name)
   sources={
+   'dezz/status/widget/launcher/MediaAutoResumeWifi.java':'''package dezz.status.widget.launcher;
+    public final class MediaAutoResumeWifi {
+     public static String snapshot(android.content.Context c){return "fixture_network_snapshot";}
+    }''',
    'android/os/SystemClock.java':'package android.os; public class SystemClock {public static volatile long now; public static long elapsedRealtime(){return now;}}',
    'android/os/Looper.java':'package android.os; public class Looper {public static Looper getMainLooper(){return new Looper();}}',
    'android/os/Handler.java':'package android.os; public class Handler {public Handler(Looper l){} public boolean postDelayed(Runnable r,long d){return true;}}',

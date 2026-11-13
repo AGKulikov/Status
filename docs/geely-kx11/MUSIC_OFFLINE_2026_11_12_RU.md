@@ -48,3 +48,31 @@ OFFLINEWAVE_START с reason; gbc перечисляет Prolongation, SkipToOffl
 CreateQueueWithSeeds, CreateQueueWithPassiveSession. В журнале Natro этих
 событий нет. Не доказано, какой путь сработал в FIELD; сетевой успех телефона
 не эквивалентен успеху предзагрузки Музыки. Чужой исходник/DEX не публикуется.
+
+## Native diagnostics implementation candidate
+USER requests actual reason/time logging, not only network snapshots. Added
+NativeWaveDiagnostics and exact-schema DEX entry hooks in Lnz0;.a(String,Map)
+and Lzzh;.a(int,String,String,Throwable), both classes.dex in pinned MusicNatro3.
+Hook tool verified on actual pinned classes.dex and synthetic high-register,
+missing-schema and double-patch rejection fixtures. Native bodies retained.
+Telemetry allowlist: OFFLINEWAVE_START(reason), PREFETCH_TRIGGER(decision,reason,
+ratio/threshold/wait), ERROR (unknown native error, raw message excluded).
+Native log allowlist: online-result-selected, keep-offline-after-online-failure,
+online-migration-started. Migration attempt is not labelled completed playback.
+PID, native elapsedRealtime and sequence correlate with Natro bootstrap.
+
+Natro observer starts from existing diagnostics worker with existing READ_LOGS;
+continues after boot autoplay completes. Sanitized events enter journal.log and
+observations.txt; manifest includes observer state/losses/limits. No READ_LOGS or
+debug off means capture unavailable; no event is never interpreted as online.
+Transport is passive logcat (not authenticated); events never trigger actions.
+Bounded 200-line tail/256-event dedupe/20 per second; ring rotation can lose events.
+Native logging may be absent if no hook APK installed. No native user data in repo.
+
+Required pair: new Natro with observer AND MusicNatro4 hooks+classes7. Existing
+Natro3.4.7/Music3 cannot provide this channel. prepare_music_wave.py produces
+unsigned Natro4 payload only (24026525); signature/install-over/release gates
+remain mandatory and open. No new APK issued yet. Android/export tests pending CI.
+
+## 13.11.2026 — closeout review in progress
+The earlier two-hook candidate missed grouped analytics: actual kwg.c0 calls nz0.b(lc0,String), not nz0.a(String,Map). A third passive hook captures this path via the pinned public lc0 fields. Added native wall/elapsed clocks, thresholdType (ratio vs duration), and allowlisted exception categories without raw error text. Observer ingestion is exercised through the real captureLine path into the diagnostic ZIP, including replay deduplication and cancelled-generation rejection. The host coordinator fixture now supplies the read-only network snapshot dependency introduced on12November; the omitted fixture was a compile error, not a device failure. SOURCE candidate; full Android/DEX/APK and FIELD still pending.

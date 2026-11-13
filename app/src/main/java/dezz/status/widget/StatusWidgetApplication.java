@@ -70,6 +70,7 @@ public class StatusWidgetApplication extends Application {
         // calls begin from the first-surface event instead of delaying startup with a timer.
         DiagnosticJournal.initializeEarly(this);
         if (!AppProcessPolicy.isHudProcess()) dezz.status.widget.diagnostics.SystemProcessDiagnostics.initialize(this);
+        if (!AppProcessPolicy.isHudProcess()) dezz.status.widget.diagnostics.MusicWaveDiagnostics.initialize(this);
         installCrashHandler(hudProcess);
         // The main process is the sole coordinator writer. MODE_MULTI_PROCESS is read-through
         // compatibility for :hud, not a transactional cross-process state machine.

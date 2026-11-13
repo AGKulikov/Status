@@ -162,6 +162,7 @@ public final class CausalDiagnostics {
     static void poll() {
         if (!DiagnosticJournal.isEnabled()) return;
         SystemProcessDiagnostics.poll();
+        MusicWaveDiagnostics.poll();
         long now = SystemClock.uptimeMillis();
         ArrayList<Span> overdue = new ArrayList<>();
         synchronized (LOCK) {
@@ -253,6 +254,7 @@ public final class CausalDiagnostics {
         synchronized (LOCK) { epoch++; PENDING.clear(); STATES.clear(); RECENT.clear(); }
         CAPTURE.getQueue().clear();
         SystemProcessDiagnostics.disabled();
+        MusicWaveDiagnostics.disabled();
     }
 
     public static String failure(Throwable error) {

@@ -3186,3 +3186,6 @@ Offline root cause OPEN, отсутствие сети не доказано.
 
 Music observation CI43243646046 PASS. Native prefetch-trigger can select
 offline separately from connectivity; no field reason captured. See report.
+
+Native wave diagnostics candidate: decision/selection events intercepted at exact
+pinned telemetry/logger entries; journal export independent of boot. APK/FIELD OPEN.

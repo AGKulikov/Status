@@ -1088,3 +1088,14 @@ MediaAutoResumeController diff reviewed: existing session-play-attempted boolean
 selects read-only observation. No added/removed preference key, namespace, default,
 serialization or adapter. Boot retry state remains transient operational data under
 the existing restore policy. Only this owner fingerprint updated. FIELD restore OPEN.
+
+## 12.11.2026 — native music diagnostics review
+DiagnosticBundle adds observer state to manifest; journal path and backup policy
+unchanged. No new persisted settings, adapters, namespaces or credentials.
+Music bridge uses logcat only; native observer counters/dedupe are RAM-only.
+Diagnostic files remain under existing bounded diagnostic-store policy. FIELD OPEN.
+StatusWidgetApplication diff reviewed: observer context initialization only;
+no preference/file schema or startup persistence change. Owner hash reviewed.
+
+## 13.11.2026 — 3.4.8 compatibility review
+The only new migration allowance is source3.4.7/code208021380 to target3.4.8/code208021381. Existing keys/defaults/serializers/adapters and conflict behavior are unchanged. Old unknown/future-schema rejection remains. Added a3.4.8 effective-default preservation regression while retaining all earlier version tests. Native diagnostic capture remains passive/RAM-only and uses the existing journal files. Runtime restore FIELD OPEN.

@@ -334,7 +334,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/StatusWidgetApplication.java": {
-      "sha256": "60bb96eab5dfbbc15ffd2ced5aea2e5580ccb9e3d8963cde6396f9e802c7dc62",
+      "sha256": "01d846d5acca9d6f4d639cda6787fbece0d457150d413cff8ea70a41809c8621",
       "access_kinds": [
         "files"
       ]
@@ -364,7 +364,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "7a1f1a9604a6b53d8c5314c22691d712fa61d30869157f9438956db8dd8bb101",
+      "sha256": "e68e75f34c210310a224f018910a39c8161dd8eaa340afab8600b4ef0c227959",
       "access_kinds": [
         "files"
       ]
@@ -462,7 +462,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/diagnostics/DiagnosticBundle.java": {
-      "sha256": "66c546a396f73d758edd52acdbf228f0c79849852abb9b850c1efa42576e8727",
+      "sha256": "a37cc9402a6d5d7bcf0e03fc2a5d156f86af1f25a34035a809176b18899fa97b",
       "access_kinds": [
         "files"
       ]

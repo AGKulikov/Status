@@ -36,6 +36,7 @@ public final class DiagnosticBundle {
                     .put("foreign_process_flush", "not_requested; complete persisted lines only; live tail may be missing")
                     .put("journal_writer", DiagnosticJournal.queueState()).put("action_writer", ActionRecorder.writerState())
                     .put("system_process_observer", SystemProcessDiagnostics.state())
+                    .put("music_wave_observer", MusicWaveDiagnostics.state())
                     .put("expanded_capture", PrivilegedActionCollector.state())
                     .put("phone_writer", PhoneConnectionJournal.writerState()).put("recorder_active", ActionRecorder.isRecording())
                     .put("read_logs_granted", granted(context, "android.permission.READ_LOGS"))
