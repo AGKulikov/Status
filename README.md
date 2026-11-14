@@ -1,4 +1,4 @@
-> Natro 3.4.8 + Music Natro 4: SOURCE/TEST/APK PASS; публикация завершается, FIELD OPEN. [Установка и проверка](docs/releases/3.4.8/README_RU.md). Актуальная ветка: `release/natro-3.4.8`.
+> Natro 3.4.8 + Music Natro 4: SOURCE/TEST/APK/PUBLISH PASS; опубликован stable/latest 14.11.2026, FIELD OPEN. [Установка и проверка](docs/releases/3.4.8/README_RU.md). Актуальная ветка: `release/natro-3.4.8`.
 > Старые статусы ниже сохранены как история.
 
 > Natro3.4.7 собран: SOURCE/TEST/APK PASS; FIELD OPEN. [Выпуск](docs/releases/3.4.7/README_RU.md).

@@ -86,3 +86,6 @@ The pinned native fox.a branch logs ONLINE_RESULT_SELECTED only after a complete
 ## 14.11.2026 — подписанная установочная пара
 
 Полный CI43434257815:2311 Android/286tool PASS. Точный кандидат подписан прежним ключом; Natro3.4.8 и MusicNatro4 прошли API28/v2/v3/install-over metadata. Три native hook проверены удалением и восстановлением всего канонического DEX. SOURCE/TEST/APK PASS; PUBLISH ожидает readback, FIELD OPEN. Для сбора нужны оба APK, включённый журнал и READ_LOGS. UNKNOWN и отсутствие событий не подменяются выводом об online; migration-start не равен playback. Фактическая причина прежнего offline всё ещё не установлена. [Итоговая матрица](../releases/3.4.8/README_RU.md).
+
+
+14.11.2026: Natro3.4.8 опубликован stable/latest; обе подписанные сборки Natro3.4.8/MusicNatro4 переданы. SOURCE/TEST/APK/PUBLISH PASS, [7assets и latest manifest проверены](../releases/3.4.8/publication-verification.json). FIELD и первопричина offline OPEN; требуется ZIP после холодного старта на установленной паре.

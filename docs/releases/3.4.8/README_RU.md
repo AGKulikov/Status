@@ -39,7 +39,9 @@ Navigator Natro 3.4.2 и iPhone Helper остаются прежними.
   [Music APK](music-release-report.json), [совместимость Navigator](navigator-reuse-verification.json).
 - Natro SHA-256: `cb7142a9cf3243af344b4014097066a68434f4b0341b2b24d1a095e855fb8252`, 29981280 bytes.
 - Music SHA-256: `0498083df0b1bafee4e4c13c155daa140110a47f00115849c8b00149344d7813`, 63765305 bytes.
-- SOURCE / TEST / APK: PASS. PUBLISH: ожидается проверка всех загруженных файлов.
+- SOURCE / TEST / APK / PUBLISH: PASS. [Stable-релиз](https://github.com/AGKulikov/Status/releases/tag/natro-v3.4.8) опубликован 14.11.2026.
+- [Публикация CI43557194045](https://github.com/AGKulikov/Status/actions/runs/43557194045): SUCCESS; все 7 assets скачаны и побайтно сопоставлены перед публикацией, затем повторно скачаны по публичным URL.
+- [Итоговая проверка публикации](publication-verification.json): SHA-256/размеры всех файлов PASS; latest/download/natro-update.json совпадает с manifest выпуска.
 - FIELD: OPEN. Предыдущий отрицательный результат на автомобиле остаётся в
   [разборе](../../geely-kx11/MUSIC_OFFLINE_2026_11_12_RU.md).
 

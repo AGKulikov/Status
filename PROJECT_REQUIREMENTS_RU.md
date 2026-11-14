@@ -6133,3 +6133,8 @@ READ_LOGS/debug/rotation/rate limits отражены. Первопричина 
 PUBLISH пока OPEN до readback: draft→сравнение всех7assets→stable/latest.
 Ключи, пароли, сырые пользовательские логи и proprietary baseline в Git не включаются.
 [Матрица и установка](docs/releases/3.4.8/README_RU.md).
+
+
+## 14.11.2026 — Natro 3.4.8 опубликован и передан с Music Natro 4
+
+PUBLISH PASS: CI43557194045 SUCCESS, commit d287286d3fe43978624a2ca6e635c7064459efd3; tag natro-v3.4.8 закреплён на exact SOURCE1ac4f00d. Все7assets сравнены до публикации draft→stable/latest и независимо повторно скачаны по публичным ссылкам с проверкой SHA-256/размеров/SHA256SUMS. Latest manifest возвращает3.4.8/code208021381 и проверенный APK SHAcb7142a9cf3243af344b4014097066a68434f4b0341b2b24d1a095e855fb8252. Оба подписанных APK отдельно переданы владельцу; Navigator3.4.2/Helper прежние. Временные локальные копии закрытого ключа и пароля удалены. SOURCE/TEST/APK/PUBLISH PASS; FIELD OPEN, причина реального offline на KX11 не объявляется устранённой. [Проверка публикации](docs/releases/3.4.8/publication-verification.json).
