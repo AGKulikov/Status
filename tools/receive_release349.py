@@ -15,15 +15,20 @@ env=json.loads(base64.b64decode(json.loads(r.stdout)['content']))
 sym=key.decrypt(base64.b64decode(env['key']),padding.OAEP(mgf=padding.MGF1(hashes.SHA256()),algorithm=hashes.SHA256(),label=None))
 data=json.loads(AESGCM(sym).decrypt(base64.b64decode(env['nonce']),base64.b64decode(env['data']),run.encode()))
 assert data['run']==run
-for name,source in data['helpers'].items():
-    assert name in ('library_file_transfer.py','library_hosted_apps.py')
-    (root/name).write_text(source)
-for app,transfer in zip(('navigator','music'),data['transfers']):
+for app,package in zip(('navigator','music'),data['packages']):
     manifest=json.loads(Path(f'docs/releases/3.4.9/{app}-update.json').read_text())
     filename=manifest['url'].rsplit('/',1)[1];target=root/filename
-    r=subprocess.run(['python3',str(root/'library_file_transfer.py'),'materialize',str(target)],input=json.dumps(transfer).encode(),stdout=subprocess.PIPE,stderr=subprocess.PIPE)
-    if r.returncode:raise RuntimeError('Materialization failed for '+app+' (details withheld to protect transfer URL)')
-    assert target.stat().st_size==manifest['size'] and hashlib.sha256(target.read_bytes()).hexdigest()==manifest['sha256']
+    encrypted=bytearray()
+    for chunk in package['chunks']:
+        blob=json.loads(subprocess.check_output(['gh','api',f"repos/{repo}/git/blobs/{chunk['sha']}"]))
+        raw=base64.b64decode(blob['content'])
+        assert len(raw)==chunk['size']
+        encrypted.extend(raw)
+    assert hashlib.sha256(encrypted).hexdigest()==package['encryptedSha256']
+    plain=AESGCM(sym).decrypt(base64.b64decode(package['nonce']),bytes(encrypted),(run+':'+app).encode())
+    assert len(plain)==manifest['size'] and hashlib.sha256(plain).hexdigest()==manifest['sha256']
+    target.write_bytes(plain)
+    del encrypted,plain
     tag='natro-navigator-v3.4.9' if app=='navigator' else 'natro-music-v4'
     release=json.loads(subprocess.check_output(['gh','api',f'repos/{repo}/releases/tags/{tag}']))
     assert release['draft'] and not any(a['name']==filename for a in release['assets'])
