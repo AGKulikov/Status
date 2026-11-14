@@ -1,3 +1,5 @@
+> **Natro 3.4.9 опубликована в stable/latest.** Единый раздел обновлений: одна общая проверка и по одной кнопке обновления Natro, Навигатора и Музыки. Все три канала опубликованы и проверены обратным скачиванием. Актуальная ветка: [release/natro-3.4.9](https://github.com/AGKulikov/Status/tree/release/natro-3.4.9). [Выпуск и проверки](https://github.com/AGKulikov/Status/blob/release/natro-3.4.9/docs/releases/3.4.9/README_RU.md). SOURCE/TEST/APK/PUBLISH PASS; FIELD OPEN.
+
 # Natro — актуальная разработка
 
 **Natro 3.4.8 опубликован в stable/latest 14 ноября 2026 года.** Для расширенного журнала Музыки также нужен мод Яндекс Музыки Natro 4, переданный владельцу отдельно.
