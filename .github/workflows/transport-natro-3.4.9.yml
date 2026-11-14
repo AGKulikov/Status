@@ -1,0 +1,37 @@
+name: Transfer verified companion APKs through connector
+on:
+  push:
+    branches: ['release/natro-3.4.9']
+    paths: ['.github/workflows/transport-natro-3.4.9.yml', 'tools/receive_release349.py']
+permissions:
+  contents: read
+jobs:
+  transfer:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - name: Generate ephemeral transfer key
+        run: |
+          set -euo pipefail
+          umask 077
+          mkdir "$RUNNER_TEMP/transport349"
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out "$RUNNER_TEMP/transport349/private.pem" 2>/dev/null
+          openssl pkey -in "$RUNNER_TEMP/transport349/private.pem" -pubout -out "$RUNNER_TEMP/transport349/public.pem"
+          python3 -c 'from cryptography.hazmat.primitives.ciphers.aead import AESGCM'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: companion-transfer-public-key
+          path: ${{ runner.temp }}/transport349/public.pem
+          retention-days: 1
+      - name: Receive encrypted scoped transfers and upload verified drafts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 tools/receive_release349.py
+      - name: Remove ephemeral private material
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/transport349"

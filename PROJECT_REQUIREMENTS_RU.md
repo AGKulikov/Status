@@ -6155,3 +6155,13 @@ SOURCE/TEST/APK/FIELD и каналы Navigator/Music пока OPEN; FIELD тр�
 
 SOURCE cbe1644909fab2d94dec3045dd73ed172fde7371/tree61059c7a19ca9ff0d7ff16e546e613cfbaaad2f0 опубликован и побайтно сверен. CI43559635840/job132340203244 SUCCESS:2325Android/289tools,0failures/errors/skips. Новые сценарии проверяют3пакета, ошибки независимых каналов, размер150MiB Navigator, неверные package/cert/URL, downgrade, retry partial download, one-tap install, cancel/no-reopen, permission resume, неблокирующий status во время verifier. Native1760×656 render просмотрен,3кнопки обновления и общийcheck видимы. Backup defaults335…381→382/same382/отказ334,383 PASS;98owners и48editors/253forms/3017labels PASS.
 Natro3.4.9/code208021382 SHA219ecf541014d050555178e5552592224915ba04cf22d3341ae536c5a5f69570;1517CI payload entries unchanged. Navigator3.4.9/code739564631 SHAc2524e28f711260d9ed9d4ac563a4f42c69757247f2b669022aad30171f901c0;17226entries unchanged,manifest semantic diff только2versionattrs,bridge exactCI. Stable signer/v2/v3/exactAPI28/zipalign16KiB/install-over PASS. MusicNatro4 переиспользуется побайтно с прежним source1ac4f00d. PUBLISH покаOPEN: подготовлены манифесты трёх каналов; для прикрепления companion APK нужен вход владельца GitHub в браузере (коннектор не имеет upload release asset). Не публиковать stable Natro до успешного readback всех3каналов. FIELD OPEN.
+
+## 14.11.2026 — публикация 3.4.9 через коннектор GitHub
+
+USER: «Через коннектор подключайся». Вход в браузере отменён. Используется
+GitHub Actions: одноразовый RSA-ключ остаётся только в runner; публичный ключ
+передаётся через artifact, ссылки на два готовых APK — только в AES-GCM/RSA-OAEP
+конверте, связанном с run ID. Полные ключи подписи и открытые ссылки в Git не
+попадают. Перед upload сверяются размеры/SHA уже подписанных APK. Upload идёт
+только в draft; отдельный publisher проверяет подпись/API28/identity и readback.
+Публикация и FIELD пока OPEN. Runtime cbe16449 и полный CI не изменяются.
