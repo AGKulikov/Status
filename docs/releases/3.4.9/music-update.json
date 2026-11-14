@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "channel": "stable",
+  "package": "ru.yandex.music",
+  "versionCode": 24026525,
+  "versionName": "2026.10.2 #169gpr Natro 4",
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "sha256": "0498083df0b1bafee4e4c13c155daa140110a47f00115849c8b00149344d7813",
+  "size": 63765305,
+  "url": "https://github.com/AGKulikov/Status/releases/download/natro-music-v4/Yandex-Music-2026.10.2-Natro-4-signed.apk"
+}

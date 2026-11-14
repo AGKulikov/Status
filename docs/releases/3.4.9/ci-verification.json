@@ -1,0 +1,19 @@
+{
+  "sourceCommit": "cbe1644909fab2d94dec3045dd73ed172fde7371",
+  "sourceTree": "61059c7a19ca9ff0d7ff16e546e613cfbaaad2f0",
+  "ciRunId": 43559635840,
+  "jobId": 132340203244,
+  "conclusion": "success",
+  "androidTests": 2325,
+  "toolTests": 289,
+  "failures": 0,
+  "errors": 0,
+  "skipped": 0,
+  "artifactSha256": {
+    "candidate": "9ef9046fa05bdda9bd6d26c492d021c14c76f41ee685e59e4ce6d910f73f94ea",
+    "tools": "e3070d93da320f17dfb19b9616c9970f63def265897e4f3591b65f037a68d841",
+    "reports": "c0c6467b63a36d8171e4705bbd0a12d33e46d6251a28cfa119a47c1efba742b6"
+  },
+  "nativeUi": "update-center-349.png; rendered and viewed; fixture versions",
+  "field": "OPEN"
+}

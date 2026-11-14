@@ -1,0 +1,24 @@
+{
+  "apk": "Navigator-30.3.0-Natro-3.4.9-signed.apk",
+  "sha256": "c2524e28f711260d9ed9d4ac563a4f42c69757247f2b669022aad30171f901c0",
+  "size": 156546666,
+  "sourceCommit": "cbe1644909fab2d94dec3045dd73ed172fde7371",
+  "sourceTree": "61059c7a19ca9ff0d7ff16e546e613cfbaaad2f0",
+  "ciRunId": "43559635840",
+  "previousSha256": "1e8e3ecaefcc3f205e06eff95d99bfca9a023bf7e9d41bbd7b60df472409f5bb",
+  "versionName": "30.3.0 Natro 3.4.9",
+  "versionCode": 739564631,
+  "previousVersionCode": 739564630,
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "signatureV2": true,
+  "signatureV3": true,
+  "exactApi28": true,
+  "zipalign16KiB": true,
+  "changedPayload": [
+    "AndroidManifest.xml"
+  ],
+  "unchangedPayloadEntries": 17226,
+  "manifestSemanticsOnlyVersionChanged": true,
+  "ciBridgeSha256": "81d37552019e321e1f807874b040a22dff81de2949d613d5f6c82035ad1ebae0",
+  "physicalKx11Verification": "pending"
+}
