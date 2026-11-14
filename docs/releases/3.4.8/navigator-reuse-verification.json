@@ -1,0 +1,9 @@
+{
+  "navigatorApk": "Navigator-30.3.0-Natro-3.4.2-signed.apk",
+  "sha256": "1e8e3ecaefcc3f205e06eff95d99bfca9a023bf7e9d41bbd7b60df472409f5bb",
+  "bridgeSha256": "81d37552019e321e1f807874b040a22dff81de2949d613d5f6c82035ad1ebae0",
+  "bridgeEqualsExactCi": true,
+  "reuseNavigatorVersion": "3.4.2",
+  "physicalVerification": "not_performed",
+  "aliceHookToolEqualsPrevious": true
+}

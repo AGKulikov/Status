@@ -6108,3 +6108,28 @@ USER: «Доделывай». Продолжить до проверенной �
 
 ## 13.11.2026 — MUSIC-WAVE-DIAG: продолжить до установочной пары
 USER: «Ну так доделывай». Восстановлен опубликованный SOURCE fbc144d6 и успешный целевой CI43365616986. При ревизии обнаружена потеря отложенных событий: лимит20/с считался по времени чтения хвоста logcat. Исправлено на native PID/elapsed-second; новый replay включает40секунд истории и последующий ONLINE_RESULT_SELECTED. Отключение observer синхронизировано с приёмом. Упаковка Music4 проверяет восстановление полного канонического native DEX после удаления ровно3вставленных вызовов, version-only manifest и неизменность остальных payload entries. Готовится полный release CI3.4.8; APK/FIELD ещё OPEN.
+
+
+## 14.11.2026 — завершить выпуск Natro 3.4.8 и Music Natro 4
+
+USER: «Ну так доделывай» после проверки неподписанного кандидата. Продолжены
+подпись прежним ключом, выдача пары APK и публикация существующего stable-канала.
+SOURCE 1ac4f00dfe03448198429de1183136211efe093f, tree 495470363aef9dab6b720fabc47e0df3a04161e5; CI43434257815/job131915199035 SUCCESS:
+2311 Android tests / 451 suites, failures/errors/skipped0; 286 tool tests.
+Native3hooks, canonical DEX restoration, version-only manifest, ZIP export с
+40секундами истории и ONLINE_RESULT_SELECTED PASS. Backup98owners/settings48editors,
+253forms/3017labels проверены без новых изменений storage/runtime.
+Natro3.4.8/code208021381 SHAcb7142a9cf3243af344b4014097066a68434f4b0341b2b24d1a095e855fb8252;
+MusicNatro4/code24026525 SHA0498083df0b1bafee4e4c13c155daa140110a47f00115849c8b00149344d7813.
+Один прежний signer/v2/v3/exactAPI28/zipalign16KiB/code+1/install-over metadata PASS.
+Natro1517payload entries после подписи неизменны; Music4724entries сохранены,
+изменены только manifest/classes.dex/classes7.dex в проверенных границах.
+Navigator3.4.2 повторно используется: actual classes19 совпал с exact CI,
+Alice hook tool совпал с прежним проверенным; Helper прежний. Служебный staging
+pairRequired уточнён отдельным reuse verification, исходный candidate не изменён.
+MUSIC-WAVE-DIAG и MUSIC-BOOT-MOD-342: SOURCE/TEST/APK PASS; FIELD OPEN.
+Native UNKNOWN остаётся неизвестным; migration-start не означает playing-online;
+READ_LOGS/debug/rotation/rate limits отражены. Первопричина FIELD offline не закрыта.
+PUBLISH пока OPEN до readback: draft→сравнение всех7assets→stable/latest.
+Ключи, пароли, сырые пользовательские логи и proprietary baseline в Git не включаются.
+[Матрица и установка](docs/releases/3.4.8/README_RU.md).

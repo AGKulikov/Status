@@ -81,3 +81,8 @@ The earlier two-hook candidate missed grouped analytics: actual kwg.c0 calls nz0
 Targeted Android CI43365616986 for fbc144d6 completed successfully. Source review found an observer tail-replay defect: an arrival-time20/s limiter discarded later native events replayed together after boot. Rate windows now follow native PID/elapsed seconds; generation invalidation is serialized with ingestion. A40-second buffered-history regression verifies the final online result remains in the ZIP. Capture retains2000tail lines and2048dedupe entries (the earlier200/256 description is superseded). Buffer rotation and source bursts over20events/second remain explicit loss limits.
 
 The pinned native fox.a branch logs ONLINE_RESULT_SELECTED only after a completed online prolongation result; fox.b logs ONLINE_MIGRATION_STARTED before awaiting migration. The latter is never reported as successful playback. Three entry hooks are reversible: removing them must restore the complete canonical native DEX, including method bodies/metadata. This is static APK verification, not execution on ECARX. Release pair: Natro3.4.8 and MusicNatro4.
+
+
+## 14.11.2026 — подписанная установочная пара
+
+Полный CI43434257815:2311 Android/286tool PASS. Точный кандидат подписан прежним ключом; Natro3.4.8 и MusicNatro4 прошли API28/v2/v3/install-over metadata. Три native hook проверены удалением и восстановлением всего канонического DEX. SOURCE/TEST/APK PASS; PUBLISH ожидает readback, FIELD OPEN. Для сбора нужны оба APK, включённый журнал и READ_LOGS. UNKNOWN и отсутствие событий не подменяются выводом об online; migration-start не равен playback. Фактическая причина прежнего offline всё ещё не установлена. [Итоговая матрица](../releases/3.4.8/README_RU.md).

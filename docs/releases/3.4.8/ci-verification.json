@@ -1,0 +1,28 @@
+{
+  "sourceCommit": "1ac4f00dfe03448198429de1183136211efe093f",
+  "sourceTree": "495470363aef9dab6b720fabc47e0df3a04161e5",
+  "runId": "43434257815",
+  "jobId": 131915199035,
+  "conclusion": "success",
+  "androidSuites": 451,
+  "androidTests": {
+    "tests": 2311,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "toolTests": 286,
+  "backupStorageOwners": 98,
+  "settingsEditors": 48,
+  "settingsForms": 253,
+  "settingsLabels": 3017,
+  "nativeMusicHooks": 3,
+  "nativeDexCanonicalRestoration": "PASS on pinned Music Natro 3",
+  "diagnosticZipExport": "PASS including 40-second buffered replay and online result",
+  "artifactHashes": {
+    "Natro-3.4.8-offline-signing-1": "a3eaeea5369848ddd21f472cf1842e4579ea5773df1b6a9089038300ccf2627a",
+    "Natro-3.4.8-signing-tools-1": "e3070d93da320f17dfb19b9616c9970f63def265897e4f3591b65f037a68d841",
+    "natro-adb-lan-candidate-1": "48d7017455e12e9c02ca7840e581cac058d4b9234815578de67c17a688ba31c7"
+  },
+  "field": "OPEN: no physical KX11 execution"
+}

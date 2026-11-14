@@ -1,0 +1,28 @@
+{
+  "apk": "Yandex-Music-2026.10.2-Natro-4-signed.apk",
+  "sha256": "0498083df0b1bafee4e4c13c155daa140110a47f00115849c8b00149344d7813",
+  "size": 63765305,
+  "sourceCommit": "1ac4f00dfe03448198429de1183136211efe093f",
+  "sourceTree": "495470363aef9dab6b720fabc47e0df3a04161e5",
+  "ciRun": "43434257815",
+  "previousSha256": "61be448f22cf3852a4a0ea12452b0e07adec60337dde5b8c1d423d459f1bbe9e",
+  "previousVersionCode": 24026524,
+  "versionCode": 24026525,
+  "dexSha256": "2881b0c1e107a3c91622a46f12afb9358f7f8fc0076208d24775619b7dabcfe1",
+  "nativeDexSha256": "f96bed4dda53a6131ebdfc9e999a1285c3fe9bde97118e444062efec9bf56b40",
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "signatureV2": true,
+  "signatureV3": true,
+  "exactApi28": true,
+  "zipalign16KiB": true,
+  "changedFromPrevious": [
+    "AndroidManifest.xml",
+    "classes.dex",
+    "classes7.dex"
+  ],
+  "unchangedPayloadEntries": 4724,
+  "nativeBodyRestorationVerified": true,
+  "manifestSemanticsOnlyVersionChanged": true,
+  "installOverNatro3MetadataVerified": true,
+  "physicalKx11Verification": "pending"
+}

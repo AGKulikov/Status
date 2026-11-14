@@ -1,4 +1,5 @@
-> Доработка Natro3.4.8 + MusicNatro4: `release/natro-3.4.8`. Запись внутренних причин офлайна и возврата онлайн; полный CI/APK ожидаются, FIELD OPEN. [Текущий разбор](docs/geely-kx11/MUSIC_OFFLINE_2026_11_12_RU.md).
+> Natro 3.4.8 + Music Natro 4: SOURCE/TEST/APK PASS; публикация завершается, FIELD OPEN. [Установка и проверка](docs/releases/3.4.8/README_RU.md). Актуальная ветка: `release/natro-3.4.8`.
+> Старые статусы ниже сохранены как история.
 
 > Natro3.4.7 собран: SOURCE/TEST/APK PASS; FIELD OPEN. [Выпуск](docs/releases/3.4.7/README_RU.md).
 
