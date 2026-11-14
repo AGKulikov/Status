@@ -39,7 +39,7 @@ class UpdateChannel(unittest.TestCase):
 
     def test_updater_guards_and_both_entry_points(self):
         base=ROOT/'app/src/main/java/dezz/status/widget'
-        source=(base/'update/NatroUpdater.java').read_text()
+        source=(base/'update/NatroUpdater.java').read_text()+(base/'update/UpdateTarget.java').read_text()
         for guard in ['GET_SIGNING_CERTIFICATES|PackageManager.GET_SIGNATURES','getApkContentsSigners','next.getLongVersionCode()<=current.getLongVersionCode()',
                       'canRequestPackageInstalls','ACTION_INSTALL_PACKAGE','setInstanceFollowRedirects(false)',
                       'natro-update.json','requireAsset(url)','requireStableSigner(current,','requireStableSigner(next,']:
@@ -48,6 +48,21 @@ class UpdateChannel(unittest.TestCase):
         self.assertNotIn('pm install',source)
         self.assertIn('UpdateActivity',(base/'settings/SettingsDestinationCatalog.java').read_text())
         self.assertIn('case "/api/update"',(base/'transfer/LanTransferService.java').read_text())
+
+    def test_companion_packages_tags_and_size_policy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            apk=Path(directory)/'companion.apk';apk.write_bytes(b'fixture')
+            signer='Signer #1 certificate SHA-256 digest: '+module.CERT
+            for app,package,tag,version in [
+                ('navigator','ru.yandex.yandexnavi','natro-navigator-v3.4.9','30.3.0 Natro 3.4.9'),
+                ('music','ru.yandex.music','natro-music-v4','2026.10.2 #169gpr Natro 4')]:
+                badging=f"package: name='{package}' versionCode='100' versionName='{version}'"
+                value=module.manifest(apk,tag,signer,badging,app)
+                self.assertEqual(value['package'],package)
+                with self.assertRaises(ValueError):module.manifest(apk,tag,signer,badging.replace(package,'ru.natro.statuswidget'),app)
+                with self.assertRaises(ValueError):module.manifest(apk,'natro-v3.4.9',signer,badging,app)
+            self.assertEqual(module.TARGETS['navigator'][1],256)
+            self.assertEqual(module.TARGETS['music'][1],128)
 
     def test_phone_exports_reuse_exact_collectors(self):
         service=(ROOT/'app/src/main/java/dezz/status/widget/transfer/LanTransferService.java').read_text()

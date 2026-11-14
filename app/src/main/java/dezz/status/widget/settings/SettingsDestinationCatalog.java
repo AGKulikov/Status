@@ -284,9 +284,9 @@ public final class SettingsDestinationCatalog {
                 "diagnostics", "dezz.status.widget.DiagnosticsActivity",
                 "отладка", "журнал", "лог", "ошибка", "падение", "красный",
                 "предупреждение", "руль", "keycode", "оверлей", "запись", "json", "txt"));
-        values.add(activity("app_update", Group.APP, "Обновление Natro",
-                "Проверить GitHub, скачать и установить подписанный выпуск",
-                "import", "dezz.status.widget.UpdateActivity", "обновить", "github", "версия", "apk"));
+        values.add(activity("app_update", Group.APP, "Обновления приложений",
+                "Natro, Навигатор и Музыка: проверка и обновление",
+                "import", "dezz.status.widget.UpdateActivity", "обновить", "github", "версия", "apk", "навигатор", "музыка"));
         values.add(activity("app_about", Group.APP, "О приложении и данные автомобиля",
                 "Версия, соединения и данные автомобиля → Sprut.hub",
                 "about", "dezz.status.widget.AboutActivity",

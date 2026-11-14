@@ -17,59 +17,72 @@ import java.io.*;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
-import java.util.concurrent.ExecutorService;
+import java.util.EnumMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 
 /** Explicit stable-channel operations only. No boot checks, root, silent install or GitHub credentials. */
-public final class NatroUpdater {
+public class NatroUpdater {
     private static final String API="https://api.github.com/repos/AGKulikov/Status/releases?per_page=100";
     private static final String ASSETS="https://github.com/AGKulikov/Status/releases/download/";
-    private static final String PACKAGE="ru.natro.statuswidget";
     private static final String CERT="6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75";
     // AOSP Android 9 getPackageArchiveInfo only invokes collectCertificates when
     // GET_SIGNATURES is present. Request both; still trust only the CURRENT
     // SigningInfo signers below, never the legacy field or signing history.
     @SuppressWarnings("deprecation")
     static final int SIGNATURE_FLAGS=PackageManager.GET_SIGNING_CERTIFICATES|PackageManager.GET_SIGNATURES;
-    private static final long MAX_APK=128L*1024*1024;
-    private static NatroUpdater instance;
-    public static synchronized NatroUpdater get(Context context) {
-        if(instance==null)instance=new NatroUpdater(context.getApplicationContext());return instance;
+    private static final EnumMap<UpdateTarget,NatroUpdater> instances=new EnumMap<>(UpdateTarget.class);
+    public static synchronized NatroUpdater get(Context context) {return get(context,UpdateTarget.NATRO);}
+    public static synchronized NatroUpdater get(Context context,UpdateTarget target) {
+        NatroUpdater updater=instances.get(target);
+        if(updater==null){updater=new NatroUpdater(context.getApplicationContext(),target,Executors.newSingleThreadExecutor());instances.put(target,updater);}
+        return updater;
     }
     private final Context context;
-    private final ExecutorService worker=Executors.newSingleThreadExecutor();
-    private String state="idle",message="Канал: GitHub Releases / AGKulikov/Status / stable";
+    private final UpdateTarget target;
+    private final Executor worker;
+    private String state="idle",message="Нажмите «Проверить обновления»";
     private boolean busy;
     private JSONObject candidate;
     private File apk;
-    NatroUpdater(Context context){this.context=context;}
+    NatroUpdater(Context context){this(context,UpdateTarget.NATRO,Executors.newSingleThreadExecutor());}
+    NatroUpdater(Context context,UpdateTarget target,Executor worker){this.context=context;this.target=target;this.worker=worker;}
     public synchronized JSONObject status() throws Exception {
+        PackageInfo current=null;
+        try{current=installed();}catch(PackageManager.NameNotFoundException ignored){}
+        // Returning from Android is not success. Read the actually installed version.
+        if(!busy&&candidate!=null&&current!=null&&current.getLongVersionCode()>=candidate.getLong("versionCode")) {
+            candidate=null;apk=null;finish("current","Установленная версия не требует обновления");
+        }
         return new JSONObject().put("state",state).put("message",message).put("busy",busy)
-                .put("installed",installed().versionName).put("version",candidate==null?"":candidate.optString("versionName"))
+                .put("installed",current==null?"Не установлено":current.versionName)
+                .put("version",candidate==null?"":candidate.optString("versionName"))
+                .put("canUpdate",!busy&&candidate!=null&&current!=null)
                 .put("canDownload",!busy&&candidate!=null&&apk==null).put("canInstall",!busy&&apk!=null);
     }
     public synchronized void check() throws IOException {
         begin("checking","Проверка GitHub Releases…");candidate=null;apk=null;
         worker.execute(()->{
             try {
-                JSONArray releases=new JSONArray(read(API,4*1024*1024));JSONObject best=null;
-                long current=installed().getLongVersionCode(),maximum=current;boolean channel=false;
+                JSONArray releases=new JSONArray(fetch(API,4*1024*1024));JSONObject best=null;
+                PackageInfo installed=installed();requireStableSigner(installed,"Установленная "+target.title);
+                long current=installed.getLongVersionCode(),maximum=current;boolean channel=false;
                 for(int i=0;i<releases.length();i++) {
                     JSONObject release=releases.getJSONObject(i);
                     if(release.optBoolean("draft")||release.optBoolean("prerelease"))continue;
                     JSONArray assets=release.getJSONArray("assets");
                     for(int j=0;j<assets.length();j++) {
                         JSONObject asset=assets.getJSONObject(j);
-                        if(!"natro-update.json".equals(asset.optString("name")))continue;
+                        if(!target.manifestName.equals(asset.optString("name")))continue;
                         String manifestUrl=asset.getString("browser_download_url");requireAsset(manifestUrl);
-                        JSONObject manifest=new JSONObject(read(manifestUrl,64*1024));
+                        JSONObject manifest=new JSONObject(fetch(manifestUrl,64*1024));
                         validateManifest(manifest,manifestUrl);channel=true;
                         long version=manifest.getLong("versionCode");
                         if(version>maximum){best=manifest;maximum=version;}
                     }
                 }
                 synchronized(this){candidate=best;finish(best!=null?"available":channel?"current":"unpublished",
-                        best!=null?"Доступна Natro "+best.getString("versionName"):channel?"Более новой версии в стабильном канале нет":"Канал ещё не опубликован: в Releases нет natro-update.json. Это не подтверждение актуальности установленной версии.");}
+                        best!=null?"Доступно обновление":channel?"Более новой версии в стабильном канале нет":"Обновления для этого приложения ещё не опубликованы");}
             } catch(Exception error){fail("Проверка обновлений",error);}
         });
     }
@@ -83,33 +96,52 @@ public final class NatroUpdater {
             try {
                 File directory=new File(context.getCacheDir(),"updates");
                 if(!directory.isDirectory()&&!directory.mkdirs())throw new IOException("Нет места для APK");
-                temporary=File.createTempFile("Natro-update-",".apk",directory);
-                HttpsURLConnection connection=open(selected.getString("url"));
-                try(InputStream input=connection.getInputStream();OutputStream output=new FileOutputStream(temporary)) {
-                    byte[] block=new byte[65536];long total=0;int count;
-                    while((count=input.read(block))!=-1){total+=count;if(total>selected.getLong("size")||total>MAX_APK)throw new IOException("Размер APK превышен");output.write(block,0,count);}
-                    if(total!=selected.getLong("size"))throw new IOException("APK скачан не полностью");
-                } finally {connection.disconnect();}
+                temporary=File.createTempFile(target.name()+"-update-",".apk",directory);
+                transfer(selected,temporary);
                 verify(temporary,selected);
-                synchronized(this){apk=temporary;temporary=null;finish("ready","APK проверен. Нажмите «Установить». Подтверждение Android появится на магнитоле.");}
+                synchronized(this){apk=temporary;temporary=null;finish("ready","APK проверен и готов к установке");}
             }catch(Exception error){fail("Загрузка обновления",error);}
             finally{if(temporary!=null)temporary.delete();}
         });
     }
     /** Called only after an explicit local/paired-user action; Android owns final consent. */
-    public synchronized Intent installationIntent() throws Exception {
-        if(busy||apk==null||candidate==null)throw new IOException("Нет проверенного APK");
-        verify(apk,candidate);
-        if(!context.getPackageManager().canRequestPackageInstalls()) {
-            message="Разрешите установку из Natro на магнитоле и снова нажмите «Установить»";
+    public Intent installationIntent() throws Exception {
+        final File selectedApk;final JSONObject selected;
+        synchronized(this){
+            if(busy||apk==null||candidate==null)throw new IOException("Нет проверенного APK");
+            selectedApk=apk;selected=candidate;
+        }
+        // Hash/signature parsing of a 150 MiB Navigator must not hold the UI status lock.
+        verify(selectedApk,selected);
+        synchronized(this){
+        if(busy||apk!=selectedApk||candidate!=selected)throw new IOException("Состояние обновления изменилось");
+        if(!canInstallPackages()) {
+            message="Разрешите установку из Natro на магнитоле и вернитесь к обновлению";
             return new Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES,Uri.parse("package:"+context.getPackageName())).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         }
         Uri uri=FileProvider.getUriForFile(context,context.getPackageName()+".fileprovider",apk);
         message="Запрошен системный установщик на магнитоле; установка ещё не подтверждена";
         return new Intent(Intent.ACTION_INSTALL_PACKAGE).setDataAndType(uri,"application/vnd.android.package-archive")
                 .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION|Intent.FLAG_ACTIVITY_NEW_TASK);
+        }
     }
-    private PackageInfo installed() throws Exception {return context.getPackageManager().getPackageInfo(context.getPackageName(),SIGNATURE_FLAGS);}
+    public boolean canInstallPackages(){return context.getPackageManager().canRequestPackageInstalls();}
+    private PackageInfo installed() throws Exception {return context.getPackageManager().getPackageInfo(target.packageName,SIGNATURE_FLAGS);}
+    String fetch(String url,int limit)throws Exception{return read(url,limit);}
+    void transfer(JSONObject selected,File temporary)throws Exception {
+        HttpsURLConnection connection=open(selected.getString("url"));
+        try(InputStream input=connection.getInputStream();OutputStream output=new FileOutputStream(temporary)) {
+            byte[] block=new byte[65536];long total=0;int count,last=-1;
+            while((count=input.read(block))!=-1){
+                total+=count;if(total>selected.getLong("size")||total>target.maxApkBytes)throw new IOException("Размер APK превышен");
+                output.write(block,0,count);
+                int progress=(int)(total*100/selected.getLong("size"));
+                if(progress!=last){last=progress;synchronized(this){message="Скачивание: "+progress+" %";}}
+            }
+            if(total!=selected.getLong("size"))throw new IOException("APK скачан не полностью");
+        } finally {connection.disconnect();}
+        synchronized(this){message="Проверка APK…";}
+    }
     void verify(File file,JSONObject manifest) throws Exception {
         if(!file.isFile()||file.length()!=manifest.getLong("size"))throw new IOException("Размер APK изменился");
         MessageDigest hash=MessageDigest.getInstance("SHA-256");
@@ -117,13 +149,13 @@ public final class NatroUpdater {
         if(!hex(hash.digest()).equals(manifest.getString("sha256")))throw new IOException("SHA-256 APK не совпадает");
         PackageInfo next=context.getPackageManager().getPackageArchiveInfo(file.getAbsolutePath(),SIGNATURE_FLAGS);
         PackageInfo current=installed();
-        if(next==null||!PACKAGE.equals(next.packageName)||!PACKAGE.equals(current.packageName)
+        if(next==null||!target.packageName.equals(next.packageName)||!target.packageName.equals(current.packageName)
                 ||next.applicationInfo==null||next.applicationInfo.minSdkVersion>android.os.Build.VERSION.SDK_INT
                 ||next.getLongVersionCode()!=manifest.getLong("versionCode")||next.getLongVersionCode()<=current.getLongVersionCode()
                 ||!manifest.getString("versionName").equals(next.versionName))throw new IOException("Пакет или версия APK не подходят");
         requireStableSigner(next,"Скачанный APK");
-        requireStableSigner(current,"Установленная Natro");
-        DiagnosticJournal.infoAsync("updater","apk_verified; version="+next.versionName+"; current_signer=stable; installed_signer=stable");
+        requireStableSigner(current,"Установленная "+target.title);
+        DiagnosticJournal.infoAsync("updater","apk_verified; app="+target.name()+"; version="+next.versionName+"; current_signer=stable; installed_signer=stable");
     }
     static void requireStableSigner(PackageInfo info,String label)throws Exception {
         if(info==null||info.signingInfo==null)throw new IOException(label+": Android не вернул сертификат подписи");
@@ -134,18 +166,18 @@ public final class NatroUpdater {
         if(!hex(MessageDigest.getInstance("SHA-256").digest(signatures[0].toByteArray())).equals(CERT))
             throw new IOException(label+": сертификат подписи не совпадает со стабильным");
     }
-    private static void validateManifest(JSONObject value,String source)throws Exception {
-        if(value.getInt("schema")!=1||!PACKAGE.equals(value.getString("package"))||!"stable".equals(value.getString("channel"))
+    void validateManifest(JSONObject value,String source)throws Exception {
+        if(value.getInt("schema")!=1||!target.packageName.equals(value.getString("package"))||!"stable".equals(value.getString("channel"))
                 ||value.getLong("versionCode")<=0||value.getString("versionName").isEmpty()
                 ||!value.getString("sha256").matches("[0-9a-f]{64}")||!CERT.equals(value.getString("certificateSha256"))
-                ||value.getLong("size")<=0||value.getLong("size")>MAX_APK)throw new IOException("Некорректный манифест выпуска");
+                ||value.getLong("size")<=0||value.getLong("size")>target.maxApkBytes)throw new IOException("Некорректный манифест выпуска");
         String url=value.getString("url");requireAsset(url);
         if(!url.substring(0,url.lastIndexOf('/')+1).equals(source.substring(0,source.lastIndexOf('/')+1))||!url.endsWith(".apk"))
             throw new IOException("APK не принадлежит выпуску манифеста");
     }
     private synchronized void begin(String next,String text)throws IOException {if(busy)throw new IOException("Операция обновления уже выполняется");busy=true;state=next;message=text;}
     private synchronized void finish(String next,String text){busy=false;state=next;message=text;}
-    private void fail(String action,Exception error){String detail=action+": "+(error instanceof IOException?error.getMessage():error.getClass().getSimpleName());DiagnosticJournal.warn("updater",detail);finish("error",detail);}
+    private void fail(String action,Exception error){String detail=target.title+" · "+action+": "+(error instanceof PackageManager.NameNotFoundException?"Приложение не установлено":error instanceof IOException?error.getMessage():error.getClass().getSimpleName());DiagnosticJournal.warn("updater",detail);finish("error",detail);}
     private static void requireAsset(String value)throws IOException {
         if(!value.startsWith(ASSETS)||value.contains("..")||value.contains("?")||value.contains("#"))throw new IOException("Недоверенный адрес выпуска");
     }

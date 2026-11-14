@@ -222,7 +222,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/update/NatroUpdater.java": {
-      "sha256": "dfde2e1c4007f4d87393efd6e1063cc481e9895e1d47253a5cd991cd26c2a698",
+      "sha256": "69eb71cb39322e75e20b1e9e4caf17b9d55a79121c8688348b996478acd94b08",
       "access_kinds": [
         "files"
       ]
@@ -364,7 +364,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "e68e75f34c210310a224f018910a39c8161dd8eaa340afab8600b4ef0c227959",
+      "sha256": "d84364a44c8256a731584be915e74ecb5f6fc9198dec39f1d1fe2f46e9bf2808",
       "access_kinds": [
         "files"
       ]
