@@ -25,13 +25,14 @@ for app,package in zip(('navigator','music'),data['packages']):
         assert len(raw)==chunk['size']
         encrypted.extend(raw)
     assert hashlib.sha256(encrypted).hexdigest()==package['encryptedSha256']
-    plain=AESGCM(sym).decrypt(base64.b64decode(package['nonce']),bytes(encrypted),(run+':'+app).encode())
+    plain=AESGCM(sym).decrypt(base64.b64decode(package['nonce']),bytes(encrypted),(data['payloadRun']+':'+app).encode())
     assert len(plain)==manifest['size'] and hashlib.sha256(plain).hexdigest()==manifest['sha256']
     target.write_bytes(plain)
     del encrypted,plain
     tag='natro-navigator-v3.4.9' if app=='navigator' else 'natro-music-v4'
-    release=json.loads(subprocess.check_output(['gh','api',f'repos/{repo}/releases/tags/{tag}']))
+    releases=json.loads(subprocess.check_output(['gh','api',f'repos/{repo}/releases?per_page=100']))
+    release=next(r for r in releases if r['tag_name']==tag)
     assert release['draft'] and not any(a['name']==filename for a in release['assets'])
-    subprocess.run(['gh','release','upload',tag,str(target),'--repo',repo],check=True)
+    subprocess.run(['gh','api','--method','POST','-H','Content-Type: application/vnd.android.package-archive','--input',str(target),f"https://uploads.github.com/repos/{repo}/releases/{release['id']}/assets?name={filename}"],check=True,stdout=subprocess.DEVNULL)
     print(app+' verified bytes uploaded to draft',flush=True)
 (root/'private.pem').unlink()
