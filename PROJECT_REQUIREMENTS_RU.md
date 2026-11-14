@@ -6165,3 +6165,22 @@ GitHub Actions: одноразовый RSA-ключ остаётся тольк�
 попадают. Перед upload сверяются размеры/SHA уже подписанных APK. Upload идёт
 только в draft; отдельный publisher проверяет подпись/API28/identity и readback.
 Публикация и FIELD пока OPEN. Runtime cbe16449 и полный CI не изменяются.
+
+Уточнение transport349: materialize возвращает локальные файлы, без download URL.
+Передаются зашифрованные готовые APK через Git blob objects; в дереве Git только
+конверт со списком SHA ciphertext chunks. Одноразовый ключ только в runner;
+закрытый ключ и незашифрованные APK в Git не отправляются. Это заменяет схему
+зашифрованных ссылок выше. Проверенные APK/исходники не меняются.
+
+## 14.11.2026 — 3.4.9: три канала опубликованы через коннектор
+
+Natro3.4.9 stable/latest, Navigator30.3.0 Natro3.4.9 и MusicNatro4 опубликованы.
+Transport43562685742 PASS, publisher43562925140/job132350380362 SUCCESS.
+Первый transport43561921450: draft tag lookup404 после успешного SHA;
+исправлено обращением по ID. Все3APK и3манифеста скачаны публично обратно,
+размеры/SHA и локальные манифесты совпали. Исходный runtime cbe16449,
+CI43559635840 PASS2325Android/289tools; новая упаковка runtime не выполнялась.
+Подпись/v2/v3/API28/zipalign/package/version повторно проверены publisher.
+SOURCE/TEST/APK/PUBLISH PASS, FIELD установки/возврата/отмены на KX11 OPEN.
+Одноразовые закрытые ключи удалены runner и локально; в Git только ciphertext.
+[Машинное подтверждение](docs/releases/3.4.9/publication-verification.json).

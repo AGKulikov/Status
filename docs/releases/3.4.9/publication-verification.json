@@ -1,0 +1,157 @@
+{
+  "sourceCommit": "cbe1644909fab2d94dec3045dd73ed172fde7371",
+  "sourceTree": "61059c7a19ca9ff0d7ff16e546e613cfbaaad2f0",
+  "ciRun": 43559635840,
+  "transferRun": 43562685742,
+  "publisherRun": 43562925140,
+  "publisherJob": 132350380362,
+  "publisherConclusion": "success",
+  "releaseCommit": "e14acc5ab9a1cb528c3728fab1e6c84480c98f0b",
+  "releases": [
+    {
+      "id": 445035872,
+      "tag": "natro-v3.4.9",
+      "url": "https://github.com/AGKulikov/Status/releases/tag/natro-v3.4.9",
+      "draft": false,
+      "prerelease": false,
+      "target": "cbe1644909fab2d94dec3045dd73ed172fde7371",
+      "assets": [
+        {
+          "name": "Natro-3.4.9-signed.apk",
+          "size": 29981280,
+          "sha256": "219ecf541014d050555178e5552592224915ba04cf22d3341ae536c5a5f69570"
+        },
+        {
+          "name": "Natro-3.4.9-source.tar.gz",
+          "size": 37174039,
+          "sha256": "9d5dda257f32a06788eba78efe7b9b179cf8a543cfb5344e4f32ce7566b99f7d"
+        },
+        {
+          "name": "natro-update.json",
+          "size": 426,
+          "sha256": "a4a98f17362fafc6baee5d594d603456363c13d7ee6b09ca824095137b301a4b"
+        },
+        {
+          "name": "README_RU.md",
+          "size": 2379,
+          "sha256": "819a01eb4e3a25eaef642f4c26e6fb1d30fcdfc02c1fd4158fb87f817dd4bcaa"
+        },
+        {
+          "name": "release-report.json",
+          "size": 3878,
+          "sha256": "7f6b7177fc8a4761c995855c1096275f8765bc8e4c4b00132cff1d80ab13329c"
+        },
+        {
+          "name": "SHA256SUMS.txt",
+          "size": 523,
+          "sha256": "becea4e32f836fb3a1dc6f9bbfc186a744f30a29cc14b9583ddf6f05216c2454"
+        },
+        {
+          "name": "signature-verification.txt",
+          "size": 2341,
+          "sha256": "64e2120c2d8b27ca604ab56544853b36687e6b327c2c94b2b4c5c4e33b47f9c9"
+        }
+      ]
+    },
+    {
+      "id": 445035940,
+      "tag": "natro-navigator-v3.4.9",
+      "url": "https://github.com/AGKulikov/Status/releases/tag/natro-navigator-v3.4.9",
+      "draft": false,
+      "prerelease": false,
+      "target": "cbe1644909fab2d94dec3045dd73ed172fde7371",
+      "assets": [
+        {
+          "name": "Navigator-30.3.0-Natro-3.4.9-signed.apk",
+          "size": 156546666,
+          "sha256": "c2524e28f711260d9ed9d4ac563a4f42c69757247f2b669022aad30171f901c0"
+        },
+        {
+          "name": "navigator-release-report.json",
+          "size": 946,
+          "sha256": "a4419065de9ba8351f5af9af7237c2e3da60a0ab0458825849fb78c14caabff8"
+        },
+        {
+          "name": "navigator-signature-verification.txt",
+          "size": 1969,
+          "sha256": "5658e9d8ab358008f5cf015490ebc4dcd0b5f573479eeed5721063639791cc6f"
+        },
+        {
+          "name": "navigator-update.json",
+          "size": 466,
+          "sha256": "fc1e7ef55c99c0eb2bf653b91385ec3b8c262e26e100edc52fe26dd0ddc11cfa"
+        }
+      ]
+    },
+    {
+      "id": 445035962,
+      "tag": "natro-music-v4",
+      "url": "https://github.com/AGKulikov/Status/releases/tag/natro-music-v4",
+      "draft": false,
+      "prerelease": false,
+      "target": "1ac4f00dfe03448198429de1183136211efe093f",
+      "assets": [
+        {
+          "name": "music-release-report.json",
+          "size": 1117,
+          "sha256": "93666284e7e81af57aa43c2a683f9dbca88c7d559feb2b197f126c56f26df06d"
+        },
+        {
+          "name": "music-signature-verification.txt",
+          "size": 1979,
+          "sha256": "9407c114fdc56b4539a344672cdfb06d40ef2dd4a5513a09ef0086d1eba4362f"
+        },
+        {
+          "name": "music-update.json",
+          "size": 460,
+          "sha256": "e5e3444f09e75e33324568d911f44cde4839d31dc30c5dc7cc946f658262aa7f"
+        },
+        {
+          "name": "Yandex-Music-2026.10.2-Natro-4-signed.apk",
+          "size": 63765305,
+          "sha256": "0498083df0b1bafee4e4c13c155daa140110a47f00115849c8b00149344d7813"
+        }
+      ]
+    }
+  ],
+  "field": "OPEN",
+  "publicReadback": [
+    {
+      "name": "Natro-3.4.9-signed.apk",
+      "sha256": "219ecf541014d050555178e5552592224915ba04cf22d3341ae536c5a5f69570",
+      "size": 29981280,
+      "publicReadback": "PASS"
+    },
+    {
+      "name": "natro-update.json",
+      "sha256": "a4a98f17362fafc6baee5d594d603456363c13d7ee6b09ca824095137b301a4b",
+      "size": 426,
+      "publicReadback": "PASS"
+    },
+    {
+      "name": "Navigator-30.3.0-Natro-3.4.9-signed.apk",
+      "sha256": "c2524e28f711260d9ed9d4ac563a4f42c69757247f2b669022aad30171f901c0",
+      "size": 156546666,
+      "publicReadback": "PASS"
+    },
+    {
+      "name": "navigator-update.json",
+      "sha256": "fc1e7ef55c99c0eb2bf653b91385ec3b8c262e26e100edc52fe26dd0ddc11cfa",
+      "size": 466,
+      "publicReadback": "PASS"
+    },
+    {
+      "name": "music-update.json",
+      "sha256": "e5e3444f09e75e33324568d911f44cde4839d31dc30c5dc7cc946f658262aa7f",
+      "size": 460,
+      "publicReadback": "PASS"
+    },
+    {
+      "name": "Yandex-Music-2026.10.2-Natro-4-signed.apk",
+      "sha256": "0498083df0b1bafee4e4c13c155daa140110a47f00115849c8b00149344d7813",
+      "size": 63765305,
+      "publicReadback": "PASS"
+    }
+  ],
+  "publicReadbackResult": "PASS"
+}

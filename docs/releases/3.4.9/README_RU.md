@@ -26,4 +26,12 @@ zipalign16KiB, install-over metadata, точное соответствие APK 
 
 SOURCE cbe1644909fab2d94dec3045dd73ed172fde7371, tree61059c7a19ca9ff0d7ff16e546e613cfbaaad2f0. [Полный CI](https://github.com/AGKulikov/Status/actions/runs/43559635840) SUCCESS,2325Android/289tools,0failures/errors/skips. Backup98owners и settings48editors/253forms/3017labels PASS.
 
-[Экран native1760×656](update-center-349.png) использует тестовые версии приложений для проверки layout; это не фотография магнитолы. [Natro APK](release-report.json), [Navigator APK](navigator-release-report.json), [Music reuse](music-release-report.json). SOURCE/TEST/APK PASS; PUBLISH OPEN до загрузки companion APK и readback всех трёх каналов. FIELD OPEN.
+[Экран native1760×656](update-center-349.png) использует тестовые версии приложений для проверки layout; это не фотография магнитолы. [Natro APK](release-report.json), [Navigator APK](navigator-release-report.json), [Music reuse](music-release-report.json). SOURCE/TEST/APK/PUBLISH PASS; FIELD OPEN.
+
+Все три канала опубликованы через коннектор GitHub и Actions, без браузерного входа.
+[Publisher43562925140](https://github.com/AGKulikov/Status/actions/runs/43562925140) SUCCESS;
+Natro3.4.9 — stable/latest, Navigator3.4.9 и MusicNatro4 — отдельные stable releases.
+Все3 публичных APK и3 манифеста скачаны обратно, размеры/SHA совпали.
+[Подтверждение публикации](publication-verification.json).
+Первый transport43561921450 остановился на draft tag lookup404; исправлено обращением
+по ID релиза, повтор43562685742 PASS. Ошибка касалась публикации, APK не менялись.
