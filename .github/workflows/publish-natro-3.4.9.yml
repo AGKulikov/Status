@@ -110,7 +110,7 @@ jobs:
           # Do not overwrite an existing release or assets. A failed draft can be
           # resumed only after matching its source and every byte below.
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh api "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
+            gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" | jq --arg tag "$RELEASE_TAG" '.[] | select(.tag_name == $tag)' \
               | jq -e --arg source "$SOURCE_SHA" \
                 '.draft == true and .target_commitish == $source and (.assets | length) == 7'
           else
@@ -143,7 +143,7 @@ jobs:
               TITLE='Yandex Music 2026.10.2 / Natro 4'
             fi
             if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-              gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" | jq -e --arg source "$TARGET" '.target_commitish == $source'
+              gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" | jq --arg tag "$TAG" '.[] | select(.tag_name == $tag)' | jq -e --arg source "$TARGET" '.target_commitish == $source'
             else
               gh release create "$TAG" "$DOC/$APP-update.json" "$DOC/$APP-release-report.json" "$DOC/$APP-signature-verification.txt" \
                 --repo "$GITHUB_REPOSITORY" --target "$TARGET" --draft --title "$TITLE" --notes-file "$DOC/$APP-release-notes.md"
