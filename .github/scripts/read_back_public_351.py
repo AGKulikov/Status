@@ -15,7 +15,8 @@ import urllib.request
 
 REPO = 'AGKulikov/Status'
 WEB = 'https://github.com/' + REPO + '/releases'
-API = 'https://api.github.com/repos/' + REPO + '/releases'
+REPO_API = 'https://api.github.com/repos/' + REPO
+API = REPO_API + '/releases'
 TAG = 'natro-v3.5.1'
 CERT = '6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75'
 TARGETS = {
@@ -70,12 +71,18 @@ def release_list(source):
     listed = next((r for r in public if r['tag_name'] == TAG), None)
     require(listed is not None and latest['tag_name'] == TAG and latest['id'] == listed['id']
             and not latest['draft'] and not latest['prerelease'] and latest['published_at']
-            and latest['target_commitish'] == listed['target_commitish'] == source
+            and latest['target_commitish'] == listed['target_commitish']
+            and latest['target_commitish'] in (source, 'release/natro-3.5.1-signed')
             and latest['html_url'] == listed['html_url'] == f'{WEB}/tag/{TAG}', 'Expected release is not public/latest yet')
     def inventory(r):
         return {a['name']: (a['id'], a['size'], a['digest'], a['browser_download_url']) for a in r['assets']}
     require(inventory(listed) == inventory(latest), 'Latest and updater listings differ')
-    return latest, public
+    ref = json.loads(small(f'{REPO_API}/git/ref/tags/{TAG}'))
+    target = ref['object']
+    require(ref['ref'] == f'refs/tags/{TAG}' and target['type'] == 'commit'
+            and re.fullmatch(r'[0-9a-f]{40}', source) and target['sha'] == source,
+            'Public tag does not directly identify the verified source commit')
+    return latest, public, target['sha']
 
 
 def read_manifest(entry):
@@ -112,7 +119,7 @@ def get_apk(url, path, size, expected):
 
 
 def verify(sdk, verified, source):
-    latest, releases = retry(lambda: release_list(source), attempts=7)
+    latest, releases, _ = retry(lambda: release_list(source), attempts=7)
     def latest_page():
         with open_url(WEB + '/latest') as response:
             require(response.status == 200 and response.geturl() == latest['html_url'], 'Public latest page redirects elsewhere')
@@ -168,11 +175,11 @@ def verify(sdk, verified, source):
                                reportSha256=digest(report_raw), apkUrl=value['url'], bytes=size, sha256=sha,
                                package=identity[1], versionCode=int(identity[2]), versionName=identity[3],
                                minSdk=int(min_sdk[1]), certificateSha256=fingerprints[0], exactApi28=True, signatureV2=True, signatureV3=True)
-    final, _ = retry(lambda: release_list(source))
+    final, _, tag_commit = retry(lambda: release_list(source))
     require(final['id'] == latest['id'], 'Latest release changed during verification')
     return dict(checkedAt=datetime.now(timezone.utc).isoformat(), latestUrl=API + '/latest', latestPageUrl=page,
                 updaterUrl=API + '?per_page=100', releaseUrl=latest['html_url'], tag=latest['tag_name'],
-                sourceCommit=latest['target_commitish'], publishedAt=latest['published_at'], releaseId=latest['id'],
+                sourceCommit=tag_commit, publishedAt=latest['published_at'], releaseId=latest['id'],
                 draft=latest['draft'], prerelease=latest['prerelease'], targets=checks)
 
 
