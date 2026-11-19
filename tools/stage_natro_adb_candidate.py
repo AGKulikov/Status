@@ -4,8 +4,10 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
+import tempfile
 import xml.etree.ElementTree as ET
 import zipfile
 if __package__:
@@ -20,12 +22,51 @@ def sha256(path):
             digest.update(chunk)
     return digest.hexdigest()
 
-def main():
-    version = os.environ["VERSION_NAME"]
-    validate_release_version(version)
-    code = int(os.environ["VERSION_CODE"])
-    out = Path(os.environ["RUNNER_TEMP"]) / ("natro-" + version + "-candidate")
-    out.mkdir(exist_ok=False)
+def standalone_source(version, code):
+    if validate_release_version(version) < (3, 5, 2) or not 0 < code <= 2100000000:
+        raise ValueError("Invalid standalone Natro release version")
+    if version == "3.5.2" and code != 208021385:
+        raise ValueError("Natro 3.5.2 must use versionCode 208021385")
+    source, tree = subprocess.check_output(
+        ["git", "rev-parse", "HEAD", "HEAD^{tree}"], text=True).splitlines()
+    if source != os.environ.get("NATRO_SOURCE_SHA") or tree != os.environ.get("NATRO_SOURCE_TREE"):
+        raise ValueError("Standalone source commit/tree differs from the requested checkout")
+    if subprocess.run(["git", "diff", "--quiet", "HEAD", "--"]).returncode:
+        raise ValueError("Standalone checkout has changes to tracked files")
+    untracked_inputs = subprocess.check_output(
+        ["git", "ls-files", "--others", "--exclude-standard", "--",
+         "app/src", "wechat-compat/src", "tools", "gradle"])
+    if untracked_inputs:
+        raise ValueError("Standalone checkout has untracked build inputs")
+    orchestrator = os.environ["GITHUB_SHA"]
+    if not all(re.fullmatch(r"[0-9a-f]{40}", value) for value in (source, tree, orchestrator)):
+        raise ValueError("Expected full Git commit/tree identities")
+    return {"sourceCommit": source, "sourceTree": tree, "orchestratorCommit": orchestrator,
+            "standalone": True}
+
+
+def verify_standalone_apk(apk, sdk, version, code, source):
+    badging = subprocess.check_output([sdk / "aapt", "dump", "badging", apk], text=True)
+    identity = f"package: name='ru.natro.statuswidget' versionCode='{code}' versionName='{version}'"
+    if (not badging.startswith(identity) or "application-label:'Natro'" not in badging
+            or "sdkVersion:'28'" not in badging or "targetSdkVersion:'28'" not in badging
+            or "application-debuggable" in badging):
+        raise ValueError("Standalone APK identity does not match the requested Natro release")
+    with zipfile.ZipFile(apk) as archive:
+        revision = archive.read("META-INF/version-control-info.textproto").decode()
+        if re.findall(r'^\s*revision:\s*"([0-9a-f]{40})"\s*$', revision, re.MULTILINE) != [source]:
+            raise ValueError("Standalone APK Git revision differs from the source checkout")
+    verification = subprocess.run([sdk / "apksigner", "verify", apk], capture_output=True, text=True)
+    if verification.returncode == 0:
+        raise ValueError("Standalone candidate must be unsigned")
+    errors = [line for line in (verification.stderr + verification.stdout).splitlines()
+              if line.startswith("ERROR:")]
+    # SDK 36.0.0 reports this specific error for a clean AGP unsigned release.
+    if verification.returncode != 1 or errors != ["ERROR: Missing META-INF/MANIFEST.MF"]:
+        raise ValueError("SDK could not confirm an unsigned Natro APK")
+
+
+def stage(out, version, code, standalone):
     apks = list(Path("app/build/outputs/apk/geely/release").glob("*.apk"))
     if len(apks) != 1:
         raise ValueError("Expected exactly one Geely release APK")
@@ -35,7 +76,7 @@ def main():
         suite = ET.parse(report).getroot()
         for key in counts:
             counts[key] += int(suite.attrib.get(key, 0))
-    if counts["tests"] < 1900 or counts["failures"] or counts["errors"]:
+    if counts["tests"] < 1900 or counts["failures"] or counts["errors"] or (standalone and counts["skipped"]):
         raise ValueError("Full test suite must pass before candidate staging")
     unsigned = out / ("Natro-" + version + "-unsigned.apk")
     shutil.copy2(apks[0], unsigned)
@@ -56,6 +97,25 @@ def main():
     shutil.copy2(sdk / "lib/apksigner.jar", out / "tools/lib/apksigner.jar")
     shutil.copytree(sdk / "lib64", out / "tools/lib64")
     shutil.copytree(Path("app/build/test-results/testGeelyDebugUnitTest"), out / "test-results")
+    manifest = {
+        "versionName": version, "versionCode": code, "package": "ru.natro.statuswidget",
+        "ciRunId": os.environ["GITHUB_RUN_ID"], "unitTests": counts,
+        "unsignedSha256": sha256(unsigned),
+        "helperChanged": os.environ.get("HELPER_CHANGED") == "true",
+        "physicalKx11Verification": "pending", "browserVisualVerification": "pending",
+    }
+    if standalone:
+        manifest.update(standalone_source(version, code))
+        verify_standalone_apk(unsigned, sdk, version, code, manifest["sourceCommit"])
+    else:
+        manifest["sourceCommit"] = os.environ["GITHUB_SHA"]
+        manifest["sourceTree"] = subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], text=True).strip()
+        stage_pair(out, version, manifest)
+    (out / "candidate.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    return counts
+
+
+def stage_pair(out, version, manifest):
     patch = Path("build/navigation-mod/classes19.dex")
     if not patch.is_file() or patch.stat().st_size < 10000:
         raise ValueError("Compiled Navigator patch is required for this pair")
@@ -84,22 +144,13 @@ def main():
         if sha256(patch) != published["ciBridgeSha256"]:
             raise ValueError("Navigator bridge differs from the published 3.4.9 release")
         compatible_pair = "Navigator Natro 3.4.2 / 3.4.9"
-    manifest = {
-        "versionName": version, "versionCode": code, "package": "ru.natro.statuswidget",
-        "sourceCommit": os.environ["GITHUB_SHA"],
-        "sourceTree": subprocess.check_output(["git", "rev-parse", "HEAD^{tree}"], text=True).strip(),
-        "ciRunId": os.environ["GITHUB_RUN_ID"], "unitTests": counts,
-        "unsignedSha256": sha256(unsigned),
-        "navigator": {
-            "pairRequired": compatible_pair is None,
-            "compatiblePair": compatible_pair,
-            "patch": "classes19.dex", "patchSha256": sha256(patch),
-            "baselineVersion": "30.3.0-Natro-2.9.8",
-            "baselineSha256": "b224bed5268469f620ab4bff3fec382aece868b9372450ff05f1f9176631280a",
-            "allowedPayloadChanges": ["classes19.dex"],
-        },
-        "helperChanged": os.environ.get("HELPER_CHANGED") == "true",
-        "physicalKx11Verification": "pending", "browserVisualVerification": "pending",
+    manifest["navigator"] = {
+        "pairRequired": compatible_pair is None,
+        "compatiblePair": compatible_pair,
+        "patch": "classes19.dex", "patchSha256": sha256(patch),
+        "baselineVersion": "30.3.0-Natro-2.9.8",
+        "baselineSha256": "b224bed5268469f620ab4bff3fec382aece868b9372450ff05f1f9176631280a",
+        "allowedPayloadChanges": ["classes19.dex"],
     }
     if reuse_349:
         manifest["navigator"].update(baselineVersion=published["versionName"],
@@ -126,7 +177,24 @@ def main():
         manifest["navigator"] = stage_turn_pair(Path(turn_base), patch, out)
     elif turn_base:
         raise ValueError("Navigator turn candidate is scoped to the 3.5.1 release")
-    (out / "candidate.json").write_text(json.dumps(manifest, indent=2) + "\n")
+
+
+def main():
+    version = os.environ["VERSION_NAME"]
+    validate_release_version(version)
+    code = int(os.environ["VERSION_CODE"])
+    standalone = os.environ.get("NATRO_STANDALONE") == "true"
+    if standalone and os.environ.get("HELPER_CHANGED") == "true":
+        raise ValueError("Standalone Natro cannot include a Helper update")
+    root = Path(os.environ["RUNNER_TEMP"])
+    out = root / ("natro-" + version + "-candidate")
+    if out.exists():
+        raise FileExistsError(out)
+    with tempfile.TemporaryDirectory(prefix="natro-stage-", dir=root) as work:
+        staging = Path(work) / out.name
+        staging.mkdir()
+        counts = stage(staging, version, code, standalone)
+        staging.rename(out)
     print(json.dumps({"candidate": str(out), "unitTests": counts}))
 
 if __name__ == "__main__":

@@ -5,6 +5,7 @@ import io
 import json
 import os
 from pathlib import Path
+import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -28,7 +29,7 @@ class CandidateStagingTest(unittest.TestCase):
             "REUSE_NAVIGATOR_300": "false", "REUSE_NAVIGATOR_302": "false",
             "REUSE_NAVIGATOR_339": "false", "REUSE_NAVIGATOR_349": "false",
             "ALICE_ENGINE_HOOKS": "false", "NAVIGATOR_TURN_BASE_APK": "",
-            "HELPER_CHANGED": "false",
+            "HELPER_CHANGED": "false", "NATRO_STANDALONE": "false",
         })
         self.environment.start()
         self.addCleanup(self.environment.stop)
@@ -204,6 +205,99 @@ class CandidateStagingTest(unittest.TestCase):
         expected = hashlib.sha256(content).hexdigest()
         self.assertEqual(expected, stage_natro_adb_candidate.sha256(payload))
         self.assertEqual(expected, sign_natro_candidate.sha256(payload))
+
+    def standalone_environment(self):
+        def git(*args):
+            return subprocess.check_output(["git", *args], text=True).strip()
+        git("init", "--quiet")
+        git("add", str(self.index))
+        git("-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
+            "commit", "--quiet", "-m", "Synthetic source")
+        source, tree = git("rev-parse", "HEAD", "HEAD^{tree}").splitlines()
+        self.dex.unlink()
+        sdk = self.root / "sdk/build-tools/36.0.0"
+        aapt = sdk / "aapt"
+        aapt.write_text("#!/bin/sh\ncat <<'END'\n"
+                        "package: name='ru.natro.statuswidget' versionCode='208021385' versionName='3.5.2'\n"
+                        "sdkVersion:'28'\ntargetSdkVersion:'28'\napplication-label:'Natro'\nEND\n")
+        aapt.chmod(0o755)
+        signer = sdk / "apksigner"
+        signer.write_text("#!/bin/sh\necho 'ERROR: Missing META-INF/MANIFEST.MF' >&2\nexit 1\n")
+        signer.chmod(0o755)
+        with zipfile.ZipFile(self.apk, "a") as apk:
+            apk.writestr("META-INF/version-control-info.textproto",
+                         f'repositories {{\n  system: GIT\n  revision: "{source}"\n}}\n')
+        self.out = self.root / "natro-3.5.2-candidate"
+        return {"NATRO_STANDALONE": "true", "VERSION_NAME": "3.5.2", "VERSION_CODE": "208021385",
+                "NATRO_SOURCE_SHA": source, "NATRO_SOURCE_TREE": tree}
+
+    def test_standalone_uses_checked_out_source_without_companion_builds(self):
+        env = self.standalone_environment()
+        with patch.dict(os.environ, env), contextlib.redirect_stdout(io.StringIO()):
+            stage_natro_adb_candidate.main()
+        result = json.loads((self.out / "candidate.json").read_text())
+        self.assertTrue(result["standalone"])
+        self.assertEqual(env["NATRO_SOURCE_SHA"], result["sourceCommit"])
+        self.assertEqual(env["NATRO_SOURCE_TREE"], result["sourceTree"])
+        self.assertEqual("a" * 40, result["orchestratorCommit"])
+        self.assertEqual("123", result["ciRunId"])
+        self.assertEqual(1906, result["unitTests"]["tests"])
+        self.assertNotIn("navigator", result)
+        self.assertFalse(result["helperChanged"])
+        self.assertEqual({"candidate.json", "Natro-3.5.2-unsigned.apk", "tools", "test-results"},
+                         {p.name for p in self.out.iterdir()})
+        self.assertEqual(self.apk.read_bytes(), (self.out / "Natro-3.5.2-unsigned.apk").read_bytes())
+
+    def test_standalone_rejects_unverified_source_and_version(self):
+        env = self.standalone_environment()
+        for key, invalid in (("NATRO_SOURCE_SHA", "a"*40), ("NATRO_SOURCE_TREE", "a"*40),
+                             ("VERSION_CODE", "208021384"), ("VERSION_NAME", "3.5.1")):
+            with self.subTest(key=key), patch.dict(os.environ, {**env, key: invalid}):
+                with self.assertRaises(ValueError):
+                    stage_natro_adb_candidate.main()
+                self.assertFalse(self.out.exists())
+
+    def test_standalone_checks_dirty_inputs_assets_and_skipped_tests(self):
+        env = self.standalone_environment()
+        with patch.dict(os.environ, env):
+            extra = self.index.with_name("untracked-input")
+            extra.write_text("not part of the requested tree")
+            with self.assertRaisesRegex(ValueError, "untracked build inputs"):
+                stage_natro_adb_candidate.main()
+            extra.unlink()
+            self.report.write_text('<testsuite tests="1906" failures="0" errors="0" skipped="1"/>')
+            with self.assertRaisesRegex(ValueError, "Full test suite"):
+                stage_natro_adb_candidate.main()
+            self.report.write_text('<testsuite tests="1906" failures="0" errors="0" skipped="0"/>')
+            self.write_apk(missing="lan/index.html")
+            with self.assertRaises(KeyError):
+                stage_natro_adb_candidate.main()
+            self.assertFalse(self.out.exists())
+
+    def test_standalone_validates_embedded_source_apk_identity_and_unsigned_state(self):
+        env = self.standalone_environment()
+        sdk = self.root / "sdk/build-tools/36.0.0"
+        signer = sdk / "apksigner"
+        original_signer = signer.read_text()
+        with patch.dict(os.environ, env):
+            for code, error in ((0, "must be unsigned"), (2, "SDK could not confirm")):
+                signer.write_text(f"#!/bin/sh\nexit {code}\n")
+                with self.subTest(code=code), self.assertRaisesRegex(ValueError, error):
+                    stage_natro_adb_candidate.main()
+                self.assertFalse(self.out.exists())
+            signer.write_text(original_signer)
+            aapt = sdk / "aapt"
+            original_aapt = aapt.read_text()
+            aapt.write_text(original_aapt.replace("208021385", "208021384"))
+            with self.assertRaisesRegex(ValueError, "APK identity"):
+                stage_natro_adb_candidate.main()
+            aapt.write_text(original_aapt)
+            self.write_apk()
+            with zipfile.ZipFile(self.apk, "a") as apk:
+                apk.writestr("META-INF/version-control-info.textproto", 'revision: "' + "a"*40 + '"')
+            with self.assertRaisesRegex(ValueError, "APK Git revision"):
+                stage_natro_adb_candidate.main()
+            self.assertFalse(self.out.exists())
 
 
 if __name__ == "__main__":

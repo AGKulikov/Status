@@ -39,10 +39,11 @@ def changed_hashes(before, after):
     return changed
 
 
-def check_manifest(aapt, baseline, updated):
+def check_manifest(aapt, baseline, updated, *, old_code=OLD_CODE, old_name=OLD_NAME,
+                   new_code=NEW_CODE, new_name=NEW_NAME):
     before = run(aapt, "dump", "badging", baseline).stdout
-    old = f"name='ru.yandex.yandexnavi' versionCode='{OLD_CODE}' versionName='{OLD_NAME}'"
-    new = f"name='ru.yandex.yandexnavi' versionCode='{NEW_CODE}' versionName='{NEW_NAME}'"
+    old = f"name='ru.yandex.yandexnavi' versionCode='{old_code}' versionName='{old_name}'"
+    new = f"name='ru.yandex.yandexnavi' versionCode='{new_code}' versionName='{new_name}'"
     if before.count(old) != 1 or run(aapt, "dump", "badging", updated).stdout != before.replace(old, new):
         raise ValueError("Navigator identity, application label, SDK or ABI differs from the reviewed update")
     def tree_without_versions(apk):

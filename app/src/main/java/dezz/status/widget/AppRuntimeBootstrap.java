@@ -9,7 +9,6 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
-import android.text.TextUtils;
 import android.util.Log;
 import android.widget.Toast;
 
@@ -23,8 +22,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
 
 import dezz.status.widget.climate.ClimatePanelService;
 import dezz.status.widget.climate.ScreenReservationStateStore;
@@ -32,7 +29,6 @@ import dezz.status.widget.driver.DriverPanelService;
 import dezz.status.widget.dim.DimMenuPanelService;
 import dezz.status.widget.hud.HudPresentationService;
 import dezz.status.widget.instrument.InstrumentDisplayLauncher;
-import dezz.status.widget.shell.PrivilegedShell;
 
 /**
  * Runtime startup shared by both the unified settings root and the legacy status-row editor.
@@ -40,8 +36,7 @@ import dezz.status.widget.shell.PrivilegedShell;
  * <p>The application icon now opens {@link SettingsHubActivity}, but opening a different screen
  * must not silently skip the recovery work that historically lived in {@link MainActivity}:
  * restarting an enabled overlay after process death, reconciling the global climate reservation,
- * surfacing a crash report once and granting head-unit permissions through the existing trusted
- * loopback shell when the vendor Settings application cannot do it.</p>
+ * and surfacing a crash report once. Android permission requests belong to the settings screen.</p>
  */
 public final class AppRuntimeBootstrap {
     private static final String TAG = "AppRuntimeBootstrap";
@@ -53,7 +48,6 @@ public final class AppRuntimeBootstrap {
                            @NonNull Preferences preferences) {
         reconcileServices(activity, preferences);
         maybeShowCrashReport(activity);
-        tryAutoGrant(activity.getApplicationContext(), preferences);
     }
 
     /**
@@ -128,103 +122,6 @@ public final class AppRuntimeBootstrap {
             } catch (RuntimeException error) {
                 Log.w(TAG, "Could not reconcile climate panel service", error);
             }
-        }
-    }
-
-    private static void tryAutoGrant(@NonNull Context appContext,
-                                     @NonNull Preferences preferences) {
-        PrivilegedShell.Request.Builder request =
-                PrivilegedShell.Request.forPackage(appContext.getPackageName());
-        boolean any = false;
-
-        if (!Permissions.checkOverlayPermission(appContext)) {
-            request.withOverlay();
-            any = true;
-        }
-        if (!Permissions.checkForMissingForegroundPermissions(appContext).isEmpty()) {
-            request.withForegroundLocation();
-            any = true;
-        }
-        if (!Permissions.isBackgroundLocationGranted(appContext)) {
-            request.withBackgroundLocation();
-            any = true;
-        }
-        if (!Permissions.isUsageAccessGranted(appContext)) {
-            request.withUsageAccess();
-            any = true;
-        }
-        boolean mediaPresent = BrickType.parseOrder(preferences.brickOrder.get())
-                .contains(BrickType.MEDIA);
-        if (mediaPresent && !Permissions.isNotificationAccessGranted(appContext)) {
-            request.withNotificationListener(PrivilegedShell.notificationListenerComponent(
-                    appContext.getPackageName(), MediaNotificationListener.class));
-            any = true;
-        }
-        String accessibilityComponent = PrivilegedShell.accessibilityServiceComponent(
-                appContext.getPackageName(), WidgetAccessibilityService.class);
-        if (!Permissions.isAccessibilityServiceEnabled(appContext, accessibilityComponent)) {
-            request.withAccessibility(accessibilityComponent);
-            any = true;
-        }
-        if (!any) return;
-
-        PrivilegedShell.get(appContext).ensurePrivileges(request.build(), result -> {
-            if (!result.transportAvailable) return;
-            if (result.anyGranted()) {
-                List<PrivilegedShell.PermissionKind> visibleGrants =
-                        successKindsForToast(result.grantedKinds);
-                if (!visibleGrants.isEmpty()) {
-                    Toast.makeText(appContext,
-                            appContext.getString(R.string.privileged_grant_success,
-                                    joinPermissionLabels(appContext, visibleGrants)),
-                            Toast.LENGTH_LONG).show();
-                }
-                reconcileServices(appContext, preferences);
-            }
-            if (result.anyFailed()) {
-                Toast.makeText(appContext,
-                        appContext.getString(R.string.privileged_grant_failed,
-                                joinPermissionLabels(appContext, result.failedKinds)),
-                        Toast.LENGTH_LONG).show();
-            }
-        });
-    }
-
-    /**
-     * Accessibility is maintained automatically on KX11 and may be restored after every head-unit
-     * boot. That background maintenance must not cover the settings screen with a success Toast.
-     * Failures remain visible, and unrelated permissions still announce a real first grant.
-     */
-    @NonNull
-    static List<PrivilegedShell.PermissionKind> successKindsForToast(
-            @NonNull List<PrivilegedShell.PermissionKind> grantedKinds) {
-        List<PrivilegedShell.PermissionKind> visible = new ArrayList<>(grantedKinds.size());
-        for (PrivilegedShell.PermissionKind kind : grantedKinds) {
-            if (kind != PrivilegedShell.PermissionKind.ACCESSIBILITY) visible.add(kind);
-        }
-        return visible;
-    }
-
-    @NonNull
-    private static String joinPermissionLabels(
-            @NonNull Context context,
-            @NonNull List<PrivilegedShell.PermissionKind> kinds) {
-        List<String> labels = new ArrayList<>(kinds.size());
-        for (PrivilegedShell.PermissionKind kind : kinds) {
-            labels.add(context.getString(permissionLabelRes(kind)));
-        }
-        return TextUtils.join(", ", labels);
-    }
-
-    private static int permissionLabelRes(@NonNull PrivilegedShell.PermissionKind kind) {
-        switch (kind) {
-            case OVERLAY: return R.string.permission_label_overlay;
-            case FOREGROUND_LOCATION: return R.string.permission_label_foreground_location;
-            case BACKGROUND_LOCATION: return R.string.permission_label_background_location;
-            case USAGE_ACCESS: return R.string.permission_label_usage_access;
-            case NOTIFICATION: return R.string.permission_label_notification;
-            case ACCESSIBILITY: return R.string.permission_label_accessibility;
-            default: throw new IllegalArgumentException("Unknown permission kind " + kind);
         }
     }
 
