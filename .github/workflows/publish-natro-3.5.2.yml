@@ -149,8 +149,13 @@ jobs:
           fi
           verify_tag
           gh api --paginate --slurp "$api/releases?per_page=100" > "$RUNNER_TEMP/releases.json"
-          id=$(jq -er --arg tag "$TAG" '[.[][] | select(.tag_name == $tag)] | if length == 0 then "new"
-            elif length == 1 then (.[0].id|tostring) else error("duplicate release") end' "$RUNNER_TEMP/releases.json")
+          id=$(jq -r '.existingReleaseId // empty' "$DOC/publish-input.json")
+          if [[ -n "$id" ]]; then
+            test "$id" = 451388551
+          else
+            id=$(jq -er --arg tag "$TAG" '[.[][] | select(.tag_name == $tag)] | if length == 0 then "new"
+              elif length == 1 then (.[0].id|tostring) else error("duplicate release") end' "$RUNNER_TEMP/releases.json")
+          fi
           if [[ "$id" == new ]]; then
             id=$(gh api --method POST "$api/releases" -f tag_name="$TAG" -f target_commitish="$SOURCE_SHA" \
               -f name='Natro 3.5.2 и Навигатор 30.3.0 Natro 3.5.2' -F draft=true -F prerelease=false \
@@ -158,12 +163,16 @@ jobs:
           fi
           release="$api/releases/$id"
           gh api "$release" > "$RUNNER_TEMP/existing-release.json"
-          jq -e --arg tag "$TAG" '.tag_name == $tag and .prerelease == false' "$RUNNER_TEMP/existing-release.json"
+          jq -e --arg tag "$TAG" --arg sha "$SOURCE_SHA" '
+            .prerelease == false and (.tag_name == $tag or
+              (.id == 451388551 and .tag_name == "untagged-f029b7a3d394edffddc9" and
+               .target_commitish == $sha and .draft == false))' "$RUNNER_TEMP/existing-release.json"
           if jq -e '.draft == true' "$RUNNER_TEMP/existing-release.json" > /dev/null; then
             jq -e --arg sha "$SOURCE_SHA" \
               '.target_commitish == $sha or (.id == 451341760 and .target_commitish == "983d7db44c2183f4198bef91de07c5f2668d7402")' \
               "$RUNNER_TEMP/existing-release.json"
-            gh api --method PATCH "$release" -f target_commitish="$SOURCE_SHA" -F "body=@$DOC/release-notes.md" > /dev/null
+            gh api --method PATCH "$release" -f tag_name="$TAG" -f target_commitish="$SOURCE_SHA" \
+              -F "body=@$DOC/release-notes.md" > /dev/null
           fi
           gh api "$release" | jq -e --arg sha "$SOURCE_SHA" '.target_commitish == $sha' > /dev/null
           gh api "$release" > "$RUNNER_TEMP/draft.json"
@@ -198,10 +207,12 @@ jobs:
             cmp "$file" "$readback/$name"
           done
           verify_tag
-          if jq -e '.draft' "$RUNNER_TEMP/assets.json" > /dev/null; then
-            gh api --method PATCH "$release" -F draft=false -F prerelease=false -f make_latest=true > /dev/null
+          if jq -e --arg tag "$TAG" '.draft or .tag_name != $tag' "$RUNNER_TEMP/assets.json" > /dev/null; then
+            gh api --method PATCH "$release" -f tag_name="$TAG" -f target_commitish="$SOURCE_SHA" \
+              -F draft=false -F prerelease=false -f make_latest=true > /dev/null
           fi
-          gh api "$api/releases/latest" | jq -e --argjson id "$id" '.id == $id and .draft == false and .prerelease == false'
+          gh api "$api/releases/latest" | jq -e --argjson id "$id" --arg tag "$TAG" --arg sha "$SOURCE_SHA" \
+            '.id == $id and .tag_name == $tag and .target_commitish == $sha and .draft == false and .prerelease == false'
       - name: Download the published pair as the Android update client
         run: |
           python3 .github/scripts/read_back_public_351.py --version 3.5.2 \
