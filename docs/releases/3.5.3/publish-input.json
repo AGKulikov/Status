@@ -1,0 +1,11 @@
+{
+  "sourceCommit": "0709102dde77476db9a3fa321232bbca904659aa",
+  "sourceTree": "eb2b72e21e130ee79fd9acbc24b0453fbf14987f",
+  "orchestratorCommit": "3fe3b64d61c9f1fc0840ccc3871416cf4c317df4",
+  "runId": 44564142108,
+  "runNumber": 1,
+  "artifactHashes": {
+    "Natro-3.5.3-offline-signing-1": "sha256:201718b7dd3d93261c8daf5777a05634f35ff0139162293cbfe2811865d17002",
+    "Natro-3.5.3-signing-tools-1": "sha256:053b2de5aea2b8673ee2b0780ead6e9ef91564186d3ac30d2188db5bf2536935"
+  }
+}
