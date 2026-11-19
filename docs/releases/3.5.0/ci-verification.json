@@ -1,0 +1,50 @@
+{
+  "sourceCommit": "a7e2f133c961e99a610703bbe14de5cbd7919d60",
+  "sourceTree": "a977b1c515cdeed81d947e67918c4a50471c3649",
+  "runId": 44458257627,
+  "jobId": 135338586358,
+  "runNumber": 4,
+  "conclusion": "success",
+  "toolTests": 291,
+  "artifactHashes": {
+    "Natro-3.5.0-offline-signing-4": "sha256:851d6ffdd5b6b2ff32e20258aa7c3a9e1a70ea44e4a5324382d0d70ffb0ced42",
+    "Natro-3.5.0-signing-tools-4": "sha256:e3070d93da320f17dfb19b9616c9970f63def265897e4f3591b65f037a68d841",
+    "natro-adb-lan-candidate-4": "sha256:11dbdace88c06e9bbdd0b2fe78336be349dfdc5d8f9dcb6c7a3e3400b782634e"
+  },
+  "publicNavigator349Sha256": "c2524e28f711260d9ed9d4ac563a4f42c69757247f2b669022aad30171f901c0",
+  "publicNavigator349BridgeSha256": "81d37552019e321e1f807874b040a22dff81de2949d613d5f6c82035ad1ebae0",
+  "androidSuites": 455,
+  "androidTests": {
+    "tests": 2332,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "regressionCases": {
+    "dezz.status.widget.navigation.StockManeuverCardStateTest": [
+      "hiddenUnknownAndWrongEpochNeverBecomeLegacy",
+      "publishedCompanionsAcceptTheirFramesAndRejectUnknownVersions",
+      "oversizeAndMalformedResourcesHideWholeCard",
+      "layersMasksAndOriginalContainerOverlapArePreserved",
+      "callbackFrameIsImmutableAndDoesNotInventMissingRows",
+      "commandSnapshotRoundTripDrivesHudWithoutBitmapAndHidesAtomically",
+      "followingLanePrefixIsOwnedByTheSameAuxiliaryFrame",
+      "originalResourceAndExactDistanceSurvive"
+    ],
+    "dezz.status.widget.files.FileManagerScreenTest": [
+      "loginDoesNotAllowLookalikeHostsOrUnencryptedRedirects",
+      "compactLayoutSwitchesPanesWithoutLosingLocation",
+      "recentDownloadCanBeLocatedAndCopiedFromTheRealPane",
+      "twoPanesAndRealSelectionRenderAtKx11Size"
+    ],
+    "dezz.status.widget.navigation.StockManeuverPackageTest": [
+      "installedRepackUsesSameArtworkOnlyWithProjectSignature"
+    ],
+    "dezz.status.widget.files.RecentFilesTest": [
+      "includesUnopenedDownloadsAndSameNamesAcrossVolumesInTimeOrder",
+      "keepsGlobalNewestAndReportsAnUnmountedRootWithoutDroppingRemainingFiles",
+      "leavingTheSectionCancelsScan"
+    ]
+  },
+  "field": "OPEN"
+}
