@@ -27,8 +27,8 @@ public final class StockManeuverResources {
 
     static boolean compatiblePackage(PackageInfo navigator, PackageManager manager, String host) {
         long installedCode = navigator.getLongVersionCode();
-        // 3.5.2 changes only the installed package version. Its 3.5.1 resources and commands are identical.
-        return (installedCode == 739564633L || StockManeuverCardState.supportsNavigator(installedCode))
+        // 3.5.2 and 3.5.3 retain the reviewed resources and maneuver command format.
+        return (installedCode == 739564634L || installedCode == 739564633L || StockManeuverCardState.supportsNavigator(installedCode))
                 && manager.checkSignatures(host, PACKAGE) == PackageManager.SIGNATURE_MATCH;
     }
     private Drawable get(String name) {

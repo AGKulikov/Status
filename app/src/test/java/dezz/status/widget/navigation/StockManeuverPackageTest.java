@@ -32,12 +32,12 @@ public class StockManeuverPackageTest {
         String host = "test.natro.host", navigator = "ru.yandex.yandexnavi";
         PackageManager pm = RuntimeEnvironment.getApplication().getPackageManager();
         install(pm, host, 22101, 1, "1234");
-        for (long code : new long[]{739564630L, 739564631L, 739564632L, 739564633L, 739564634L}) {
+        for (long code : new long[]{739564630L, 739564631L, 739564632L, 739564633L, 739564634L, 739564635L}) {
             install(pm, navigator, 22102, code, "1234");
-            assertEquals(code != 739564634L, StockManeuverResources.compatiblePackage(
+            assertEquals(code != 739564635L, StockManeuverResources.compatiblePackage(
                     pm.getPackageInfo(navigator, 0), pm, host));
         }
-        for (long code : new long[]{739564632L, 739564633L}) {
+        for (long code : new long[]{739564632L, 739564633L, 739564634L}) {
             install(pm, navigator, 22102, code, "5678");
             assertFalse(StockManeuverResources.compatiblePackage(pm.getPackageInfo(navigator, 0), pm, host));
         }

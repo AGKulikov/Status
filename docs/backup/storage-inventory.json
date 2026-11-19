@@ -265,7 +265,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/HudPanelSettingsActivity.java": {
-      "sha256": "78f7b5173d8fdfd730af961964be5441aaba8a87723f6876972fcd1f9db401fd",
+      "sha256": "4d3d6d745c7976a63ee29bb06019468eba890bc28574c7beba901190f56ac8af",
       "access_kinds": [
         "external_resource"
       ]
@@ -364,7 +364,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "55f541d1d358f030fd71889314ec7760f4d4b1a8b395ed99f0a7039cac683059",
+      "sha256": "59fa835950c984c59ed11c12227ad0bc0767f016d29b9565eb2adf5b32fd2b07",
       "access_kinds": [
         "files"
       ]
