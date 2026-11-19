@@ -1,0 +1,86 @@
+{
+  "sourceCommit": "af3199bc43bfe547729ef802e85a7e833e273b56",
+  "sourceTree": "c16d980a14d52b7f0d145dbab110802ca153326e",
+  "runId": 44497523069,
+  "jobId": 135468591187,
+  "runNumber": 2,
+  "conclusion": "success",
+  "artifactHashes": {
+    "Natro-3.5.1-signing-tools-2": "sha256:e3070d93da320f17dfb19b9616c9970f63def265897e4f3591b65f037a68d841",
+    "natro-adb-lan-candidate-2": "sha256:45d881e3488643cf3c455e34371828cf70d59e3ada576a85c61627caea8d4505",
+    "Natro-3.5.1-offline-signing-2": "sha256:4b7c5deca9d0a32d98ebfec50af4bcd18d97dd989a942cc54676168bcac3edc3"
+  },
+  "toolTests": 300,
+  "toolFailures": 0,
+  "toolErrors": 0,
+  "toolSkipped": 0,
+  "androidSuites": 455,
+  "androidTests": {
+    "tests": 2339,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "field": "OPEN",
+  "regressionCases": {
+    "dezz.status.widget.navigation.StockManeuverCardStateTest": [
+      "hiddenUnknownAndWrongEpochNeverBecomeLegacy",
+      "publishedCompanionsAcceptTheirFramesAndRejectUnknownVersions",
+      "oversizeAndMalformedResourcesHideWholeCard",
+      "layersMasksAndOriginalContainerOverlapArePreserved",
+      "callbackFrameIsImmutableAndDoesNotInventMissingRows",
+      "commandSnapshotRoundTripDrivesHudWithoutBitmapAndHidesAtomically",
+      "followingLanePrefixIsOwnedByTheSameAuxiliaryFrame",
+      "originalResourceAndExactDistanceSurvive"
+    ],
+    "dezz.status.widget.files.FileManagerScreenTest": [
+      "loginDoesNotAllowLookalikeHostsOrUnencryptedRedirects",
+      "compactLayoutSwitchesPanesWithoutLosingLocation",
+      "recentDownloadCanBeLocatedAndCopiedFromTheRealPane",
+      "recentCardsExpandAndRememberDocumentTypes",
+      "twoPanesAndRealSelectionRenderAtKx11Size"
+    ],
+    "dezz.status.widget.files.RecentFilesTest": [
+      "splitsMinutesThenHoursThenDaysAndPreservesTypesFoldersAndVolumes",
+      "skipsPrivateAndThumbnailTreesRegardlessOfHiddenFilesOption",
+      "usesModificationTimeWithin31DaysEvenAfterReadOrFreshCreation",
+      "twoHundredThirtyNewerServiceFilesCannotDisplaceUnopenedApk",
+      "incompleteVolumeDoesNotInvalidateAnotherVolumeAndCancelStopsScan",
+      "optionalTypesOnlyAdmitRecognisedDocumentsAndRespectEmptySelection",
+      "keepsFullGroupAndFourNewestPreviewsPlusOtherSources",
+      "exactlyEightScreenshotsAreOneCardAndQueryReachesBeyondPreview"
+    ],
+    "dezz.status.widget.navigation.NavigationHudV2ContractTest": [
+      "settingsExposeIndependentMapsAndNavigatorWindowButton",
+      "hudAndClusterMapEditorsUseVisualControlsForEveryCameraValue",
+      "featureAwareMapKitOrderIsDefaultAndManualOrderIsSafe",
+      "existingIndependentNavigationElementsRemainAvailable",
+      "legacyManeuverAuxiliaryColorsMigrateWithoutReturningToBlue",
+      "endpointRequestsFreshStateAfterAuthenticatedHello",
+      "bootAdmitsAutostartHudBeforeTheIntegrationGraph",
+      "externalMapsAlwaysUseNightAcrossLegacyImportAndRoundTrip",
+      "exactVisibleManeuverArtworkIsIdentityKeyedAndNeverGuessed",
+      "navigatorPatchHasButtonAndConsumesExistingNatroWindowContract",
+      "abandonedFrameCopyBridgeCannotReturn",
+      "natroTargetsTheSameNewMapActivityForWindowAndFullscreen",
+      "legacyCameraDirectionScaleMigratesToIndependentLengthAndWidth",
+      "opaquePickerColorsAreCanonicalizedBeforePersistence",
+      "nonFiniteMapValuesRestoreFieldDefaults",
+      "legacyRouteTurnScaleMigratesToLengthAndHeadWithoutForcingColors",
+      "externalMapResizePublishesANewViewportGenerationWithoutDetachGap",
+      "legacyRouteOnlyLabelsMigrateToNativeYandexLabels",
+      "legacyLayerPresetMigratesAndPolylineArrowsFollowRoutePriority",
+      "sharpnessAuditHasNoRepeatedNavigationBitmapResize",
+      "stockRoadLabelsAndCursorFollowCanonicalRouteState",
+      "routeProgressIsReversibleWithoutRecreatingGeometry",
+      "bridgeRequiresDirectSurfaceAndSnapshotCapabilities",
+      "fastSnapshotAndRouteGeometryUseSeparateVersionedPayloads",
+      "mapSurfacesShowOnCurrentUpdateWithoutTileOrReadbackGates",
+      "exportedNatroEndpointAuthenticatesHelloThenPinsUidAndSession",
+      "mainAndHudProfilesAreIndependentAndRoundTrip",
+      "navigatorBindsToNatroAndPreservesExistingWindowCommands",
+      "independentHudElementsConsumeDirectBridgeState",
+      "hudSpeedWakeIsBoundedAndYandexCameraFallbackIsIndependent"
+    ]
+  }
+}

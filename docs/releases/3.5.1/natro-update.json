@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "channel": "stable",
+  "package": "ru.natro.statuswidget",
+  "versionCode": 208021384,
+  "versionName": "3.5.1",
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "sha256": "6ccef64a124daa2e7bcbff66aaf92d624d1a1dac7ee2fb91d1e67d464b955726",
+  "size": 30009952,
+  "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.5.1/Natro-3.5.1-signed.apk"
+}

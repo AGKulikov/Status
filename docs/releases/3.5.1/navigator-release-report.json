@@ -1,0 +1,32 @@
+{
+  "sourceCommit": "af3199bc43bfe547729ef802e85a7e833e273b56",
+  "sourceTree": "c16d980a14d52b7f0d145dbab110802ca153326e",
+  "ciRunId": "44497523069",
+  "apk": "Navigator-30.3.0-Natro-3.5.1-signed.apk",
+  "package": "ru.yandex.yandexnavi",
+  "versionName": "30.3.0 Natro 3.5.1",
+  "versionCode": 739564632,
+  "previousVersionCode": 739564631,
+  "previousSha256": "c2524e28f711260d9ed9d4ac563a4f42c69757247f2b669022aad30171f901c0",
+  "sha256": "b8059680598ddd2c4f35c25979f025f4034a7a0513d0535262948713f5e7e0ea",
+  "size": 156497514,
+  "changedPayload": [
+    "AndroidManifest.xml",
+    "classes19.dex",
+    "classes3.dex"
+  ],
+  "changedEntryHashes": {
+    "AndroidManifest.xml": "e1042e7c149090c9726aa359ec483b831ed432c5bc0e95a087769c72351ab24b",
+    "classes19.dex": "6ab22b24d9f70ed99ca7ae92a182e1106885095265daa9493f7110dddeb9f780",
+    "classes3.dex": "93d44242faae6cc35e9345347c9fe2d5d7ea3786eb54a157c65a9a177d453fc4"
+  },
+  "unchangedPayloadEntries": 17224,
+  "manifestSemanticsOnlyVersionChanged": true,
+  "ciBridgeSha256": "6ab22b24d9f70ed99ca7ae92a182e1106885095265daa9493f7110dddeb9f780",
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "signatureV2": true,
+  "signatureV3": true,
+  "exactApi28": true,
+  "zipalign16KiB": true,
+  "physicalKx11Verification": "pending"
+}
