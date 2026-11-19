@@ -1,0 +1,84 @@
+name: Prepare empty Natro 3.5.2 release draft
+on:
+  push:
+    branches: ['ci/natro-3.5.2']
+    paths: ['docs/releases/3.5.2/draft-input.json']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-natro-3.5.2
+  cancel-in-progress: false
+
+jobs:
+  draft:
+    if: github.repository == 'AGKulikov/Status'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    outputs:
+      id: ${{ steps.release.outputs.id }}
+      target: ${{ steps.release.outputs.target }}
+      url: ${{ steps.release.outputs.url }}
+      status: ${{ steps.release.outputs.status }}
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+          sparse-checkout: docs/releases/3.5.2/draft-input.json
+          sparse-checkout-cone-mode: false
+      - name: Verify the release source and prepare its empty draft
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: AGKulikov/Status
+          TAG: natro-v3.5.2
+        run: |
+          set -euo pipefail
+          api="repos/$GH_REPO"
+          input=docs/releases/3.5.2/draft-input.json
+          source=$(jq -er '.sourceCommit | select(test("^[0-9a-f]{40}$"))' "$input")
+          tree=$(jq -er '.sourceTree | select(test("^[0-9a-f]{40}$"))' "$input")
+          verify_source() {
+            gh api "$api/git/ref/heads/release/natro-3.5.2" |
+              jq -e --arg sha "$source" '.object.type == "commit" and .object.sha == $sha' > /dev/null
+          }
+          verify_tag_if_present() {
+            gh api "$api/git/matching-refs/tags/$TAG" |
+              jq -e --arg ref "refs/tags/$TAG" --arg sha "$source" '
+                all(.[] | select(.ref == $ref); .object.type == "commit" and .object.sha == $sha)' > /dev/null
+          }
+          draft_ids() {
+            gh api --paginate --slurp "$api/releases?per_page=100" |
+              jq -cer --arg tag "$TAG" '[.[][] | select(.tag_name == $tag) | .id] | select(length <= 1)'
+          }
+          verify_source
+          gh api "$api/git/commits/$source" | jq -e --arg tree "$tree" '.tree.sha == $tree' > /dev/null
+          github_dir=$(gh api "$api/git/trees/$tree" | jq -er '
+            select(.truncated == false) | [.tree[] | select(.path == ".github")] |
+            if length == 0 then "none" elif (length == 1 and .[0].type == "tree") then .[0].sha
+            else error("Unexpected .github entry") end')
+          if [[ "$github_dir" != none ]]; then
+            gh api "$api/git/trees/$github_dir" | jq -e '
+              .truncated == false and all(.tree[]; .path != "workflows")' > /dev/null
+          fi
+          verify_tag_if_present
+          ids=$(draft_ids)
+          if [[ "$ids" == '[]' ]]; then
+            gh release create "$TAG" --repo "$GH_REPO" --draft --target "$source" \
+              --title 'Natro 3.5.2 и Навигатор 30.3.0 Natro 3.5.2' \
+              --notes 'Черновик выпуска 3.5.2. Проверенные файлы будут добавлены после подписания.'
+            ids=$(draft_ids)
+          fi
+          id=$(jq -er 'select(length == 1) | .[0] | numbers' <<< "$ids")
+          draft=$(gh api "$api/releases/$id")
+          jq -e --arg sha "$source" --arg tag "$TAG" '
+            .tag_name == $tag and .target_commitish == $sha and .draft == true and
+            .prerelease == false and .published_at == null and (.assets | length == 0)' <<< "$draft" > /dev/null
+          verify_source
+          verify_tag_if_present
+          url=$(jq -er '.html_url' <<< "$draft")
+          printf 'id=%s\ntarget=%s\nurl=%s\nstatus=draft\n' "$id" "$source" "$url" >> "$GITHUB_OUTPUT"
+          printf 'Draft [%s](%s) on commit %s, with zero assets.\n' "$id" "$url" "$source" >> "$GITHUB_STEP_SUMMARY"
