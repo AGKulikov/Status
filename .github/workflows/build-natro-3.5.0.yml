@@ -2,7 +2,7 @@ name: Build Natro 3.5.0 update candidate
 on:
   push:
     branches: ['release/natro-3.5.0']
-    paths: ['app/**', 'navigator-mod/**', 'music-mod/**', 'tools/**', 'wechat-compat/**', 'settings.gradle', 'build.gradle', '.github/workflows/build-natro-3.5.0.yml']
+    paths: ['app/**', 'navigator-mod/**', 'music-mod/**', 'tools/**', 'docs/backup/storage-inventory.json', 'wechat-compat/**', 'settings.gradle', 'build.gradle', '.github/workflows/build-natro-3.5.0.yml']
 permissions:
   contents: read
 concurrency:
