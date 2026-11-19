@@ -6203,3 +6203,8 @@ SOURCE/TEST/APK/PUBLISH PASS, FIELD установки/возврата/отме
 2332 тестов приложения без пропусков и ошибок. SOURCE/TEST/APK PASS.
 FIELD по обоим экранам и съёмному носителю остаётся открытой.
 [Подписанная сборка и доказательства](docs/releases/3.5.0/README_RU.md).
+
+Публикация 3.5.0 подтверждена 19.11.2026. Stable/latest в GitHub указывает на
+`natro-v3.5.0` с исходным коммитом `a7e2f133c961e99a610703bbe14de5cbd7919d60`.
+APK и манифест из публичного канала побайтно совпали с локально проверенными файлами.
+PUBLISH PASS, FIELD OPEN. [Проверка канала](docs/releases/3.5.0/publication-verification.json).

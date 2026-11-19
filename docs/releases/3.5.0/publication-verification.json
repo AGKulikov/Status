@@ -1,0 +1,54 @@
+{
+  "sourceCommit": "a7e2f133c961e99a610703bbe14de5cbd7919d60",
+  "sourceTree": "a977b1c515cdeed81d947e67918c4a50471c3649",
+  "ciRun": 44458257627,
+  "publisherRun": 44459500429,
+  "publisherJob": 135342542222,
+  "publisherConclusion": "success",
+  "releaseId": 450885234,
+  "tag": "natro-v3.5.0",
+  "latest": true,
+  "draft": false,
+  "prerelease": false,
+  "publishedAt": "2026-11-19T04:37:13Z",
+  "url": "https://github.com/AGKulikov/Status/releases/tag/natro-v3.5.0",
+  "assets": [
+    {
+      "file": "Natro-3.5.0-signed.apk",
+      "bytes": 30001760,
+      "sha256": "sha256:e5cdb6ccf98d0687bb2dfa896d817acd51efc56a44405c921ca08729c985f234"
+    },
+    {
+      "file": "Natro-3.5.0-source.tar.gz",
+      "bytes": 37476576,
+      "sha256": "sha256:29ac16f8cfe5d37e789a16e2ae1d9be49ef41f2ce7cdc01c346641c78563a003"
+    },
+    {
+      "file": "natro-update.json",
+      "bytes": 426,
+      "sha256": "sha256:4dc026634159909f755a79d92b8e75a4332149101efd0dbe7733f0d288ffd5c8"
+    },
+    {
+      "file": "README_RU.md",
+      "bytes": 2572,
+      "sha256": "sha256:2733ebd362b49f78fd9bfb47565771d317f1b32541496a71847bc9b03cc6a201"
+    },
+    {
+      "file": "release-report.json",
+      "bytes": 2651,
+      "sha256": "sha256:190cfd25c6866db42994866998c8072f634e67f795ad0a7101f5540a49fde678"
+    },
+    {
+      "file": "SHA256SUMS.txt",
+      "bytes": 523,
+      "sha256": "sha256:638632494409940872ac4bf5cc23ba9e830f475438ccd89881ee6406d0e39be8"
+    },
+    {
+      "file": "signature-verification.txt",
+      "bytes": 2341,
+      "sha256": "sha256:64e2120c2d8b27ca604ab56544853b36687e6b327c2c94b2b4c5c4e33b47f9c9"
+    }
+  ],
+  "publicReadback": "Published APK and manifest downloaded again and byte-compared with the verified offline release; both identical",
+  "field": "OPEN"
+}

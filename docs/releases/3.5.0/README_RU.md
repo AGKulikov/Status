@@ -32,3 +32,7 @@ Natro принимает штатные ресурсы для HUD и прибо�
 [Исходный код](https://github.com/AGKulikov/Status/commit/a7e2f133c961e99a610703bbe14de5cbd7919d60) · [Сборка и тесты](https://github.com/AGKulikov/Status/actions/runs/44458257627)
 
 [Отчёт APK](release-report.json) · [Результаты тестов](ci-verification.json)
+
+Канал обновлений проверен 19 ноября 2026 года. Выпуск опубликован как stable/latest.
+Опубликованные APK и манифест скачаны повторно и побайтно совпали с подписанной сборкой.
+[Скачать обновление](https://github.com/AGKulikov/Status/releases/tag/natro-v3.5.0) · [Проверка публикации](publication-verification.json).
