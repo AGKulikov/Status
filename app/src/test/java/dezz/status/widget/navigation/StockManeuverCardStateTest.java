@@ -8,7 +8,7 @@ import dezz.status.widget.hud.HudElementType;
 import dezz.status.widget.hud.HudNavigationState;
 
 public final class StockManeuverCardStateTest {
-    private JSONObject frame() throws Exception {
+    static JSONObject frame() throws Exception {
         return new JSONObject().put("schema", 1).put("routeEpoch", 3).put("visible", true)
                 .put("package", "ru.yandex.yandexnavi").put("versionCode", 739564630)
                 .put("generation", 5).put("revision", 11)

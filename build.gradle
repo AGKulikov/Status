@@ -34,6 +34,9 @@ int getVersionCode() {
         return explicitCode.toInteger()
     }
     def version = getVersionName()
+    if (version == '3.5.2') {
+        return 208021385
+    }
     // Every public release gets a distinct versionName. 2.2.11 arms media before the shared boot
     // lane and coalesces repeated ECARX QuickBoot events instead of restarting the user delay.
     if (version == '2.2.5') {

@@ -1130,3 +1130,7 @@ The only new migration allowance is source3.4.7/code208021380 to target3.4.8/cod
 ### Review14.11.2026 — UPDATE-CENTER-349
 
 NatroUpdater: только прежний cache/updates с раздельными префиксами APK; временный файл при ошибке удаляется, кандидаты/прогресс/автооткрытие только RAM и transient Activity savedInstanceState. APK не входят в переносимую копию, после process death не устанавливаются автоматически. Нет новых настроек, ключей, persistent roots или адаптеров. Проверка APK выполняется вне status-lock. BackupDefaultsMigration разрешает335…381→382 иsame382; keys/effective/explicit/unknown сохраняются;334/383 отклоняются отдельным тестом, прежние тесты сохранены. Fingerprints этих двух owners пересмотрены по diff, не доказательство FIELD restore.
+
+### 19.11.2026 — восстановление настроек в Natro 3.5.2
+
+Для целевого `versionCode 208021385` разрешено восстановление копий с поддерживаемыми кодами, включая Natro 3.5.1 (`208021384`). Формат архива, имена ключей, их значения по умолчанию и обработка неизвестных настроек сохранены. Пересмотрен отпечаток `BackupDefaultsMigration`. Проверка восстановления на ECARX KX11 остаётся открытой.
