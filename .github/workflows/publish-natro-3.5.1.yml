@@ -3,7 +3,9 @@ name: Publish verified Natro and Navigator 3.5.1
 on:
   push:
     branches: ['release/natro-3.5.1']
-    paths: ['docs/releases/3.5.1/ci-verification.json']
+    paths:
+      - docs/releases/3.5.1/ci-verification.json
+      - .github/workflows/publish-natro-3.5.1.yml
 
 permissions:
   actions: read
@@ -118,14 +120,28 @@ jobs:
           retention-days: 14
       - name: Read back the complete paired draft and publish both updates together
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.NATRO_351_RELEASE_TOKEN || github.token }}
+          USING_JOB_TOKEN: ${{ secrets.NATRO_351_RELEASE_TOKEN == '' }}
         run: |
           set -euo pipefail
           OUT="$RUNNER_TEMP/release"
           READBACK="$RUNNER_TEMP/readback"
           mkdir "$READBACK"
+          # Create the tag separately so we can distinguish a tag refusal from a release refusal.
+          TAG_API="repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG"
+          if ! gh api "$TAG_API" > "$RUNNER_TEMP/tag.json"; then
+            if ! gh api --method POST "repos/$GITHUB_REPOSITORY/git/refs" \
+                -f ref="refs/tags/$RELEASE_TAG" -f sha="$SOURCE_SHA" > /dev/null; then
+              if [[ "$USING_JOB_TOKEN" == true ]]; then
+                echo "::error::The job token could not create the signed source tag. Create $RELEASE_TAG at $SOURCE_SHA or configure the repository release secret NATRO_351_RELEASE_TOKEN, then rerun this job."
+              fi
+              exit 1
+            fi
+            gh api "$TAG_API" > "$RUNNER_TEMP/tag.json"
+          fi
+          jq -e --arg source "$SOURCE_SHA" '.object.type == "commit" and .object.sha == $source' "$RUNNER_TEMP/tag.json"
           if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft --target "$SOURCE_SHA" \
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --target "$SOURCE_SHA" \
               --title 'Natro 3.5.1 и Навигатор 30.3.0 Natro 3.5.1' --notes-file "$DOC/release-notes.md"
           fi
           gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json targetCommitish,isDraft,isPrerelease,assets > "$RUNNER_TEMP/publication.json"
