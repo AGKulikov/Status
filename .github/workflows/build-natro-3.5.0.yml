@@ -17,7 +17,6 @@ jobs:
       VERSION_CODE: '208021383'
       ALLOW_UNSIGNED_RELEASE: 'true'
       HELPER_CHANGED: 'false'
-      REUSE_NAVIGATOR_349: 'true'
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
       - name: Enforce REL-004 before build
@@ -63,6 +62,8 @@ jobs:
           export NATRO_ANDROID_JSON_JAR="$JSON_JAR"
           python3 -m unittest discover -s tools/tests -q
       - name: Stage exact candidate and signing tools
+        env:
+          REUSE_NAVIGATOR_349: 'true'
         run: python3 tools/stage_natro_adb_candidate.py
       - name: Upload verified unsigned candidate
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

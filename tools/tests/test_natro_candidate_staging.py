@@ -26,7 +26,8 @@ class CandidateStagingTest(unittest.TestCase):
             "RUNNER_TEMP": str(self.root), "ANDROID_HOME": str(self.root / "sdk"),
             "GITHUB_SHA": "a" * 40, "GITHUB_RUN_ID": "123",
             "REUSE_NAVIGATOR_300": "false", "REUSE_NAVIGATOR_302": "false",
-            "REUSE_NAVIGATOR_339": "false", "ALICE_ENGINE_HOOKS": "false",
+            "REUSE_NAVIGATOR_339": "false", "REUSE_NAVIGATOR_349": "false",
+            "ALICE_ENGINE_HOOKS": "false",
             "HELPER_CHANGED": "false",
         })
         self.environment.start()
@@ -118,6 +119,29 @@ class CandidateStagingTest(unittest.TestCase):
     def test_339_reuse_refuses_a_different_navigator_patch(self):
         with patch.dict(os.environ, {"REUSE_NAVIGATOR_339": "true"}):
             with self.assertRaisesRegex(ValueError, "exact verified 3.3.9 patch"):
+                self.stage()
+        self.assertFalse((self.out / "candidate.json").exists())
+
+    def test_reuses_published_349_only_when_compiled_bridge_matches(self):
+        published = self.root / "docs/releases/3.4.9/navigator-release-report.json"
+        published.parent.mkdir(parents=True)
+        digest = hashlib.sha256(self.dex.read_bytes()).hexdigest()
+        published.write_text(json.dumps({
+            "ciBridgeSha256": digest, "versionName": "30.3.0 Natro 3.4.9", "sha256": "a" * 64,
+        }))
+        with patch.dict(os.environ, {"REUSE_NAVIGATOR_349": "true"}):
+            self.stage()
+        nav = json.loads((self.out / "candidate.json").read_text())["navigator"]
+        self.assertFalse(nav["pairRequired"])
+        self.assertEqual("a" * 64, nav["baselineSha256"])
+        self.assertEqual([], nav["allowedPayloadChanges"])
+
+    def test_changed_349_bridge_requires_separate_navigator_release(self):
+        published = self.root / "docs/releases/3.4.9/navigator-release-report.json"
+        published.parent.mkdir(parents=True)
+        published.write_text(json.dumps({"ciBridgeSha256": "0" * 64}))
+        with patch.dict(os.environ, {"REUSE_NAVIGATOR_349": "true"}):
+            with self.assertRaisesRegex(ValueError, "bridge differs"):
                 self.stage()
         self.assertFalse((self.out / "candidate.json").exists())
 
