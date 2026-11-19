@@ -104,7 +104,7 @@ final class PrimaryTurnObserver {
         }
         long now = SystemClock.elapsedRealtime();
         currentTurns = candidates(turns, lane, frame);
-        if (latest != null && (now - latest.sampledAt > PrimaryTurnSample.FRESH_MS || !sceneStillCurrent())) {
+        if (latest != null && (now - latest.sampledAt > PrimaryTurnSample.FRESH_MS || !sceneStillCurrent(scene, false))) {
             latest = null;
         }
         if (currentTurns.isEmpty() || !view.isShown() || !view.isAttachedToWindow() || secure(view)) {
@@ -224,6 +224,7 @@ final class PrimaryTurnObserver {
         final View source;
         Object backing;
         long bufferGeneration;
+        boolean projectionVerified = true;
         final List<StockTurnTextures.Texture> textures;
         final List<RouteTurnFrame> turns;
         final ArrayList<PointF> points = new ArrayList<>();
@@ -243,7 +244,7 @@ final class PrimaryTurnObserver {
 
     // Any alternative newly visible in the camera or the source factory invalidates the
     // sample, even when the winning turn and its own texture are still unchanged.
-    private boolean sceneStillCurrent() {
+    private boolean sceneStillCurrent(ObservedScene scene, boolean validateCaptureProjection) {
         if (scene == null || scene.turns.size() != currentTurns.size()
                 || !scene.textures.equals(StockTurnTextures.forWindow(window))) return false;
         try {
@@ -268,7 +269,7 @@ final class PrimaryTurnObserver {
                 PointF before = scene.points.get(i), after = project(window, current);
                 boolean visible = inViewport(after, scene.width, scene.height);
                 if (visible != inViewport(before, scene.width, scene.height)) return false;
-                if (visible && (Math.abs(before.x - after.x) > 2 || Math.abs(before.y - after.y) > 2)) return false;
+                if (validateCaptureProjection && visible && (Math.abs(before.x - after.x) > 2 || Math.abs(before.y - after.y) > 2)) return false;
             }
             return true;
         } catch (Exception changed) {
@@ -391,6 +392,7 @@ final class PrimaryTurnObserver {
             Bitmap copy = target;
             nativeRequests++;
             PixelCopy.request(surface, crop, copy, status -> {
+                if (generation == ticket) captured.projectionVerified &= sceneStillCurrent(captured, true);
                 if (status != PixelCopy.SUCCESS || generation != ticket) {
                     nativeRequests--;
                     copy.recycle();
@@ -464,11 +466,18 @@ final class PrimaryTurnObserver {
         if (ticket != generation) return;
         pending = false;
         cancelTimeout();
-        latest = null;
-        scene = captured;
+        // Screen coordinates matter while identifying a new bitmap. A confirmed sample
+        // already has a route position and can move on screen until its original expiry.
+        boolean captureCurrent = captured.projectionVerified && sceneStillCurrent(captured, false);
+        boolean retainDuringMotion = !captureCurrent && latest != null
+                && SystemClock.elapsedRealtime() - latest.sampledAt < PrimaryTurnSample.FRESH_MS
+                && primaryView.isShown() && primaryView.isAttachedToWindow() && !secure(primaryView)
+                && sceneStillCurrent(scene, false);
+        if (!retainDuringMotion) latest = null;
         if (hit != null && SystemClock.elapsedRealtime() - at <= PrimaryTurnSample.FRESH_MS
                 && primaryView.isShown() && primaryView.isAttachedToWindow() && !secure(primaryView)
-                && sceneStillCurrent()) {
+                && captureCurrent) {
+            scene = captured;
             latest = new PrimaryTurnSample(hit.turn, hit.texture, at, epoch);
         }
         if (latest == null) scene = null;

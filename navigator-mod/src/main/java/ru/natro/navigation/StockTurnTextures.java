@@ -27,9 +27,11 @@ public final class StockTurnTextures {
         final float anchorX, anchorY;
         final boolean combined;
         final long revision;
+        final CombinedLaneArtwork artwork;
 
         Texture(Bitmap bitmap, Object provider, float anchorX, float anchorY,
-                boolean combined, long revision) {
+                boolean combined, long revision, CombinedLaneArtwork artwork) {
+            this.artwork = artwork;
             this.bitmap = bitmap;
             this.provider = provider;
             this.anchorX = anchorX;
@@ -82,16 +84,21 @@ public final class StockTurnTextures {
                 // The pinned createTexture() allocates a new ARGB bitmap, draws it once and returns
                 // ImageProvider.fromBitmap. Read the matching normalized anchor after that layout.
                 // A failed observation of a replacement must relinquish the previous texture.
-                remove(owner);
-                if (provider == null) return null;
-                Object anchor = anchorMethod.invoke(view);
-                float ax = ((Number) x.invoke(anchor)).floatValue();
-                float ay = ((Number) y.invoke(anchor)).floatValue();
-                Bitmap bitmap = (Bitmap) image.invoke(provider);
-                if (ax >= 0 && ax <= 1 && ay >= 0 && ay <= 1 && bitmap != null
-                        && !bitmap.isRecycled() && bitmap.getWidth() > 0 && bitmap.getHeight() > 0
-                        && (long) bitmap.getWidth() * bitmap.getHeight() <= MAX_PIXELS) {
-                    record(window, owner, bitmap, provider, ax, ay, combined);
+                boolean recorded = false;
+                try {
+                    if (provider == null) return null;
+                    Object anchor = anchorMethod.invoke(view);
+                    float ax = ((Number) x.invoke(anchor)).floatValue();
+                    float ay = ((Number) y.invoke(anchor)).floatValue();
+                    Bitmap bitmap = (Bitmap) image.invoke(provider);
+                    if (ax >= 0 && ax <= 1 && ay >= 0 && ay <= 1 && bitmap != null
+                            && !bitmap.isRecycled() && bitmap.getWidth() > 0 && bitmap.getHeight() > 0
+                            && (long) bitmap.getWidth() * bitmap.getHeight() <= MAX_PIXELS) {
+                        record(window, owner, bitmap, provider, ax, ay, combined, view);
+                        recorded = true;
+                    }
+                } finally {
+                    if (!recorded) remove(owner);
                 }
             }
             return provider;
@@ -126,10 +133,17 @@ public final class StockTurnTextures {
     }
 
     private static synchronized void record(WeakReference<Object> window, Object owner, Bitmap bitmap,
-                                            Object provider, float ax, float ay, boolean combined) {
+                                            Object provider, float ax, float ay, boolean combined, Object view) {
+        for (Capture capture : captures) {
+            Texture old = capture.texture;
+            if (capture.view.get() == owner && capture.window.get() == window.get()
+                    && old.anchorX == ax && old.anchorY == ay && old.combined == combined
+                    && !old.bitmap.isRecycled() && old.bitmap.sameAs(bitmap)) return;
+        }
+        CombinedLaneArtwork artwork = combined ? CombinedLaneArtwork.capture(view, bitmap) : null;
         remove(owner);
         if (captures.size() == MAX_TEXTURES) captures.remove(0);
-        captures.add(new Capture(window, owner, new Texture(bitmap, provider, ax, ay, combined, ++sequence)));
+        captures.add(new Capture(window, owner, new Texture(bitmap, provider, ax, ay, combined, ++sequence, artwork)));
     }
 
     private static synchronized void remove(Object owner) {

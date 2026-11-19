@@ -311,6 +311,12 @@ public class PrimaryTurnReplay {
             check(s!=null && s.texture==revision,"fresh texture confirmed at same turn");break;
         case "changed_during_callback":
             poll();select(texture(2));complete(0);check(poll()==null,"revision changed before callback");break;
+        case "confirmed_motion":
+            poll();complete(0);s=poll();check(s!=null,"baseline confirmed");
+            window.dx=6;check(poll()==s,"camera pan must not erase confirmed route position");
+            advance(350);poll();window.dx=10;complete(0);
+            check(poll()==s,"in-flight pan retains previous confirmation without renewing it");
+            SystemClock.now+=901;check(poll()==null,"continued motion cannot renew old evidence");break;
         case "wrong_projection":
             poll();window.dx=8;complete(0);check(poll()==null,"camera moved while pixels copied");break;
         case "competitor_moved":
@@ -450,7 +456,7 @@ class PrimaryTurnObserverTest(unittest.TestCase):
     def test_captures_and_lifecycle(self):
         for case in ['surface','textureView','vulkan','api28','epoch','new_texture','changed_during_callback','foreign_surface','nested_surface',
                      'surface_swap','buffer_resize','buffer_destroy','texture_buffer_swap',
-                     'wrong_projection','competitor_moved','ambiguous','adjacent','anchor','lane_site','view_hidden','secure','detached','passed','age',
+                     'confirmed_motion','wrong_projection','competitor_moved','ambiguous','adjacent','anchor','lane_site','view_hidden','secure','detached','passed','age',
                      'budget','far_unique','large_budget','hung','outstanding','busy_worker','request_throw','cached_scope','added_alternative','added_texture']:
             with self.subTest(case=case):
                 self.run_case(case)

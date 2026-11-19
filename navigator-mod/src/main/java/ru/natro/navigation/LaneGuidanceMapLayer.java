@@ -217,7 +217,7 @@ final class LaneGuidanceMapLayer {
         if (proof != null && latestRouteActive && (proof.texture.combined ? enabled : showRouteTurns)
                 && SystemClock.elapsedRealtime() - proof.sampledAt < PrimaryTurnSample.FRESH_MS) {
             try {
-                turnPlacemark.show(ensureCollection(), proof, scalePercent, zIndex, placementCoordinator);
+                turnPlacemark.show(ensureCollection(), proof, scalePercent, zIndex, placementCoordinator, appearance);
                 turnVisible = true;
             } catch (Exception failure) {
                 Log.w(TAG, "Cannot draw the verified primary maneuver at its route point", failure);

@@ -767,11 +767,11 @@ public final class InstrumentPanelSettingsActivity extends dezz.status.widget.se
         SliderField laneGuidanceScale = slider(content,
                 "Размер знаков движения по полосам",
                 map.laneGuidanceScalePercent, 50, 250, 5, " %");
-        content.addView(section("Оформление знака полос"), marginTop(12));
+        content.addView(section("Оформление знаков по полосам и таблички у поворота"), marginTop(12));
         OptionalColorButton laneCardColor = new OptionalColorButton(this, content,
                 "Цвет таблички", map.laneGuidanceCardColor);
         OptionalColorButton laneSignsColor = new OptionalColorButton(this, content,
-                "Цвет стрелок", map.laneGuidanceSignsColor);
+                "Цвет стрелок и текста", map.laneGuidanceSignsColor);
         OptionalColorButton laneBorderColor = new OptionalColorButton(this, content,
                 "Цвет обводки", map.laneGuidanceBorderColor);
         SliderField laneBorderWidth = slider(content, "Толщина обводки",

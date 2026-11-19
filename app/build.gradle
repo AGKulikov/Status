@@ -183,6 +183,9 @@ def prepareNavigatorAliceTests = tasks.register("prepareNavigatorAliceTests", Co
     from(rootProject.file("navigator-mod/src/main/java")) {
         include "ru/natro/navigation/NavigatorAlice*.java"
         include "ru/natro/navigation/NativeAliceBridge.java"
+        include "ru/natro/navigation/CombinedLaneArtwork.java"
+        include "ru/natro/navigation/LaneGuidanceAppearance.java"
+        include "ru/natro/navigation/NavigationMapProfile.java"
     }
     into(navigatorAliceTestSources)
 }

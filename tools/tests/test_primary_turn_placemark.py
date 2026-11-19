@@ -61,7 +61,8 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
                   check(!PrimaryTurnPlacemark.isCurrent(s,4,false,2000,1500));
                   check(!PrimaryTurnPlacemark.isCurrent(s,4,true,999,1500));
                   check(!PrimaryTurnPlacemark.isCurrent(null,4,true,2000,1500));
-                  p.show(map,s,125,5f,c);
+                  LaneGuidanceAppearance style = new LaneGuidanceAppearance();
+                  p.show(map,s,125,5f,c,style);
                   check(map.pin.visible && map.pin.point.x==55 && map.pin.point.y==37);
                   check(map.pin.image.bitmap==s.texture.bitmap && map.pin.style.scale==1.25f);
                   check(map.pin.style.anchor.x==.15f && map.pin.style.anchor.y==.85f);
@@ -71,7 +72,7 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
                   lane.routeSegmentIndex=5;lane.routeSegmentPosition=1;lane.latitude+=.0001;
                   check(!p.replaces(lane));lane.latitude=55;lane.routeSegmentPosition=Double.NaN;
                   check(!p.replaces(lane));lane.routeSegmentPosition=1;
-                  s=new PrimaryTurnSample();s.texture.combined=false;p.show(map,s,90,5f,c);
+                  s=new PrimaryTurnSample();s.texture.combined=false;p.show(map,s,90,5f,c,style);
                   check(!p.replaces(lane) && map.creations==1 && map.pin.style.scale==.9f);
                   p.clear(map,c);check(map.pin==null && !p.replaces(lane));
                 }
@@ -86,9 +87,11 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
               }
               class StockTurnTextures {
                 static class Texture {
-                  Bitmap bitmap=new Bitmap(); boolean combined=true;float anchorX=.15f,anchorY=.85f;
+                  CombinedLaneArtwork artwork; Bitmap bitmap=new Bitmap(); boolean combined=true;float anchorX=.15f,anchorY=.85f;
                 }
               }
+              class LaneGuidanceAppearance {boolean same(LaneGuidanceAppearance x){return x==this;}}
+              class CombinedLaneArtwork { Bitmap render(Bitmap b,LaneGuidanceAppearance a){return b;} }
               class PrimaryTurnSample {
                 long routeEpoch=4,sampledAt=1000;
                 NavigatorStatePublisher.RouteTurnFrame turn=new NavigatorStatePublisher.RouteTurnFrame();

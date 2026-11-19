@@ -610,11 +610,11 @@ public final class HudPanelSettingsActivity extends dezz.status.widget.settings.
         SliderField laneGuidanceScale = slider(form,
                 "Размер знаков движения по полосам",
                 profile.laneGuidanceScalePercent, 50, 250, 5, " %");
-        form.addView(section("Оформление знака полос"), marginTop(12));
+        form.addView(section("Оформление знаков по полосам и таблички у поворота"), marginTop(12));
         OptionalColorButton laneCardColor = new OptionalColorButton(this, form,
                 "Цвет таблички", profile.laneGuidanceCardColor);
         OptionalColorButton laneSignsColor = new OptionalColorButton(this, form,
-                "Цвет стрелок", profile.laneGuidanceSignsColor);
+                "Цвет стрелок и текста", profile.laneGuidanceSignsColor);
         OptionalColorButton laneBorderColor = new OptionalColorButton(this, form,
                 "Цвет обводки", profile.laneGuidanceBorderColor);
         SliderField laneBorderWidth = slider(form, "Толщина обводки",

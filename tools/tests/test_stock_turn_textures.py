@@ -13,6 +13,7 @@ class StockTurnTexturesTest(unittest.TestCase):
     def test_original_factory_callbacks_surfaces_and_lifetime(self):
         sources = {
             "android.graphics.Bitmap": """public class Bitmap {
+                public boolean sameAs(Bitmap b){return b!=null;}
                 public int getWidth() {return 132;} public int getHeight() {return 56;}
                 public boolean isRecycled() {return false;}
             }""",
@@ -48,13 +49,14 @@ class StockTurnTexturesTest(unittest.TestCase):
                         return new com.yandex.mapkit.ScreenPoint();
                     }
                     public com.yandex.runtime.image.ImageProvider createTexture() {
-                        if (calls++==2) throw failure;
+                        if (calls++==3) throw failure;
                         return image = new com.yandex.runtime.image.ImageProvider();
                     }
                 }
             """,
             "ru.yandex.yandexnavi.ui.guidance.context.LaneAndManeuverBalloonViewImpl":
                 "public class LaneAndManeuverBalloonViewImpl extends ManeuverBalloonViewImpl {}",
+            "ru.natro.navigation.CombinedLaneArtwork": "class CombinedLaneArtwork {static CombinedLaneArtwork capture(Object v,android.graphics.Bitmap b){return new CombinedLaneArtwork();}}",
             "ru.natro.navigation.TurnSourceTest": """
                 import com.yandex.navikit.ui.balloons.BalloonFactory;
                 import com.yandex.navikit.ui.guidance.context.Turn;
@@ -87,6 +89,8 @@ class StockTurnTexturesTest(unittest.TestCase):
                               image==stock.both.image && first.bitmap==image.getImage() &&
                               first.anchorX==.125f && first.anchorY==.95f,"genuine stock pixels and anchor");
                         check(StockTurnTextures.forWindow(other).isEmpty(),"distinct map windows");
+                        joint.createTexture();
+                        check(StockTurnTextures.forWindow(primary).get(0)==first,"same pixels keep observation identity");
                         stock.both.broken=true;
                         check(joint.createTexture()==stock.both.image &&
                               StockTurnTextures.forWindow(primary).isEmpty(),"failed sample preserves original result");

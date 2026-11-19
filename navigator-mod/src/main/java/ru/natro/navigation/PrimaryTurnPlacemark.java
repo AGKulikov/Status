@@ -11,6 +11,7 @@ final class PrimaryTurnPlacemark {
     private PrimaryTurnSample displayed;
     private int displayedScale;
     private float displayedZ;
+    private LaneGuidanceAppearance displayedStyle;
 
     static boolean isCurrent(PrimaryTurnSample sample, long routeEpoch, boolean active, long now, long maxAge) {
         return active && sample != null && sample.routeEpoch == routeEpoch && sample.sampledAt > 0L
@@ -19,7 +20,7 @@ final class PrimaryTurnPlacemark {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     void show(Object collection, PrimaryTurnSample sample, int scale, float zIndex,
-              MapOverlayPlacementCoordinator coordinator) throws Exception {
+              MapOverlayPlacementCoordinator coordinator, LaneGuidanceAppearance appearance) throws Exception {
         StockTurnTextures.Texture texture = sample.texture;
         NavigatorStatePublisher.RouteTurnFrame turn = sample.turn;
         if (!turn.hasContent() || texture.bitmap == null || texture.bitmap.isRecycled()
@@ -29,7 +30,8 @@ final class PrimaryTurnPlacemark {
         if (displayed != null && displayed.routeEpoch == sample.routeEpoch
                 && displayed.turn.id.equals(turn.id) && displayed.turn.latitude == turn.latitude
                 && displayed.turn.longitude == turn.longitude && displayed.texture == texture
-                && displayedScale == scale && displayedZ == zIndex) {
+                && displayedScale == scale && displayedZ == zIndex
+                && (!texture.combined || appearance.same(displayedStyle))) {
             displayed = sample;
             return;
         }
@@ -50,11 +52,13 @@ final class PrimaryTurnPlacemark {
         invoke(style, "setFlat", new Class<?>[]{Boolean.class}, false);
         invoke(style, "setZIndex", new Class<?>[]{Float.class}, zIndex);
         // A fresh bitmap provider guarantees the exact pixels that passed the primary-surface check.
-        Object provider = imageClass.getMethod("fromBitmap", Bitmap.class).invoke(null, texture.bitmap);
+        Bitmap bitmap = texture.artwork == null ? texture.bitmap : texture.artwork.render(texture.bitmap, appearance);
+        Object provider = imageClass.getMethod("fromBitmap", Bitmap.class).invoke(null, bitmap);
         invoke(placemark, "setIcon", new Class<?>[]{imageClass, styleClass}, provider, style);
         invoke(placemark, "setGeometry", new Class<?>[]{pointClass}, point);
         invoke(placemark, "setVisible", new Class<?>[]{boolean.class}, true);
         displayed = sample;
+        displayedStyle = appearance;
         displayedScale = scale;
         displayedZ = zIndex;
         reserve(coordinator);
