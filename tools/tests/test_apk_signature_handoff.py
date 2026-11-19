@@ -26,6 +26,17 @@ class SignatureHandoff(unittest.TestCase):
             self.assertLess(patch['literalBytes'], 2000)
             self.assertEqual(handoff.payload(before), handoff.payload(after))
 
+    def test_copies_contiguous_payload_and_shared_zip_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            before, after = self.fixture(Path(directory))
+            with zipfile.ZipFile(before) as source:
+                directory_offset = source.start_dir
+            patch = handoff.create(before, after)
+            copied = [op for op in patch['ops'] if 'offset' in op]
+            self.assertEqual(copied[0], {'offset': 0, 'length': directory_offset})
+            self.assertTrue(any(op['offset'] == directory_offset and op['length'] > 50 for op in copied))
+            self.assertEqual(handoff.reconstruct(before.read_bytes(), patch), after.read_bytes())
+
     def test_rejects_modified_payload(self):
         with tempfile.TemporaryDirectory() as directory:
             before, after = self.fixture(Path(directory))

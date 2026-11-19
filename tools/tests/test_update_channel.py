@@ -64,6 +64,20 @@ class UpdateChannel(unittest.TestCase):
             self.assertEqual(module.TARGETS['navigator'][1],256)
             self.assertEqual(module.TARGETS['music'][1],128)
 
+    def test_navigator_can_share_only_its_matching_natro_release(self):
+        with tempfile.TemporaryDirectory() as directory:
+            apk = Path(directory) / 'Navigator-signed.apk'
+            apk.write_bytes(b'paired release')
+            signer = 'Signer #1 certificate SHA-256 digest: ' + module.CERT
+            badging = "package: name='ru.yandex.yandexnavi' versionCode='739564632' versionName='30.3.0 Natro 3.5.1'"
+            value = module.manifest(apk, 'natro-v3.5.1', signer, badging, 'navigator', paired=True)
+            self.assertTrue(value['url'].endswith('/natro-v3.5.1/Navigator-signed.apk'))
+            for tag in ('natro-v3.5.0', 'natro-navigator-v3.5.1', 'natro-v3.5.1-beta'):
+                with self.assertRaises(ValueError):
+                    module.manifest(apk, tag, signer, badging, 'navigator', paired=True)
+            with self.assertRaises(ValueError):
+                module.manifest(apk, 'natro-v3.5.1', signer, badging, 'music', paired=True)
+
     def test_phone_exports_reuse_exact_collectors(self):
         service=(ROOT/'app/src/main/java/dezz/status/widget/transfer/LanTransferService.java').read_text()
         for call in ['DiagnosticJournal.copyForExport(this)','DiagnosticBundle.create(this)','SystemFileDump.collect(',

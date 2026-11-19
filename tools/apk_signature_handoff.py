@@ -9,8 +9,14 @@ import re
 import struct
 import zipfile
 
-LIMIT = 128 * 1024 * 1024
+# The companion updater accepts Navigator APKs up to 256 MiB. Its v1 manifest
+# and signature alone exceed 1 MiB with more than 17,000 payload entries.
+LIMIT = 256 * 1024 * 1024
 LITERAL_LIMIT = 2 * 1024 * 1024
+
+
+def literal_limit(size):
+    return 5 * 1024 * 1024 if size > 128 * 1024 * 1024 else LITERAL_LIMIT
 
 
 def digest(data):
@@ -53,7 +59,27 @@ def create(unsigned, signed):
             old_start, old_length = data_range(before, old)
             start, length = data_range(after, entry)
             if length == old_length and after[start:start + length] == before[old_start:old_start + length]:
+                # Include unchanged ZIP local headers, alignment padding and the
+                # gaps between content. This usually lets a large, prealigned
+                # candidate copy the whole payload with one operation.
+                header_length = start - entry.header_offset
+                if (header_length == old_start - old.header_offset and
+                        after[entry.header_offset:start] == before[old.header_offset:old_start]):
+                    start, old_start, length = entry.header_offset, old.header_offset, length + header_length
                 ranges.append((start, length, old_start))
+        # APK signing appends its own META-INF entries to the ZIP directory.
+        # Prealigned candidates retain a byte-identical directory prefix.
+        low, high = 0, min(len(before) - source.start_dir, len(after) - target.start_dir)
+        old_directory = memoryview(before)[source.start_dir:]
+        new_directory = memoryview(after)[target.start_dir:]
+        while low < high:
+            count = (low + high + 1) // 2
+            if old_directory[:count] == new_directory[:count]:
+                low = count
+            else:
+                high = count - 1
+        if low:
+            ranges.append((target.start_dir, low, source.start_dir))
     ops, cursor, literals = [], 0, 0
     for start, length, old_start in sorted(ranges):
         if start < cursor:
@@ -62,13 +88,16 @@ def create(unsigned, signed):
             block = after[cursor:start]
             literals += len(block)
             ops.append({'data': base64.b64encode(block).decode('ascii')})
-        ops.append({'offset': old_start, 'length': length})
+        if ops and 'offset' in ops[-1] and ops[-1]['offset'] + ops[-1]['length'] == old_start:
+            ops[-1]['length'] += length
+        else:
+            ops.append({'offset': old_start, 'length': length})
         cursor = start + length
     if cursor < len(after):
         block = after[cursor:]
         literals += len(block)
         ops.append({'data': base64.b64encode(block).decode('ascii')})
-    if literals > LITERAL_LIMIT:
+    if literals > literal_limit(len(after)):
         raise ValueError('Handoff must contain headers/signature only, not a full APK')
     result = dict(schema=1, unsignedSha256=digest(before), signedSha256=digest(after),
                   signedSize=len(after), literalBytes=literals, ops=ops)
@@ -84,14 +113,14 @@ def reconstruct(before, patch):
     if type(size) is not int or not 0 < size <= LIMIT or len(before) > LIMIT:
         raise ValueError('APK size out of bounds')
     ops = patch.get('ops')
-    if not isinstance(ops, list) or len(ops) > 20000:
+    if not isinstance(ops, list) or len(ops) > (40000 if size > 128 * 1024 * 1024 else 20000):
         raise ValueError('Invalid operation count')
     after, literals = bytearray(), 0
     for op in ops:
         if set(op) == {'data'}:
             block = base64.b64decode(op['data'], validate=True)
             literals += len(block)
-            if literals > LITERAL_LIMIT:
+            if literals > literal_limit(size):
                 raise ValueError('Too many literal bytes')
         elif set(op) == {'offset', 'length'}:
             start, length = op['offset'], op['length']

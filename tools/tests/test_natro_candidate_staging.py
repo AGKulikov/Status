@@ -27,7 +27,7 @@ class CandidateStagingTest(unittest.TestCase):
             "GITHUB_SHA": "a" * 40, "GITHUB_RUN_ID": "123",
             "REUSE_NAVIGATOR_300": "false", "REUSE_NAVIGATOR_302": "false",
             "REUSE_NAVIGATOR_339": "false", "REUSE_NAVIGATOR_349": "false",
-            "ALICE_ENGINE_HOOKS": "false",
+            "ALICE_ENGINE_HOOKS": "false", "NAVIGATOR_TURN_BASE_APK": "",
             "HELPER_CHANGED": "false",
         })
         self.environment.start()
@@ -79,6 +79,30 @@ class CandidateStagingTest(unittest.TestCase):
         self.assertEqual(hashlib.sha256(self.apk.read_bytes()).hexdigest(), manifest["unsignedSha256"])
         self.assertEqual(b"lib/apksigner.jar", (self.out / "tools/lib/apksigner.jar").read_bytes())
         self.assertTrue((self.out / "test-results/TEST-example.xml").is_file())
+
+    def test_351_rejects_wrong_or_absent_turn_baseline(self):
+        with patch.dict(os.environ, {"VERSION_NAME": "3.5.1", "VERSION_CODE": "208021384"}):
+            with self.assertRaisesRegex(ValueError, "new pair"):
+                self.stage()
+        out = self.root / "natro-3.5.1-candidate"
+        self.assertFalse((out / "candidate.json").exists())
+
+    def test_351_requires_the_reviewed_349_bytes(self):
+        env = {"VERSION_NAME": "3.5.1", "VERSION_CODE": "208021384", "NAVIGATOR_TURN_BASE_APK": str(self.apk)}
+        with patch.dict(os.environ, env), self.assertRaisesRegex(ValueError, "exact signed 3.4.9"):
+            self.stage()
+        self.assertFalse((self.root / "natro-3.5.1-candidate/candidate.json").exists())
+
+    def test_turn_payload_rejects_any_other_changed_added_or_removed_entry(self):
+        from tools.navigation_turn_candidate import CHANGES, changed_hashes
+        before = {name: "old" for name in (*CHANGES, "resources.arsc")}
+        after = dict(before, **{name: "new" for name in CHANGES})
+        self.assertEqual({name: "new" for name in CHANGES}, changed_hashes(before, after))
+        for rejected in (dict(after, **{"resources.arsc": "changed"}), dict(after, added="extra"),
+                         {name: value for name, value in after.items() if name != "resources.arsc"},
+                         dict(after, **{"classes3.dex": "old"})):
+            with self.subTest(rejected=rejected), self.assertRaises(ValueError):
+                changed_hashes(before, rejected)
 
     def test_failed_tests_stop_publication(self):
         self.report.write_text('<testsuite tests="1906" failures="1" errors="0"/>')

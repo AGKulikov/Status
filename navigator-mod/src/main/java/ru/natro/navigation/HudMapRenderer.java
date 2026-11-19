@@ -251,7 +251,8 @@ final class HudMapRenderer {
                 frame.routeProgressValid, frame.routeSegmentIndex,
                 frame.routeSegmentPosition);
         laneGuidanceMapLayer.update(frame.routeActive,
-                frame.laneGuidanceSampleElapsedMs, frame.laneGuidance);
+                frame.laneGuidanceSampleElapsedMs, frame.laneGuidance,
+                frame.turnBalloon, activeRouteEpoch);
         routeTurnMapLayer.update(frame.routeActive,
                 frame.routeTurnsSampleElapsedMs, frame.routeTurns);
         applySublayerOrder();

@@ -1,0 +1,147 @@
+name: Publish verified Natro and Navigator 3.5.1
+
+on:
+  push:
+    branches: ['release/natro-3.5.1']
+    paths: ['docs/releases/3.5.1/ci-verification.json']
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: publish-natro-v3.5.1
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: github.repository == 'AGKulikov/Status'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 25
+    permissions:
+      actions: read
+      contents: write
+    env:
+      RELEASE_TAG: natro-v3.5.1
+      DOC: docs/releases/3.5.1
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Require the exact successful CI run and its artifacts
+        id: build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          CI="$DOC/ci-verification.json"
+          SOURCE="$(jq -er '.sourceCommit | select(test("^[0-9a-f]{40}$"))' "$CI")"
+          TREE="$(jq -er '.sourceTree | select(test("^[0-9a-f]{40}$"))' "$CI")"
+          RUN="$(jq -er '.runId | numbers | select(. > 0)' "$CI")"
+          NUMBER="$(jq -er '.runNumber | numbers | select(. > 0)' "$CI")"
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN" | jq -e \
+            --arg source "$SOURCE" --argjson number "$NUMBER" \
+            '.head_sha == $source and .run_number == $number and .conclusion == "success" and
+             .status == "completed" and .path == ".github/workflows/build-natro-3.5.1.yml"'
+          gh api "repos/$GITHUB_REPOSITORY/git/commits/$SOURCE" | jq -e --arg tree "$TREE" '.tree.sha == $tree'
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$RUN/artifacts" > "$RUNNER_TEMP/artifacts.json"
+          for TYPE in offline-signing signing-tools; do
+            NAME="Natro-3.5.1-$TYPE-$NUMBER"
+            DIGEST="$(jq -er --arg name "$NAME" '.artifactHashes[$name] | select(test("^sha256:[0-9a-f]{64}$"))' "$CI")"
+            jq -e --arg name "$NAME" --arg digest "$DIGEST" \
+              '[.artifacts[] | select(.name == $name and .expired == false and .digest == $digest)] | length == 1' \
+              "$RUNNER_TEMP/artifacts.json"
+          done
+          echo "run=$RUN" >> "$GITHUB_OUTPUT"
+          echo "number=$NUMBER" >> "$GITHUB_OUTPUT"
+          echo "source=$SOURCE" >> "$GITHUB_OUTPUT"
+          echo "SOURCE_SHA=$SOURCE" >> "$GITHUB_ENV"
+          echo "SOURCE_TREE=$TREE" >> "$GITHUB_ENV"
+          echo "BUILD_RUN=$RUN" >> "$GITHUB_ENV"
+      - name: Download the unchanged unsigned pair
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: Natro-3.5.1-offline-signing-${{ steps.build.outputs.number }}
+          run-id: ${{ steps.build.outputs.run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/candidate
+      - name: Download the verified Android SDK tools
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: Natro-3.5.1-signing-tools-${{ steps.build.outputs.number }}
+          run-id: ${{ steps.build.outputs.run }}
+          github-token: ${{ github.token }}
+          path: ${{ runner.temp }}/sdk
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ steps.build.outputs.source }}
+          path: exact-apk-source
+          persist-credentials: false
+      - name: Reconstruct the signed pair, verify both manifests and prepare the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/release"
+          SDK="$RUNNER_TEMP/sdk"
+          CANDIDATE="$RUNNER_TEMP/candidate"
+          mkdir "$OUT"
+          test "$(git -C exact-apk-source rev-parse HEAD)" = "$SOURCE_SHA"
+          test "$(git -C exact-apk-source rev-parse 'HEAD^{tree}')" = "$SOURCE_TREE"
+          test "$(jq -r .versionName "$DOC/release-report.json")" = 3.5.1
+          test "$(jq -r .versionCode "$DOC/release-report.json")" = 208021384
+          python3 -m unittest tools.tests.test_apk_signature_handoff tools.tests.test_update_channel
+          gh release download natro-navigator-v3.4.9 --repo "$GITHUB_REPOSITORY" \
+            --pattern Navigator-30.3.0-Natro-3.4.9-signed.apk --dir "$RUNNER_TEMP"
+          for f in release-report.json natro-update.json signature-verification.txt navigator-release-report.json navigator-update.json navigator-signature-verification.txt; do cp "$DOC/$f" "$OUT/$f"; done
+          cp "$DOC/release-notes.md" "$OUT/README_RU.md"
+          python3 tools/apk_signature_handoff.py apply --unsigned "$CANDIDATE/Natro-3.5.1-unsigned.apk" \
+            --patch "$DOC/signing-handoff.json" --output "$OUT/Natro-3.5.1-signed.apk"
+          python3 tools/apk_signature_handoff.py apply --unsigned "$CANDIDATE/Navigator-30.3.0-Natro-3.5.1-unsigned.apk" \
+            --patch "$DOC/navigator-signing-handoff.json" --output "$OUT/Navigator-30.3.0-Natro-3.5.1-signed.apk"
+          python3 tools/verify_offline_release_handoff.py --candidate "$CANDIDATE" --tools "$SDK" --release "$OUT" \
+            --source "$SOURCE_SHA" --tree "$SOURCE_TREE" --run "$BUILD_RUN" --signed-sha256 "$(jq -er .sha256 "$DOC/natro-update.json")"
+          python3 tools/verify_navigator_turn_handoff.py --candidate "$CANDIDATE" --tools "$SDK" --release "$OUT" \
+            --source "$SOURCE_SHA" --tree "$SOURCE_TREE" --run "$BUILD_RUN" --baseline "$RUNNER_TEMP/Navigator-30.3.0-Natro-3.4.9-signed.apk"
+          git -C exact-apk-source archive --format=tar.gz --prefix=Natro-3.5.1-source/ --output="$OUT/Natro-3.5.1-source.tar.gz" HEAD
+          (cd "$OUT" && sha256sum -- * > "$RUNNER_TEMP/checksums" && mv "$RUNNER_TEMP/checksums" SHA256SUMS.txt && sha256sum -c SHA256SUMS.txt)
+      - name: Retain verified stable files
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Natro-3.5.1-verified-stable-pair
+          path: ${{ runner.temp }}/release/*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Read back the complete paired draft and publish both updates together
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          OUT="$RUNNER_TEMP/release"
+          READBACK="$RUNNER_TEMP/readback"
+          mkdir "$READBACK"
+          if ! gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft --target "$SOURCE_SHA" \
+              --title 'Natro 3.5.1 и Навигатор 30.3.0 Natro 3.5.1' --notes-file "$DOC/release-notes.md"
+          fi
+          gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json targetCommitish,isDraft,isPrerelease,assets > "$RUNNER_TEMP/publication.json"
+          jq -e --arg source "$SOURCE_SHA" '.targetCommitish == $source and .isPrerelease == false' "$RUNNER_TEMP/publication.json"
+          for file in "$OUT/"*; do
+            name="$(basename "$file")"
+            if ! jq -e --arg name "$name" 'any(.assets[]; .name == $name)' "$RUNNER_TEMP/publication.json" >/dev/null; then
+              jq -e '.isDraft == true' "$RUNNER_TEMP/publication.json"
+              gh release upload "$RELEASE_TAG" "$file" --repo "$GITHUB_REPOSITORY"
+            fi
+          done
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --dir "$READBACK"
+          diff -qr "$OUT" "$READBACK"
+          (cd "$READBACK" && sha256sum -c SHA256SUMS.txt)
+          if jq -e '.isDraft == true' "$RUNNER_TEMP/publication.json" >/dev/null; then
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease=false --latest
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$RELEASE_TAG" | jq -e --arg source "$SOURCE_SHA" '.object.type == "commit" and .object.sha == $source'
+          gh api "repos/$GITHUB_REPOSITORY/releases/latest" | jq -e --arg tag "$RELEASE_TAG" '.tag_name == $tag and .draft == false and .prerelease == false'

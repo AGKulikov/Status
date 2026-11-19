@@ -8,8 +8,8 @@ LIBS = [
  ('guava-32.0.1-jre.jar', 'bd7fa227591fb8509677d0d1122cf95158f3b8a9f45653f58281d879f6dc48c5', 'https://repo.maven.apache.org/maven2/com/google/guava/guava/32.0.1-jre/guava-32.0.1-jre.jar'),
  ('jsr305-3.0.2.jar', '766ad2a0783f2687962c8ad74ceecc38a28b9f72a2d085ee438b7813e928d0c7', 'https://repo.maven.apache.org/maven2/com/google/code/findbugs/jsr305/3.0.2/jsr305-3.0.2.jar'),
 ]
-def build():
- out = ROOT/'build/alice-focus-tool'; out.mkdir(parents=True, exist_ok=True)
+def library_classpath(out):
+ out.mkdir(parents=True, exist_ok=True)
  sdk = Path(os.environ.get('ANDROID_HOME', os.environ.get('ANDROID_SDK_ROOT', '/missing')))
  for name, digest, url in LIBS:
   dest = out/name
@@ -19,7 +19,11 @@ def build():
    else:
     with urllib.request.urlopen(url, timeout=60) as response: dest.write_bytes(response.read())
   if hashlib.sha256(dest.read_bytes()).hexdigest() != digest: raise ValueError('Dependency hash mismatch: '+name)
- cp = os.pathsep.join(str(out/name) for name,_,_ in LIBS)
+ return os.pathsep.join(str(out/name) for name,_,_ in LIBS)
+
+def build():
+ out = ROOT/'build/alice-focus-tool'
+ cp = library_classpath(out)
  subprocess.run(['javac','-encoding','UTF-8','-cp',cp,'-d',str(out),
                  str(ROOT/'tools/alice/PatchAliceFocus.java'),str(ROOT/'tools/alice/PatchAliceFocusSelfTest.java'),str(ROOT/'tools/music/PatchMusicWave.java'),str(ROOT/'tools/music/PatchMusicWaveSelfTest.java')],check=True)
  subprocess.run(['java','-cp',str(out)+os.pathsep+cp,'PatchAliceFocusSelfTest'],check=True)

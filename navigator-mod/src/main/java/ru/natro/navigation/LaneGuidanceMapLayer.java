@@ -23,6 +23,10 @@ final class LaneGuidanceMapLayer {
     private final Handler main = new Handler(Looper.getMainLooper());
     private Object map;
     private Object collection;
+    private final PrimaryTurnPlacemark turnPlacemark = new PrimaryTurnPlacemark();
+    private PrimaryTurnSample turnSample;
+    private boolean showRouteTurns;
+    private final Runnable expireTurn = () -> { turnSample = null; render(); };
     private Object placemark;
     private Object iconStyle;
     private Object imageProvider;
@@ -86,6 +90,9 @@ final class LaneGuidanceMapLayer {
     void detachMap() {
         main.removeCallbacks(expire);
         expiryPosted = false;
+        main.removeCallbacks(expireTurn);
+        turnSample = null;
+        turnPlacemark.clear(collection, placementCoordinator);
         clearVisual();
         collection = null;
         map = null;
@@ -99,7 +106,8 @@ final class LaneGuidanceMapLayer {
         boolean presentationChanged = scalePercent != nextScale || nightMode != nextNightMode
                 || placeOnRight != nextPlaceOnRight || zIndex != nextZ
                 || !appearance.same(nextAppearance);
-        boolean enabledChanged = enabled != nextEnabled;
+        boolean enabledChanged = enabled != nextEnabled || showRouteTurns != profile.showRouteTurns;
+        showRouteTurns = profile.showRouteTurns;
         if (!presentationChanged && !enabledChanged) return;
         appearance = nextAppearance;
         enabled = nextEnabled;
@@ -123,11 +131,18 @@ final class LaneGuidanceMapLayer {
     }
 
     void update(boolean routeActive, long sampleElapsedMs,
-                NavigatorStatePublisher.LaneGuidanceFrame frame) {
-        if (routeActive == latestRouteActive && sampleElapsedMs == latestSampleElapsedMs
+                NavigatorStatePublisher.LaneGuidanceFrame frame, PrimaryTurnSample proof, long routeEpoch) {
+        long now = SystemClock.elapsedRealtime();
+        if (!PrimaryTurnPlacemark.isCurrent(proof, routeEpoch, routeActive, now, PrimaryTurnSample.FRESH_MS)) proof = null;
+        boolean turnChanged = turnSample != proof;
+        if (turnChanged) {
+            main.removeCallbacks(expireTurn);
+            turnSample = proof;
+            if (proof != null) main.postDelayed(expireTurn, PrimaryTurnSample.FRESH_MS - (now - proof.sampledAt));
+        }
+        if (!turnChanged && routeActive == latestRouteActive && sampleElapsedMs == latestSampleElapsedMs
                 && frame == latest) return;
         latestRouteActive = routeActive;
-        long now = SystemClock.elapsedRealtime();
         boolean fresh = routeActive && sampleElapsedMs > 0L && now >= sampleElapsedMs
                 && now - sampleElapsedMs <= FRESH_MS
                 && frame != null && frame.hasContent();
@@ -141,12 +156,14 @@ final class LaneGuidanceMapLayer {
             expiryPosted = false;
         }
         long fingerprint = fingerprint(latest);
-        if (fingerprint == latestFingerprint) return;
+        if (!turnChanged && fingerprint == latestFingerprint) return;
         latestFingerprint = fingerprint;
-        if (enabled && map != null) render();
+        if (map != null) render();
     }
 
     void clearData() {
+        main.removeCallbacks(expireTurn);
+        turnSample = null;
         main.removeCallbacks(expire);
         expiryPosted = false;
         latestRouteActive = false;
@@ -158,6 +175,7 @@ final class LaneGuidanceMapLayer {
 
     /** Participates in the shared lane/light/camera collision pass after a camera move. */
     void relayout() {
+        turnPlacemark.reserve(placementCoordinator);
         placementCoordinator.clearOwner(MapOverlayPlacementCoordinator.OWNER_LANES);
         NavigatorStatePublisher.LaneGuidanceFrame frame = latest;
         if (!enabled || !latestRouteActive || frame == null || !frame.hasContent()
@@ -194,8 +212,21 @@ final class LaneGuidanceMapLayer {
 
     private void render() {
         if (map == null) return;
+        PrimaryTurnSample proof = turnSample;
+        boolean turnVisible = false;
+        if (proof != null && latestRouteActive && (proof.texture.combined ? enabled : showRouteTurns)
+                && SystemClock.elapsedRealtime() - proof.sampledAt < PrimaryTurnSample.FRESH_MS) {
+            try {
+                turnPlacemark.show(ensureCollection(), proof, scalePercent, zIndex, placementCoordinator);
+                turnVisible = true;
+            } catch (Exception failure) {
+                Log.w(TAG, "Cannot draw the verified primary maneuver at its route point", failure);
+            }
+        }
+        if (!turnVisible) turnPlacemark.clear(collection, placementCoordinator);
         NavigatorStatePublisher.LaneGuidanceFrame frame = latest;
-        if (!enabled || !latestRouteActive || frame == null || !frame.hasContent()) {
+        if (!enabled || !latestRouteActive || frame == null || !frame.hasContent()
+                || (turnVisible && turnPlacemark.replaces(frame))) {
             clearVisual();
             return;
         }
@@ -222,13 +253,7 @@ final class LaneGuidanceMapLayer {
             throws Exception {
         Object currentPlacemark = placemark;
         if (currentPlacemark != null) return currentPlacemark;
-        Object currentCollection = collection;
-        if (currentCollection == null) {
-            currentCollection = MapObjectLayerFactory.create(map,
-                    MapSublayerOrder.LANE_GUIDANCE,
-                    MapObjectLayerFactory.MAJOR, zIndex);
-            collection = currentCollection;
-        }
+        Object currentCollection = ensureCollection();
         Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
         Object point = pointClass.getConstructor(double.class, double.class)
                 .newInstance(frame.latitude, frame.longitude);
@@ -237,6 +262,12 @@ final class LaneGuidanceMapLayer {
         MapObjectLayerFactory.hideUntilTextured(currentPlacemark);
         placemark = currentPlacemark;
         return currentPlacemark;
+    }
+
+    private Object ensureCollection() throws Exception {
+        if (collection == null) collection = MapObjectLayerFactory.create(map,
+                MapSublayerOrder.LANE_GUIDANCE, MapObjectLayerFactory.MAJOR, zIndex);
+        return collection;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
@@ -412,10 +443,7 @@ final class LaneGuidanceMapLayer {
 
     private void clearVisual() {
         placementCoordinator.clearOwner(MapOverlayPlacementCoordinator.OWNER_LANES);
-        if (collection != null) {
-            try { invoke(collection, "clear", new Class<?>[0]); }
-            catch (Throwable ignored) {}
-        }
+        PrimaryTurnPlacemark.remove(collection, placemark);
         placemark = null;
         iconStyle = null;
         imageProvider = null;

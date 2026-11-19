@@ -75,10 +75,10 @@ public final class StockManeuverCardState {
     }
     public boolean hasMain() { return visible && ((imageVisible && !image.isEmpty()) || !lanes.isEmpty()); }
     public boolean hasAuxiliary() { return visible && (!auxiliaryText.isEmpty() || !auxiliaryImage.isEmpty() || !auxiliaryLanes.isEmpty()); }
-    // The 3.4.9 repack changed the APK version but kept the 3.4.2 commands and drawables.
-    // Installed 3.4.9 still sends the older version in its maneuver frames.
+    // The 3.4.9 and 3.5.1 APKs use the verified 3.4.2 drawable IDs.
+    // Their pinned-card command frames still carry the original resource version.
     static boolean supportsNavigator(long versionCode) {
-        return versionCode == 739564630L || versionCode == 739564631L;
+        return versionCode == 739564630L || versionCode == 739564631L || versionCode == 739564632L;
     }
 
     public static StockManeuverCardState parse(String raw, long epoch, boolean routeActive) {

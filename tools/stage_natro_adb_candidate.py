@@ -115,6 +115,17 @@ def main():
             allowedPayloadChanges=["classes11.dex", "classes15.dex", "classes19.dex"],
             nativeEngineHooks=True,
             nativeToolSha256={p.name: sha256(p) for p in native.iterdir() if p.is_file()})
+    turn_base = os.environ.get("NAVIGATOR_TURN_BASE_APK")
+    if version == "3.5.1":
+        if not turn_base or compatible_pair is not None or manifest["navigator"].get("nativeEngineHooks"):
+            raise ValueError("3.5.1 requires a new pair based on the released Navigator 3.4.9")
+        if __package__:
+            from .navigation_turn_candidate import stage_turn_pair
+        else:
+            from navigation_turn_candidate import stage_turn_pair
+        manifest["navigator"] = stage_turn_pair(Path(turn_base), patch, out)
+    elif turn_base:
+        raise ValueError("Navigator turn candidate is scoped to the 3.5.1 release")
     (out / "candidate.json").write_text(json.dumps(manifest, indent=2) + "\n")
     print(json.dumps({"candidate": str(out), "unitTests": counts}))
 

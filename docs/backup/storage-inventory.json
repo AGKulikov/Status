@@ -6,8 +6,8 @@
   "shared_preferences": [
     {
       "name": "natro_file_manager_v1",
-      "contents": "CE pane0/pane1 JSON, sort0, showHidden false, bookmarks StringSet, encrypted v1 yandexSession; no password or transfer replay. recentLocalOpens: up to 200 local paths and open times; absent means empty.",
-      "source": "app/src/main/java/dezz/status/widget/FileManagerActivity.java; YandexDiskSession.java",
+      "contents": "CE pane0/pane1 JSON, sort0, showHidden false, bookmarks StringSet, encrypted v1 yandexSession; no password or transfer replay. recentLocalOpens: up to 200 local paths and open times; absent means empty. recentFileTypes: comma-separated category names; missing selects nine defaults and an explicit empty string selects none. Opens do not affect the Recent feed.",
+      "source": "app/src/main/java/dezz/status/widget/FileManagerActivity.java; RecentFilesDialog.java; RecentFileTimes.java; YandexDiskSession.java",
       "restore_policy": "Full prefs adapter, v1 secrets rewrapped by existing PortableBackupSecrets. Restore locations/bookmarks; SAF grants require reconnection on a new installation, expired cloud session requires login."
     },
     {
@@ -364,7 +364,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "24090af1e75f7288fbc292957b24c2a8daf880edef710f33c3f1d4d8c51b8718",
+      "sha256": "cdeb3479647eed55d04ad507c5effadbec1d2e91b92a86b005cc684c2b60e84b",
       "access_kinds": [
         "files"
       ]
@@ -804,7 +804,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/FileManagerActivity.java": {
-      "sha256": "c9ed4c8426dbccd9fa0282eaac3b47ad38aa01c947cc71ea68b332128a805b92",
+      "sha256": "81ec820bc4823d2e18f75d8a8ae53b875cd9ffc2eebfc9b12e0a59e3320f551e",
       "access_kinds": [
         "external_resource",
         "files",
@@ -818,7 +818,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/files/RecentFilesDialog.java": {
-      "sha256": "08b268004e9b2d43f26c4bcf39d16ed8f04f51160aff909658bf9bdc518f8dd3",
+      "sha256": "628819b0cb1745bb2b70948e7b7adfc80e392d897ab40ce806ee741cb2695882",
       "access_kinds": [
         "files"
       ]

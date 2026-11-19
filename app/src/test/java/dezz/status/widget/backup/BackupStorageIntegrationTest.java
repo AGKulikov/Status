@@ -28,6 +28,10 @@ public class BackupStorageIntegrationTest {
             String oldSecret=PortableBackupSecrets.wrapPreference(app,"synthetic-fixture-secret");
             main.edit().putString("fixtureSecret",oldSecret).putString("customIconUri",oldUri)
                     .putString("customConfig","{\"iconUri\":\""+oldUri+"\",\"scale\":1.25}").commit();
+            String history = "[[\"/storage/emulated/0/Download/file.pdf\",123]]";
+            SharedPreferences manager = BackupPreferences.open(app,"natro_file_manager_v1",0);
+            assertTrue(manager.edit().putString("recentFileTypes","APK,TXT")
+                    .putString("recentLocalOpens",history).commit());
             Map<String,Object> expected=new LinkedHashMap<>();expected.put("unknown-long",Long.MAX_VALUE);expected.put("float",-0.0f);
             expected.put("set",new HashSet<>(Arrays.asList("я","雪","")));expected.put("empty","");expected.put("disabled",false);
             BackupPreferencesXml.write(new File(device.getDataDir(),"shared_prefs/future_namespace.xml"),expected);
@@ -42,6 +46,7 @@ public class BackupStorageIntegrationTest {
             File imported=new File(app.getCacheDir(),"imported");
             JSONObject importedMetadata=BackupArchive.read(new ByteArrayInputStream(bytes),password,imported);
             File data=new File(imported,"data");storage.prepareRestore(data,importedMetadata);
+            assertTrue(manager.edit().clear().commit());
             Map<String,Object> restored=BackupPreferencesXml.read(new File(data,"de_prefs/"+app.getPackageName()+"_preferences.xml"));
             String newSecret=(String)restored.get("fixtureSecret");assertNotEquals(oldSecret,newSecret);
             assertEquals("synthetic-fixture-secret",PortableBackupSecrets.unwrapPreference(app,newSecret));
@@ -54,6 +59,10 @@ public class BackupStorageIntegrationTest {
             assertArrayEquals(new byte[]{8,7,6},BackupFiles.read(new File(Uri.parse((String)restored.get("customIconUri")).getPath()),10));
             assertArrayEquals(new byte[]{1,2,3},BackupFiles.read(new File(app.getFilesDir(),"custom/sub/file.bin"),10));
             assertEquals(expected,BackupPreferencesXml.read(new File(device.getDataDir(),"shared_prefs/future_namespace.xml")));
+            Map<String,Object> restoredManager = BackupPreferencesXml.read(
+                    new File(app.getDataDir(),"shared_prefs/natro_file_manager_v1.xml"));
+            assertEquals("APK,TXT",restoredManager.get("recentFileTypes"));
+            assertEquals(history,restoredManager.get("recentLocalOpens"));
             Arrays.fill(pem,(byte)0);Arrays.fill(password,'\0');
         }
     }

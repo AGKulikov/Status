@@ -2,15 +2,20 @@
 """Give the verified Navigator 3.4.2 mod a monotonic updater identity; do not change its code."""
 import argparse,copy,json,re,struct,zipfile
 from pathlib import Path
-from patch_music_manifest import chunks
-from sign_natro_candidate import CERT,payload_hashes,run,sha256,signature_entry
-from verify_kx11_navigation_pair import verify_signer,verify_zipalign
+if __package__:
+    from .patch_music_manifest import chunks
+    from .sign_natro_candidate import CERT,payload_hashes,run,sha256,signature_entry
+    from .verify_kx11_navigation_pair import verify_signer,verify_zipalign
+else:
+    from patch_music_manifest import chunks
+    from sign_natro_candidate import CERT,payload_hashes,run,sha256,signature_entry
+    from verify_kx11_navigation_pair import verify_signer,verify_zipalign
 BASE='1e8e3ecaefcc3f205e06eff95d99bfca9a023bf7e9d41bbd7b60df472409f5bb'
 OLD_CODE=739564630
 NEW_CODE=739564631
 NEW_NAME='30.3.0 Natro 3.4.9'
 
-def identity(data):
+def identity(data, *, old_code=OLD_CODE, old_name="30.3.0", new_code=NEW_CODE, new_name=NEW_NAME):
     parts=list(chunks(data));pool=parts[0][1]
     count,styles,flags,start,style_start=struct.unpack_from('<5I',pool,8)
     if styles or flags!=256 or style_start or start!=28+4*count:raise ValueError('Unreviewed Navigator string pool')
@@ -21,8 +26,8 @@ def identity(data):
         return first,pos
     for off in offsets:
         _,pos=length(start+off);size,pos=length(pos);strings.append(pool[pos:pos+size].decode('utf-8'))
-    raw=NEW_NAME.encode('utf-8');assert len(raw)<128
-    blob=pool[start:];offsets.append(len(blob));blob+=bytes([len(NEW_NAME),len(raw)])+raw+b'\0'
+    raw=new_name.encode('utf-8');assert len(raw)<128
+    blob=pool[start:];offsets.append(len(blob));blob+=bytes([len(new_name),len(raw)])+raw+b'\0'
     blob+=b'\0'*((-len(blob))%4)
     newpool=struct.pack('<HHI5I',1,28,28+4*(count+1)+len(blob),count+1,0,flags,28+4*(count+1),0)+struct.pack('<'+'I'*(count+1),*offsets)+blob
     result=[newpool];changed=[]
@@ -32,10 +37,10 @@ def identity(data):
             for i in range(attr_count):
                 pos=16+attr_start+i*attr_size;name=strings[struct.unpack_from('<I',b,pos+4)[0]]
                 if name=='versionCode':
-                    if b[pos+15]!=0x10 or struct.unpack_from('<I',b,pos+16)[0]!=OLD_CODE:raise ValueError('Unexpected old versionCode')
-                    struct.pack_into('<I',b,pos+16,NEW_CODE);changed.append(name)
+                    if b[pos+15]!=0x10 or struct.unpack_from('<I',b,pos+16)[0]!=old_code:raise ValueError('Unexpected old versionCode')
+                    struct.pack_into('<I',b,pos+16,new_code);changed.append(name)
                 if name=='versionName':
-                    if b[pos+15]!=3 or strings[struct.unpack_from('<I',b,pos+16)[0]]!='30.3.0':raise ValueError('Unexpected old versionName')
+                    if b[pos+15]!=3 or strings[struct.unpack_from('<I',b,pos+16)[0]]!=old_name:raise ValueError('Unexpected old versionName')
                     struct.pack_into('<I',b,pos+8,count);struct.pack_into('<I',b,pos+16,count);changed.append(name)
             part=bytes(b)
         result.append(part)

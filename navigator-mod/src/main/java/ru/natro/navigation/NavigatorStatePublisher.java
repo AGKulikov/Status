@@ -105,6 +105,7 @@ final class NavigatorStatePublisher {
         final long laneGuidanceSampleElapsedMs;
         final List<RouteTurnFrame> routeTurns;
         final long routeTurnsSampleElapsedMs;
+        final PrimaryTurnSample turnBalloon;
 
         NavigationFrame(double latitude, double longitude, double bearingDegrees,
                         double speedKmh, boolean routeActive,
@@ -114,7 +115,7 @@ final class NavigatorStatePublisher {
                     routeProgressValid, routeSegmentIndex, routeSegmentPosition,
                     currentRoutePoint, Collections.emptyList(), 0L,
                     Collections.emptyList(), 0L, null, 0L,
-                    Collections.emptyList(), 0L);
+                    Collections.emptyList(), 0L, null);
         }
 
         NavigationFrame(double latitude, double longitude, double bearingDegrees,
@@ -128,7 +129,8 @@ final class NavigatorStatePublisher {
                         LaneGuidanceFrame laneGuidance,
                         long laneGuidanceSampleElapsedMs,
                         List<RouteTurnFrame> routeTurns,
-                        long routeTurnsSampleElapsedMs) {
+                        long routeTurnsSampleElapsedMs, PrimaryTurnSample turnBalloon) {
+            this.turnBalloon = turnBalloon;
             this.latitude = latitude;
             this.longitude = longitude;
             this.bearingDegrees = finite(bearingDegrees) ? bearingDegrees : 0d;
@@ -163,17 +165,17 @@ final class NavigatorStatePublisher {
                     trafficLightValues, trafficLightsSampledAt,
                     cameraDirectionValues, cameraDirectionsSampledAt,
                     laneGuidanceValue, laneGuidanceSampledAt,
-                    routeTurns, routeTurnsSampleElapsedMs);
+                    routeTurns, routeTurnsSampleElapsedMs, turnBalloon);
         }
 
-        NavigationFrame withRouteTurns(List<RouteTurnFrame> turns, long sampledAt) {
+        NavigationFrame withRouteTurns(List<RouteTurnFrame> turns, long sampledAt, PrimaryTurnSample turnProof) {
             return new NavigationFrame(latitude, longitude, bearingDegrees, speedKmh,
                     routeActive, routeProgressValid, routeSegmentIndex,
                     routeSegmentPosition, currentRoutePoint,
                     trafficLights, trafficLightsSampleElapsedMs,
                     cameraDirections, cameraDirectionsSampleElapsedMs,
                     laneGuidance, laneGuidanceSampleElapsedMs,
-                    turns, sampledAt);
+                    turns, sampledAt, turnProof);
         }
 
         boolean isValid() {
@@ -385,6 +387,13 @@ final class NavigatorStatePublisher {
     private WeakReference<Activity> activityReference = new WeakReference<>(null);
 
     private Object primaryMap;
+    private Object primaryWindow;
+    private View primaryView;
+    private final PrimaryTurnObserver turnObserver = new PrimaryTurnObserver(() -> {
+        if (guidanceReady()) publishState(false, false, false);
+    });
+
+    private boolean guidanceReady() { return guidance != null && naviKitGuidance != null; }
     private Object cameraListener;
     private WeakReference<Object> cameraListenerReference;
     private CameraState pendingCamera;
@@ -509,6 +518,8 @@ final class NavigatorStatePublisher {
                     detachCameraListener();
                     throw bindingFailure;
                 }
+                primaryWindow = mapWindow;
+                primaryView = mapView instanceof View ? (View) mapView : null;
                 sink.onPrimaryMap(mapWindow, nextMap);
                 resolvedSomething = true;
                 Log.i(TAG, "Primary Navigator MapWindow resolved");
@@ -754,11 +765,13 @@ final class NavigatorStatePublisher {
                     lastTrafficLightsReadElapsedMs = elapsedNow;
                 }
             }
+            PrimaryTurnSample turnProof = turnObserver.observe(primaryView, primaryWindow, routeEpoch,
+                    activeRouteTurns, activeLaneState.mapFrame, inputs.frame);
             NavigationFrame navigationFrame = inputs.frame.withMapOverlays(
                     activeTrafficLights, activeTrafficLightsSampleElapsedMs,
                     activeCameraDirections, activeCameraDirectionsSampleElapsedMs,
                     activeLaneState.mapFrame, activeLaneSampleElapsedMs)
-                    .withRouteTurns(activeRouteTurns, activeRouteTurnsSampleElapsedMs);
+                    .withRouteTurns(activeRouteTurns, activeRouteTurnsSampleElapsedMs, turnProof);
             String snapshot = snapshotDue
                     ? buildSnapshot(currentGuidance, currentNaviKitGuidance,
                             activeRoute, inputs,
@@ -772,6 +785,7 @@ final class NavigatorStatePublisher {
             lastStateDispatchElapsedMs = elapsedNow;
         } catch (Throwable failure) {
             Log.w(TAG, "Could not publish Navigator state", failure);
+            turnObserver.clear();
             detachGuidanceListeners();
             activeTrafficLights = Collections.emptyList();
             activeTrafficLightsSampleElapsedMs = 0L;
@@ -1667,7 +1681,8 @@ final class NavigatorStatePublisher {
                     }
                 } catch (Throwable ignored) {}
                 String key = action + ':' + Math.round(latitude * 100_000d)
-                        + ':' + Math.round(longitude * 100_000d);
+                        + ':' + Math.round(longitude * 100_000d)
+                        + ':' + routeSegmentIndex + ':' + routeSegmentPosition;
                 if (!seen.add(key)) continue;
                 RouteTurnFrame frame = new RouteTurnFrame(
                         "route-turn:" + routeEpoch + ':' + key,
@@ -2276,6 +2291,10 @@ final class NavigatorStatePublisher {
     }
 
     private void detachOnMain() {
+        if (primaryWindow != null) StockTurnTextures.clearWindow(primaryWindow);
+        turnObserver.clear();
+        primaryWindow = null;
+        primaryView = null;
         StockManeuverCommands.listen(null);
         StockManeuverCommands.reset(routeEpoch);
         main.removeCallbacks(dispatchManeuverCommands);

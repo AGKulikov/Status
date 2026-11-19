@@ -15,10 +15,13 @@ TARGETS = {
     'music': ('ru.yandex.music', 128),
 }
 
-def manifest(apk, tag, signer_output, badging, app='natro'):
+def manifest(apk, tag, signer_output, badging, app='natro', paired=False):
     package, max_mib = TARGETS[app]
     patterns = {'natro': r'natro-v[0-9]+\.[0-9]+\.[0-9]', 'navigator': r'natro-navigator-v[0-9]+\.[0-9]+\.[0-9]', 'music': r'natro-music-v[1-9][0-9]*'}
-    if not re.fullmatch(patterns[app], tag):
+    if paired and app != 'navigator':
+        raise ValueError('Only Navigator supports sharing the Natro release')
+    pattern = patterns['natro'] if paired else patterns[app]
+    if not re.fullmatch(pattern, tag):
         raise ValueError('Use an explicit stable release tag for the selected app')
     certificates = re.findall(r'^Signer #\d+ certificate SHA-256 digest: ([0-9a-fA-F]+)$', signer_output, re.M)
     if [value.lower() for value in certificates] != [CERT]:
@@ -48,13 +51,14 @@ def main():
     parser.add_argument('apk', type=Path)
     parser.add_argument('--tag', required=True)
     parser.add_argument('--app', choices=tuple(TARGETS), default='natro')
+    parser.add_argument('--paired', action='store_true', help='Publish Navigator in the matching Natro release')
     parser.add_argument('--apksigner', default='apksigner')
     parser.add_argument('--aapt', default='aapt')
     parser.add_argument('--output', type=Path, required=True)
     args = parser.parse_args()
     signer = subprocess.run([args.apksigner, 'verify', '--verbose', '--print-certs', str(args.apk)], check=True, capture_output=True, text=True)
     badging = subprocess.run([args.aapt, 'dump', 'badging', str(args.apk)], check=True, capture_output=True, text=True)
-    value = manifest(args.apk, args.tag, signer.stdout, badging.stdout, args.app)
+    value = manifest(args.apk, args.tag, signer.stdout, badging.stdout, args.app, args.paired)
     # Never silently overwrite a published manifest. Publish this with the same verified APK.
     with args.output.open('x', encoding='utf-8') as target:
         json.dump(value, target, ensure_ascii=False, indent=2)

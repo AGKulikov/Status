@@ -38,6 +38,7 @@ public final class FileManagerActivity extends AppCompatActivity {
     private SharedPreferences settings;
     private TextView operation;
     private RecentFilesDialog recent;
+    private int localOpenRequest;
     private FileLocation clipboardSource;
     private List<FileEntry> clipboard=new ArrayList<>();
     private boolean cut;
@@ -113,9 +114,7 @@ public final class FileManagerActivity extends AppCompatActivity {
         if (recent != null && recent.showing()) return;
         recent = new RecentFilesDialog(this, settings, reads, showHidden, new RecentFilesDialog.Actions() {
             @Override public void open(RecentFiles.Entry entry, boolean share) {
-                try {
-                    openLocal(new LocalFiles(entry.root).resolve(entry.file.path), share);
-                } catch (Exception failure) { error(failure); }
+                openLocal(entry.root, entry.file.path, share);
             }
             @Override public void showFolder(RecentFiles.Entry entry) {
                 try {
@@ -252,22 +251,35 @@ public final class FileManagerActivity extends AppCompatActivity {
     }
     private void openEntry(Pane pane,FileEntry entry,boolean share) {
         FileLocation location=pane.location;Context app=getApplicationContext();
-        if(location.kind.equals("local")){try{openLocal(new LocalFiles(new File(location.root)).resolve(entry.path),share);}catch(Exception e){error(e);}return;}
+        if(location.kind.equals("local")){openLocal(new File(location.root),entry.path,share);return;}
         if(location.kind.equals("tree")){reads.submit(()->{try{Uri uri=new DocumentFiles(app.getContentResolver(),Uri.parse(location.root)).uri(entry.path);main.post(()->openUri(uri,entry.name,share));}catch(Exception e){main.post(()->error(e));}});return;}
         if(entry.directory)return;
         new AlertDialog.Builder(this).setTitle("Скачать файл для открытия?").setMessage(entry.name+"\nФайл будет сохранён в «Загрузки/Natro».").setNegativeButton("Отмена",null).setPositiveButton("Скачать",(d,w)->{
             // Only the explicit foreground screen may open a downloaded file; never background-install APKs.
             startTask("Скачивание",c->{File folder=new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS),"Natro");if(!folder.isDirectory()&&!folder.mkdirs())throw new IOException("Не удалось создать папку загрузки");LocalFiles target=new LocalFiles(folder);
-                String path=FileOperations.copy(location.backend(app),entry.path,target,"/",entry.name,false,c);File file=target.resolve(path);main.post(()->{if(!isDestroyed()&&!isFinishing())openLocal(file,share);});return "Скачано: "+file.getName();});
+                String path=FileOperations.copy(location.backend(app),entry.path,target,"/",entry.name,false,c);main.post(()->{if(!isDestroyed()&&!isFinishing())openLocal(folder,path,share);});return "Скачано: "+FilePaths.leaf(path);});
         }).show();
     }
-    private void openLocal(File file, boolean share) {
-        try {
-            if (!file.isFile()) throw new IOException("Файл больше недоступен");
-            Uri uri = FileProvider.getUriForFile(this, getPackageName()+".fileprovider", file);
-            if (openUri(uri, file.getName(), share) && !share)
-                RecentFileTimes.recordOpen(settings, file, System.currentTimeMillis());
-        } catch (Exception failure) { error(failure); }
+    private void openLocal(File root, String path, boolean share) {
+        int request = ++localOpenRequest;
+        RecentFilesDialog source = recent != null && recent.showing() ? recent : null;
+        reads.submit(() -> {
+            try {
+                File file = new LocalFiles(root).resolve(path);
+                if (!file.isFile()) throw new IOException("Файл больше недоступен");
+                Uri uri = FileProvider.getUriForFile(this, getPackageName()+".fileprovider", file);
+                main.post(() -> {
+                    if (canOpenLocal(request, source) && openUri(uri, file.getName(), share) && !share)
+                        RecentFileTimes.recordOpen(settings, file, System.currentTimeMillis());
+                });
+            } catch (Exception failure) {
+                main.post(() -> { if (canOpenLocal(request, source)) error(failure); });
+            }
+        });
+    }
+    private boolean canOpenLocal(int request, RecentFilesDialog source) {
+        return request == localOpenRequest && resumed && !isDestroyed() && !isFinishing()
+                && (source == null || source.showing());
     }
     private boolean openUri(Uri uri,String name,boolean share){if(!resumed||isDestroyed()||isFinishing())return false;String ext=name.lastIndexOf('.')>=0?name.substring(name.lastIndexOf('.')+1).toLowerCase(Locale.ROOT):"";
         String mime=ext.equals("apk")?"application/vnd.android.package-archive":MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);if(mime==null)mime="application/octet-stream";
@@ -280,7 +292,7 @@ public final class FileManagerActivity extends AppCompatActivity {
     private void message(String value){Toast.makeText(this,value,Toast.LENGTH_LONG).show();}
     private void error(Exception e){if(!isDestroyed())new AlertDialog.Builder(this).setTitle("Не удалось выполнить").setMessage(FileTaskService.safeMessage(e)).setPositiveButton("Закрыть",null).show();}
     @Override protected void onResume(){super.onResume();resumed=true;main.post(poll);if(recent!=null && recent.showing())recent.refresh();}
-    @Override protected void onPause(){resumed=false;main.removeCallbacks(poll);super.onPause();}
+    @Override protected void onPause(){resumed=false;localOpenRequest++;main.removeCallbacks(poll);super.onPause();}
     @Override protected void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);for(Pane p:panes)state.putString("pane"+p.index,p.location.encode());state.putInt("active",active);state.putBoolean("showRecent",recent!=null && recent.showing());}
     @Override protected void onDestroy(){if(recent!=null && recent.showing())recent.dismiss();main.removeCallbacksAndMessages(null);reads.shutdownNow();super.onDestroy();}
     @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] result){super.onRequestPermissionsResult(code,permissions,result);if(code==STORAGE){reloadBoth();if(recent!=null && recent.showing())recent.refresh();}}

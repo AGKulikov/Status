@@ -19,9 +19,9 @@ public final class StockManeuverCardStateTest {
     }
     private StockManeuverCardState parse(JSONObject source) { return StockManeuverCardState.parse(source.toString(), 3, true); }
     @Test public void publishedCompanionsAcceptTheirFramesAndRejectUnknownVersions() throws Exception {
-        for (long version : new long[]{739564630L, 739564631L})
+        for (long version : new long[]{739564630L, 739564631L, 739564632L})
             assertTrue(parse(frame().put("versionCode", version)).hasMain());
-        assertFalse(parse(frame().put("versionCode", 739564632L)).hasMain());
+        assertFalse(parse(frame().put("versionCode", 739564633L)).hasMain());
     }
 
     @Test public void originalResourceAndExactDistanceSurvive() throws Exception {
