@@ -15,6 +15,7 @@ import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.*;
+import dezz.status.widget.LongPressFeedback;
 import java.io.File;
 import java.text.DateFormat;
 import java.time.Instant;
@@ -70,6 +71,7 @@ public final class RecentFilesDialog {
         content.addView(list, new LinearLayout.LayoutParams(-1, 0, 1));
         list.setOnItemClickListener((parent, view, position, id) -> perform(visible.get(position), 0));
         list.setOnItemLongClickListener((parent, view, position, id) -> {
+            LongPressFeedback.play(view);
             options(visible.get(position));
             return true;
         });
