@@ -1,0 +1,50 @@
+name: Verify Navigator 3.5.2 candidate
+on:
+  push:
+    branches: ['ci/natro-3.5.2']
+    paths: ['docs/releases/3.5.2/navigator-input.json']
+permissions:
+  contents: read
+  actions: read
+jobs:
+  navigator:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - name: Read input
+        run: |
+          set -euo pipefail
+          sha=$(jq -er '.sourceCommit | select(test("^[0-9a-f]{40}$"))' docs/releases/3.5.2/navigator-input.json)
+          tree=$(jq -er '.sourceTree | select(test("^[0-9a-f]{40}$"))' docs/releases/3.5.2/navigator-input.json)
+          echo "SOURCE_SHA=$sha" >> "$GITHUB_ENV"
+          echo "SOURCE_TREE=$tree" >> "$GITHUB_ENV"
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ env.SOURCE_SHA }}
+          path: source
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 44524202133
+          artifact-ids: 14529762533
+          merge-multiple: true
+          path: ${{ runner.temp }}/baseline
+      - name: Verify and package UI companion
+        working-directory: source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse 'HEAD^{tree}')" = "$SOURCE_TREE"
+          sdk="$ANDROID_HOME/build-tools/36.0.0"
+          if [[ ! -x "$sdk/aapt" ]]; then "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'build-tools;36.0.0'; fi
+          python3 tools/navigation_identity_352.py stage --baseline "$RUNNER_TEMP/baseline/Navigator-30.3.0-Natro-3.5.1-signed.apk" --sdk "$sdk" --candidate "$RUNNER_TEMP/nav" --source-commit "$SOURCE_SHA" --source-tree "$SOURCE_TREE" --run "$GITHUB_RUN_ID"
+          cd "$RUNNER_TEMP/nav"
+          sha256sum -- * > "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Navigator-3.5.2-verified-candidate
+          path: ${{ runner.temp }}/nav/*
+          if-no-files-found: error
+          retention-days: 14
