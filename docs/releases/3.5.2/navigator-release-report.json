@@ -1,7 +1,7 @@
 {
-  "sourceCommit": "983d7db44c2183f4198bef91de07c5f2668d7402",
-  "sourceTree": "9126682d6fcb2a8f2046243f0ffdbf86fb87be21",
-  "ciRunId": "44530588376",
+  "sourceCommit": "02c0ed2251f503a2c56babbb9efea4265141ed13",
+  "sourceTree": "0e9127449c11db31c69830295d7a9b5cb6053bb5",
+  "ciRunId": "44532329751",
   "uiSourceCommit": "af3199bc43bfe547729ef802e85a7e833e273b56",
   "package": "ru.yandex.yandexnavi",
   "versionName": "30.3.0 Natro 3.5.2",
