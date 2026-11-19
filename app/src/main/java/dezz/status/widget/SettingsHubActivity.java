@@ -182,7 +182,6 @@ public final class SettingsHubActivity extends dezz.status.widget.settings.Setti
         }
         updateBackVisibility();
         AppRuntimeBootstrap.run(this, preferences);
-        if (savedInstanceState == null && missingPermissionCount() > 0) showPermissions();
     }
 
     @Override

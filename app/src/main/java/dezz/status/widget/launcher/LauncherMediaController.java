@@ -46,6 +46,7 @@ import dezz.status.widget.Permissions;
 import dezz.status.widget.Preferences;
 import dezz.status.widget.diagnostics.ActionRecorder;
 import dezz.status.widget.launcher.media.MediaAppLauncher;
+import dezz.status.widget.shell.PrivilegedShell;
 
 /**
  * Chooses the active Android media session and augments it with the media broadcast used by
@@ -333,7 +334,7 @@ public final class LauncherMediaController {
     private long pendingSeekPositionMs = -1L;
     private boolean seekDispatchScheduled;
     private boolean seekFailureToastShown;
-    private boolean sessionAccessRegistered;
+    private boolean sessionAccessGrantAttempted;
     private boolean sessionQueryInFlight;
     private boolean sessionQueryPending;
     private int sessionQueryGeneration;
@@ -1009,14 +1010,31 @@ public final class LauncherMediaController {
     }
 
     private void ensureSessionAccessForTransportControls() {
-        if (sessionAccessRegistered || !Permissions.isNotificationAccessGranted(context)) return;
-        sessionAccessRegistered = true;
-        try {
-            NotificationListenerService.requestRebind(listenerComponent());
-        } catch (RuntimeException ignored) {
+        if (sessionAccessGrantAttempted) return;
+        sessionAccessGrantAttempted = true;
+        if (Permissions.isNotificationAccessGranted(context)) {
+            try {
+                NotificationListenerService.requestRebind(listenerComponent());
+            } catch (RuntimeException ignored) {
+            }
+            registerSessionsListener();
+            return;
         }
-        registerSessionsListener();
-
+        PrivilegedShell.get(context).ensurePrivileges(
+                PrivilegedShell.Request.forPackage(context.getPackageName())
+                        .withNotificationListener(PrivilegedShell.notificationListenerComponent(
+                                context.getPackageName(), MediaNotificationListener.class))
+                        .build(), result -> {
+                    if (!Permissions.isNotificationAccessGranted(context)) return;
+                    try {
+                        NotificationListenerService.requestRebind(listenerComponent());
+                    } catch (RuntimeException ignored) {
+                    }
+                    if (started) {
+                        registerSessionsListener();
+                        refresh();
+                    }
+                });
     }
 
     private void registerSessionsListener() {

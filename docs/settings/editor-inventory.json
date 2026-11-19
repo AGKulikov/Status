@@ -231,13 +231,13 @@
       "forms": [
         {
           "dialogs": 0,
-          "line": 85,
+          "line": 86,
           "method": "onCreate",
           "numeric_controls": 0
         },
         {
           "dialogs": 1,
-          "line": 156,
+          "line": 157,
           "method": "buildContent",
           "numeric_controls": 0
         }
@@ -292,6 +292,7 @@
         "Размер и положение на HOME…",
         "Размер и положение плавающего окна сохранятся.",
         "Размер маленькой кнопки",
+        "Разрешение поверх приложений получено",
         "Расстояние между плитками",
         "Режим отображения",
         "Сбросить",
@@ -321,7 +322,7 @@
       ],
       "numeric_controls": 2,
       "path": "app/src/main/java/dezz/status/widget/ClimatePanelSettingsActivity.java",
-      "sha256": "c4f2a36a72b49ac320ba378f4df63ce5d38c055232fdd22497d417233498c13b"
+      "sha256": "6884b154aca990daa03642f7b4ffe6d411cfaa92dfaa8a4d32194a37ecba1356"
     },
     {
       "class": "dezz.status.widget.DimMenuPanelSettingsActivity",

@@ -19,18 +19,16 @@ import dezz.status.widget.shell.PrivilegedShell;
 /** Guards silent, idempotent accessibility maintenance on the KX11 boot path. */
 public final class AccessibilityAutoGrantContractTest {
     @Test
-    public void normalStartupAndMediaDoNotGrantSystemPermissions() throws Exception {
-        Path root = Paths.get("src/main/java/dezz/status/widget");
-        if (!Files.isDirectory(root)) root = Paths.get("app").resolve(root);
-        for (String name : Arrays.asList("AppRuntimeBootstrap.java", "launcher/LauncherMediaController.java",
-                "ClimatePanelSettingsActivity.java", "media/VehicleButtonController.java")) {
-            String code = new String(Files.readAllBytes(root.resolve(name)), StandardCharsets.UTF_8);
-            org.junit.Assert.assertFalse(name, code.contains(".ensurePrivileges("));
-            org.junit.Assert.assertFalse(name, code.contains("pm grant "));
-        }
-        String hub = new String(Files.readAllBytes(root.resolve("SettingsHubActivity.java")), StandardCharsets.UTF_8);
-        assertTrue(hub.contains("Settings.ACTION_ACCESSIBILITY_SETTINGS"));
-        assertTrue(hub.contains("Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"));
+    public void accessibilityMaintenanceIsExcludedFromSuccessToast() {
+        List<PrivilegedShell.PermissionKind> accessibilityOnly =
+                Collections.singletonList(PrivilegedShell.PermissionKind.ACCESSIBILITY);
+        assertTrue(AppRuntimeBootstrap.successKindsForToast(accessibilityOnly).isEmpty());
+
+        List<PrivilegedShell.PermissionKind> mixed = Arrays.asList(
+                PrivilegedShell.PermissionKind.ACCESSIBILITY,
+                PrivilegedShell.PermissionKind.OVERLAY);
+        assertEquals(Collections.singletonList(PrivilegedShell.PermissionKind.OVERLAY),
+                AppRuntimeBootstrap.successKindsForToast(mixed));
     }
 
     @Test

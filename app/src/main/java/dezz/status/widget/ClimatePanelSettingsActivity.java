@@ -46,6 +46,7 @@ import dezz.status.widget.climate.ClimatePanelService;
 import dezz.status.widget.climate.ScreenReservationStateStore;
 import dezz.status.widget.settings.AppleColorPickerDialog;
 import dezz.status.widget.settings.SettingsBackNavigation;
+import dezz.status.widget.shell.PrivilegedShell;
 
 /** Immediate editor for either HOME climate widgets or the independent floating surface. */
 public final class ClimatePanelSettingsActivity extends SettingsLauncherProfileActivity {
@@ -403,16 +404,30 @@ public final class ClimatePanelSettingsActivity extends SettingsLauncherProfileA
     private void requestOverlayPermission() {
         if (overlayPermissionRequestInFlight) return;
         overlayPermissionRequestInFlight = true;
-        try {
-            Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                    Uri.parse("package:" + getPackageName()));
-            startActivity(intent);
-        } catch (RuntimeException error) {
-            overlayPermissionRequestInFlight = false;
-            Toast.makeText(this,
-                    "Не удалось открыть системную настройку. Разрешите приложению показ поверх других окон.",
-                    Toast.LENGTH_LONG).show();
-        }
+        PrivilegedShell.Request request = PrivilegedShell.Request
+                .forPackage(getPackageName())
+                .withOverlay()
+                .build();
+        PrivilegedShell.get(this).ensurePrivileges(request, result -> {
+            if (isFinishing() || isDestroyed()) return;
+            if (Settings.canDrawOverlays(this)) {
+                overlayPermissionRequestInFlight = false;
+                applyClimatePanel();
+                Toast.makeText(this, "Разрешение поверх приложений получено",
+                        Toast.LENGTH_SHORT).show();
+                return;
+            }
+            try {
+                Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:" + getPackageName()));
+                startActivity(intent);
+            } catch (RuntimeException error) {
+                overlayPermissionRequestInFlight = false;
+                Toast.makeText(this,
+                        "Не удалось открыть системную настройку. Разрешите приложению показ поверх других окон.",
+                        Toast.LENGTH_LONG).show();
+            }
+        });
     }
 
     private void updateModeSettings(int mode) {

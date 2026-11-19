@@ -58,7 +58,7 @@ public final class Ha1216ImmediateStartupContractTest {
         assertTrue(run.contains("reconcileServices(activity, preferences)"));
         assertFalse(run.contains("automaticReconcileDelayMillis"));
         String reconcile = between(source, "static void reconcileServices(",
-                "private static void maybeShowCrashReport");
+                "private static void tryAutoGrant");
         assertTrue(reconcile.contains("WidgetServiceStarter.startIfNeeded(appContext)"));
         assertTrue(reconcile.contains("DriverPanelService.apply(appContext)"));
         assertTrue(reconcile.contains("HudPresentationService.apply(appContext)"));

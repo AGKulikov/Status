@@ -35,8 +35,7 @@ public final class SettingsHubRuntimeContractTest {
         assertFalse(bootstrap.contains("automaticReconcileDelayMillis"));
         assertTrue(bootstrap.contains("ClimatePanelService.apply("));
         assertTrue(bootstrap.contains("maybeShowCrashReport(activity)"));
-        assertFalse(bootstrap.contains("ensurePrivileges("));
-        assertTrue(hub.contains("savedInstanceState == null && missingPermissionCount() > 0"));
+        assertTrue(bootstrap.contains("tryAutoGrant(activity.getApplicationContext()"));
         assertTrue(bootstrap.contains("static void reconcileServices("));
         assertTrue(hub.contains("AppRuntimeBootstrap.reconcileServices(this, preferences)"));
     }

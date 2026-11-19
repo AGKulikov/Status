@@ -49,12 +49,13 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
     private volatile String status = "Загрузка настроек…";
     private volatile long generation, logGeneration;
     private volatile Process logProcess;
-    private volatile boolean listening;
+    private volatile boolean listening, permissionPending;
     private final java.util.concurrent.atomic.AtomicLong inputSequence = new java.util.concurrent.atomic.AtomicLong();
     private final java.util.concurrent.atomic.AtomicLong discardedInputs = new java.util.concurrent.atomic.AtomicLong();
     private volatile long lastInputAt;
     private String currentInput = "none";
     private final Map<String, String> gestureInputs = new HashMap<>();
+    private int permissionAttempts;
     private final java.util.Set<VehicleButton> patching = java.util.EnumSet.noneOf(VehicleButton.class);
     private final java.util.Map<VehicleButton, Boolean> verifiedDefault = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Map<VehicleButton, String> defaultDetails = new java.util.concurrent.ConcurrentHashMap<>();
@@ -133,7 +134,7 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
                             + ", va_enabled=" + enabled(VehicleButton.VA) + ", listening=" + listening
                             + ", process_alive=" + (process != null && process.isAlive())
                             + ", read_logs=" + (context.checkSelfPermission("android.permission.READ_LOGS") == PackageManager.PERMISSION_GRANTED)
-                            + ", generation=" + generation
+                            + ", permission_pending=" + permissionPending + ", generation=" + generation
                             + ", log_owner=" + logGeneration + ", epoch=" + inputEpoch.get()
                             + ", input_pending=" + pendingInputs.get() + ", actions_pending=" + actions.getQueue().size()
                             + ", actions_active=" + actions.getActiveCount() + ", discarded=" + discardedInputs.get()
@@ -320,10 +321,11 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
     void reconnectAfterUpdate(String reason) {
         input.post(() -> {
             logGeneration++; listening = false; inputEpoch.incrementAndGet(); resetInputState();
+            permissionAttempts = 0;
             Process old = logProcess; logProcess = null;
             if (old != null) old.destroy();
             DiagnosticJournal.infoAsync("vehicle-buttons", "input_reconnect reason=" + reason
-                    + ", needed=" + needed());
+                    + ", needed=" + needed() + ", permission_pending=" + permissionPending);
             reconcile();
         });
     }
@@ -335,7 +337,19 @@ public final class VehicleButtonController implements ButtonGestureEngine.Bindin
             status = "Обработка дополнительных кнопок выключена"; return;
         }
         if (context.checkSelfPermission("android.permission.READ_LOGS") != PackageManager.PERMISSION_GRANTED) {
-            status = "Для дополнительных кнопок требуется разрешение READ_LOGS";
+            if (permissionPending) return;
+            permissionPending = true; permissionAttempts++; status = "Подключение кнопок…";
+            PrivilegedShell.get(context).runCommand("pm grant " + MediaButtonController.quote(context.getPackageName())
+                    + " android.permission.READ_LOGS", (output, error) -> input.post(() -> {
+                        permissionPending = false;
+                        if (context.checkSelfPermission("android.permission.READ_LOGS") == PackageManager.PERMISSION_GRANTED)
+                            reconcile();
+                        else {
+                            status = "Не удалось подключить кнопки: проверьте встроенный ADB";
+                            DiagnosticJournal.warn("vehicle-buttons", "input_permission_failed attempt=" + permissionAttempts);
+                            if (permissionAttempts < 3) input.postDelayed(this::reconcile, 5000);
+                        }
+                    }));
             return;
         }
         if (!listening) {
