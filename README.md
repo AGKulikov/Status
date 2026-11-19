@@ -1,3 +1,5 @@
+> Кандидат Natro 3.5.0 в ветке `release/natro-3.5.0`. [Синяя табличка и «Недавние»](docs/releases/3.5.0/README_RU.md).
+
 > Текущая разработка: `release/natro-3.4.9` — единый раздел обновлений Natro, Навигатора и Музыки. SOURCE/TEST/APK/PUBLISH PASS; Natro3.4.9 stable/latest, Navigator3.4.9 и MusicNatro4 опубликованы. FIELD OPEN. [Выпуск и проверки](docs/releases/3.4.9/README_RU.md).
 
 > Natro 3.4.8 + Music Natro 4: SOURCE/TEST/APK/PUBLISH PASS; опубликован stable/latest 14.11.2026, FIELD OPEN. [Установка и проверка](docs/releases/3.4.8/README_RU.md). Актуальная ветка: `release/natro-3.4.8`.

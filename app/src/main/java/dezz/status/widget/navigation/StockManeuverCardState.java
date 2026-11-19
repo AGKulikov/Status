@@ -75,6 +75,12 @@ public final class StockManeuverCardState {
     }
     public boolean hasMain() { return visible && ((imageVisible && !image.isEmpty()) || !lanes.isEmpty()); }
     public boolean hasAuxiliary() { return visible && (!auxiliaryText.isEmpty() || !auxiliaryImage.isEmpty() || !auxiliaryLanes.isEmpty()); }
+    // The 3.4.9 repack changed the APK version but kept the 3.4.2 commands and drawables.
+    // Installed 3.4.9 still sends the older version in its maneuver frames.
+    static boolean supportsNavigator(long versionCode) {
+        return versionCode == 739564630L || versionCode == 739564631L;
+    }
+
     public static StockManeuverCardState parse(String raw, long epoch, boolean routeActive) {
         if (raw == null || raw.isEmpty()) return LEGACY;
         if (!routeActive || raw.length() > 32768) return HIDDEN;
@@ -83,7 +89,7 @@ public final class StockManeuverCardState {
             if (source.getInt("schema") != 1 || source.getLong("routeEpoch") != epoch
                     || !source.optBoolean("visible")
                     || !"ru.yandex.yandexnavi".equals(source.getString("package"))
-                    || source.getLong("versionCode") != 739564630L) return HIDDEN;
+                    || !supportsNavigator(source.getLong("versionCode"))) return HIDDEN;
             return new StockManeuverCardState(source);
         } catch (Exception invalid) { return HIDDEN; }
     }

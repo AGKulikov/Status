@@ -49,6 +49,57 @@ public class FileManagerScreenTest {
             assertEquals(View.GONE,((View)ReflectionHelpers.getField(panes[0],"box")).getVisibility());assertEquals(View.VISIBLE,((View)ReflectionHelpers.getField(panes[1],"box")).getVisibility());
         }
     }
+    @Test public void recentDownloadCanBeLocatedAndCopiedFromTheRealPane() throws Exception {
+        Application app = RuntimeEnvironment.getApplication();
+        Shadows.shadowOf(app).grantPermissions(Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE);
+        File folder = new File(Environment.getExternalStorageDirectory(), "Download/Natro-test");
+        assertTrue(folder.isDirectory() || folder.mkdirs());
+        File download = new File(folder, "recent-ui-test.apk");
+        assertTrue(download.createNewFile());
+        try (ActivityController<FileManagerActivity> controller = Robolectric.buildActivity(FileManagerActivity.class).setup().visible()) {
+            FileManagerActivity activity = controller.get();
+            click(activity, "Недавние");
+            AlertDialog dialog = org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
+            View decor = dialog.getWindow().getDecorView();
+            EditText filter = findType(decor, EditText.class);
+            filter.setText(download.getName());
+            ListView recent = findType(decor, ListView.class);
+            long end = System.nanoTime() + java.util.concurrent.TimeUnit.SECONDS.toNanos(10);
+            while (recent.getCount() == 0 && System.nanoTime() < end) {
+                Shadows.shadowOf(Looper.getMainLooper()).idle();
+                Thread.sleep(10);
+            }
+            assertEquals(1, recent.getCount());
+            assertEquals("/Download/Natro-test/recent-ui-test.apk", ((RecentFiles.Entry)recent.getItemAtPosition(0)).file.path);
+            recent.getOnItemLongClickListener().onItemLongClick(recent, null, 0, 0);
+            AlertDialog actions = org.robolectric.shadows.ShadowAlertDialog.getLatestAlertDialog();
+            actions.getListView().performItemClick(null, 1, 1);
+            Shadows.shadowOf(Looper.getMainLooper()).idle();
+            Object[] panes = ReflectionHelpers.getField(activity, "panes");
+            FileLocation location = ReflectionHelpers.getField(panes[0], "location");
+            assertEquals("/Download/Natro-test", location.path);
+            java.util.concurrent.Future<?> load = ReflectionHelpers.getField(panes[0], "loading");
+            load.get(10, java.util.concurrent.TimeUnit.SECONDS);
+            Shadows.shadowOf(Looper.getMainLooper()).idle();
+            click(activity, "Копировать");
+            List<FileEntry> clipboard = ReflectionHelpers.getField(activity, "clipboard");
+            assertEquals(1, clipboard.size());
+            assertEquals("/Download/Natro-test/recent-ui-test.apk", clipboard.get(0).path);
+        } finally { download.delete(); folder.delete(); }
+    }
+    private static <T extends View> T findType(View root, Class<T> type) {
+        if (type.isInstance(root)) return type.cast(root);
+        if (root instanceof ViewGroup) {
+            ViewGroup group = (ViewGroup)root;
+            for (int i=0; i<group.getChildCount(); i++) {
+                T result = findType(group.getChildAt(i), type);
+                if (result != null) return result;
+            }
+        }
+        return null;
+    }
+
     @Test public void loginDoesNotAllowLookalikeHostsOrUnencryptedRedirects() {
         assertTrue(YandexDiskLoginActivity.allowed("https://passport.yandex.ru/auth"));
         assertFalse(YandexDiskLoginActivity.allowed("https://passport.yandex.ru.evil.test/"));

@@ -18,6 +18,12 @@ public final class StockManeuverCardStateTest {
                 .put("auxiliary", new JSONObject());
     }
     private StockManeuverCardState parse(JSONObject source) { return StockManeuverCardState.parse(source.toString(), 3, true); }
+    @Test public void publishedCompanionsAcceptTheirFramesAndRejectUnknownVersions() throws Exception {
+        for (long version : new long[]{739564630L, 739564631L})
+            assertTrue(parse(frame().put("versionCode", version)).hasMain());
+        assertFalse(parse(frame().put("versionCode", 739564632L)).hasMain());
+    }
+
     @Test public void originalResourceAndExactDistanceSurvive() throws Exception {
         StockManeuverCardState state = parse(frame());
         assertTrue(state.hasMain()); assertEquals("context_ra_turn_right", state.image);

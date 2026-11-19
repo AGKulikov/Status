@@ -25,6 +25,10 @@ public final class StockManeuverResources {
     private int configuration;
     public StockManeuverResources(Context context) { this.context = context.getApplicationContext(); }
 
+    static boolean compatiblePackage(PackageInfo navigator, PackageManager manager, String host) {
+        return StockManeuverCardState.supportsNavigator(navigator.getLongVersionCode())
+                && manager.checkSignatures(host, PACKAGE) == PackageManager.SIGNATURE_MATCH;
+    }
     private Drawable get(String name) {
         if (name.isEmpty() || !name.matches("[a-z0-9_]{1,160}")) return null;
         try {
@@ -33,8 +37,7 @@ public final class StockManeuverResources {
             if (resources == null || now - checkedAt >= 1000 || configuration != config) {
                 PackageManager manager = context.getPackageManager();
                 PackageInfo info = manager.getPackageInfo(PACKAGE, 0);
-                if (info.getLongVersionCode() != 739564630L || manager.checkSignatures(
-                        context.getPackageName(), PACKAGE) != PackageManager.SIGNATURE_MATCH) {
+                if (!compatiblePackage(info, manager, context.getPackageName())) {
                     cache.evictAll(); resources = null; return null;
                 }
                 if (resources == null || updatedAt != info.lastUpdateTime || configuration != config) {

@@ -37,6 +37,7 @@ public final class FileManagerActivity extends AppCompatActivity {
     private boolean compact,showHidden,resumed;
     private SharedPreferences settings;
     private TextView operation;
+    private RecentFilesDialog recent;
     private FileLocation clipboardSource;
     private List<FileEntry> clipboard=new ArrayList<>();
     private boolean cut;
@@ -44,7 +45,7 @@ public final class FileManagerActivity extends AppCompatActivity {
     private final Runnable poll=new Runnable(){@Override public void run(){
         if(isDestroyed())return;
         operation.setText(FileTaskService.status+(FileTaskService.busy?" · нажмите, чтобы отменить":""));
-        if(seenRevision!=FileTaskService.revision){seenRevision=FileTaskService.revision;if(!FileTaskService.busy){reloadBoth();}}
+        if(seenRevision!=FileTaskService.revision){seenRevision=FileTaskService.revision;if(!FileTaskService.busy){reloadBoth();if(recent!=null && recent.showing())recent.refresh();}}
         main.postDelayed(this,500);
     }};
     private final class Pane {
@@ -86,6 +87,7 @@ public final class FileManagerActivity extends AppCompatActivity {
         LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);
         header.addView(button("Назад",this::finish));
         TextView title=text("Файлы",28,TEXT);title.setTypeface(null,Typeface.BOLD);title.setPadding(dp(16),0,0,0);header.addView(title,new LinearLayout.LayoutParams(0,dp(52),1));
+        header.addView(button("Недавние", this::showRecent));
         header.addView(button("Войти в Яндекс",()->startActivityForResult(new Intent(this,YandexDiskConnectActivity.class),LOGIN)));
         header.addView(button("Ещё",this::more));root.addView(header);
         HorizontalScrollView actions=new HorizontalScrollView(this);actions.setHorizontalScrollBarEnabled(false);LinearLayout tools=new LinearLayout(this);
@@ -103,8 +105,28 @@ public final class FileManagerActivity extends AppCompatActivity {
         operation=text("Готово к работе",15,MUTED);operation.setMinHeight(dp(36));operation.setGravity(Gravity.CENTER_VERTICAL);operation.setOnClickListener(v->{if(FileTaskService.busy)new AlertDialog.Builder(this).setTitle("Отменить текущую операцию?").setMessage("Уже завершённые файлы останутся в назначении.").setNegativeButton("Продолжить",null).setPositiveButton("Отменить",(d,w)->FileTaskService.cancel()).show();});root.addView(operation);
         setContentView(root);SettingsBackNavigation.applySafeTopInset(this,root);getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);
         activate(active);
+        if (state != null && state.getBoolean("showRecent")) showRecent();
         if(checkSelfPermission(Manifest.permission.READ_EXTERNAL_STORAGE)!=PackageManager.PERMISSION_GRANTED)
             requestPermissions(new String[]{Manifest.permission.READ_EXTERNAL_STORAGE,Manifest.permission.WRITE_EXTERNAL_STORAGE},STORAGE);
+    }
+    private void showRecent() {
+        if (recent != null && recent.showing()) return;
+        recent = new RecentFilesDialog(this, settings, reads, showHidden, new RecentFilesDialog.Actions() {
+            @Override public void open(RecentFiles.Entry entry, boolean share) {
+                try {
+                    openLocal(new LocalFiles(entry.root).resolve(entry.file.path), share);
+                } catch (Exception failure) { error(failure); }
+            }
+            @Override public void showFolder(RecentFiles.Entry entry) {
+                try {
+                    Pane pane = current();
+                    setLocation(pane, new FileLocation("local", entry.root.getPath(),
+                            FilePaths.parent(entry.file.path), RecentFilesDialog.volumeLabel(entry.root)));
+                    pane.selected.add(entry.file.path);
+                } catch (Exception failure) { error(failure); }
+            }
+        });
+        recent.show();
     }
     private void buildPane(Pane pane) {
         pane.box=new LinearLayout(this);pane.box.setOrientation(LinearLayout.VERTICAL);pane.box.setPadding(dp(12),dp(10),dp(12),dp(8));pane.box.setBackground(background(CARD));
@@ -239,22 +261,29 @@ public final class FileManagerActivity extends AppCompatActivity {
                 String path=FileOperations.copy(location.backend(app),entry.path,target,"/",entry.name,false,c);File file=target.resolve(path);main.post(()->{if(!isDestroyed()&&!isFinishing())openLocal(file,share);});return "Скачано: "+file.getName();});
         }).show();
     }
-    private void openLocal(File file,boolean share){try{openUri(FileProvider.getUriForFile(this,getPackageName()+".fileprovider",file),file.getName(),share);}catch(Exception e){error(e);}}
-    private void openUri(Uri uri,String name,boolean share){if(!resumed||isDestroyed()||isFinishing())return;String ext=name.lastIndexOf('.')>=0?name.substring(name.lastIndexOf('.')+1).toLowerCase(Locale.ROOT):"";
+    private void openLocal(File file, boolean share) {
+        try {
+            if (!file.isFile()) throw new IOException("Файл больше недоступен");
+            Uri uri = FileProvider.getUriForFile(this, getPackageName()+".fileprovider", file);
+            if (openUri(uri, file.getName(), share) && !share)
+                RecentFileTimes.recordOpen(settings, file, System.currentTimeMillis());
+        } catch (Exception failure) { error(failure); }
+    }
+    private boolean openUri(Uri uri,String name,boolean share){if(!resumed||isDestroyed()||isFinishing())return false;String ext=name.lastIndexOf('.')>=0?name.substring(name.lastIndexOf('.')+1).toLowerCase(Locale.ROOT):"";
         String mime=ext.equals("apk")?"application/vnd.android.package-archive":MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext);if(mime==null)mime="application/octet-stream";
         Intent intent=share?new Intent(Intent.ACTION_SEND).setType(mime).putExtra(Intent.EXTRA_STREAM,uri):new Intent(Intent.ACTION_VIEW).setDataAndType(uri,mime);
         intent.setClipData(ClipData.newRawUri(name,uri));intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        try{startActivity(share?Intent.createChooser(intent,"Поделиться файлом"):intent);}catch(ActivityNotFoundException e){message("Нет приложения для открытия этого типа файла");}
+        try{startActivity(share?Intent.createChooser(intent,"Поделиться файлом"):intent);return true;}catch(ActivityNotFoundException e){message("Нет приложения для открытия этого типа файла");return false;}
     }
     private interface Entered {void accept(String text)throws Exception;}
     private void input(String title,String value,Entered accept){EditText field=new EditText(this);field.setText(value);field.setSingleLine();field.setSelectAllOnFocus(true);field.setPadding(dp(24),dp(12),dp(24),dp(12));AlertDialog dialog=new AlertDialog.Builder(this).setTitle(title).setView(field).setNegativeButton("Отмена",null).setPositiveButton("Готово",null).create();dialog.setOnShowListener(d->dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{try{accept.accept(field.getText().toString());dialog.dismiss();}catch(Exception e){field.setError(FileTaskService.safeMessage(e));}}));dialog.show();}
     private void message(String value){Toast.makeText(this,value,Toast.LENGTH_LONG).show();}
     private void error(Exception e){if(!isDestroyed())new AlertDialog.Builder(this).setTitle("Не удалось выполнить").setMessage(FileTaskService.safeMessage(e)).setPositiveButton("Закрыть",null).show();}
-    @Override protected void onResume(){super.onResume();resumed=true;main.post(poll);}
+    @Override protected void onResume(){super.onResume();resumed=true;main.post(poll);if(recent!=null && recent.showing())recent.refresh();}
     @Override protected void onPause(){resumed=false;main.removeCallbacks(poll);super.onPause();}
-    @Override protected void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);for(Pane p:panes)state.putString("pane"+p.index,p.location.encode());state.putInt("active",active);}
-    @Override protected void onDestroy(){main.removeCallbacksAndMessages(null);reads.shutdownNow();super.onDestroy();}
-    @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] result){super.onRequestPermissionsResult(code,permissions,result);if(code==STORAGE)reloadBoth();}
+    @Override protected void onSaveInstanceState(Bundle state){super.onSaveInstanceState(state);for(Pane p:panes)state.putString("pane"+p.index,p.location.encode());state.putInt("active",active);state.putBoolean("showRecent",recent!=null && recent.showing());}
+    @Override protected void onDestroy(){if(recent!=null && recent.showing())recent.dismiss();main.removeCallbacksAndMessages(null);reads.shutdownNow();super.onDestroy();}
+    @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] result){super.onRequestPermissionsResult(code,permissions,result);if(code==STORAGE){reloadBoth();if(recent!=null && recent.showing())recent.refresh();}}
     @Override protected void onActivityResult(int request,int result,Intent data){super.onActivityResult(request,result,data);
         if(result!=RESULT_OK)return;
         if(request==LOGIN){try{setLocation(current(),new FileLocation("disk","","/","Яндекс Диск"));}catch(Exception e){error(e);}}

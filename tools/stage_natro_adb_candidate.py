@@ -63,7 +63,8 @@ def main():
     reuse_300 = os.environ.get("REUSE_NAVIGATOR_300") == "true"
     reuse_302 = os.environ.get("REUSE_NAVIGATOR_302") == "true"
     reuse_339 = os.environ.get("REUSE_NAVIGATOR_339") == "true"
-    if sum([reuse_300, reuse_302, reuse_339]) > 1:
+    reuse_349 = os.environ.get("REUSE_NAVIGATOR_349") == "true"
+    if sum([reuse_300, reuse_302, reuse_339, reuse_349]) > 1:
         raise ValueError("Select exactly one verified Navigator for reuse")
     compatible_pair = None
     if reuse_300:
@@ -78,6 +79,11 @@ def main():
         if sha256(patch) != "1aa6f536cf9464a1b0d32da5abfc47d7a528e5b9d509417dad41acb619956490":
             raise ValueError("Navigator reuse requires the exact verified 3.3.9 patch bytes")
         compatible_pair = "Natro 3.3.9 / Navigator 30.3.0"
+    if reuse_349:
+        published = json.loads(Path("docs/releases/3.4.9/navigator-release-report.json").read_text())
+        if sha256(patch) != published["ciBridgeSha256"]:
+            raise ValueError("Navigator bridge differs from the published 3.4.9 release")
+        compatible_pair = "Navigator Natro 3.4.2 / 3.4.9"
     manifest = {
         "versionName": version, "versionCode": code, "package": "ru.natro.statuswidget",
         "sourceCommit": os.environ["GITHUB_SHA"],
@@ -95,6 +101,9 @@ def main():
         "helperChanged": os.environ.get("HELPER_CHANGED") == "true",
         "physicalKx11Verification": "pending", "browserVisualVerification": "pending",
     }
+    if reuse_349:
+        manifest["navigator"].update(baselineVersion=published["versionName"],
+                                     baselineSha256=published["sha256"], allowedPayloadChanges=[])
     if os.environ.get("ALICE_ENGINE_HOOKS") == "true":
         if compatible_pair is not None: raise ValueError("Native hooks require a new Navigator pair")
         native = Path("build/alice-focus-tool")

@@ -6,7 +6,7 @@
   "shared_preferences": [
     {
       "name": "natro_file_manager_v1",
-      "contents": "CE pane0/pane1 JSON, sort0, showHidden false, bookmarks StringSet, encrypted v1 yandexSession; no password or transfer replay.",
+      "contents": "CE pane0/pane1 JSON, sort0, showHidden false, bookmarks StringSet, encrypted v1 yandexSession; no password or transfer replay. recentLocalOpens: up to 200 local paths and open times; absent means empty.",
       "source": "app/src/main/java/dezz/status/widget/FileManagerActivity.java; YandexDiskSession.java",
       "restore_policy": "Full prefs adapter, v1 secrets rewrapped by existing PortableBackupSecrets. Restore locations/bookmarks; SAF grants require reconnection on a new installation, expired cloud session requires login."
     },
@@ -364,7 +364,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/backup/BackupDefaultsMigration.java": {
-      "sha256": "d84364a44c8256a731584be915e74ecb5f6fc9198dec39f1d1fe2f46e9bf2808",
+      "sha256": "24090af1e75f7288fbc292957b24c2a8daf880edef710f33c3f1d4d8c51b8718",
       "access_kinds": [
         "files"
       ]
@@ -804,7 +804,7 @@
       ]
     },
     "app/src/main/java/dezz/status/widget/FileManagerActivity.java": {
-      "sha256": "8bf64e72cef45053a823428aace0e846d92fa2294a7e7693f607e7c908396179",
+      "sha256": "c9ed4c8426dbccd9fa0282eaac3b47ad38aa01c947cc71ea68b332128a805b92",
       "access_kinds": [
         "external_resource",
         "files",
@@ -813,6 +813,12 @@
     },
     "app/src/main/java/dezz/status/widget/files/LocalFiles.java": {
       "sha256": "3d4c9e4298e7353e32b4c70e257ecfe2eb51ddfaafdc10a5fee145616d9daefb",
+      "access_kinds": [
+        "files"
+      ]
+    },
+    "app/src/main/java/dezz/status/widget/files/RecentFilesDialog.java": {
+      "sha256": "eb347cba84ff04308330724323d81734a161a0abe1f0652e025137e1281209f4",
       "access_kinds": [
         "files"
       ]
