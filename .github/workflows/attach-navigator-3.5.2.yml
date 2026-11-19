@@ -1,0 +1,76 @@
+name: Verify and attach signed Navigator 3.5.2 to the update draft
+on:
+  push:
+    branches: ['ci/natro-3.5.2']
+    paths: ['docs/releases/3.5.2/navigator-signing-handoff.json']
+permissions:
+  actions: read
+  contents: write
+jobs:
+  attach:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          persist-credentials: false
+      - name: Verify source and candidate run
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          api="repos/$GITHUB_REPOSITORY"
+          gh api "$api/actions/runs/44530588376" | jq -e '.conclusion=="success" and .head_sha=="cbfbe6323108bc498e01fc7ee10db67cf13cad65"'
+          gh api "$api/actions/artifacts/14533314175" | jq -e '.expired==false and .digest=="sha256:a8eef69f5ff8b65750057f6ea1c8e6f1582609b559cc28dbe3f1d682eebf5363"'
+          gh api "$api/git/ref/heads/release/natro-3.5.2" | jq -e '.object.sha=="983d7db44c2183f4198bef91de07c5f2668d7402"'
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: 983d7db44c2183f4198bef91de07c5f2668d7402
+          path: source
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 44530588376
+          artifact-ids: 14533314175
+          merge-multiple: true
+          path: ${{ runner.temp }}/candidate
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 44524202133
+          artifact-ids: 14529762533
+          merge-multiple: true
+          path: ${{ runner.temp }}/baseline
+      - name: Reconstruct and verify Navigator
+        run: |
+          set -euo pipefail
+          doc=docs/releases/3.5.2
+          out="$RUNNER_TEMP/release"
+          mkdir "$out"
+          cp "$doc"/navigator-{release-report.json,signature-verification.txt,update.json} "$out"
+          apk=Navigator-30.3.0-Natro-3.5.2
+          python3 source/tools/apk_signature_handoff.py apply --unsigned "$RUNNER_TEMP/candidate/$apk-unsigned.apk" --patch "$doc/navigator-signing-handoff.json" --output "$out/$apk-signed.apk"
+          sdk="$ANDROID_HOME/build-tools/36.0.0"
+          if [[ ! -x "$sdk/aapt" ]]; then "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" 'build-tools;36.0.0'; fi
+          python3 source/tools/navigation_identity_352.py verify --sdk "$sdk" --candidate "$RUNNER_TEMP/candidate" --baseline "$RUNNER_TEMP/baseline/Navigator-30.3.0-Natro-3.5.1-signed.apk" --output "$out" --source-commit 983d7db44c2183f4198bef91de07c5f2668d7402 --source-tree 9126682d6fcb2a8f2046243f0ffdbf86fb87be21 --run 44530588376
+          python3 source/tools/create_update_manifest.py "$out/$apk-signed.apk" --tag natro-v3.5.2 --app navigator --paired --apksigner "$sdk/apksigner" --aapt "$sdk/aapt" --output "$RUNNER_TEMP/check.json"
+          cmp "$RUNNER_TEMP/check.json" "$out/navigator-update.json"
+      - name: Attach to draft and compare downloaded bytes
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          api="repos/$GITHUB_REPOSITORY/releases"
+          id=451341760
+          source=983d7db44c2183f4198bef91de07c5f2668d7402
+          gh api "$api/$id" | jq -e --arg source "$source" '.draft and .tag_name=="natro-v3.5.2" and (.target_commitish==$source or (.target_commitish=="e528ca0c2466aa65d91a279c7f6882e119c345ab" and (.assets|length)==0))'
+          gh api -X PATCH "$api/$id" -f target_commitish="$source" | jq -e --arg source "$source" '.draft and .target_commitish==$source'
+          for path in "$RUNNER_TEMP/release/"*; do
+            name=$(basename "$path")
+            asset=$(gh api "$api/$id/assets" | jq -r --arg name "$name" '.[] | select(.name==$name) | .id')
+            if [[ -z "$asset" ]]; then
+              asset=$(gh api -X POST "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$id/assets?name=$name" -H "Content-Type: application/octet-stream" --input "$path" --jq '.id')
+            fi
+            gh api "$api/assets/$asset" -H 'Accept: application/octet-stream' > "$RUNNER_TEMP/readback"
+            cmp "$path" "$RUNNER_TEMP/readback"
+          done
