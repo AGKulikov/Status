@@ -170,6 +170,11 @@ public class PixelCopy {
     }
 }''')
 fixture('android.util.Log','public class Log {public static int d(String t,String s){return 0;}}')
+fixture('ru.natro.navigation.NavigationBridgeClient', '''
+final class NavigationBridgeClient {
+    static final java.util.List<String> diagnostics=new java.util.ArrayList<>();
+    static void reportDiagnostic(String detail){diagnostics.add(detail);}
+}''')
 fixture('com.yandex.mapkit.geometry.Point','public class Point {public final double latitude,longitude;public Point(double a,double b){latitude=a;longitude=b;}}')
 fixture('ru.natro.navigation.NavigatorStatePublisher','''
 final class NavigatorStatePublisher {
@@ -321,6 +326,65 @@ public class PrimaryTurnReplay {
                 check(s!=null && s.texture==next,"new distance positively verified "+i);
             }
             break;
+        case "revision_during_copy":
+        case "revision_during_worker":
+            poll();complete(0);check(poll()!=null,"initial confirmed turn");
+            for(int i=0;i<12;i++){
+                advance(350);PrimaryTurnSample before=poll();
+                check(before!=null,"continuous visible sign before revision "+i);
+                StockTurnTextures.Texture next=texture(2+i);next.source=original.source;
+                if(which.equals("revision_during_worker")){
+                    Bitmap.entered=new java.util.concurrent.CountDownLatch(1);
+                    Bitmap.resume=new java.util.concurrent.CountDownLatch(1);
+                    last().finish(0);
+                    check(Bitmap.entered.await(2,java.util.concurrent.TimeUnit.SECONDS),"pixel worker entered");
+                }
+                select(next);
+                if(which.equals("revision_during_worker"))Bitmap.resume.countDown();
+                complete(0);s=poll();
+                Bitmap.entered=null;Bitmap.resume=null;
+                check(s!=null&&s.sampledAt==SystemClock.now,"observed pixels renew proof despite texture revision "+i);
+                check(s.texture!=next,"unobserved revision cannot replace captured pixels");
+                Arrays.fill(screen.pixels,0);paint(second,next);
+            }
+            break;
+        case "gpu_revision_lag":
+            poll();complete(0);check(poll()!=null,"initial confirmed turn");
+            for(int i=0;i<8;i++){
+                advance(350);StockTurnTextures.Texture next=texture(2+i);next.source=original.source;
+                select(next);poll();complete(0);s=poll();
+                check(s!=null&&s.texture==original,"old texture still visible on GPU must remain "+i);
+                check(s.sampledAt==SystemClock.now,"old pixels actually reverified, not TTL extension "+i);
+            }
+            Arrays.fill(screen.pixels,0);advance(350);poll();complete(0);check(poll()!=null,"one blank frame");
+            advance(350);poll();complete(0);check(poll()==null,"confirmed disappearance clears despite revision cache");
+            break;
+        case "revision_miss_during_copy":
+            poll();complete(0);s=poll();
+            Arrays.fill(screen.pixels,0);
+            for(int i=0;i<2;i++){
+                advance(350);poll();StockTurnTextures.Texture next=texture(2+i);next.source=original.source;
+                select(next);complete(0);
+                check(poll()==s,"changing source is not a verified absence "+i);
+            }
+            SystemClock.now=s.sampledAt+PrimaryTurnSample.FRESH_MS;
+            check(poll()==null,"unmatched revisions cannot extend evidence deadline");break;
+        case "revision_ambiguity":
+            poll();complete(0);check(poll()!=null,"initial proof");
+            paint(first,original);advance(350);poll();
+            StockTurnTextures.Texture changed=texture(2);changed.source=original.source;select(changed);
+            complete(0);check(poll()==null,"real spatial ambiguity still clears across source revision");break;
+        case "revision_cache_ambiguity":
+            poll();complete(0);check(poll()!=null,"initial proof");
+            StockTurnTextures.Texture competitor=texture(2);competitor.source=original.source;
+            select(competitor);paint(first,competitor);advance(350);poll();complete(0);
+            check(poll()==null,"different revisions at different route positions remain ambiguous");
+            check(NavigationBridgeClient.diagnostics.stream().anyMatch(d->d.contains("cause=ambiguous_pixels")),"journal records the actual hide reason");break;
+        case "same_source_same_pixels":
+            poll();complete(0);check(poll()!=null,"initial proof");
+            StockTurnTextures.Texture equivalent=texture(1);equivalent.source=original.source;
+            select(equivalent);advance(350);poll();complete(0);
+            check(poll()!=null,"two matching revisions of the same source are not two distinct signs");break;
         case "new_owner":
             poll();complete(0);check(poll()!=null,"initial proof");
             select(texture(2));check(poll()==null,"new native view cannot inherit old route binding");break;
@@ -502,5 +566,12 @@ class PrimaryTurnObserverTest(unittest.TestCase):
                      'surface_swap','buffer_resize','buffer_destroy','texture_buffer_swap',
                      'confirmed_motion','wrong_projection','competitor_moved','ambiguous','adjacent','anchor','lane_site','view_hidden','secure','detached','passed','age',
                      'budget','far_unique','large_budget','hung','outstanding','busy_worker','request_throw','cached_scope','added_alternative','added_texture']:
+            with self.subTest(case=case):
+                self.run_case(case)
+
+    def test_async_distance_revision(self):
+        for case in ['revision_during_copy','revision_during_worker','gpu_revision_lag',
+                     'revision_miss_during_copy','revision_ambiguity','revision_cache_ambiguity',
+                     'same_source_same_pixels']:
             with self.subTest(case=case):
                 self.run_case(case)

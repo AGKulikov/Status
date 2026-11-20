@@ -80,8 +80,7 @@ final class PrimaryTurnObserver {
     void clear() {
         generation++;
         cancelTimeout();
-        latest = null;
-        consecutiveMisses = 0;
+        discard("route_or_window_reset");
         pending = false;
         scene = null;
         primaryView = null;
@@ -108,13 +107,11 @@ final class PrimaryTurnObserver {
         }
         long now = SystemClock.elapsedRealtime();
         currentTurns = candidates(turns, lane, frame);
-        if (latest != null && (now - latest.sampledAt >= PrimaryTurnSample.FRESH_MS || !bindingStillCurrent())) {
-            latest = null;
-            scene = null;
-            consecutiveMisses = 0;
-        }
+        if (latest != null && now - latest.sampledAt >= PrimaryTurnSample.FRESH_MS)
+            discard("proof_age");
+        if (latest != null && !bindingStillCurrent()) discard("binding_changed");
         if (currentTurns.isEmpty() || !view.isShown() || !view.isAttachedToWindow() || secure(view)) {
-            latest = null;
+            discard(currentTurns.isEmpty() ? "no_upcoming_turn" : "primary_not_visible");
             if (pending) { generation++; pending = false; cancelTimeout(); }
             MAIN.removeCallbacks(refresh);
             return null;
@@ -231,7 +228,7 @@ final class PrimaryTurnObserver {
         Object backing;
         long bufferGeneration;
         boolean projectionVerified = true;
-        boolean failed, ambiguous;
+        boolean failed, ambiguous, revisionsChanged;
         final List<StockTurnTextures.Texture> textures;
         final List<RouteTurnFrame> turns;
         final ArrayList<PointF> points = new ArrayList<>();
@@ -251,10 +248,6 @@ final class PrimaryTurnObserver {
 
     // Any alternative newly visible in the camera or the source factory invalidates the
     // sample, even when the winning turn and its own texture are still unchanged.
-    private boolean sceneStillCurrent(ObservedScene scene, boolean validateCaptureProjection) {
-        return sceneStillCurrent(scene, validateCaptureProjection, false);
-    }
-
     private boolean bindingStillCurrent() { return sceneStillCurrent(scene, false, true); }
 
     private boolean sceneStillCurrent(ObservedScene scene, boolean validateCaptureProjection, boolean allowRevision) {
@@ -304,6 +297,14 @@ final class PrimaryTurnObserver {
         return true;
     }
 
+    private static boolean sameSource(StockTurnTextures.Texture a, StockTurnTextures.Texture b) {
+        return a.source == b.source && a.combined == b.combined;
+    }
+
+    private static boolean sameMatch(Trial a, Trial b) {
+        return samePosition(a.turn, b.turn) && sameSource(a.texture, b.texture);
+    }
+
     private static final class Tile {
         final Rect crop = new Rect();
         final ArrayList<Trial> trials = new ArrayList<>();
@@ -341,13 +342,25 @@ final class PrimaryTurnObserver {
 
     private void start(long capturedAt) throws Exception {
         List<StockTurnTextures.Texture> textures = StockTurnTextures.forWindow(window);
-        if (textures.isEmpty()) { latest = null; reason("awaiting stock texture"); return; }
+        if (textures.isEmpty()) { discard("no_stock_texture"); reason("awaiting stock texture"); return; }
+        ArrayList<StockTurnTextures.Texture> renderTextures = new ArrayList<>(textures);
+        // createTexture precedes the GPU swap. Re-check the last *observed* image
+        // alongside the new revision, only while the same native source is alive.
+        // This is a new pixel measurement, never an extension of an old timestamp.
+        if (latest != null && !textures.contains(latest.texture) && !latest.texture.bitmap.isRecycled()) {
+            for (StockTurnTextures.Texture texture : textures) {
+                if (sameSource(texture, latest.texture)) {
+                    renderTextures.add(latest.texture);
+                    break;
+                }
+            }
+        }
         int width = ((Number) get(window, "width")).intValue();
         int height = ((Number) get(window, "height")).intValue();
         View source = mapSurface(primaryView);
-        if (source == null) { latest = null; reason("map surface unavailable"); return; }
+        if (source == null) { discard("map_surface_unavailable"); reason("map surface unavailable"); return; }
         if (width <= 0 || height <= 0 || source.getWidth() != width || source.getHeight() != height) {
-            latest = null; reason("map size changed"); return;
+            discard("map_size_changed"); reason("map size changed"); return;
         }
         Rect viewport = new Rect(0, 0, width, height);
         ArrayList<Tile> tiles = new ArrayList<>();
@@ -357,24 +370,24 @@ final class PrimaryTurnObserver {
             PointF point = project(window, turn);
             next.points.add(point);
             if (!inViewport(point, width, height)) continue;
-            for (StockTurnTextures.Texture texture : textures) {
+            for (StockTurnTextures.Texture texture : renderTextures) {
                 if ((!texture.combined && turn.action.equals("LANE_SITE")) || texture.bitmap.isRecycled())
                     continue;
                 Trial trial = new Trial(turn, texture, point);
                 if (!viewport.contains(trial.bounds)) continue;
                 if (++count > 64 || !addTrial(tiles, viewport, trial)) {
-                    latest = null; reason("turn sample exceeded budget"); return;
+                    discard("capture_budget"); reason("turn sample exceeded budget"); return;
                 }
             }
         }
-        if (tiles.isEmpty()) { latest = null; reason("no on-screen source"); return; }
+        if (tiles.isEmpty()) { discard("no_on_screen_source"); reason("no on-screen source"); return; }
         Surface surface;
         boolean owned = false;
         if (source instanceof SurfaceView) {
             SurfaceHolder holder = ((SurfaceView)source).getHolder();
             watchHolder(holder);
             if (holder.getSurfaceFrame().width() != width || holder.getSurfaceFrame().height() != height) {
-                latest = null; return;
+                discard("surface_size_changed"); return;
             }
             surface = holder.getSurface();
             next.backing = surface;
@@ -382,14 +395,14 @@ final class PrimaryTurnObserver {
             watchHolder(null);
             TextureView texture = (TextureView) source;
             SurfaceTexture backing = texture.getSurfaceTexture();
-            if (!texture.isAvailable() || backing == null) { latest = null; return; }
+            if (!texture.isAvailable() || backing == null) { discard("surface_unavailable"); return; }
             surface = new Surface(backing);
             next.backing = backing;
             owned = true;
         }
         if (!surface.isValid()) {
             if (owned) surface.release();
-            latest = null;
+            discard("surface_invalid");
             return;
         }
         next.bufferGeneration = bufferGeneration;
@@ -419,7 +432,10 @@ final class PrimaryTurnObserver {
             Bitmap copy = target;
             nativeRequests++;
             PixelCopy.request(surface, crop, copy, status -> {
-                if (generation == ticket) captured.projectionVerified &= sceneStillCurrent(captured, true);
+                if (generation == ticket) {
+                    captured.projectionVerified &= sceneStillCurrent(captured, true, true);
+                    captured.revisionsChanged |= !sameSources(captured.textures, StockTurnTextures.forWindow(window), false);
+                }
                 if (status != PixelCopy.SUCCESS || generation != ticket) {
                     captured.failed = true;
                     nativeRequests--;
@@ -456,8 +472,10 @@ final class PrimaryTurnObserver {
                         Trial hit = null;
                         if (valid && generation == ticket) for (Tile done : tiles) {
                             if (done.match == null) continue;
-                            if (hit != null) { hit = null; captured.ambiguous = true; break; }
-                            hit = done.match;
+                            if (hit != null && !sameMatch(hit, done.match)) {
+                                hit = null; captured.ambiguous = true; break;
+                            }
+                            if (hit == null || done.match.texture.revision > hit.texture.revision) hit = done.match;
                         }
                         finish(ticket, capturedAt, hit, captured);
                     });
@@ -494,11 +512,11 @@ final class PrimaryTurnObserver {
                 patterns.put(t.texture, pattern);
             }
             if (pattern == null || !matchesMotion(pattern, pixels, w, h, t, crop)) continue;
-            if (hit != null && (!samePosition(hit.turn, t.turn) || hit.texture != t.texture)) {
+            if (hit != null && !sameMatch(hit, t)) {
                 tile.ambiguous = true;
                 return false;
             }
-            hit = t;
+            if (hit == null || t.texture.revision > hit.texture.revision) hit = t;
         }
         tile.match = hit;
         return true;
@@ -529,28 +547,46 @@ final class PrimaryTurnObserver {
         cancelTimeout();
         // Screen coordinates matter while identifying a new bitmap. A confirmed sample
         // already has a route position and can move on screen until its original expiry.
-        boolean captureCurrent = captured.projectionVerified && sceneStillCurrent(captured, false);
+        boolean captureCurrent = captured.projectionVerified && sceneStillCurrent(captured, false, true);
+        captured.revisionsChanged |= !sameSources(captured.textures, StockTurnTextures.forWindow(window), false);
         boolean retainDuringTransition = latest != null
                 && SystemClock.elapsedRealtime() - latest.sampledAt < PrimaryTurnSample.FRESH_MS
                 && primaryView.isShown() && primaryView.isAttachedToWindow() && !secure(primaryView)
                 && bindingStillCurrent();
-        if (!retainDuringTransition) { latest = null; consecutiveMisses = 0; }
-        if (captureCurrent && captured.ambiguous) { latest = null; consecutiveMisses = 0; }
+        if (!retainDuringTransition) discard("confirmation_no_longer_current");
+        if (captureCurrent && captured.ambiguous) discard("ambiguous_pixels");
         if (hit != null && !captured.failed && !captured.ambiguous && SystemClock.elapsedRealtime() - at <= CAPTURE_MS
                 && primaryView.isShown() && primaryView.isAttachedToWindow() && !secure(primaryView)
                 && captureCurrent) {
             scene = captured;
+            if (latest == null) transition("shown; revision=" + hit.texture.revision);
             latest = new PrimaryTurnSample(hit.turn, hit.texture, at, epoch);
             consecutiveMisses = 0;
         } else if (latest != null && captureCurrent && !captured.failed && !captured.ambiguous
+                && !captured.revisionsChanged
                 && SystemClock.elapsedRealtime() - at <= CAPTURE_MS && ++consecutiveMisses >= 2) {
-            latest = null;
+            discard("two_confirmed_absences");
         }
         if (latest == null) scene = null;
-        reason(latest == null ? "no unique visible turn" : "native turn confirmed");
+        reason(latest == null ? "no unique visible turn" : latest.sampledAt == at
+                ? "native turn confirmed" : "previous confirmation retained");
         MAIN.removeCallbacks(refresh);
         MAIN.post(refresh);
         MAIN.postDelayed(refresh, INTERVAL_MS + 5);
+    }
+
+    private void discard(String cause) {
+        if (latest != null) transition("hidden; cause=" + cause
+                + "; ageMs=" + (SystemClock.elapsedRealtime() - latest.sampledAt)
+                + "; revision=" + latest.texture.revision + "; misses=" + consecutiveMisses);
+        latest = null;
+        scene = null;
+        consecutiveMisses = 0;
+    }
+
+    private static void transition(String detail) {
+        Log.d("NatroTurnMap", detail);
+        NavigationBridgeClient.reportDiagnostic("turn-balloon " + detail);
     }
 
     private void reason(String text) {

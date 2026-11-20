@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Stage, sign, or verify the Navigator 3.5.4 turn update from signed 3.5.3."""
+"""Stage, sign, or verify the Navigator 3.5.5 turn update from signed 3.5.4."""
 import argparse
 import copy
 import hashlib
@@ -21,13 +21,13 @@ else:
     from sign_natro_candidate import CERT, payload_hashes, run, sha256, signature_entry
     from verify_kx11_navigation_pair import verify_signer, verify_zipalign
 
-BASE_SHA = "8091dfb6be987e9e931cc297cffdc7294bd4da91e6032bd47700f9a7cb9911de"
-OLD_CODE, NEW_CODE = 739564634, 739564635
-OLD_NAME, NEW_NAME = "30.3.0 Natro 3.5.3", "30.3.0 Natro 3.5.4"
+BASE_SHA = "c323d969f3bc43ef5d92bc972026439d50ae9754c7008970ebf4b96aa403a989"
+OLD_CODE, NEW_CODE = 739564635, 739564636
+OLD_NAME, NEW_NAME = "30.3.0 Natro 3.5.4", "30.3.0 Natro 3.5.5"
 VERSIONS = dict(old_code=OLD_CODE, new_code=NEW_CODE, old_name=OLD_NAME, new_name=NEW_NAME)
 MANIFEST = "AndroidManifest.xml"
-UNSIGNED = "Navigator-30.3.0-Natro-3.5.4-unsigned.apk"
-SIGNED = "Navigator-30.3.0-Natro-3.5.4-signed.apk"
+UNSIGNED = "Navigator-30.3.0-Natro-3.5.5-unsigned.apk"
+SIGNED = "Navigator-30.3.0-Natro-3.5.5-signed.apk"
 METADATA = "navigator-candidate.json"
 REPORT = "navigator-release-report.json"
 
@@ -67,7 +67,7 @@ def process(args):
     record = provenance(args)
     sdk, baseline = args.sdk, args.baseline
     if sha256(baseline) != BASE_SHA:
-        raise ValueError("Exact signed Navigator 3.5.3 baseline required")
+        raise ValueError("Exact signed Navigator 3.5.4 baseline required")
     signer, align, aapt = (sdk / name for name in ("apksigner", "zipalign", "aapt"))
     previous_signature = verify_signer(signer, baseline, ("v2", "v3"))
     expected = payload_hashes(baseline)

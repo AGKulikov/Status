@@ -13,6 +13,41 @@ import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=28,application=Application.class)
 public class BackupDefaultsMigrationTest {
+    @Test public void restoresSupportedBackupsIncluding355On355() throws Exception {
+        Map<String,Object> defaults = new LinkedHashMap<>();
+        defaults.put("old-default", 7);
+        defaults.put("user-choice", false);
+        for (int source = 208021335; source <= 208021387; source++) {
+            JSONObject metadata = new JSONObject().put("sourceVersionCode", source)
+                    .put("defaultsSchema", source).put("declaredMainDefaults", BackupPreferencesXml.encode(defaults));
+            File snapshot = new File(RuntimeEnvironment.getApplication().getCacheDir(), "355-" + source);
+            File main = BackupFiles.child(snapshot, "de_prefs/example_preferences.xml");
+            Map<String,Object> expected = new LinkedHashMap<>();
+            expected.put("user-choice", true);
+            expected.put("unknown-key", "preserved");
+            BackupPreferencesXml.write(main, expected);
+            BackupDefaultsMigration.materialize(snapshot, "example", metadata, 208021388);
+            expected.put("old-default", 7);
+            assertEquals(expected, BackupPreferencesXml.read(main));
+        }
+        for (int invalid : new int[]{208021334, 208021389}) {
+            JSONObject metadata = new JSONObject().put("sourceVersionCode", invalid)
+                    .put("defaultsSchema", invalid).put("declaredMainDefaults", BackupPreferencesXml.encode(defaults));
+            try { BackupDefaultsMigration.validate(metadata, 208021388); fail(); } catch (IOException expected) {}
+        }
+    }
+
+    @Test public void fresh355SnapshotLeavesUnconfiguredPreferencesAbsent() throws Exception {
+        File snapshot = new File(RuntimeEnvironment.getApplication().getCacheDir(), "355-fresh");
+        File main = BackupFiles.child(snapshot, "de_prefs/example_preferences.xml");
+        assertFalse(main.exists());
+        JSONObject metadata = new JSONObject().put("sourceVersionCode", 208021388)
+                .put("defaultsSchema", 208021388)
+                .put("declaredMainDefaults", BackupPreferencesXml.encode(Collections.singletonMap("example-default", true)));
+        BackupDefaultsMigration.materialize(snapshot, "example", metadata, 208021388);
+        assertFalse(main.exists());
+    }
+
     @Test public void restoresSupportedBackupsIncluding353On354() throws Exception {
         Map<String,Object> defaults = new LinkedHashMap<>();
         defaults.put("old-default", 7);
