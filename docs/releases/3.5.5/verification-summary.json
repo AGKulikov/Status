@@ -1,0 +1,133 @@
+{
+  "sourceCommit": "abfb97f0ae06d3c2a9b96c051e44cd75c40d448e",
+  "sourceTree": "545a0522f0a02a61b86d9d8f385ba4c7bd3adec6",
+  "orchestratorCommit": "0875abd044ea4974283f8d648e16fedef2fd946f",
+  "ciRun": 44787963925,
+  "ciUrl": "https://github.com/AGKulikov/Status/actions/runs/44787963925",
+  "ciConclusion": "success",
+  "androidTests": {
+    "tests": 2351,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "toolTests": {
+    "tests": 306,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "artifactArchives": [
+    {
+      "id": 14655502643,
+      "name": "Natro-3.5.5-signing-tools-1",
+      "size": 23987605,
+      "digest": "sha256:5383fb5c99e22df453527e373f0a20b6b6a6d2534e9eda5e214664d3702ecc3b"
+    },
+    {
+      "id": 14655448026,
+      "name": "Natro-3.5.5-offline-signing-1",
+      "size": 164845228,
+      "digest": "sha256:85c80bf54000656f593527598e95fed3083c9b887d9d4c6d7d1aeba571ac88d8"
+    },
+    {
+      "id": 14654853152,
+      "name": "Natro-3.5.5-test-reports-1",
+      "size": 1045677,
+      "digest": "sha256:bc0d7782449b5d0e42f6cb761500555c95658218d30fa512fa3a453f0159172f"
+    }
+  ],
+  "selectedSuites": [
+    {
+      "suite": "dezz.status.widget.navigation.StockManeuverPackageTest",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "dezz.status.widget.update.MultiAppUpdaterTest",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "dezz.status.widget.hud.HudTurnSignalsTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "ru.natro.navigation.CombinedLaneArtworkTest",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "dezz.status.widget.update.NatroUpdaterAndroid9Test",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "dezz.status.widget.update.UpdateActivityFlowTest",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "suite": "dezz.status.widget.backup.BackupDefaultsMigrationTest",
+      "tests": 51,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "natro": {
+    "package": "ru.natro.statuswidget",
+    "versionName": "3.5.5",
+    "versionCode": 208021388,
+    "sha256": "30e2b0ee7f63616c03140b98b178e51fd609e7d005eafe45bb756cbc514ad87b",
+    "previous": {
+      "package": "ru.natro.statuswidget",
+      "versionCode": 208021387,
+      "versionName": "3.5.4",
+      "sha256": "c409b88ebca5a4889a74c7143510ee3d2e8fb087a8bbf4853fc1740caa795527"
+    },
+    "payloadEntriesUnchanged": 1517,
+    "installOverMetadataVerified": true
+  },
+  "navigator": {
+    "package": "ru.yandex.yandexnavi",
+    "versionName": "30.3.0 Natro 3.5.5",
+    "versionCode": 739564636,
+    "sha256": "a1e358d83b8fcd62cd3063511d4e0182c79d54bbee6c95caa3171c3b27f4904b",
+    "previousSha256": "c323d969f3bc43ef5d92bc972026439d50ae9754c7008970ebf4b96aa403a989",
+    "changedPayload": [
+      "AndroidManifest.xml",
+      "classes19.dex"
+    ],
+    "unchangedPayloadEntries": 17225,
+    "ciBridgeSha256": "34ca8f4fcb633c05a8c27d8c424e5ee56ca8431412608675d7ff5b313ab633c3",
+    "manifestSemanticsOnlyVersionChanged": true
+  },
+  "checks": {
+    "stableSingleSigner": true,
+    "signatureV2": true,
+    "signatureV3": true,
+    "exactApi28": true,
+    "zipalign16KiB": true,
+    "exactTestedPayload": true,
+    "updateManifestsMatchSignedApks": true,
+    "signatureHandoffRoundtrip": true,
+    "accessBootstrapUnchangedFrom354": true
+  },
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "physicalKx11Verification": "pending",
+  "publication": "pending"
+}

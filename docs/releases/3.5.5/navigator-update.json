@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "channel": "stable",
+  "package": "ru.yandex.yandexnavi",
+  "versionCode": 739564636,
+  "versionName": "30.3.0 Natro 3.5.5",
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "sha256": "a1e358d83b8fcd62cd3063511d4e0182c79d54bbee6c95caa3171c3b27f4904b",
+  "size": 156505706,
+  "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.5.5/Navigator-30.3.0-Natro-3.5.5-signed.apk"
+}
