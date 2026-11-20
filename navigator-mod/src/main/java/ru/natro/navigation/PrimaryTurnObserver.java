@@ -35,6 +35,8 @@ import static ru.natro.navigation.NavigatorStatePublisher.RouteTurnFrame;
 final class PrimaryTurnObserver {
     private static final int MAX_PIXELS = 512 * 1024;
     private static final long INTERVAL_MS = 320;
+    private static final long CAPTURE_MS = 900;
+    private static final int MAX_CAPTURE_MOTION = 24;
     private static final Handler MAIN = new Handler(Looper.getMainLooper());
     private static final ExecutorService PIXELS = Executors.newSingleThreadExecutor(task -> {
         Thread thread = new Thread(task, "NatroTurnArtwork");
@@ -52,6 +54,7 @@ final class PrimaryTurnObserver {
     private boolean pending;
     private int nativeRequests;
     private PrimaryTurnSample latest;
+    private int consecutiveMisses;
     private ObservedScene scene;
     private List<RouteTurnFrame> currentTurns = Collections.emptyList();
     private String lastReason = "";
@@ -78,6 +81,7 @@ final class PrimaryTurnObserver {
         generation++;
         cancelTimeout();
         latest = null;
+        consecutiveMisses = 0;
         pending = false;
         scene = null;
         primaryView = null;
@@ -104,8 +108,10 @@ final class PrimaryTurnObserver {
         }
         long now = SystemClock.elapsedRealtime();
         currentTurns = candidates(turns, lane, frame);
-        if (latest != null && (now - latest.sampledAt > PrimaryTurnSample.FRESH_MS || !sceneStillCurrent(scene, false))) {
+        if (latest != null && (now - latest.sampledAt >= PrimaryTurnSample.FRESH_MS || !bindingStillCurrent())) {
             latest = null;
+            scene = null;
+            consecutiveMisses = 0;
         }
         if (currentTurns.isEmpty() || !view.isShown() || !view.isAttachedToWindow() || secure(view)) {
             latest = null;
@@ -118,7 +124,6 @@ final class PrimaryTurnObserver {
             try {
                 start(now);
             } catch (Exception | OutOfMemoryError unavailable) {
-                latest = null;
                 reason("map capture unavailable");
             }
         }
@@ -172,6 +177,7 @@ final class PrimaryTurnObserver {
         final StockTurnTextures.Texture texture;
         final PointF point;
         final Rect bounds;
+        int dx, dy;
         Trial(RouteTurnFrame turn, StockTurnTextures.Texture texture, PointF point) {
             this.turn = turn;
             this.texture = texture;
@@ -225,6 +231,7 @@ final class PrimaryTurnObserver {
         Object backing;
         long bufferGeneration;
         boolean projectionVerified = true;
+        boolean failed, ambiguous;
         final List<StockTurnTextures.Texture> textures;
         final List<RouteTurnFrame> turns;
         final ArrayList<PointF> points = new ArrayList<>();
@@ -245,8 +252,14 @@ final class PrimaryTurnObserver {
     // Any alternative newly visible in the camera or the source factory invalidates the
     // sample, even when the winning turn and its own texture are still unchanged.
     private boolean sceneStillCurrent(ObservedScene scene, boolean validateCaptureProjection) {
+        return sceneStillCurrent(scene, validateCaptureProjection, false);
+    }
+
+    private boolean bindingStillCurrent() { return sceneStillCurrent(scene, false, true); }
+
+    private boolean sceneStillCurrent(ObservedScene scene, boolean validateCaptureProjection, boolean allowRevision) {
         if (scene == null || scene.turns.size() != currentTurns.size()
-                || !scene.textures.equals(StockTurnTextures.forWindow(window))) return false;
+                || !sameSources(scene.textures, StockTurnTextures.forWindow(window), allowRevision)) return false;
         try {
             View source = mapSurface(primaryView);
             if (source != scene.source || source.getWidth() != scene.width || source.getHeight() != scene.height
@@ -269,7 +282,8 @@ final class PrimaryTurnObserver {
                 PointF before = scene.points.get(i), after = project(window, current);
                 boolean visible = inViewport(after, scene.width, scene.height);
                 if (visible != inViewport(before, scene.width, scene.height)) return false;
-                if (validateCaptureProjection && visible && (Math.abs(before.x - after.x) > 2 || Math.abs(before.y - after.y) > 2)) return false;
+                if (validateCaptureProjection && visible && (Math.abs(before.x - after.x) > MAX_CAPTURE_MOTION
+                        || Math.abs(before.y - after.y) > MAX_CAPTURE_MOTION)) return false;
             }
             return true;
         } catch (Exception changed) {
@@ -277,10 +291,24 @@ final class PrimaryTurnObserver {
         }
     }
 
+    private static boolean sameSources(List<StockTurnTextures.Texture> before,
+            List<StockTurnTextures.Texture> after, boolean allowRevision) {
+        if (!allowRevision) return before.equals(after);
+        if (before.size() != after.size()) return false;
+        for (StockTurnTextures.Texture old : before) {
+            boolean found = false;
+            for (StockTurnTextures.Texture next : after)
+                if (old.source == next.source && old.combined == next.combined) { found = true; break; }
+            if (!found) return false;
+        }
+        return true;
+    }
+
     private static final class Tile {
         final Rect crop = new Rect();
         final ArrayList<Trial> trials = new ArrayList<>();
         Trial match;
+        boolean ambiguous;
     }
 
     private static long area(Rect r) { return (long) r.width() * r.height(); }
@@ -289,7 +317,7 @@ final class PrimaryTurnObserver {
     // all eligible candidates participate or the entire sample is discarded.
     private static boolean addTrial(ArrayList<Tile> tiles, Rect viewport, Trial trial) {
         Rect box = new Rect(trial.bounds);
-        box.inset(-2, -2);
+        box.inset(-MAX_CAPTURE_MOTION - 2, -MAX_CAPTURE_MOTION - 2);
         box.intersect(viewport);
         long total = 0, smallestExtra = Long.MAX_VALUE;
         Tile best = null;
@@ -373,12 +401,11 @@ final class PrimaryTurnObserver {
             if (ticket != generation) return;
             generation++;
             pending = false;
-            latest = null;
             timeout = null;
             reason("turn sample expired");
             MAIN.post(refresh);
         };
-        MAIN.postDelayed(timeout, PrimaryTurnSample.FRESH_MS);
+        MAIN.postDelayed(timeout, CAPTURE_MS);
         captureTile(surface, releaseSurface, tiles, 0, ticket, capturedAt, next);
     }
 
@@ -394,12 +421,23 @@ final class PrimaryTurnObserver {
             PixelCopy.request(surface, crop, copy, status -> {
                 if (generation == ticket) captured.projectionVerified &= sceneStillCurrent(captured, true);
                 if (status != PixelCopy.SUCCESS || generation != ticket) {
+                    captured.failed = true;
                     nativeRequests--;
                     copy.recycle();
                     if (owned) surface.release();
                     finish(ticket, capturedAt, null, captured);
                     return;
                 }
+                try {
+                    for (Trial trial : tile.trials) {
+                        PointF after = project(window, trial.turn);
+                        if (after == null) { captured.projectionVerified = false; break; }
+                        trial.dx = Math.round(after.x) - Math.round(trial.point.x);
+                        trial.dy = Math.round(after.y) - Math.round(trial.point.y);
+                        if (Math.abs(trial.dx) > MAX_CAPTURE_MOTION || Math.abs(trial.dy) > MAX_CAPTURE_MOTION)
+                            captured.projectionVerified = false;
+                    }
+                } catch (Exception moved) { captured.projectionVerified = false; }
                 PIXELS.execute(() -> {
                     boolean usable = false;
                     try { usable = match(copy, tile); }
@@ -408,6 +446,8 @@ final class PrimaryTurnObserver {
                     final boolean valid = usable;
                     MAIN.post(() -> {
                         nativeRequests--;
+                        captured.ambiguous |= tile.ambiguous;
+                        captured.failed |= !valid && !tile.ambiguous;
                         if (valid && generation == ticket && index + 1 < tiles.size()) {
                             captureTile(surface, owned, tiles, index + 1, ticket, capturedAt, captured);
                             return;
@@ -416,7 +456,7 @@ final class PrimaryTurnObserver {
                         Trial hit = null;
                         if (valid && generation == ticket) for (Tile done : tiles) {
                             if (done.match == null) continue;
-                            if (hit != null) { hit = null; break; }
+                            if (hit != null) { hit = null; captured.ambiguous = true; break; }
                             hit = done.match;
                         }
                         finish(ticket, capturedAt, hit, captured);
@@ -424,6 +464,7 @@ final class PrimaryTurnObserver {
                 });
             }, MAIN);
         } catch (RuntimeException | OutOfMemoryError unavailable) {
+            captured.failed = true;
             if (target != null) { target.recycle(); nativeRequests--; }
             if (owned) surface.release();
             finish(ticket, capturedAt, null, captured);
@@ -452,14 +493,34 @@ final class PrimaryTurnObserver {
                 pattern = StockTurnPixelMatcher.prepare(rgba, tw, th);
                 patterns.put(t.texture, pattern);
             }
-            if (pattern == null || !StockTurnPixelMatcher.matches(pattern, pixels, w, h,
-                    t.bounds.left-crop.left, t.bounds.top-crop.top)) continue;
-            if (hit != null && (!samePosition(hit.turn, t.turn) || hit.texture != t.texture))
+            if (pattern == null || !matchesMotion(pattern, pixels, w, h, t, crop)) continue;
+            if (hit != null && (!samePosition(hit.turn, t.turn) || hit.texture != t.texture)) {
+                tile.ambiguous = true;
                 return false;
+            }
             hit = t;
         }
         tile.match = hit;
         return true;
+    }
+
+    private static boolean matchesMotion(StockTurnPixelMatcher.Pattern pattern, int[] pixels,
+            int w, int h, Trial trial, Rect crop) {
+        if (Math.abs(trial.dx) > MAX_CAPTURE_MOTION || Math.abs(trial.dy) > MAX_CAPTURE_MOTION) return false;
+        int minX = Math.min(0, trial.dx), maxX = Math.max(0, trial.dx);
+        int minY = Math.min(0, trial.dy), maxY = Math.max(0, trial.dy);
+        // PixelCopy can sample anywhere between request and callback. Search only
+        // the measured sweep, at native resolution; test every competing route point.
+        // The matcher's +/-2 tolerance covers each four-pixel step without gaps.
+        for (int y = minY; ; y = Math.min(y + 4, maxY)) {
+            for (int x = minX; ; x = Math.min(x + 4, maxX)) {
+                if (StockTurnPixelMatcher.matches(pattern, pixels, w, h,
+                        trial.bounds.left - crop.left + x, trial.bounds.top - crop.top + y)) return true;
+                if (x == maxX) break;
+            }
+            if (y == maxY) break;
+        }
+        return false;
     }
 
     private void finish(long ticket, long at, Trial hit, ObservedScene captured) {
@@ -469,16 +530,21 @@ final class PrimaryTurnObserver {
         // Screen coordinates matter while identifying a new bitmap. A confirmed sample
         // already has a route position and can move on screen until its original expiry.
         boolean captureCurrent = captured.projectionVerified && sceneStillCurrent(captured, false);
-        boolean retainDuringMotion = !captureCurrent && latest != null
+        boolean retainDuringTransition = latest != null
                 && SystemClock.elapsedRealtime() - latest.sampledAt < PrimaryTurnSample.FRESH_MS
                 && primaryView.isShown() && primaryView.isAttachedToWindow() && !secure(primaryView)
-                && sceneStillCurrent(scene, false);
-        if (!retainDuringMotion) latest = null;
-        if (hit != null && SystemClock.elapsedRealtime() - at <= PrimaryTurnSample.FRESH_MS
+                && bindingStillCurrent();
+        if (!retainDuringTransition) { latest = null; consecutiveMisses = 0; }
+        if (captureCurrent && captured.ambiguous) { latest = null; consecutiveMisses = 0; }
+        if (hit != null && !captured.failed && !captured.ambiguous && SystemClock.elapsedRealtime() - at <= CAPTURE_MS
                 && primaryView.isShown() && primaryView.isAttachedToWindow() && !secure(primaryView)
                 && captureCurrent) {
             scene = captured;
             latest = new PrimaryTurnSample(hit.turn, hit.texture, at, epoch);
+            consecutiveMisses = 0;
+        } else if (latest != null && captureCurrent && !captured.failed && !captured.ambiguous
+                && SystemClock.elapsedRealtime() - at <= CAPTURE_MS && ++consecutiveMisses >= 2) {
+            latest = null;
         }
         if (latest == null) scene = null;
         reason(latest == null ? "no unique visible turn" : "native turn confirmed");

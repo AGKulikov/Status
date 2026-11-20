@@ -191,7 +191,7 @@ import android.graphics.Bitmap;import java.util.*;
 final class StockTurnTextures {
     static final class Texture {
         final Bitmap bitmap; final Object provider=new Object(); final float anchorX,anchorY;
-        final boolean combined; final long revision;
+        final boolean combined; final long revision; Object source=new Object();
         Texture(Bitmap b,long r){this(b,r,0,0,true);}
         Texture(Bitmap b,long r,float x,float y,boolean c){bitmap=b;revision=r;anchorX=x;anchorY=y;combined=c;}
     }
@@ -295,7 +295,8 @@ public class PrimaryTurnReplay {
             complete(0);s=poll();check(s!=null&&s.turn==second&&s.texture==original,"right geo anchor and artwork");
             int count=PixelCopy.requests.size();
             for(int i=0;i<50;i++)poll();check(PixelCopy.requests.size()==count,"sample rate limited");
-            advance(340);Arrays.fill(screen.pixels,0xff123456);poll();complete(0);check(poll()==null,"hidden marker clears");
+            advance(340);Arrays.fill(screen.pixels,0xff123456);poll();complete(0);check(poll()!=null,"one render gap retains confirmation");
+            advance(340);poll();complete(0);check(poll()==null,"two verified absences clear marker");
             break;
         case "epoch":
             poll(); PixelCopy.Request obsolete=last();epoch=2;poll();
@@ -304,11 +305,53 @@ public class PrimaryTurnReplay {
             complete(0);s=poll();check(s!=null&&s.routeEpoch==2,"no stale route commit");break;
         case "new_texture":
             poll();complete(0);check(poll()!=null,"baseline visible");
-            StockTurnTextures.Texture revision=texture(2);select(revision);
-            check(poll()==null,"old artwork invalid immediately even inside sample interval");
-            advance(350);poll();complete(0);check(poll()==null,"old pixels can't confirm new artwork");
+            StockTurnTextures.Texture revision=texture(2);revision.source=original.source;select(revision);
+            check(poll()!=null,"distance update retains the confirmed native view binding");
+            advance(350);poll();complete(0);check(poll().texture==original,"one in-flight old frame holds original without accepting new pixels");
             advance(350);paint(second,revision);poll();complete(0);s=poll();
             check(s!=null && s.texture==revision,"fresh texture confirmed at same turn");break;
+        case "distance_stream":
+            poll();complete(0);check(poll()!=null,"initial native artwork");
+            for(int i=0;i<30;i++){
+                advance(350);StockTurnTextures.Texture next=texture(2+i);next.source=original.source;
+                select(next);check(poll()!=null,"meters change cannot erase confirmed turn "+i);
+                complete(0);check(poll()!=null,"old GPU frame during replacement "+i);
+                Arrays.fill(screen.pixels,0);paint(second,next);
+                advance(350);poll();complete(0);s=poll();
+                check(s!=null && s.texture==next,"new distance positively verified "+i);
+            }
+            break;
+        case "new_owner":
+            poll();complete(0);check(poll()!=null,"initial proof");
+            select(texture(2));check(poll()==null,"new native view cannot inherit old route binding");break;
+        case "copy_failure":
+            poll();complete(0);s=poll();
+            advance(350);poll();complete(1);check(poll()==s,"one copy failure does not remove visible sign");
+            advance(350);poll();complete(0);check(poll()!=null,"capture recovers without disappearance");break;
+        case "ambiguous_after_confirmation":
+            poll();complete(0);check(poll()!=null,"initial proof");
+            paint(first,original);advance(350);poll();complete(0);
+            check(poll()==null,"ambiguity never receives a grace period");break;
+        case "passed_after_confirmation":
+            poll();complete(0);check(poll()!=null,"initial proof");
+            frame.routeProgressValid=true;frame.routeSegmentIndex=12;
+            check(poll()==null,"passing the confirmed turn clears immediately");break;
+        case "motion_stream":
+            for(int i=0;i<30;i++){
+                window.dx=(i%5)*6;Arrays.fill(screen.pixels,0);paint(second,original);
+                if(i>0)advance(350);poll();window.dx+=5;complete(0);s=poll();
+                check(s!=null && s.turn==second,"moving capture must renew proof "+i);
+                check(s.sampledAt==SystemClock.now,"motion proof timestamp actually renewed");
+            }
+            break;
+        case "swept_ambiguous":
+            turns=Arrays.asList(second,turn(12,120,32));poll();window.dx=-16;complete(0);
+            check(poll()==null,"two measured sweeps can explain the same visible pixels; reject");break;
+        case "expired_transition":
+            poll();complete(0);s=poll();
+            StockTurnTextures.Texture next=texture(2);next.source=original.source;select(next);
+            SystemClock.now+=PrimaryTurnSample.FRESH_MS;
+            check(poll()==null,"unconfirmed replacement never extends proof lifetime");break;
         case "changed_during_callback":
             poll();select(texture(2));complete(0);check(poll()==null,"revision changed before callback");break;
         case "confirmed_motion":
@@ -316,11 +359,11 @@ public class PrimaryTurnReplay {
             window.dx=6;check(poll()==s,"camera pan must not erase confirmed route position");
             advance(350);poll();window.dx=10;complete(0);
             check(poll()==s,"in-flight pan retains previous confirmation without renewing it");
-            SystemClock.now+=901;check(poll()==null,"continued motion cannot renew old evidence");break;
+            SystemClock.now+=PrimaryTurnSample.FRESH_MS;check(poll()==null,"continued misses cannot renew old evidence");break;
         case "wrong_projection":
-            poll();window.dx=8;complete(0);check(poll()==null,"camera moved while pixels copied");break;
+            poll();window.dx=40;complete(0);check(poll()==null,"camera moved outside bounded capture sweep");break;
         case "competitor_moved":
-            poll();window.alternateDx=20;complete(0);
+            poll();window.alternateDx=40;complete(0);
             check(stored()==null,"moving a competitor invalidates batch even if winning turn stayed still");break;
         case "ambiguous":
             paint(first,original);poll();complete(0);check(poll()==null,"two genuine matching turns left ambiguous");break;
@@ -332,7 +375,8 @@ public class PrimaryTurnReplay {
             Arrays.fill(screen.pixels,0);paint(second,reversed);select(reversed);poll();complete(0);s=poll();
             check(s!=null&&s.texture==reversed&&s.turn==second,"noncentral stock texture tip in physical pixels");
             advance(350);Arrays.fill(screen.pixels,0);paint(second,original);poll();complete(0);
-            check(poll()==null,"other orientation at same turn must not confirm this tip");break;
+            check(poll()!=null,"single incomplete frame retains old confirmation");
+            advance(350);poll();complete(0);check(poll()==null,"other orientation cannot confirm this tip");break;
         case "lane_site":
             turns=Collections.emptyList();LaneGuidanceFrame lane=new LaneGuidanceFrame();
             lane.id="site";lane.latitude=second.latitude;lane.longitude=second.longitude;lane.routeSegmentIndex=11;
@@ -454,7 +498,7 @@ class PrimaryTurnObserverTest(unittest.TestCase):
         subprocess.run(['java', '-cp', self.work.name, 'ru.natro.navigation.PrimaryTurnReplay', case], check=True)
 
     def test_captures_and_lifecycle(self):
-        for case in ['surface','textureView','vulkan','api28','epoch','new_texture','changed_during_callback','foreign_surface','nested_surface',
+        for case in ['distance_stream','new_owner','copy_failure','ambiguous_after_confirmation','passed_after_confirmation','motion_stream','swept_ambiguous','expired_transition','surface','textureView','vulkan','api28','epoch','new_texture','changed_during_callback','foreign_surface','nested_surface',
                      'surface_swap','buffer_resize','buffer_destroy','texture_buffer_swap',
                      'confirmed_motion','wrong_projection','competitor_moved','ambiguous','adjacent','anchor','lane_site','view_hidden','secure','detached','passed','age',
                      'budget','far_unique','large_budget','hung','outstanding','busy_worker','request_throw','cached_scope','added_alternative','added_texture']:

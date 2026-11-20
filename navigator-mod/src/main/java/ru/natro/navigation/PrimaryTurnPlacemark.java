@@ -3,6 +3,8 @@ package ru.natro.navigation;
 
 import android.graphics.Bitmap;
 import android.graphics.PointF;
+import android.os.SystemClock;
+import java.lang.reflect.Proxy;
 
 /** Owns one exact, positively observed primary-screen maneuver bitmap on one external map. */
 final class PrimaryTurnPlacemark {
@@ -12,6 +14,11 @@ final class PrimaryTurnPlacemark {
     private int displayedScale;
     private float displayedZ;
     private LaneGuidanceAppearance displayedStyle;
+    private Object loading, loadingCallback;
+    private PrimaryTurnSample loadingSample;
+    private LaneGuidanceAppearance loadingStyle;
+    private int loadingScale, displayedWidth, displayedHeight;
+    private float loadingZ;
 
     static boolean isCurrent(PrimaryTurnSample sample, long routeEpoch, boolean active, long now, long maxAge) {
         return active && sample != null && sample.routeEpoch == routeEpoch && sample.sampledAt > 0L
@@ -20,7 +27,7 @@ final class PrimaryTurnPlacemark {
 
     @SuppressWarnings({"unchecked", "rawtypes"})
     void show(Object collection, PrimaryTurnSample sample, int scale, float zIndex,
-              MapOverlayPlacementCoordinator coordinator, LaneGuidanceAppearance appearance) throws Exception {
+              MapOverlayPlacementCoordinator coordinator, LaneGuidanceAppearance appearance, Runnable ready) throws Exception {
         StockTurnTextures.Texture texture = sample.texture;
         NavigatorStatePublisher.RouteTurnFrame turn = sample.turn;
         if (!turn.hasContent() || texture.bitmap == null || texture.bitmap.isRecycled()
@@ -31,37 +38,86 @@ final class PrimaryTurnPlacemark {
                 && displayed.turn.id.equals(turn.id) && displayed.turn.latitude == turn.latitude
                 && displayed.turn.longitude == turn.longitude && displayed.texture == texture
                 && displayedScale == scale && displayedZ == zIndex
-                && (!texture.combined || appearance.same(displayedStyle))) {
+                && appearance.same(displayedStyle)) {
+            remove(collection, loading);
+            loading = null; loadingSample = null; loadingCallback = null;
             displayed = sample;
             return;
         }
+        if (loadingSample != null && loadingSample.routeEpoch == sample.routeEpoch
+                && loadingSample.turn.id.equals(turn.id) && loadingSample.texture == texture
+                && loadingScale == scale && loadingZ == zIndex && appearance.same(loadingStyle)) {
+            loadingSample = sample;
+            return;
+        }
+        remove(collection, loading);
+        loading = null;
+        loadingCallback = null;
+        loadingSample = null;
         Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
         Object point = pointClass.getConstructor(double.class, double.class)
                 .newInstance(turn.latitude, turn.longitude);
-        if (placemark == null) {
-            placemark = invoke(collection, "addEmptyPlacemark", new Class<?>[]{pointClass}, point);
-            MapObjectLayerFactory.hideUntilTextured(placemark);
-        }
         Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
         Class<?> imageClass = Class.forName("com.yandex.runtime.image.ImageProvider");
         Class<?> rotation = Class.forName("com.yandex.mapkit.map.RotationType");
         Object style = styleClass.getConstructor().newInstance();
         invoke(style, "setAnchor", new Class<?>[]{PointF.class}, new PointF(texture.anchorX, texture.anchorY));
         invoke(style, "setRotationType", new Class<?>[]{rotation}, Enum.valueOf((Class) rotation, "NO_ROTATION"));
-        invoke(style, "setScale", new Class<?>[]{Float.class}, scale / 100f);
+        invoke(style, "setScale", new Class<?>[]{Float.class}, texture.artwork == null ? scale / 100f : 1f);
         invoke(style, "setFlat", new Class<?>[]{Boolean.class}, false);
         invoke(style, "setZIndex", new Class<?>[]{Float.class}, zIndex);
-        // A fresh bitmap provider guarantees the exact pixels that passed the primary-surface check.
-        Bitmap bitmap = texture.artwork == null ? texture.bitmap : texture.artwork.render(texture.bitmap, appearance);
+        Bitmap bitmap = texture.artwork == null ? texture.bitmap
+                : texture.artwork.render(texture.bitmap, appearance, scale / 100f);
         Object provider = imageClass.getMethod("fromBitmap", Bitmap.class).invoke(null, bitmap);
-        invoke(placemark, "setIcon", new Class<?>[]{imageClass, styleClass}, provider, style);
-        invoke(placemark, "setGeometry", new Class<?>[]{pointClass}, point);
-        invoke(placemark, "setVisible", new Class<?>[]{boolean.class}, true);
-        displayed = sample;
-        displayedStyle = appearance;
-        displayedScale = scale;
-        displayedZ = zIndex;
-        reserve(coordinator);
+        Class<?> callbackClass = Class.forName("com.yandex.mapkit.map.Callback");
+        Object candidate = invoke(collection, "addEmptyPlacemark", new Class<?>[]{pointClass}, point);
+        try { MapObjectLayerFactory.hideUntilTextured(candidate); }
+        catch (Exception failure) { remove(collection, candidate); throw failure; }
+        loading = candidate;
+        loadingSample = sample;
+        loadingStyle = appearance;
+        loadingScale = scale;
+        loadingZ = zIndex;
+        loadingCallback = Proxy.newProxyInstance(callbackClass.getClassLoader(), new Class<?>[]{callbackClass},
+                (proxy, method, args) -> {
+                    if (method.getName().equals("onTaskFinished")) {
+                        if (loading != candidate) return null;
+                        if (!isCurrent(loadingSample, sample.routeEpoch, true,
+                                SystemClock.elapsedRealtime(), PrimaryTurnSample.FRESH_MS)) {
+                            remove(collection, loading);
+                            loading = null; loadingSample = null; loadingCallback = null;
+                            return null;
+                        }
+                        // Keep the old icon visible until the new GPU texture is ready.
+                        // The swap occurs in one callback, without a blank map frame.
+                        invoke(candidate, "setVisible", new Class<?>[]{boolean.class}, true);
+                        Object previous = placemark;
+                        placemark = candidate;
+                        displayed = loadingSample;
+                        displayedStyle = loadingStyle;
+                        displayedScale = loadingScale;
+                        displayedZ = loadingZ;
+                        float rasterScale = texture.artwork == null ? scale / 100f : 1f;
+                        displayedWidth = Math.round(bitmap.getWidth() * rasterScale);
+                        displayedHeight = Math.round(bitmap.getHeight() * rasterScale);
+                        loading = null; loadingSample = null; loadingCallback = null;
+                        remove(collection, previous);
+                        reserve(coordinator);
+                        ready.run();
+                        return null;
+                    }
+                    if (method.getName().equals("hashCode")) return System.identityHashCode(proxy);
+                    if (method.getName().equals("equals")) return proxy == args[0];
+                    if (method.getName().equals("toString")) return "NatroTurnTextureReady";
+                    return null;
+                });
+        try {
+            invoke(candidate, "setIcon", new Class<?>[]{imageClass, styleClass, callbackClass}, provider, style, loadingCallback);
+        } catch (Exception failure) {
+            remove(collection, candidate);
+            if (loading == candidate) { loading = null; loadingSample = null; loadingCallback = null; }
+            throw failure;
+        }
     }
 
     boolean replaces(NavigatorStatePublisher.LaneGuidanceFrame lane) {
@@ -84,12 +140,15 @@ final class PrimaryTurnPlacemark {
         NavigatorStatePublisher.RouteTurnFrame turn = displayed.turn;
         StockTurnTextures.Texture texture = displayed.texture;
         coordinator.reserveFixed(OWNER, turn.id, turn.latitude, turn.longitude,
-                Math.round(texture.bitmap.getWidth() * displayedScale / 100f),
-                Math.round(texture.bitmap.getHeight() * displayedScale / 100f),
+                displayedWidth, displayedHeight,
                 texture.anchorX, texture.anchorY);
     }
 
     void clear(Object collection, MapOverlayPlacementCoordinator coordinator) {
+        remove(collection, loading);
+        loading = null;
+        loadingSample = null;
+        loadingCallback = null;
         remove(collection, placemark);
         placemark = null;
         displayed = null;

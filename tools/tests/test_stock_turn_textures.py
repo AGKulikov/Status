@@ -13,7 +13,7 @@ class StockTurnTexturesTest(unittest.TestCase):
     def test_original_factory_callbacks_surfaces_and_lifetime(self):
         sources = {
             "android.graphics.Bitmap": """public class Bitmap {
-                public boolean sameAs(Bitmap b){return b!=null;}
+                public int version; public boolean sameAs(Bitmap b){return b!=null && version==b.version;}
                 public int getWidth() {return 132;} public int getHeight() {return 56;}
                 public boolean isRecycled() {return false;}
             }""",
@@ -49,8 +49,9 @@ class StockTurnTexturesTest(unittest.TestCase):
                         return new com.yandex.mapkit.ScreenPoint();
                     }
                     public com.yandex.runtime.image.ImageProvider createTexture() {
-                        if (calls++==3) throw failure;
-                        return image = new com.yandex.runtime.image.ImageProvider();
+                        if (calls++==4) throw failure;
+                        image = new com.yandex.runtime.image.ImageProvider();
+                        image.bitmap.version=distance==null?0:distance.hashCode();return image;
                     }
                 }
             """,
@@ -91,6 +92,9 @@ class StockTurnTexturesTest(unittest.TestCase):
                         check(StockTurnTextures.forWindow(other).isEmpty(),"distinct map windows");
                         joint.createTexture();
                         check(StockTurnTextures.forWindow(primary).get(0)==first,"same pixels keep observation identity");
+                        joint.setDistance("400","м");joint.createTexture();
+                        StockTurnTextures.Texture changed=StockTurnTextures.forWindow(primary).get(0);
+                        check(changed!=first && changed.source==first.source,"distance revision preserves native source identity");
                         stock.both.broken=true;
                         check(joint.createTexture()==stock.both.image &&
                               StockTurnTextures.forWindow(primary).isEmpty(),"failed sample preserves original result");
@@ -99,7 +103,7 @@ class StockTurnTexturesTest(unittest.TestCase):
                         Turn single=wrapped.createManeuverBalloonView();
                         single.createTexture();
                         StockTurnTextures.Texture second=StockTurnTextures.forWindow(primary).get(0);
-                        check(!second.combined && second.revision>first.revision,"ordinary maneuver");
+                        check(!second.combined && second.revision>first.revision && second.artwork!=null && second.source!=first.source,"ordinary maneuver uses same styling with separate source identity");
                         StockTurnTextures.clearWindow(other);
                         check(StockTurnTextures.forWindow(primary).size()==1,"clear only requested window");
                         StockTurnTextures.clearWindow(primary);

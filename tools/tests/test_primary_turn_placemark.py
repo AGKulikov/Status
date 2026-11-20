@@ -12,9 +12,12 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
     def test_exact_texture_position_and_lane_replacement(self):
         fixtures = {
             "android.graphics.Bitmap": """public class Bitmap {
+              int w=180,h=90; public Bitmap(){} public Bitmap(int w,int h){this.w=w;this.h=h;}
               public boolean isRecycled(){return false;}
-              public int getWidth(){return 180;} public int getHeight(){return 90;}
+              public int getWidth(){return w;} public int getHeight(){return h;}
             }""",
+            "android.os.SystemClock": "public class SystemClock {public static long now=1000; public static long elapsedRealtime(){return now;}}",
+            "com.yandex.mapkit.map.Callback": "public interface Callback {void onTaskFinished();}",
             "android.graphics.PointF": """public class PointF {
               public final float x,y; public PointF(float x,float y){this.x=x;this.y=y;}
             }""",
@@ -42,14 +45,15 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
               import com.yandex.runtime.image.ImageProvider;
               class RecordingMap {
                 static final class Pin extends MapObject {
-                  Point point; ImageProvider image; IconStyle style; boolean visible;
+                  Point point; ImageProvider image; IconStyle style; boolean visible; Callback loaded;
+                  static boolean immediate=true;
                   public void setVisible(boolean v){visible=v;}
                   public void setGeometry(Point p){point=p;}
-                  public void setIcon(ImageProvider p,IconStyle s){image=p;style=s;}
+                  public void setIcon(ImageProvider p,IconStyle s,Callback c){image=p;style=s;loaded=c;if(immediate)c.onTaskFinished();}
                 }
-                Pin pin; int creations;
-                public Pin addEmptyPlacemark(Point p){creations++;return pin=new Pin();}
-                public void remove(MapObject p){if(pin==p)pin=null;}
+                Pin pin; int creations; java.util.List<Pin> pins=new java.util.ArrayList<>();
+                public Pin addEmptyPlacemark(Point p){creations++;pin=new Pin();pin.point=p;pins.add(pin);return pin;}
+                public void remove(MapObject p){pins.remove(p);if(pin==p)pin=null;}
                 public static void main(String[] args)throws Exception{
                   RecordingMap map=new RecordingMap();
                   MapOverlayPlacementCoordinator c=new MapOverlayPlacementCoordinator();
@@ -62,7 +66,7 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
                   check(!PrimaryTurnPlacemark.isCurrent(s,4,true,999,1500));
                   check(!PrimaryTurnPlacemark.isCurrent(null,4,true,2000,1500));
                   LaneGuidanceAppearance style = new LaneGuidanceAppearance();
-                  p.show(map,s,125,5f,c,style);
+                  p.show(map,s,125,5f,c,style,()->{});
                   check(map.pin.visible && map.pin.point.x==55 && map.pin.point.y==37);
                   check(map.pin.image.bitmap==s.texture.bitmap && map.pin.style.scale==1.25f);
                   check(map.pin.style.anchor.x==.15f && map.pin.style.anchor.y==.85f);
@@ -72,8 +76,29 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
                   lane.routeSegmentIndex=5;lane.routeSegmentPosition=1;lane.latitude+=.0001;
                   check(!p.replaces(lane));lane.latitude=55;lane.routeSegmentPosition=Double.NaN;
                   check(!p.replaces(lane));lane.routeSegmentPosition=1;
-                  s=new PrimaryTurnSample();s.texture.combined=false;p.show(map,s,90,5f,c,style);
-                  check(!p.replaces(lane) && map.creations==1 && map.pin.style.scale==.9f);
+                  s=new PrimaryTurnSample();s.texture.combined=false;p.show(map,s,90,5f,c,style,()->{});
+                  check(!p.replaces(lane) && map.creations==2 && map.pin.style.scale==.9f);
+
+                  // A replacement stays hidden until its asynchronous upload completes.
+                  Pin old=map.pin;Pin.immediate=false;
+                  s=new PrimaryTurnSample();s.texture.combined=false;s.texture.artwork=new CombinedLaneArtwork();
+                  p.show(map,s,125,5f,c,style,()->{});Pin replacement=map.pin;
+                  check(old.visible && !replacement.visible && map.pins.size()==2);
+                  check(replacement.style.scale==1f && replacement.image.bitmap.getWidth()==113);
+                  replacement.loaded.onTaskFinished();
+                  check(replacement.visible && !old.visible && map.pins.size()==1);
+                  check(c.width==113 && c.height==56);
+                  // Both standalone and combined signs respond to the same appearance.
+                  LaneGuidanceAppearance other=new LaneGuidanceAppearance();
+                  p.show(map,s,125,5f,c,other,()->{});Pin changed=map.pin;
+                  check(changed!=replacement && replacement.visible && !changed.visible);
+                  // Superseded callback cannot swap a stale sign after route cleanup.
+                  p.clear(map,c);changed.loaded.onTaskFinished();
+                  check(map.pins.isEmpty() && !changed.visible && !p.replaces(lane));
+                  // A queued upload that outlives its evidence cannot show a stale sign.
+                  p.show(map,s,125,5f,c,style,()->{});Pin expired=map.pin;
+                  android.os.SystemClock.now=3000;expired.loaded.onTaskFinished();
+                  check(map.pins.isEmpty() && !expired.visible);
                   p.clear(map,c);check(map.pin==null && !p.replaces(lane));
                 }
                 static void check(boolean condition){if(!condition)throw new AssertionError();}
@@ -91,8 +116,9 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
                 }
               }
               class LaneGuidanceAppearance {boolean same(LaneGuidanceAppearance x){return x==this;}}
-              class CombinedLaneArtwork { Bitmap render(Bitmap b,LaneGuidanceAppearance a){return b;} }
+              class CombinedLaneArtwork { Bitmap render(Bitmap b,LaneGuidanceAppearance a,float scale){return new Bitmap(Math.round(b.getWidth()/2f*scale),Math.round(b.getHeight()/2f*scale));} }
               class PrimaryTurnSample {
+                static final long FRESH_MS=1500;
                 long routeEpoch=4,sampledAt=1000;
                 NavigatorStatePublisher.RouteTurnFrame turn=new NavigatorStatePublisher.RouteTurnFrame();
                 StockTurnTextures.Texture texture=new StockTurnTextures.Texture();

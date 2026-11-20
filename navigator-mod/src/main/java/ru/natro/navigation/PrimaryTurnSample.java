@@ -3,7 +3,9 @@ package ru.natro.navigation;
 
 /** One native maneuver texture observed on the primary map at this route position. */
 final class PrimaryTurnSample {
-    static final long FRESH_MS = 900L;
+    // A short render transition may miss one capture. Only a new pixel confirmation
+    // renews this deadline; route/view invalidations are still immediate.
+    static final long FRESH_MS = 1500L;
     final NavigatorStatePublisher.RouteTurnFrame turn;
     final StockTurnTextures.Texture texture;
     final long sampledAt;

@@ -27,10 +27,14 @@ public final class StockTurnTextures {
         final float anchorX, anchorY;
         final boolean combined;
         final long revision;
+        // Identity of the native view, independent of its changing distance/texture.
+        // A token does not keep the view, its Context or its window alive.
+        final Object source;
         final CombinedLaneArtwork artwork;
 
         Texture(Bitmap bitmap, Object provider, float anchorX, float anchorY,
-                boolean combined, long revision, CombinedLaneArtwork artwork) {
+                boolean combined, long revision, CombinedLaneArtwork artwork, Object source) {
+            this.source = source;
             this.artwork = artwork;
             this.bitmap = bitmap;
             this.provider = provider;
@@ -79,6 +83,7 @@ public final class StockTurnTextures {
         Class<?> point = anchorMethod.getReturnType();
         Method x = point.getMethod("getX"), y = point.getMethod("getY");
         Method image = api.getMethod("createTexture").getReturnType().getMethod("getImage");
+        Object source = new Object();
         return forward(api, view, (method, provider, owner) -> {
             if (method.getName().equals("createTexture") && window.get() != null) {
                 // The pinned createTexture() allocates a new ARGB bitmap, draws it once and returns
@@ -94,7 +99,7 @@ public final class StockTurnTextures {
                     if (ax >= 0 && ax <= 1 && ay >= 0 && ay <= 1 && bitmap != null
                             && !bitmap.isRecycled() && bitmap.getWidth() > 0 && bitmap.getHeight() > 0
                             && (long) bitmap.getWidth() * bitmap.getHeight() <= MAX_PIXELS) {
-                        record(window, owner, bitmap, provider, ax, ay, combined, view);
+                        record(window, owner, bitmap, provider, ax, ay, combined, view, source);
                         recorded = true;
                     }
                 } finally {
@@ -133,17 +138,17 @@ public final class StockTurnTextures {
     }
 
     private static synchronized void record(WeakReference<Object> window, Object owner, Bitmap bitmap,
-                                            Object provider, float ax, float ay, boolean combined, Object view) {
+                                            Object provider, float ax, float ay, boolean combined, Object view, Object source) {
         for (Capture capture : captures) {
             Texture old = capture.texture;
             if (capture.view.get() == owner && capture.window.get() == window.get()
                     && old.anchorX == ax && old.anchorY == ay && old.combined == combined
                     && !old.bitmap.isRecycled() && old.bitmap.sameAs(bitmap)) return;
         }
-        CombinedLaneArtwork artwork = combined ? CombinedLaneArtwork.capture(view, bitmap) : null;
+        CombinedLaneArtwork artwork = CombinedLaneArtwork.capture(view, bitmap);
         remove(owner);
         if (captures.size() == MAX_TEXTURES) captures.remove(0);
-        captures.add(new Capture(window, owner, new Texture(bitmap, provider, ax, ay, combined, ++sequence, artwork)));
+        captures.add(new Capture(window, owner, new Texture(bitmap, provider, ax, ay, combined, ++sequence, artwork, source)));
     }
 
     private static synchronized void remove(Object owner) {
