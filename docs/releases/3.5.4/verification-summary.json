@@ -1,0 +1,121 @@
+{
+  "sourceCommit": "ee7d938a6a0c9e9ead67749a7c08e284bc6c3068",
+  "sourceTree": "7b8d2d2c6c09e11098b6e2e679be520a4dd9347f",
+  "orchestratorCommit": "6984cd9306f53e395ad9dc64324a0e736cd17a75",
+  "runId": 44736096676,
+  "runNumber": 1,
+  "artifactHashes": {
+    "Natro-3.5.4-offline-signing-1": "sha256:446de3d27fdd55f4a68c324f75dd545bf39c1d85ed2e2ba75e58ef299b508a83",
+    "Natro-3.5.4-signing-tools-1": "sha256:e3070d93da320f17dfb19b9616c9970f63def265897e4f3591b65f037a68d841"
+  },
+  "buildUrl": "https://github.com/AGKulikov/Status/actions/runs/44736096676",
+  "buildConclusion": "success",
+  "androidTests": {
+    "tests": 2349,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "pythonTests": {
+    "tests": 305,
+    "result": "OK"
+  },
+  "sourceInventoryOwners": 99,
+  "targetedTestReports": {
+    "CombinedLaneArtworkTest": {
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "sameDisplayProfileStylesCombinedSignWithoutMutatingSource",
+        "recordedArtworkIsImmutableAndProfilesRemainIndependent",
+        "standaloneAndCombinedUseTargetScaleRegardlessOfPrimaryScale"
+      ]
+    },
+    "BackupDefaultsMigrationTest": {
+      "tests": 49,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "systemDumpReleasePreservesDefaultsAndRejectsFuture",
+        "followupReleaseAcceptsReviewedVersionsAndPreservesExplicitDefaults",
+        "qnxMissingReleasePreservesDefaultsAndRejectsFuture",
+        "oldEffectiveDefaultsAndUnknownValuesSurviveOnTheNewVersion",
+        "fullQnxInventoryReleaseAcceptsReviewedSchemas",
+        "updaterCompatibilityReleasePreservesDefaultsAndRejectsFuture",
+        "wifiBoot347PreservesDefaults",
+        "mediaActions339PreservesDefaults",
+        "graphicsDumpReleaseAcceptsReviewedSchemasOnly",
+        "startupIconsReleasePreservesOldDefaultsAndRejectsFuture",
+        "instrument332PreservesEffectiveAndExplicitDefaults",
+        "dimExport334PreservesDefaults",
+        "diagnosticReleaseAccepts315AndRejectsUnknownSchemas",
+        "recentFiles351PreservesDefaults",
+        "musicWave348PreservesDefaults",
+        "fresh354SnapshotLeavesUnconfiguredPreferencesAbsent",
+        "updateCenter349PreservesDefaults",
+        "coldBoot346PreservesDefaults",
+        "mediaActions338PreservesDefaults",
+        "restoresSupportedBackupsIncluding351On352",
+        "restoresSupportedBackupsIncluding352On353",
+        "restoresSupportedBackupsIncluding353On354",
+        "qnxCollector328PreservesDefaultsAndRejectsFuture",
+        "hudDimReleasePreservesOldDefaultsAndRejectsFuture",
+        "mediaGestures336PreservesDefaults",
+        "mediaDelivery335PreservesDefaults",
+        "recentFiles350PreservesDefaults",
+        "declaredDefaultsUseRealGettersWithoutWritingOrProxyIdentityFailure",
+        "wingsCollector330PreservesDefaultsAndRejectsFuture",
+        "fresh353SnapshotLeavesUnconfiguredPreferencesAbsent",
+        "fullCompositionReleaseAcceptsReviewedSchemasOnly",
+        "mediaActions337PreservesDefaults",
+        "wideMappingsReleaseAcceptsReviewedSchemas",
+        "dimRecording333PreservesEffectiveAndExplicitDefaults",
+        "fullVehicleArchiveReleasePreservesDefaultsAndRejectsFuture",
+        "hudVolumeReleaseAcceptsThrough309ButRejectsFuture",
+        "logFixReleaseAcceptsReviewedVersionsAndPreservesExplicitDefaults",
+        "expandedGraphicsReleaseAcceptsReviewedSchemasOnly",
+        "fresh352SnapshotLeavesUnconfiguredPreferencesAbsent",
+        "coldBoot344PreservesDefaults",
+        "qnxReaderReleaseAcceptsReviewedSchemasOnly",
+        "loggingReleaseAcceptsAllReviewedPredecessorsAndRejectsFutureSchema",
+        "exactBatteryReleaseAcceptsReviewedSchemasOnly",
+        "instrument331PreservesEffectiveAndExplicitDefaults",
+        "mediaAndCollector329PreservesDefaultsAndRejectsFuture",
+        "diagnosticReleasePreservesOldDefaultsAndRejectsFuture",
+        "fileManager340PreservesDefaults",
+        "passengerStartupReleasePreservesExplicitOptInAndRejectsFuture",
+        "qnxReleaseAcceptsReviewedSchemasOnly"
+      ]
+    },
+    "NatroUpdaterAndroid9Test": {
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "incorrectHashStillFailsBeforeSignatureCheck",
+        "actualPublishedApkPassesCompleteVerification",
+        "installActionRechecksPreparedBytes",
+        "android9RequiresBothFlagsToCollectCurrentCertificate",
+        "sameVersionStillCannotBeInstalledAsUpdate",
+        "actualV3VerifierRejectsTamperedApkEvenWithMatchingManifestHash"
+      ]
+    },
+    "StockManeuverPackageTest": {
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "cases": [
+        "version352SuppliesResourcesForItsOriginalCommandFrame",
+        "installedRepackUsesSameArtworkOnlyWithProjectSignature"
+      ]
+    }
+  },
+  "ciLogSha256": "b7eff8fe5c646daefa854880369aef81814d8d04a2fd5f8c2787858946638d44",
+  "physicalKx11Verification": "pending",
+  "scope": "SOURCE/TEST/APK evidence for CARD-017/018/019/020, MAP-054; GATE-058/060 FIELD remains OPEN"
+}

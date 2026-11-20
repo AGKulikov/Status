@@ -100,13 +100,14 @@ jobs:
           echo "8091dfb6be987e9e931cc297cffdc7294bd4da91e6032bd47700f9a7cb9911de  $baseline" | sha256sum --check -
           chmod +x "$sdk"/{apksigner,aapt,zipalign}
           mkdir "$out"
-          cp "$DOC"/{release-report.json,navigator-release-report.json,natro-update.json,navigator-update.json,signature-verification.txt,navigator-signature-verification.txt,release-notes.md,navigator-release-notes.md} "$out"
+          cp "$DOC"/{release-report.json,navigator-release-report.json,natro-update.json,navigator-update.json,signature-verification.txt,navigator-signature-verification.txt,release-notes.md,navigator-release-notes.md,verification-summary.json} "$out"
           mv "$out/release-notes.md" "$out/README_RU.md"
           for base in Natro-3.5.4 Navigator-30.3.0-Natro-3.5.4; do
             handoff=signing-handoff.json
             if [[ "$base" == Navigator-* ]]; then handoff=navigator-signing-handoff.json; fi
+            gzip -cd "$DOC/$handoff.gz" > "$RUNNER_TEMP/$handoff"
             python3 source/tools/apk_signature_handoff.py apply --unsigned "$candidate/$base-unsigned.apk" \
-              --patch "$DOC/$handoff" --output "$out/$base-signed.apk"
+              --patch "$RUNNER_TEMP/$handoff" --output "$out/$base-signed.apk"
           done
           python3 source/tools/verify_offline_release_handoff.py --candidate "$candidate" --tools "$sdk" --release "$out" \
             --source "$SOURCE_SHA" --tree "$SOURCE_TREE" --run "$BUILD_RUN" --signed-sha256 "$(jq -er .sha256 "$out/natro-update.json")"
