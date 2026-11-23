@@ -7,5 +7,6 @@
   "artifactHashes": {
     "Natro-3.5.6-offline-signing-2": "sha256:8abda09ff6419582f837030ad146375a36b2cdecd74f4500b434bf3fa306a726",
     "Natro-3.5.6-signing-tools-2": "sha256:5383fb5c99e22df453527e373f0a20b6b6a6d2534e9eda5e214664d3702ecc3b"
-  }
+  },
+  "publicReadbackVersion": "3.5.6"
 }
