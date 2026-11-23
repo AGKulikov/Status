@@ -1146,7 +1146,11 @@ public final class NavigationHudV2ContractTest {
         assertTrue(laneGuidance.contains("getImageAnchor"));
         assertTrue(laneGuidance.contains("BalloonAnchor"));
         assertFalse(laneGuidance.contains("getMethod(\"createView\""));
-        assertTrue(laneGuidance.contains("scalePercent / 100f"));
+        // Both native lanes and the combined sign use the same viewport-limited
+        // percentage, derived from the user's requested profile scale.
+        assertTrue(laneGuidance.contains(
+                "PrimaryTurnPlacemark.effectiveScale(proof, scalePercent, placementCoordinator, appearance)"));
+        assertTrue(laneGuidance.contains("effectiveScalePercent / 100f"));
         assertTrue(laneGuidance.contains("RotationType"));
         assertTrue(laneGuidance.contains("NO_ROTATION"));
         assertTrue(laneGuidance.contains("setGeometry"));
