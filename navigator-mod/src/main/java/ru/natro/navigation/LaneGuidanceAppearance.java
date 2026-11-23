@@ -20,20 +20,29 @@ final class LaneGuidanceAppearance {
     private static final String TAG = "NatroLaneAppearance";
     final String cardColor, signsColor, borderColor;
     final int borderWidth, cornerRadius;
+    final float laneGlyphHeight;
 
     LaneGuidanceAppearance(NavigationMapProfile profile) {
+        this(profile, null);
+    }
+
+    LaneGuidanceAppearance(NavigationMapProfile profile, android.content.Context context) {
         cardColor = profile.laneGuidanceCardColor;
         signsColor = profile.laneGuidanceSignsColor;
         borderColor = profile.laneGuidanceBorderColor;
         borderWidth = profile.laneGuidanceBorderWidthPx;
         cornerRadius = profile.laneGuidanceCornerRadiusPx;
+        int id = context == null ? 0 : context.getResources().getIdentifier(
+                "mapkit_styling_automotive_height_laneicon", "dimen", context.getPackageName());
+        laneGlyphHeight = id == 0 ? 0f : context.getResources().getDimension(id);
     }
 
     boolean same(LaneGuidanceAppearance other) {
         return other != null && Objects.equals(cardColor, other.cardColor)
                 && Objects.equals(signsColor, other.signsColor)
                 && Objects.equals(borderColor, other.borderColor)
-                && borderWidth == other.borderWidth && cornerRadius == other.cornerRadius;
+                && borderWidth == other.borderWidth && cornerRadius == other.cornerRadius
+                && laneGlyphHeight == other.laneGlyphHeight;
     }
 
     void configureFactory(Object factory) throws Exception {

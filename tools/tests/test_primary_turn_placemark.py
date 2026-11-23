@@ -18,6 +18,8 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
             }""",
             "android.os.SystemClock": "public class SystemClock {public static long now=1000; public static long elapsedRealtime(){return now;}}",
             "com.yandex.mapkit.map.Callback": "public interface Callback {void onTaskFinished();}",
+            "android.graphics.RectF": """public class RectF { public float left,top,right,bottom;
+              public RectF(float a,float b,float c,float d){left=a;top=b;right=c;bottom=d;} }""",
             "android.graphics.PointF": """public class PointF {
               public final float x,y; public PointF(float x,float y){this.x=x;this.y=y;}
             }""",
@@ -84,14 +86,25 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
                   s=new PrimaryTurnSample();s.texture.combined=false;s.texture.artwork=new CombinedLaneArtwork();
                   p.show(map,s,125,5f,c,style,()->{});Pin replacement=map.pin;
                   check(old.visible && !replacement.visible && map.pins.size()==2);
-                  check(replacement.style.scale==1f && replacement.image.bitmap.getWidth()==113);
+                  check(replacement.style.scale==1f && replacement.image.bitmap.getWidth()==123);
                   replacement.loaded.onTaskFinished();
                   check(replacement.visible && !old.visible && map.pins.size()==1);
-                  check(c.width==113 && c.height==56);
+                  check(c.width==123 && c.height==56);
+                  // One destination may still have the turn outside its viewport. It keeps a
+                  // complete fixed card; the other destination can attach to the same turn.
+                  c.onScreen=false;
+                  p.show(map,s,125,5f,c,style,()->{});Pin docked=map.pin;
+                  check(replacement.visible && !docked.visible);
+                  docked.loaded.onTaskFinished();
+                  check(docked.visible && docked.style.anchor.x==0 && docked.style.anchor.y==1);
+                  check(docked.point.x==6 && docked.point.y==184 && c.screenReserved);
+                  check(docked.image.bitmap.getWidth()==113 && docked.image.bitmap.getHeight()==56);
+                  check(!p.replaces(lane));
+
                   // Both standalone and combined signs respond to the same appearance.
                   LaneGuidanceAppearance other=new LaneGuidanceAppearance();
                   p.show(map,s,125,5f,c,other,()->{});Pin changed=map.pin;
-                  check(changed!=replacement && replacement.visible && !changed.visible);
+                  check(changed!=docked && docked.visible && !changed.visible);
                   // Superseded callback cannot swap a stale sign after route cleanup.
                   p.clear(map,c);changed.loaded.onTaskFinished();
                   check(map.pins.isEmpty() && !changed.visible && !p.replaces(lane));
@@ -116,7 +129,10 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
                 }
               }
               class LaneGuidanceAppearance {boolean same(LaneGuidanceAppearance x){return x==this;}}
-              class CombinedLaneArtwork { Bitmap render(Bitmap b,LaneGuidanceAppearance a,float scale){return new Bitmap(Math.round(b.getWidth()/2f*scale),Math.round(b.getHeight()/2f*scale));} }
+              class CombinedLaneArtwork {
+                float bodyWidth(LaneGuidanceAppearance a){return 90;} float bodyHeight(LaneGuidanceAppearance a){return 45;}
+                Bitmap renderPlaced(LaneGuidanceAppearance a,float scale,TurnBalloonLayout l){return new Bitmap(l.width,l.height);}
+              }
               class PrimaryTurnSample {
                 static final long FRESH_MS=1500;
                 long routeEpoch=4,sampledAt=1000;
@@ -127,7 +143,14 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
                 static void hideUntilTextured(Object pin){((RecordingMap.Pin)pin).setVisible(false);}
               }
               class MapOverlayPlacementCoordinator {
-                int width,height;
+                int width,height; boolean onScreen=true,screenReserved=false;
+                int viewportWidth(){return 728;} int viewportHeight(){return 190;}
+                Object pointAtScreen(float x,float y){return new Point(x,y);}
+                void reserveScreen(String owner,String key,android.graphics.RectF b){screenReserved=true;}
+                static String[] placementLegNames(){return new String[]{"LEFT_CENTER","RIGHT_CENTER","TOP_CENTER","BOTTOM_CENTER","TOP_LEFT","TOP_RIGHT","BOTTOM_LEFT","BOTTOM_RIGHT"};}
+                static class Placement {String legName;Placement(float x,float y,String s){legName=s;}}
+                static class Footprint {Footprint(String s,int w,int h,float x,float y,android.graphics.RectF r){}}
+                Placement reserveIfClear(String o,String k,double lat,double lon,int w,int h,boolean right,int si,double sp,Placement previous,java.util.List<Footprint> f){return onScreen?new Placement(0,.5f,"LEFT_CENTER"):null;}
                 void clearOwner(String name){}
                 void reserveFixed(String owner,String key,double lat,double lon,int w,int h,float x,float y){
                   width=w;height=h;
@@ -144,5 +167,5 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
                 destination.write_text(f"package {package};\n{body}")
                 paths.append(str(destination))
             subprocess.run(["java", "com.sun.tools.javac.Main", "-d", str(root), *paths, str(SOURCE / "ReflectMethods.java"),
-                            str(SOURCE / "PrimaryTurnPlacemark.java")], check=True)
+                            str(SOURCE / "PrimaryTurnPlacemark.java"), str(SOURCE / "TurnBalloonLayout.java")], check=True)
             subprocess.run(["java", "-cp", str(root), "ru.natro.navigation.RecordingMap"], check=True)

@@ -79,6 +79,22 @@ final class MapOverlayPlacementCoordinator {
     void setDiagnosticProfile(String profile) { diagnosticProfile = profile; }
     String diagnosticContext() { return "profile=" + diagnosticProfile + ", viewport=" + viewportWidth + "x" + viewportHeight; }
     String lastOptionalFailure() { return optionalFailure; }
+    int viewportWidth() { return viewportWidth; }
+    int viewportHeight() { return viewportHeight; }
+
+    /** Used only for the explicitly screen-fixed fallback, which has no geographic pointer. */
+    Object pointAtScreen(float x, float y) throws Exception {
+        if (mapWindow == null) return null;
+        Class<?> type = Class.forName("com.yandex.mapkit.ScreenPoint");
+        Object screen = type.getConstructor(float.class, float.class).newInstance(x, y);
+        return invoke(mapWindow, "screenToWorld", new Class<?>[]{type}, screen);
+    }
+
+    void reserveScreen(String owner, String key, RectF bounds) {
+        RectF occupied = new RectF(bounds);
+        occupied.inset(-ITEM_MARGIN_PX, -ITEM_MARGIN_PX);
+        reservations.add(new Reservation(owner, key, occupied));
+    }
 
     void attach(Object nextMapWindow, int width, int height) {
         mapWindow = nextMapWindow;

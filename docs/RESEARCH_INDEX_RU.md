@@ -187,3 +187,5 @@ MUSIC-WAVE-DIAG: native hook/observer implementation candidate; actual pinned DE
 patch and synthetic fixture checks PASS; release and physical capture OPEN.
 
 - 20.11.2026: [мерцание при обновлении метров, масштаб и отдельные таблички](NAVIGATOR_TURN_BALLOON_2026_11_20_RU.md). SOURCE и целевой replay; полный CI/APK/FIELD отслеживаются в выпуске 3.5.4.
+
+- 23.11.2026: [Масштаб и viewport табличек, CARD-021](NAVIGATOR_SIGN_VIEWPORT_2026_11_23_RU.md).

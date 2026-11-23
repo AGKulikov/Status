@@ -103,4 +103,35 @@ public class CombinedLaneArtworkTest {
         assertEquals(Color.BLUE,b.getPixel(50,30));assertEquals(Color.WHITE,b.getPixel(120,50));
         assertEquals(Color.RED,a.getPixel(25,15));
     }
+
+    @Test public void destinationBodyKeepsNativeSymbolsAndHasNoPrimaryScreenTail() {
+        Standalone source = new Fixture();
+        source.sourceScale = 2f;
+        CombinedLaneArtwork artwork = CombinedLaneArtwork.capture(source,
+                Bitmap.createBitmap(160,80,Bitmap.Config.ARGB_8888));
+        NavigationMapProfile profile = new NavigationMapProfile();
+        profile.laneGuidanceSignsColor = "#FFFF0000";
+        profile.laneGuidanceCardColor = "#8000FF00";
+        LaneGuidanceAppearance style = new LaneGuidanceAppearance(profile);
+        for (String side : new String[]{"LEFT_CENTER","RIGHT_CENTER","TOP_LEFT","TOP_RIGHT",
+                "BOTTOM_LEFT","BOTTOM_RIGHT","TOP_CENTER","BOTTOM_CENTER","DOCKED"}) {
+            TurnBalloonLayout layout = new TurnBalloonLayout(120,60,12,side);
+            Bitmap rendered = artwork.renderPlaced(style,1.5f,layout);
+            assertEquals(layout.width,rendered.getWidth());
+            assertEquals(layout.height,rendered.getHeight());
+            assertEquals(Color.RED,rendered.getPixel((int)layout.left+37,(int)layout.top+22));
+            assertEquals(Color.YELLOW,rendered.getPixel((int)layout.left+67,(int)layout.top+22));
+            assertEquals(0x8000FF00,rendered.getPixel((int)layout.left+90,(int)layout.top+37));
+            if (layout.docked) { assertEquals(120,rendered.getWidth());assertEquals(60,rendered.getHeight()); }
+        }
+    }
+
+    @Test public void normalizeNativeAndMapkitGlyphUnitsBeforeApplyingUserScale() {
+        // The pinned APK has 40 dp MapKit arrows and a 64 dp native resource variant.
+        // A line of distance may add height, but the SAME arrow must still be 40 * profileScale.
+        for(float nativeHeight:new float[]{40,64,80,120})
+            for(float profileScale:new float[]{.5f,1,1.5f,2.5f})
+                assertEquals(40*profileScale,
+                        nativeHeight*CombinedLaneArtwork.unitScale(40,nativeHeight)*profileScale,.001f);
+    }
 }

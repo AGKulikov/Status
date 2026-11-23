@@ -184,6 +184,8 @@ def prepareNavigatorAliceTests = tasks.register("prepareNavigatorAliceTests", Co
         include "ru/natro/navigation/NavigatorAlice*.java"
         include "ru/natro/navigation/NativeAliceBridge.java"
         include "ru/natro/navigation/CombinedLaneArtwork.java"
+        include "ru/natro/navigation/TurnBalloonLayout.java"
+        include "ru/natro/navigation/BalloonGeometry.java"
         include "ru/natro/navigation/LaneGuidanceAppearance.java"
         include "ru/natro/navigation/NavigationMapProfile.java"
     }

@@ -41,6 +41,7 @@ final class LaneGuidanceMapLayer {
     private boolean nightMode;
     private boolean placeOnRight = true;
     private int scalePercent = 100;
+    private int effectiveScalePercent = 100;
     private float zIndex = NavigationMapProfile.layerZ(80);
     private boolean latestRouteActive;
     private NavigatorStatePublisher.LaneGuidanceFrame latest;
@@ -100,7 +101,7 @@ final class LaneGuidanceMapLayer {
 
     void apply(boolean nextEnabled, int nextScalePercent, boolean nextNightMode,
                boolean nextPlaceOnRight, int layerPriority, NavigationMapProfile profile) {
-        LaneGuidanceAppearance nextAppearance = new LaneGuidanceAppearance(profile);
+        LaneGuidanceAppearance nextAppearance = new LaneGuidanceAppearance(profile, context);
         int nextScale = Math.max(50, Math.min(250, nextScalePercent));
         float nextZ = NavigationMapProfile.layerZ(layerPriority);
         boolean presentationChanged = scalePercent != nextScale || nightMode != nextNightMode
@@ -175,6 +176,9 @@ final class LaneGuidanceMapLayer {
 
     /** Participates in the shared lane/light/camera collision pass after a camera move. */
     void relayout() {
+        // Viewport visibility is local to this map, not to the primary Navigator.
+        // Re-evaluate the full card before laying out neighbouring lane signs.
+        renderTurn();
         turnPlacemark.reserve(placementCoordinator);
         placementCoordinator.clearOwner(MapOverlayPlacementCoordinator.OWNER_LANES);
         NavigatorStatePublisher.LaneGuidanceFrame frame = latest;
@@ -194,6 +198,8 @@ final class LaneGuidanceMapLayer {
         }
     }
 
+    void repositionFixed() { turnPlacemark.repositionFixed(placementCoordinator); }
+
     private void scheduleExpiryIfNeeded() {
         if (!enabled || map == null || latestSampleElapsedMs <= 0L || expiryPosted) return;
         long age = SystemClock.elapsedRealtime() - latestSampleElapsedMs;
@@ -212,21 +218,37 @@ final class LaneGuidanceMapLayer {
 
     private void render() {
         if (map == null) return;
+        renderTurn();
+        renderLane();
+    }
+
+    private void renderTurn() {
+        if (map == null) return;
+        placementCoordinator.clearOwner(MapOverlayPlacementCoordinator.OWNER_LANES);
         PrimaryTurnSample proof = turnSample;
+        int nextScale = PrimaryTurnPlacemark.effectiveScale(proof, scalePercent, placementCoordinator, appearance);
+        if (effectiveScalePercent != nextScale) {
+            effectiveScalePercent = nextScale;
+            renderedFingerprint = Long.MIN_VALUE;
+        }
         boolean turnVisible = false;
         if (proof != null && latestRouteActive && (proof.texture.combined ? enabled : showRouteTurns)
                 && SystemClock.elapsedRealtime() - proof.sampledAt < PrimaryTurnSample.FRESH_MS) {
             try {
-                turnPlacemark.show(ensureCollection(), proof, scalePercent, zIndex, placementCoordinator, appearance, this::render);
+                turnPlacemark.show(ensureCollection(), proof, effectiveScalePercent, zIndex,
+                        placementCoordinator, appearance, this::renderLane);
                 turnVisible = true;
             } catch (Exception failure) {
                 Log.w(TAG, "Cannot draw the verified primary maneuver at its route point", failure);
             }
         }
         if (!turnVisible) turnPlacemark.clear(collection, placementCoordinator);
+    }
+
+    private void renderLane() {
         NavigatorStatePublisher.LaneGuidanceFrame frame = latest;
         if (!enabled || !latestRouteActive || frame == null || !frame.hasContent()
-                || (turnVisible && turnPlacemark.replaces(frame))) {
+                || turnPlacemark.replaces(frame)) {
             clearVisual();
             return;
         }
@@ -303,14 +325,14 @@ final class LaneGuidanceMapLayer {
         try {
             appearance.configureFactory(factory);
             texture = factoryClass.getMethod("createTexture", balloonClass, boolean.class, float.class)
-                    .invoke(factory, balloon, nightMode, scalePercent / 100f);
+                    .invoke(factory, balloon, nightMode, effectiveScalePercent / 100f);
             appearance.configureTexture(factory);
         } catch (Exception unsupportedStyle) {
             Log.w(TAG, "Lane styling unavailable; restoring original renderer", unsupportedStyle);
             factory = factoryClass.getConstructor(Context.class, colorsClass).newInstance(context, null);
             texture = factoryClass.getMethod("createTexture", balloonClass, boolean.class, float.class)
-                    .invoke(factory, balloon, nightMode, scalePercent / 100f);
-            renderedAppearance = new LaneGuidanceAppearance(new NavigationMapProfile());
+                    .invoke(factory, balloon, nightMode, effectiveScalePercent / 100f);
+            renderedAppearance = new LaneGuidanceAppearance(new NavigationMapProfile(), context);
         }
         List<MapOverlayPlacementCoordinator.Footprint> footprints =
                 measureBalloonFootprints(texture);
@@ -345,7 +367,7 @@ final class LaneGuidanceMapLayer {
             iconStyle = style;
         }
         Object exactAnchor = balloonAnchor(nextPlacement.legName);
-        Object provider = renderedAppearance.createImage(texture, exactAnchor, scalePercent / 100f);
+        Object provider = renderedAppearance.createImage(texture, exactAnchor, effectiveScalePercent / 100f);
         Object geometry = invoke(texture, "getBalloonGeometry",
                 new Class<?>[]{exactAnchor.getClass()}, exactAnchor);
         PointF imageAnchor = (PointF) invoke(geometry, "getImageAnchor", new Class<?>[0]);
@@ -374,7 +396,7 @@ final class LaneGuidanceMapLayer {
                 || currentPlacemark == null) return;
         if (placement != null && placement.sameSlot(next)) return;
         Object exactAnchor = balloonAnchor(next.legName);
-        provider = renderedAppearance.createImage(texture, exactAnchor, scalePercent / 100f);
+        provider = renderedAppearance.createImage(texture, exactAnchor, effectiveScalePercent / 100f);
         Object geometry = invoke(texture, "getBalloonGeometry",
                 new Class<?>[]{exactAnchor.getClass()}, exactAnchor);
         PointF imageAnchor = (PointF) invoke(geometry, "getImageAnchor", new Class<?>[0]);

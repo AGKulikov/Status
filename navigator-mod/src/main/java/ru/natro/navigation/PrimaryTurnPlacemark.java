@@ -3,8 +3,10 @@ package ru.natro.navigation;
 
 import android.graphics.Bitmap;
 import android.graphics.PointF;
+import android.graphics.RectF;
 import android.os.SystemClock;
 import java.lang.reflect.Proxy;
+import java.util.ArrayList;
 
 /** Owns one exact, positively observed primary-screen maneuver bitmap on one external map. */
 final class PrimaryTurnPlacemark {
@@ -19,6 +21,56 @@ final class PrimaryTurnPlacemark {
     private LaneGuidanceAppearance loadingStyle;
     private int loadingScale, displayedWidth, displayedHeight;
     private float loadingZ;
+    private TurnBalloonLayout displayedLayout, loadingLayout;
+    private Object displayedPoint;
+
+    static int effectiveScale(PrimaryTurnSample sample, int requested,
+                              MapOverlayPlacementCoordinator coordinator, LaneGuidanceAppearance appearance) {
+        if (sample == null || sample.texture.artwork == null) return requested;
+        CombinedLaneArtwork artwork = sample.texture.artwork;
+        float scale = TurnBalloonLayout.fitScale(artwork.bodyWidth(appearance), artwork.bodyHeight(appearance),
+                coordinator.viewportWidth(), coordinator.viewportHeight(), requested / 100f);
+        return Math.max(1, Math.min(requested, (int)Math.floor(scale * 100f)));
+    }
+
+    private TurnBalloonLayout layout(PrimaryTurnSample sample, int scale,
+                                     MapOverlayPlacementCoordinator coordinator, LaneGuidanceAppearance appearance) {
+        CombinedLaneArtwork artwork = sample.texture.artwork;
+        if (artwork == null) return null;
+        int w = Math.max(1, Math.round(artwork.bodyWidth(appearance) * scale / 100f));
+        int h = Math.max(1, Math.round(artwork.bodyHeight(appearance) * scale / 100f));
+        int gap = Math.max(3, Math.round(8f * scale / 100f));
+        ArrayList<MapOverlayPlacementCoordinator.Footprint> footprints = new ArrayList<>();
+        for (String side : MapOverlayPlacementCoordinator.placementLegNames()) {
+            TurnBalloonLayout l = new TurnBalloonLayout(w, h, gap, side);
+            footprints.add(new MapOverlayPlacementCoordinator.Footprint(side, l.width, l.height,
+                    l.anchorX(), l.anchorY(), new RectF(l.left, l.top, l.right, l.bottom)));
+        }
+        coordinator.clearOwner(OWNER);
+        NavigatorStatePublisher.RouteTurnFrame t = sample.turn;
+        MapOverlayPlacementCoordinator.Placement previous = displayedLayout == null ? null
+                : new MapOverlayPlacementCoordinator.Placement(displayedLayout.anchorX(),
+                        displayedLayout.anchorY(), displayedLayout.side);
+        MapOverlayPlacementCoordinator.Placement p = coordinator.reserveIfClear(OWNER, t.id,
+                t.latitude, t.longitude, w, h, true, t.routeSegmentIndex,
+                t.routeSegmentPosition, previous, footprints);
+        return new TurnBalloonLayout(w, h, gap, p == null ? "DOCKED" : p.legName);
+    }
+
+    private static Object point(PrimaryTurnSample sample, TurnBalloonLayout layout,
+                                MapOverlayPlacementCoordinator coordinator) throws Exception {
+        if (layout != null && layout.docked) {
+            // The bottom of a pitched map stays on the ground plane; the top may be above
+            // its horizon and screenToWorld would return null precisely when fallback is needed.
+            Object p = coordinator.pointAtScreen(TurnBalloonLayout.MARGIN,
+                    coordinator.viewportHeight() - TurnBalloonLayout.MARGIN);
+            if (p == null) throw new IllegalStateException("No destination viewport projection");
+            return p;
+        }
+        return Class.forName("com.yandex.mapkit.geometry.Point")
+                .getConstructor(double.class, double.class)
+                .newInstance(sample.turn.latitude, sample.turn.longitude);
+    }
 
     static boolean isCurrent(PrimaryTurnSample sample, long routeEpoch, boolean active, long now, long maxAge) {
         return active && sample != null && sample.routeEpoch == routeEpoch && sample.sampledAt > 0L
@@ -34,20 +86,29 @@ final class PrimaryTurnPlacemark {
                 || !normalized(texture.anchorX) || !normalized(texture.anchorY))
             throw new IllegalArgumentException("Invalid primary maneuver artwork or anchor");
 
+        TurnBalloonLayout nextLayout = layout(sample, scale, coordinator, appearance);
+        Object nextPoint = point(sample, nextLayout, coordinator);
+
         if (displayed != null && displayed.routeEpoch == sample.routeEpoch
                 && displayed.turn.id.equals(turn.id) && displayed.turn.latitude == turn.latitude
                 && displayed.turn.longitude == turn.longitude && displayed.texture == texture
                 && displayedScale == scale && displayedZ == zIndex
-                && appearance.same(displayedStyle)) {
+                && appearance.same(displayedStyle)
+                && (nextLayout == null ? displayedLayout == null : nextLayout.sameImage(displayedLayout))) {
             remove(collection, loading);
             loading = null; loadingSample = null; loadingCallback = null;
             displayed = sample;
+            displayedPoint = nextPoint;
+            invoke(placemark, "setGeometry", new Class<?>[]{Class.forName("com.yandex.mapkit.geometry.Point")}, nextPoint);
+            reserve(coordinator);
             return;
         }
         if (loadingSample != null && loadingSample.routeEpoch == sample.routeEpoch
                 && loadingSample.turn.id.equals(turn.id) && loadingSample.texture == texture
-                && loadingScale == scale && loadingZ == zIndex && appearance.same(loadingStyle)) {
+                && loadingScale == scale && loadingZ == zIndex && appearance.same(loadingStyle)
+                && (nextLayout == null ? loadingLayout == null : nextLayout.sameImage(loadingLayout))) {
             loadingSample = sample;
+            invoke(loading, "setGeometry", new Class<?>[]{Class.forName("com.yandex.mapkit.geometry.Point")}, nextPoint);
             return;
         }
         remove(collection, loading);
@@ -55,22 +116,22 @@ final class PrimaryTurnPlacemark {
         loadingCallback = null;
         loadingSample = null;
         Class<?> pointClass = Class.forName("com.yandex.mapkit.geometry.Point");
-        Object point = pointClass.getConstructor(double.class, double.class)
-                .newInstance(turn.latitude, turn.longitude);
         Class<?> styleClass = Class.forName("com.yandex.mapkit.map.IconStyle");
         Class<?> imageClass = Class.forName("com.yandex.runtime.image.ImageProvider");
         Class<?> rotation = Class.forName("com.yandex.mapkit.map.RotationType");
         Object style = styleClass.getConstructor().newInstance();
-        invoke(style, "setAnchor", new Class<?>[]{PointF.class}, new PointF(texture.anchorX, texture.anchorY));
+        invoke(style, "setAnchor", new Class<?>[]{PointF.class}, nextLayout == null
+                ? new PointF(texture.anchorX, texture.anchorY)
+                : new PointF(nextLayout.anchorX(), nextLayout.anchorY()));
         invoke(style, "setRotationType", new Class<?>[]{rotation}, Enum.valueOf((Class) rotation, "NO_ROTATION"));
         invoke(style, "setScale", new Class<?>[]{Float.class}, texture.artwork == null ? scale / 100f : 1f);
         invoke(style, "setFlat", new Class<?>[]{Boolean.class}, false);
         invoke(style, "setZIndex", new Class<?>[]{Float.class}, zIndex);
         Bitmap bitmap = texture.artwork == null ? texture.bitmap
-                : texture.artwork.render(texture.bitmap, appearance, scale / 100f);
+                : texture.artwork.renderPlaced(appearance, scale / 100f, nextLayout);
         Object provider = imageClass.getMethod("fromBitmap", Bitmap.class).invoke(null, bitmap);
         Class<?> callbackClass = Class.forName("com.yandex.mapkit.map.Callback");
-        Object candidate = invoke(collection, "addEmptyPlacemark", new Class<?>[]{pointClass}, point);
+        Object candidate = invoke(collection, "addEmptyPlacemark", new Class<?>[]{pointClass}, nextPoint);
         try { MapObjectLayerFactory.hideUntilTextured(candidate); }
         catch (Exception failure) { remove(collection, candidate); throw failure; }
         loading = candidate;
@@ -78,6 +139,7 @@ final class PrimaryTurnPlacemark {
         loadingStyle = appearance;
         loadingScale = scale;
         loadingZ = zIndex;
+        loadingLayout = nextLayout;
         loadingCallback = Proxy.newProxyInstance(callbackClass.getClassLoader(), new Class<?>[]{callbackClass},
                 (proxy, method, args) -> {
                     if (method.getName().equals("onTaskFinished")) {
@@ -97,6 +159,9 @@ final class PrimaryTurnPlacemark {
                         displayedStyle = loadingStyle;
                         displayedScale = loadingScale;
                         displayedZ = loadingZ;
+                        displayedLayout = loadingLayout;
+                        displayedPoint = point(displayed, displayedLayout, coordinator);
+                        invoke(candidate, "setGeometry", new Class<?>[]{pointClass}, displayedPoint);
                         float rasterScale = texture.artwork == null ? scale / 100f : 1f;
                         displayedWidth = Math.round(bitmap.getWidth() * rasterScale);
                         displayedHeight = Math.round(bitmap.getHeight() * rasterScale);
@@ -137,11 +202,29 @@ final class PrimaryTurnPlacemark {
     void reserve(MapOverlayPlacementCoordinator coordinator) {
         coordinator.clearOwner(OWNER);
         if (displayed == null) return;
+        if (displayedLayout != null && displayedLayout.docked) {
+            int m = TurnBalloonLayout.MARGIN;
+            int bottom = coordinator.viewportHeight() - m;
+            coordinator.reserveScreen(OWNER, displayed.turn.id,
+                    new RectF(m, bottom - displayedHeight, m + displayedWidth, bottom));
+            return;
+        }
         NavigatorStatePublisher.RouteTurnFrame turn = displayed.turn;
         StockTurnTextures.Texture texture = displayed.texture;
         coordinator.reserveFixed(OWNER, turn.id, turn.latitude, turn.longitude,
                 displayedWidth, displayedHeight,
-                texture.anchorX, texture.anchorY);
+                displayedLayout == null ? texture.anchorX : displayedLayout.anchorX(),
+                displayedLayout == null ? texture.anchorY : displayedLayout.anchorY());
+    }
+
+    void repositionFixed(MapOverlayPlacementCoordinator coordinator) {
+        if (displayedLayout == null || !displayedLayout.docked || placemark == null) return;
+        try {
+            Object point = point(displayed, displayedLayout, coordinator);
+            invoke(placemark, "setGeometry",
+                    new Class<?>[]{Class.forName("com.yandex.mapkit.geometry.Point")}, point);
+            displayedPoint = point;
+        } catch (Exception unavailable) { /* The next full layout/expiry handles a lost surface. */ }
     }
 
     void clear(Object collection, MapOverlayPlacementCoordinator coordinator) {
@@ -152,6 +235,8 @@ final class PrimaryTurnPlacemark {
         remove(collection, placemark);
         placemark = null;
         displayed = null;
+        displayedLayout = loadingLayout = null;
+        displayedPoint = null;
         coordinator.clearOwner(OWNER);
     }
 

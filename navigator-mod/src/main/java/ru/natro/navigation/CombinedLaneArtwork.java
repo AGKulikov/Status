@@ -15,6 +15,8 @@ final class CombinedLaneArtwork {
     private final float width, height;
     private final float scale;
     private final int stockColor;
+    private final float laneUnitScale;
+    private final float nativeLaneHeight;
 
     private CombinedLaneArtwork(Object source, Bitmap original) throws Exception {
         // Combined views delegate to the current JointBalloonContainer. Standalone
@@ -23,6 +25,10 @@ final class CombinedLaneArtwork {
         try { container = call(source, "getContainer"); }
         catch (NoSuchMethodException standalone) { container = source; }
         ViewGroup root = (ViewGroup) call(container, "getView");
+        // NaviKit and the older MapKit lane factory have DIFFERENT base glyph sizes.
+        // Removing texture scale alone (3.5.4) did not normalize those layout units.
+        laneUnitScale = laneUnitScale(container, root);
+        nativeLaneHeight = nativeLaneHeight(container, root);
         Object texture = call(container, "getTexture");
         scale = ((Number) call(texture, "getScale")).floatValue();
         if (!Float.isFinite(scale) || scale <= 0f) throw new IllegalArgumentException("Native balloon scale");
@@ -90,6 +96,106 @@ final class CombinedLaneArtwork {
             android.util.Log.w("NatroLaneAppearance", "Cannot capture native balloon layers", unsupported);
             return null;
         }
+    }
+
+    private static float laneUnitScale(Object container, View root) throws Exception {
+        android.content.res.Resources resources = root.getResources();
+        String pkg = root.getContext().getPackageName();
+        int reference = resources.getIdentifier("mapkit_styling_automotive_height_laneicon", "dimen", pkg);
+        int nativeId = resources.getIdentifier("height_laneicon", "dimen", pkg);
+        if (reference == 0 || nativeId == 0) return 1f;
+        float nativeHeight = nativeLaneHeight(container, root);
+        float referenceHeight = resources.getDimension(reference);
+        return unitScale(referenceHeight, nativeHeight);
+    }
+
+    private static float nativeLaneHeight(Object container, View root) throws Exception {
+        int id = root.getResources().getIdentifier("height_laneicon", "dimen", root.getContext().getPackageName());
+        float nativeHeight = id == 0 ? 0f : root.getResources().getDimension(id);
+        try {
+            ViewGroup lanes = (ViewGroup) call(container, "getLaneItemsView");
+            if (lanes.getChildCount() > 0 && lanes.getChildAt(0).getHeight() > 0)
+                nativeHeight = lanes.getChildAt(0).getHeight();
+        } catch (NoSuchMethodException standalone) { /* same native unit, without a lane row */ }
+        return nativeHeight;
+    }
+
+    static float unitScale(float referenceHeight, float nativeHeight) {
+        if (!Float.isFinite(referenceHeight) || !Float.isFinite(nativeHeight)
+                || referenceHeight <= 0 || nativeHeight <= 0) throw new IllegalArgumentException("Lane units");
+        return referenceHeight / nativeHeight;
+    }
+
+    private float laneUnitScale(LaneGuidanceAppearance style) {
+        // The target MapKit factory uses its own Context. Do not accidentally import the
+        // primary Activity's density or screen-size resource qualifier into this display.
+        return style.laneGlyphHeight > 0 && nativeLaneHeight > 0
+                ? unitScale(style.laneGlyphHeight, nativeLaneHeight) : laneUnitScale;
+    }
+    float bodyWidth(LaneGuidanceAppearance style) { return body.width() * laneUnitScale(style); }
+    float bodyHeight(LaneGuidanceAppearance style) { return body.height() * laneUnitScale(style); }
+
+    /** Reuses recorded native symbols, but chooses body and pointer for the destination window. */
+    Bitmap renderPlaced(LaneGuidanceAppearance style, float targetScale, TurnBalloonLayout layout) {
+        float factor = targetScale * laneUnitScale(style);
+        if (!(factor > 0) || !Float.isFinite(factor)
+                || (long) layout.width * layout.height > 4 * 1024 * 1024)
+            throw new IllegalArgumentException("Target balloon size");
+        Bitmap result = Bitmap.createBitmap(layout.width, layout.height, Bitmap.Config.ARGB_8888);
+        Canvas canvas = new Canvas(result);
+        Matrix transform = new Matrix();
+        transform.setScale(factor, factor);
+        transform.postTranslate(layout.left - body.left * factor, layout.top - body.top * factor);
+        RectF targetBody = new RectF(layout.left, layout.top, layout.right, layout.bottom);
+        Path outline = new Path();
+        float radius = style.cornerRadius < 0 ? Math.min(8f * factor, targetBody.height() / 4f)
+                : style.cornerRadius * factor;
+        if (style.cornerRadius < 0) stockBody.transform(transform, outline);
+        else outline.addRoundRect(targetBody, radius, radius, Path.Direction.CW);
+        if (!layout.docked) {
+            float[] base = BalloonGeometry.tailBase(targetBody.left, targetBody.top,
+                    targetBody.right, targetBody.bottom, radius, layout.tipX, layout.tipY,
+                    Math.max(2f, 6f * factor));
+            Path pointer = new Path();
+            pointer.moveTo(layout.tipX, layout.tipY);
+            pointer.lineTo(base[0], base[1]); pointer.lineTo(base[2], base[3]); pointer.close();
+            if (!outline.op(pointer, Path.Op.UNION)) throw new IllegalStateException("Pointer union");
+        }
+        Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        paint.setColor(style.cardColor == null ? stockColor : Color.parseColor(style.cardColor));
+        canvas.drawPath(outline, paint);
+        canvas.save();
+        canvas.clipPath(outline);
+        if (style.borderWidth > 0) {
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeJoin(Paint.Join.ROUND);
+            paint.setStrokeWidth(Math.min(2f * style.borderWidth * factor,
+                    Math.min(targetBody.width(), targetBody.height()) / 2f));
+            String color = style.borderColor == null ? style.signsColor : style.borderColor;
+            paint.setColor(color == null ? Color.WHITE : Color.parseColor(color));
+            canvas.drawPath(outline, paint);
+        }
+        canvas.concat(transform);
+        canvas.clipRect(body);
+        drawContent(canvas, style);
+        canvas.restore();
+        return result;
+    }
+
+    private void drawContent(Canvas canvas, LaneGuidanceAppearance style) {
+        if (style.signsColor != null) {
+            Paint glyphs = new Paint();
+            int color = Color.parseColor(style.signsColor);
+            glyphs.setColorFilter(new LightingColorFilter(color | 0xff000000, 0));
+            glyphs.setAlpha(Color.alpha(color));
+            canvas.save();
+            canvas.clipPath(roadSigns, Region.Op.DIFFERENCE);
+            canvas.saveLayer(0, 0, width, height, glyphs);
+            canvas.drawPicture(content);
+            canvas.restore(); canvas.restore();
+            canvas.clipPath(roadSigns);
+        }
+        canvas.drawPicture(content);
     }
 
     Bitmap render(Bitmap original, LaneGuidanceAppearance style) {
