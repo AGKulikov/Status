@@ -1,3 +1,11 @@
+> **Natro и Навигатор 3.5.6 опубликованы в [канале обновлений](https://github.com/AGKulikov/Status/releases/tag/natro-v3.5.6).**
+> Текущая ветка — [release/natro-3.5.6](https://github.com/AGKulikov/Status/tree/release/natro-3.5.6).
+> Внесены единый размер стрелок и размещение таблички по границам каждого экрана;
+> обновить оба приложения. SOURCE/TEST/APK/PUBLISH PASS, FIELD на KX11 OPEN.
+> [Проверки и ограничения](docs/releases/3.5.6/README_RU.md): source `2eb80ca017ca`,
+> CI 45210040545 — 2355 Android / 307 tool tests; publisher 45213002181 PASS.
+> Исторический main не является текущим выпуском. Прежние статусы ниже — история.
+
 > **Кандидат3.5.6** — `release/natro-3.5.6`: единый размер стрелок и размещение таблички по границам HUD/приборки. [Статус сборки и проверки](docs/releases/3.5.6/README_RU.md). FIELD открыт.
 
 > **Кандидат 3.5.5:** повторное подтверждение видимой таблички при асинхронной смене метров. Пользователь сообщил редкое моргание в 3.5.4. [Текущая ветка release/natro-3.5.5](https://github.com/AGKulikov/Status/tree/release/natro-3.5.5), [проверки и ограничения](docs/releases/3.5.5/README_RU.md). FIELD 3.5.5 открыт.
