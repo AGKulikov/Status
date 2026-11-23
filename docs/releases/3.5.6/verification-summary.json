@@ -1,0 +1,64 @@
+{
+  "sourceCommit": "2eb80ca017ca5c036deb6ca4df52135550eecef4",
+  "sourceTree": "6d32b88e99b1d632bec72da58ce364c837263329",
+  "orchestratorCommit": "f8afba020827936502ec9edad993e210f1062d1a",
+  "runId": 45210040545,
+  "runNumber": 2,
+  "artifactHashes": {
+    "Natro-3.5.6-offline-signing-2": "sha256:8abda09ff6419582f837030ad146375a36b2cdecd74f4500b434bf3fa306a726",
+    "Natro-3.5.6-signing-tools-2": "sha256:5383fb5c99e22df453527e373f0a20b6b6a6d2534e9eda5e214664d3702ecc3b"
+  },
+  "version": "3.5.6",
+  "androidTests": {
+    "tests": 2355,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "toolTests": {
+    "tests": 307,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "localViewportCases": 784,
+  "settingsAudit": {
+    "editors": 48,
+    "forms": 253,
+    "labels": 3017
+  },
+  "backupInventory": {
+    "reviewedOwners": 99,
+    "staticInventoryUnchanged": true,
+    "runtimeBackupRestoreAcceptance": "OPEN"
+  },
+  "signature": {
+    "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+    "singleSigner": true,
+    "v2": true,
+    "v3": true,
+    "exactApi28": true,
+    "zipalign16KiB": true
+  },
+  "unchangedSignedPayload": true,
+  "navigatorChangedPayload": [
+    "AndroidManifest.xml",
+    "classes19.dex"
+  ],
+  "navigatorUnchangedPayloadEntries": 17225,
+  "updateOver355MetadataVerified": true,
+  "pairedDelivery": true,
+  "fieldAcceptance": "OPEN",
+  "requirements": [
+    "CARD-026",
+    "CARD-017",
+    "CARD-018",
+    "CARD-019",
+    "CARD-020",
+    "MAP-033",
+    "MAP-054",
+    "GATE-058",
+    "GATE-060"
+  ],
+  "publicChannelReadback": "pendingPublisher"
+}

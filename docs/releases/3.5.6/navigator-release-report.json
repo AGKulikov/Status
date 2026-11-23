@@ -1,0 +1,33 @@
+{
+  "sourceCommit": "2eb80ca017ca5c036deb6ca4df52135550eecef4",
+  "sourceTree": "6d32b88e99b1d632bec72da58ce364c837263329",
+  "ciRunId": "45210040545",
+  "package": "ru.yandex.yandexnavi",
+  "versionName": "30.3.0 Natro 3.5.6",
+  "versionCode": 739564637,
+  "previousVersionName": "30.3.0 Natro 3.5.5",
+  "previousVersionCode": 739564636,
+  "previousSha256": "a1e358d83b8fcd62cd3063511d4e0182c79d54bbee6c95caa3171c3b27f4904b",
+  "changedPayload": [
+    "AndroidManifest.xml",
+    "classes19.dex"
+  ],
+  "changedEntryHashes": {
+    "AndroidManifest.xml": "60dfdb5ab6e05ac3695782cc1ff7ce4453a156255a7918e3ed3830f0ff555714",
+    "classes19.dex": "1058ab59ba73a674a97dbb9edc547726e3a7041dff3cd47d953dc5391412be0a"
+  },
+  "unchangedPayloadEntries": 17225,
+  "ciBridgeSha256": "1058ab59ba73a674a97dbb9edc547726e3a7041dff3cd47d953dc5391412be0a",
+  "manifestSemanticsOnlyVersionChanged": true,
+  "unsignedFile": "Navigator-30.3.0-Natro-3.5.6-unsigned.apk",
+  "unsignedSha256": "68e0f641c4e34a8386f1caa3a7d2b5f4055fd18d3bf4a0d45e227791e7fbc01b",
+  "apk": "Navigator-30.3.0-Natro-3.5.6-signed.apk",
+  "sha256": "5e286a6498619e8e67befaf55cc4d744a554518c65a6a11a3d5f927314bb48b4",
+  "size": 156505706,
+  "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "signatureV2": true,
+  "signatureV3": true,
+  "exactApi28": true,
+  "zipalign16KiB": true,
+  "physicalKx11Verification": "pending"
+}
