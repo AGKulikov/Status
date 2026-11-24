@@ -1,8 +1,9 @@
-> **Кандидат 3.5.7:** независимая передача видимости таблички на HUD и приборке.
-> Текущая разработка — `release/natro-3.5.7`; [проверки и ограничения](docs/releases/3.5.7/README_RU.md).
-> FIELD3.5.6 по приборке отрицательный. Полный CI/APK3.5.7 OPEN.
-> 24.11.2026 пользователь подтвердил публикацию исходников и выпуск после полной проверки.
-> Полная сборка и проверка канала выполняются; готовность APK фиксируется в протоколе.
+> **Natro и Навигатор3.5.7 опубликованы в [канале обновлений](https://github.com/AGKulikov/Status/releases/tag/natro-v3.5.7).**
+> Текущая ветка — [release/natro-3.5.7](https://github.com/AGKulikov/Status/tree/release/natro-3.5.7).
+> Карточка сохраняется до готовности замены именно для текущего манёвра и целевого экрана; исправлено прерывание загрузки при обновлении метров.
+> Обновить оба приложения: сначала Natro, затем Навигатор. Подпись прежняя.
+> SOURCE/TEST/APK/PUBLISH PASS; FIELD на KX11 OPEN. Runtime source `d7d22321ff68`, CI45336188430:2358 Android /309 tool tests; publisher45337568028 PASS.
+> [Доказательства и ограничения](docs/releases/3.5.7/README_RU.md). Ниже — история предыдущих выпусков.
 
 > **Natro и Навигатор 3.5.6 опубликованы в [канале обновлений](https://github.com/AGKulikov/Status/releases/tag/natro-v3.5.6).**
 > Текущая ветка — [release/natro-3.5.6](https://github.com/AGKulikov/Status/tree/release/natro-3.5.6).
