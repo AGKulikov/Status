@@ -200,3 +200,5 @@ patch and synthetic fixture checks PASS; release and physical capture OPEN.
 - 24.11.2026: [реорганизация чтения требований](requirements/REORGANIZATION_2026_11_24_RU.md), [модули и зависимости](requirements/README_RU.md). Архив прежней редакции сохранён; функциональные требования и FIELD не изменены.
 
 - 24.11.2026: [повторная проверка порядка чтения](requirements/FOLLOWUP_REVIEW_2026_11_24_RU.md) — свежесть выборок, ссылки с редакцией, полный поиск внутри разделов и передача задач. Архив и аппаратные статусы сохранены.
+
+- 24.11.2026: [порядок обновления требований и описания](requirements/UPDATING_RU.md) — новые ID, поправки без дублей, актуализация README и сохранение истории; [результат проверки](requirements/FOLLOWUP_REVIEW_2026_11_24_RU.md).

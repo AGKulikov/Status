@@ -32,16 +32,19 @@ module files are views, never an independently edited second specification.
 Avoid repeated reads of unchanged files and printing whole logs, archives or source files;
 use bounded excerpts, save full evidence in files, and report paths plus concise results.
 
-When a new user requirement, correction, rejection, or acceptance result arrives:
-
-1. append the new decision with a stable ID/date and explicit replaced ID/section to
-   `PROJECT_REQUIREMENTS_RU.md` in the same change; preserve the archived baseline verbatim;
-2. never delete an older requirement—record supersession and the replacement in the new
-   entry/current map; do not rewrite old evidence or silently overwrite generated files;
-3. distinguish source/test completion from verification on the ECARX KX11;
-4. do not describe an item as fixed unless its stated acceptance gate has passed;
-5. preserve the stable signing, versioning, install-over, Git provenance, and proprietary-baseline
-   rules in section 1 of the ledger.
+When requirements or the project description change, follow
+`docs/requirements/UPDATING_RU.md`. Record new decisions before implementation:
+new independent requirement = unused ID and one canonical row; amendment/status result =
+existing ID plus dated prose and evidence, never a duplicate canonical row. State exactly
+what is replaced (or that nothing is replaced), conditions, dependencies and acceptance gate.
+Append to the ledger, preserve the archived baseline, and update the current map together.
+Update README when actual capabilities, limitations, branch or published release change;
+never describe a proposal or source-only change as delivered. Plain status questions/repeated
+requests without new facts do not require a new ID or repeated history. Distinguish
+SOURCE/TEST/APK/PUBLISH/FIELD and preserve all stable signing/versioning/baseline rules.
+Regenerate views and check links, IDs and semantic consistency; the generator does not
+apply supersession or validate README meaning. Commit/publish the related files together
+and verify the remote tree. Do not rewrite immutable archives or previous evidence.
 
 
 For Geely/ECARX vehicle interfaces, also read `GEELY_KX11_KNOWLEDGE_RU.md` and the

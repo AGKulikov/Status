@@ -1,5 +1,5 @@
 {
-  "ledger_sha256": "b93d0fb119e0b1a4f23cd61ec6f8fe1277dcd38e0bd956253f9e303ba4704ef9",
+  "ledger_sha256": "e28cf72df2bcde3f1703041610dff57e7d64b9c2fd93b1362b31bb5bef392c59",
   "canonical": {
     "FILES-001": {
       "line": 49,
@@ -4754,9 +4754,19 @@
     {
       "key": "S291",
       "start": 6479,
-      "end": 6489,
+      "end": 6490,
       "level": 2,
       "title": "24.11.2026 — DOC-READ-20261124-R2: повторная проверка инструкций чтения",
+      "parents": [
+        "S000"
+      ]
+    },
+    {
+      "key": "S292",
+      "start": 6491,
+      "end": 6495,
+      "level": 2,
+      "title": "24.11.2026 — DOC-UPDATE-20261124: порядок обновления требований и описания",
       "parents": [
         "S000"
       ]
