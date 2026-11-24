@@ -1,7 +1,23 @@
 # Repository instructions
 
-Before changing, reviewing, building, or releasing this project, read
-`PROJECT_REQUIREMENTS_RU.md` completely. Treat it as the source of truth for user requirements.
+Before changing, reviewing, building, or releasing, read this file,
+`docs/requirements/COMMON_RU.md` and `docs/CURRENT_REQUIREMENTS_RU.md`.
+Then use `docs/requirements/README_RU.md` to select affected modules and dependencies.
+`PROJECT_REQUIREMENTS_RU.md` remains the full authoritative ledger; do NOT read it
+entirely by default. Read relevant module rows and use `python tools/requirements.py search`
+for IDs, families AND task terms (including Russian synonyms) across the WHOLE ledger.
+Inspect every matching title, then read relevant amendments/context with the `read` command.
+Search is candidate discovery, not proof that unreturned requirements are irrelevant.
+If scope is uncertain, expand the search and read the containing/adjacent sections.
+Before implementation record affected IDs, dependencies and acceptance gates in the task
+report; before closeout account for each, including OPEN/BLOCKED. Do not read all GATE
+rows by default: select gates referenced by affected requirements and matching history.
+The new selective reading procedure supersedes historical instructions to read the
+whole ledger. It does not supersede functional requirements or acceptance gates.
+After ledger changes run `python tools/requirements.py build` and `check`; generated
+module files are views, never an independently edited second specification.
+Avoid repeated reads of unchanged files and printing whole logs, archives or source files;
+use bounded excerpts, save full evidence in files, and report paths plus concise results.
 
 When a new user requirement, correction, rejection, or acceptance result arrives:
 

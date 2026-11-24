@@ -1,0 +1,3545 @@
+{
+  "ledger_sha256": "809fcbaa38d7773428fb85b0dc873cb7d433e915412d0ffde62f0e967237aa3b",
+  "canonical": {
+    "FILES-001": {
+      "line": 49,
+      "module": "modules/FILES.md"
+    },
+    "FILES-002": {
+      "line": 50,
+      "module": "modules/FILES.md"
+    },
+    "FILES-003": {
+      "line": 51,
+      "module": "modules/FILES.md"
+    },
+    "PASSHOME-004": {
+      "line": 2118,
+      "module": "modules/PASSHOME.md"
+    },
+    "SETUI-008": {
+      "line": 2119,
+      "module": "modules/SETUI.md"
+    },
+    "FIELD-001": {
+      "line": 2511,
+      "module": "modules/FIELD.md"
+    },
+    "FIELD-002": {
+      "line": 2512,
+      "module": "modules/FIELD.md"
+    },
+    "FIELD-003": {
+      "line": 2513,
+      "module": "modules/FIELD.md"
+    },
+    "FIELD-004": {
+      "line": 2514,
+      "module": "modules/FIELD.md"
+    },
+    "FIELD-005": {
+      "line": 2515,
+      "module": "modules/FIELD.md"
+    },
+    "FIELD-006": {
+      "line": 2516,
+      "module": "modules/FIELD.md"
+    },
+    "SETUI-005": {
+      "line": 2567,
+      "module": "modules/SETUI.md"
+    },
+    "SETUI-006": {
+      "line": 2568,
+      "module": "modules/SETUI.md"
+    },
+    "SETUI-007": {
+      "line": 2569,
+      "module": "modules/SETUI.md"
+    },
+    "SETUI-001": {
+      "line": 2620,
+      "module": "modules/SETUI.md"
+    },
+    "SETUI-002": {
+      "line": 2621,
+      "module": "modules/SETUI.md"
+    },
+    "SETUI-003": {
+      "line": 2622,
+      "module": "modules/SETUI.md"
+    },
+    "SETUI-004": {
+      "line": 2623,
+      "module": "modules/SETUI.md"
+    },
+    "PASSHOME-001": {
+      "line": 2633,
+      "module": "modules/PASSHOME.md"
+    },
+    "PASSHOME-002": {
+      "line": 2634,
+      "module": "modules/PASSHOME.md"
+    },
+    "PASSHOME-003": {
+      "line": 2635,
+      "module": "modules/PASSHOME.md"
+    },
+    "MUSIC-027": {
+      "line": 2984,
+      "module": "modules/MUSIC.md"
+    },
+    "BUTTON-001": {
+      "line": 2994,
+      "module": "modules/BUTTON.md"
+    },
+    "GATE-112": {
+      "line": 2995,
+      "module": "modules/GATE.md"
+    },
+    "MAP-071": {
+      "line": 3004,
+      "module": "modules/MAP.md"
+    },
+    "MAP-072": {
+      "line": 3005,
+      "module": "modules/MAP.md"
+    },
+    "SERVICE-003": {
+      "line": 3006,
+      "module": "modules/SERVICE.md"
+    },
+    "GATE-111": {
+      "line": 3007,
+      "module": "modules/GATE.md"
+    },
+    "NAV-020": {
+      "line": 3019,
+      "module": "modules/NAV.md"
+    },
+    "NAV-021": {
+      "line": 3020,
+      "module": "modules/NAV.md"
+    },
+    "MAP-069": {
+      "line": 3021,
+      "module": "modules/MAP.md"
+    },
+    "MAP-070": {
+      "line": 3022,
+      "module": "modules/MAP.md"
+    },
+    "MUSIC-025": {
+      "line": 3023,
+      "module": "modules/MUSIC.md"
+    },
+    "MUSIC-026": {
+      "line": 3024,
+      "module": "modules/MUSIC.md"
+    },
+    "GATE-107": {
+      "line": 3025,
+      "module": "modules/GATE.md"
+    },
+    "GATE-108": {
+      "line": 3026,
+      "module": "modules/GATE.md"
+    },
+    "GATE-109": {
+      "line": 3027,
+      "module": "modules/GATE.md"
+    },
+    "GATE-110": {
+      "line": 3028,
+      "module": "modules/GATE.md"
+    },
+    "SERVICE-001": {
+      "line": 3068,
+      "module": "modules/SERVICE.md"
+    },
+    "SERVICE-002": {
+      "line": 3069,
+      "module": "modules/SERVICE.md"
+    },
+    "GATE-106": {
+      "line": 3070,
+      "module": "modules/GATE.md"
+    },
+    "DRIVE-004": {
+      "line": 3091,
+      "module": "modules/DRIVE.md"
+    },
+    "GATE-105": {
+      "line": 3092,
+      "module": "modules/GATE.md"
+    },
+    "DRIVE-005": {
+      "line": 3101,
+      "module": "modules/DRIVE.md"
+    },
+    "DRIVE-006": {
+      "line": 3102,
+      "module": "modules/DRIVE.md"
+    },
+    "DRIVE-007": {
+      "line": 3103,
+      "module": "modules/DRIVE.md"
+    },
+    "GATE-104": {
+      "line": 3104,
+      "module": "modules/GATE.md"
+    },
+    "CLIP-001": {
+      "line": 3116,
+      "module": "modules/CLIP.md"
+    },
+    "CLIP-002": {
+      "line": 3117,
+      "module": "modules/CLIP.md"
+    },
+    "CLIP-003": {
+      "line": 3118,
+      "module": "modules/CLIP.md"
+    },
+    "CLIP-004": {
+      "line": 3119,
+      "module": "modules/CLIP.md"
+    },
+    "GATE-103": {
+      "line": 3120,
+      "module": "modules/GATE.md"
+    },
+    "ADB-001": {
+      "line": 3130,
+      "module": "modules/ADB.md"
+    },
+    "ADB-002": {
+      "line": 3131,
+      "module": "modules/ADB.md"
+    },
+    "ADB-003": {
+      "line": 3132,
+      "module": "modules/ADB.md"
+    },
+    "ADB-004": {
+      "line": 3133,
+      "module": "modules/ADB.md"
+    },
+    "ADB-005": {
+      "line": 3134,
+      "module": "modules/ADB.md"
+    },
+    "ADB-006": {
+      "line": 3135,
+      "module": "modules/ADB.md"
+    },
+    "ADB-007": {
+      "line": 3136,
+      "module": "modules/ADB.md"
+    },
+    "GATE-101": {
+      "line": 3137,
+      "module": "modules/GATE.md"
+    },
+    "GATE-102": {
+      "line": 3138,
+      "module": "modules/GATE.md"
+    },
+    "ANCS-015": {
+      "line": 3184,
+      "module": "modules/ANCS.md"
+    },
+    "NATRO-029": {
+      "line": 3185,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-030": {
+      "line": 3186,
+      "module": "modules/NATRO.md"
+    },
+    "MUSIC-022": {
+      "line": 3187,
+      "module": "modules/MUSIC.md"
+    },
+    "MUSIC-023": {
+      "line": 3188,
+      "module": "modules/MUSIC.md"
+    },
+    "MUSIC-024": {
+      "line": 3189,
+      "module": "modules/MUSIC.md"
+    },
+    "MAP-067": {
+      "line": 3190,
+      "module": "modules/MAP.md"
+    },
+    "MAP-068": {
+      "line": 3191,
+      "module": "modules/MAP.md"
+    },
+    "GATE-096": {
+      "line": 3192,
+      "module": "modules/GATE.md"
+    },
+    "GATE-097": {
+      "line": 3193,
+      "module": "modules/GATE.md"
+    },
+    "GATE-098": {
+      "line": 3194,
+      "module": "modules/GATE.md"
+    },
+    "GATE-099": {
+      "line": 3195,
+      "module": "modules/GATE.md"
+    },
+    "GATE-100": {
+      "line": 3196,
+      "module": "modules/GATE.md"
+    },
+    "REL-001": {
+      "line": 3282,
+      "module": "modules/REL.md"
+    },
+    "REL-002": {
+      "line": 3283,
+      "module": "modules/REL.md"
+    },
+    "REL-003": {
+      "line": 3284,
+      "module": "modules/REL.md"
+    },
+    "REL-004": {
+      "line": 3285,
+      "module": "modules/REL.md"
+    },
+    "REL-005": {
+      "line": 3286,
+      "module": "modules/REL.md"
+    },
+    "REL-006": {
+      "line": 3287,
+      "module": "modules/REL.md"
+    },
+    "REL-007": {
+      "line": 3288,
+      "module": "modules/REL.md"
+    },
+    "REL-008": {
+      "line": 3289,
+      "module": "modules/REL.md"
+    },
+    "REL-009": {
+      "line": 3290,
+      "module": "modules/REL.md"
+    },
+    "REL-010": {
+      "line": 3291,
+      "module": "modules/REL.md"
+    },
+    "REL-011": {
+      "line": 3292,
+      "module": "modules/REL.md"
+    },
+    "REL-012": {
+      "line": 3293,
+      "module": "modules/REL.md"
+    },
+    "REL-013": {
+      "line": 3294,
+      "module": "modules/REL.md"
+    },
+    "REL-014": {
+      "line": 3295,
+      "module": "modules/REL.md"
+    },
+    "REL-015": {
+      "line": 3296,
+      "module": "modules/REL.md"
+    },
+    "REL-016": {
+      "line": 3297,
+      "module": "modules/REL.md"
+    },
+    "REL-017": {
+      "line": 3298,
+      "module": "modules/REL.md"
+    },
+    "BASE-001": {
+      "line": 3304,
+      "module": "modules/BASE.md"
+    },
+    "BASE-002": {
+      "line": 3305,
+      "module": "modules/BASE.md"
+    },
+    "BASE-003": {
+      "line": 3306,
+      "module": "modules/BASE.md"
+    },
+    "BASE-004": {
+      "line": 3307,
+      "module": "modules/BASE.md"
+    },
+    "BASE-005": {
+      "line": 3308,
+      "module": "modules/BASE.md"
+    },
+    "BASE-006": {
+      "line": 3309,
+      "module": "modules/BASE.md"
+    },
+    "BASE-007": {
+      "line": 3310,
+      "module": "modules/BASE.md"
+    },
+    "BASE-008": {
+      "line": 3311,
+      "module": "modules/BASE.md"
+    },
+    "NAV-001": {
+      "line": 3319,
+      "module": "modules/NAV.md"
+    },
+    "NAV-002": {
+      "line": 3320,
+      "module": "modules/NAV.md"
+    },
+    "NAV-003": {
+      "line": 3321,
+      "module": "modules/NAV.md"
+    },
+    "NAV-004": {
+      "line": 3322,
+      "module": "modules/NAV.md"
+    },
+    "NAV-005": {
+      "line": 3323,
+      "module": "modules/NAV.md"
+    },
+    "NAV-006": {
+      "line": 3324,
+      "module": "modules/NAV.md"
+    },
+    "NAV-007": {
+      "line": 3325,
+      "module": "modules/NAV.md"
+    },
+    "NAV-008": {
+      "line": 3326,
+      "module": "modules/NAV.md"
+    },
+    "NAV-009": {
+      "line": 3327,
+      "module": "modules/NAV.md"
+    },
+    "NAV-010": {
+      "line": 3328,
+      "module": "modules/NAV.md"
+    },
+    "NAV-011": {
+      "line": 3329,
+      "module": "modules/NAV.md"
+    },
+    "NAV-012": {
+      "line": 3330,
+      "module": "modules/NAV.md"
+    },
+    "NAV-013": {
+      "line": 3331,
+      "module": "modules/NAV.md"
+    },
+    "NAV-014": {
+      "line": 3332,
+      "module": "modules/NAV.md"
+    },
+    "NAV-015": {
+      "line": 3333,
+      "module": "modules/NAV.md"
+    },
+    "NAV-016": {
+      "line": 3334,
+      "module": "modules/NAV.md"
+    },
+    "NAV-017": {
+      "line": 3335,
+      "module": "modules/NAV.md"
+    },
+    "WIN-001": {
+      "line": 3341,
+      "module": "modules/WIN.md"
+    },
+    "WIN-002": {
+      "line": 3342,
+      "module": "modules/WIN.md"
+    },
+    "WIN-003": {
+      "line": 3343,
+      "module": "modules/WIN.md"
+    },
+    "WIN-004": {
+      "line": 3344,
+      "module": "modules/WIN.md"
+    },
+    "WIN-005": {
+      "line": 3345,
+      "module": "modules/WIN.md"
+    },
+    "WIN-006": {
+      "line": 3346,
+      "module": "modules/WIN.md"
+    },
+    "WIN-007": {
+      "line": 3347,
+      "module": "modules/WIN.md"
+    },
+    "WIN-008": {
+      "line": 3348,
+      "module": "modules/WIN.md"
+    },
+    "WIN-009": {
+      "line": 3349,
+      "module": "modules/WIN.md"
+    },
+    "WIN-010": {
+      "line": 3350,
+      "module": "modules/WIN.md"
+    },
+    "WIN-011": {
+      "line": 3351,
+      "module": "modules/WIN.md"
+    },
+    "WIN-012": {
+      "line": 3352,
+      "module": "modules/WIN.md"
+    },
+    "WIN-013": {
+      "line": 3353,
+      "module": "modules/WIN.md"
+    },
+    "WIN-014": {
+      "line": 3354,
+      "module": "modules/WIN.md"
+    },
+    "WIN-015": {
+      "line": 3355,
+      "module": "modules/WIN.md"
+    },
+    "WIN-016": {
+      "line": 3356,
+      "module": "modules/WIN.md"
+    },
+    "WIN-017": {
+      "line": 3357,
+      "module": "modules/WIN.md"
+    },
+    "WIN-018": {
+      "line": 3358,
+      "module": "modules/WIN.md"
+    },
+    "WIN-019": {
+      "line": 3359,
+      "module": "modules/WIN.md"
+    },
+    "WIN-020": {
+      "line": 3360,
+      "module": "modules/WIN.md"
+    },
+    "WIN-021": {
+      "line": 3361,
+      "module": "modules/WIN.md"
+    },
+    "MAP-001": {
+      "line": 3367,
+      "module": "modules/MAP.md"
+    },
+    "MAP-002": {
+      "line": 3368,
+      "module": "modules/MAP.md"
+    },
+    "MAP-003": {
+      "line": 3369,
+      "module": "modules/MAP.md"
+    },
+    "MAP-004": {
+      "line": 3370,
+      "module": "modules/MAP.md"
+    },
+    "MAP-005": {
+      "line": 3371,
+      "module": "modules/MAP.md"
+    },
+    "MAP-006": {
+      "line": 3372,
+      "module": "modules/MAP.md"
+    },
+    "MAP-007": {
+      "line": 3373,
+      "module": "modules/MAP.md"
+    },
+    "MAP-008": {
+      "line": 3374,
+      "module": "modules/MAP.md"
+    },
+    "MAP-009": {
+      "line": 3375,
+      "module": "modules/MAP.md"
+    },
+    "MAP-010": {
+      "line": 3376,
+      "module": "modules/MAP.md"
+    },
+    "MAP-011": {
+      "line": 3377,
+      "module": "modules/MAP.md"
+    },
+    "MAP-012": {
+      "line": 3378,
+      "module": "modules/MAP.md"
+    },
+    "MAP-013": {
+      "line": 3379,
+      "module": "modules/MAP.md"
+    },
+    "MAP-014": {
+      "line": 3380,
+      "module": "modules/MAP.md"
+    },
+    "MAP-015": {
+      "line": 3381,
+      "module": "modules/MAP.md"
+    },
+    "MAP-016": {
+      "line": 3382,
+      "module": "modules/MAP.md"
+    },
+    "MAP-017": {
+      "line": 3383,
+      "module": "modules/MAP.md"
+    },
+    "MAP-018": {
+      "line": 3384,
+      "module": "modules/MAP.md"
+    },
+    "MAP-019": {
+      "line": 3385,
+      "module": "modules/MAP.md"
+    },
+    "MAP-020": {
+      "line": 3386,
+      "module": "modules/MAP.md"
+    },
+    "MAP-021": {
+      "line": 3387,
+      "module": "modules/MAP.md"
+    },
+    "MAP-022": {
+      "line": 3388,
+      "module": "modules/MAP.md"
+    },
+    "MAP-023": {
+      "line": 3389,
+      "module": "modules/MAP.md"
+    },
+    "MAP-024": {
+      "line": 3390,
+      "module": "modules/MAP.md"
+    },
+    "MAP-025": {
+      "line": 3391,
+      "module": "modules/MAP.md"
+    },
+    "MAP-026": {
+      "line": 3392,
+      "module": "modules/MAP.md"
+    },
+    "MAP-027": {
+      "line": 3393,
+      "module": "modules/MAP.md"
+    },
+    "MAP-028": {
+      "line": 3394,
+      "module": "modules/MAP.md"
+    },
+    "MAP-029": {
+      "line": 3395,
+      "module": "modules/MAP.md"
+    },
+    "MAP-030": {
+      "line": 3396,
+      "module": "modules/MAP.md"
+    },
+    "MAP-031": {
+      "line": 3397,
+      "module": "modules/MAP.md"
+    },
+    "MAP-032": {
+      "line": 3398,
+      "module": "modules/MAP.md"
+    },
+    "MAP-033": {
+      "line": 3399,
+      "module": "modules/MAP.md"
+    },
+    "MAP-034": {
+      "line": 3400,
+      "module": "modules/MAP.md"
+    },
+    "MAP-035": {
+      "line": 3401,
+      "module": "modules/MAP.md"
+    },
+    "MAP-036": {
+      "line": 3402,
+      "module": "modules/MAP.md"
+    },
+    "MAP-037": {
+      "line": 3403,
+      "module": "modules/MAP.md"
+    },
+    "MAP-038": {
+      "line": 3404,
+      "module": "modules/MAP.md"
+    },
+    "MAP-039": {
+      "line": 3405,
+      "module": "modules/MAP.md"
+    },
+    "MAP-040": {
+      "line": 3406,
+      "module": "modules/MAP.md"
+    },
+    "MAP-041": {
+      "line": 3407,
+      "module": "modules/MAP.md"
+    },
+    "MAP-042": {
+      "line": 3408,
+      "module": "modules/MAP.md"
+    },
+    "MAP-043": {
+      "line": 3409,
+      "module": "modules/MAP.md"
+    },
+    "MAP-044": {
+      "line": 3410,
+      "module": "modules/MAP.md"
+    },
+    "MAP-045": {
+      "line": 3411,
+      "module": "modules/MAP.md"
+    },
+    "MAP-046": {
+      "line": 3412,
+      "module": "modules/MAP.md"
+    },
+    "MAP-047": {
+      "line": 3413,
+      "module": "modules/MAP.md"
+    },
+    "MAP-048": {
+      "line": 3414,
+      "module": "modules/MAP.md"
+    },
+    "MAP-049": {
+      "line": 3415,
+      "module": "modules/MAP.md"
+    },
+    "MAP-050": {
+      "line": 3416,
+      "module": "modules/MAP.md"
+    },
+    "MAP-051": {
+      "line": 3417,
+      "module": "modules/MAP.md"
+    },
+    "MAP-052": {
+      "line": 3418,
+      "module": "modules/MAP.md"
+    },
+    "MAP-053": {
+      "line": 3419,
+      "module": "modules/MAP.md"
+    },
+    "MAP-054": {
+      "line": 3420,
+      "module": "modules/MAP.md"
+    },
+    "MAP-055": {
+      "line": 3421,
+      "module": "modules/MAP.md"
+    },
+    "MAP-056": {
+      "line": 3422,
+      "module": "modules/MAP.md"
+    },
+    "MAP-057": {
+      "line": 3423,
+      "module": "modules/MAP.md"
+    },
+    "MAP-058": {
+      "line": 3424,
+      "module": "modules/MAP.md"
+    },
+    "MAP-059": {
+      "line": 3425,
+      "module": "modules/MAP.md"
+    },
+    "CARD-001": {
+      "line": 3431,
+      "module": "modules/CARD.md"
+    },
+    "CARD-002": {
+      "line": 3432,
+      "module": "modules/CARD.md"
+    },
+    "CARD-003": {
+      "line": 3433,
+      "module": "modules/CARD.md"
+    },
+    "CARD-004": {
+      "line": 3434,
+      "module": "modules/CARD.md"
+    },
+    "CARD-005": {
+      "line": 3435,
+      "module": "modules/CARD.md"
+    },
+    "CARD-006": {
+      "line": 3436,
+      "module": "modules/CARD.md"
+    },
+    "CARD-007": {
+      "line": 3437,
+      "module": "modules/CARD.md"
+    },
+    "CARD-008": {
+      "line": 3438,
+      "module": "modules/CARD.md"
+    },
+    "CARD-009": {
+      "line": 3439,
+      "module": "modules/CARD.md"
+    },
+    "CARD-010": {
+      "line": 3440,
+      "module": "modules/CARD.md"
+    },
+    "CARD-011": {
+      "line": 3441,
+      "module": "modules/CARD.md"
+    },
+    "CARD-012": {
+      "line": 3442,
+      "module": "modules/CARD.md"
+    },
+    "CARD-013": {
+      "line": 3443,
+      "module": "modules/CARD.md"
+    },
+    "CARD-014": {
+      "line": 3444,
+      "module": "modules/CARD.md"
+    },
+    "CARD-015": {
+      "line": 3445,
+      "module": "modules/CARD.md"
+    },
+    "CARD-016": {
+      "line": 3446,
+      "module": "modules/CARD.md"
+    },
+    "CARD-017": {
+      "line": 3457,
+      "module": "modules/CARD.md"
+    },
+    "CARD-018": {
+      "line": 3458,
+      "module": "modules/CARD.md"
+    },
+    "CARD-019": {
+      "line": 3459,
+      "module": "modules/CARD.md"
+    },
+    "CARD-020": {
+      "line": 3460,
+      "module": "modules/CARD.md"
+    },
+    "CARD-021": {
+      "line": 3461,
+      "module": "modules/CARD.md"
+    },
+    "CARD-022": {
+      "line": 3462,
+      "module": "modules/CARD.md"
+    },
+    "CARD-023": {
+      "line": 3463,
+      "module": "modules/CARD.md"
+    },
+    "CARD-024": {
+      "line": 3464,
+      "module": "modules/CARD.md"
+    },
+    "CARD-025": {
+      "line": 3465,
+      "module": "modules/CARD.md"
+    },
+    "CLUSTER-001": {
+      "line": 3471,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-002": {
+      "line": 3472,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-003": {
+      "line": 3473,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-004": {
+      "line": 3474,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-005": {
+      "line": 3475,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-006": {
+      "line": 3476,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-007": {
+      "line": 3477,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-008": {
+      "line": 3478,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-009": {
+      "line": 3479,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-010": {
+      "line": 3480,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-011": {
+      "line": 3481,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-012": {
+      "line": 3482,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-013": {
+      "line": 3483,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-014": {
+      "line": 3484,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-015": {
+      "line": 3485,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-016": {
+      "line": 3486,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-017": {
+      "line": 3487,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-018": {
+      "line": 3488,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-019": {
+      "line": 3489,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-020": {
+      "line": 3490,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-021": {
+      "line": 3491,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-022": {
+      "line": 3492,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-023": {
+      "line": 3494,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-024": {
+      "line": 3495,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-025": {
+      "line": 3496,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-026": {
+      "line": 3497,
+      "module": "modules/CLUSTER.md"
+    },
+    "DIM-001": {
+      "line": 3503,
+      "module": "modules/DIM.md"
+    },
+    "DIM-002": {
+      "line": 3504,
+      "module": "modules/DIM.md"
+    },
+    "DIM-003": {
+      "line": 3505,
+      "module": "modules/DIM.md"
+    },
+    "DIM-004": {
+      "line": 3506,
+      "module": "modules/DIM.md"
+    },
+    "DIM-005": {
+      "line": 3507,
+      "module": "modules/DIM.md"
+    },
+    "DIM-006": {
+      "line": 3508,
+      "module": "modules/DIM.md"
+    },
+    "NATRO-001": {
+      "line": 3514,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-002": {
+      "line": 3515,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-003": {
+      "line": 3516,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-004": {
+      "line": 3517,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-005": {
+      "line": 3518,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-006": {
+      "line": 3519,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-007": {
+      "line": 3520,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-008": {
+      "line": 3521,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-009": {
+      "line": 3522,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-010": {
+      "line": 3523,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-011": {
+      "line": 3524,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-012": {
+      "line": 3525,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-013": {
+      "line": 3526,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-014": {
+      "line": 3527,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-015": {
+      "line": 3528,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-016": {
+      "line": 3529,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-017": {
+      "line": 3530,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-018": {
+      "line": 3531,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-019": {
+      "line": 3532,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-020": {
+      "line": 3533,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-021": {
+      "line": 3534,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-022": {
+      "line": 3535,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-023": {
+      "line": 3536,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-024": {
+      "line": 3537,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-025": {
+      "line": 3538,
+      "module": "modules/NATRO.md"
+    },
+    "SHADE-001": {
+      "line": 3544,
+      "module": "modules/SHADE.md"
+    },
+    "SHADE-002": {
+      "line": 3545,
+      "module": "modules/SHADE.md"
+    },
+    "SHADE-003": {
+      "line": 3546,
+      "module": "modules/SHADE.md"
+    },
+    "SHADE-004": {
+      "line": 3547,
+      "module": "modules/SHADE.md"
+    },
+    "SHADE-005": {
+      "line": 3548,
+      "module": "modules/SHADE.md"
+    },
+    "SHADE-006": {
+      "line": 3549,
+      "module": "modules/SHADE.md"
+    },
+    "SHADE-007": {
+      "line": 3550,
+      "module": "modules/SHADE.md"
+    },
+    "SHADE-008": {
+      "line": 3551,
+      "module": "modules/SHADE.md"
+    },
+    "NOTIF-001": {
+      "line": 3557,
+      "module": "modules/NOTIF.md"
+    },
+    "NOTIF-002": {
+      "line": 3558,
+      "module": "modules/NOTIF.md"
+    },
+    "NOTIF-003": {
+      "line": 3559,
+      "module": "modules/NOTIF.md"
+    },
+    "NOTIF-004": {
+      "line": 3560,
+      "module": "modules/NOTIF.md"
+    },
+    "NOTIF-005": {
+      "line": 3561,
+      "module": "modules/NOTIF.md"
+    },
+    "NOTIF-006": {
+      "line": 3562,
+      "module": "modules/NOTIF.md"
+    },
+    "NOTIF-007": {
+      "line": 3563,
+      "module": "modules/NOTIF.md"
+    },
+    "NOTIF-008": {
+      "line": 3564,
+      "module": "modules/NOTIF.md"
+    },
+    "NOTIF-009": {
+      "line": 3565,
+      "module": "modules/NOTIF.md"
+    },
+    "ANCS-001": {
+      "line": 3571,
+      "module": "modules/ANCS.md"
+    },
+    "ANCS-002": {
+      "line": 3572,
+      "module": "modules/ANCS.md"
+    },
+    "ANCS-003": {
+      "line": 3573,
+      "module": "modules/ANCS.md"
+    },
+    "ANCS-004": {
+      "line": 3574,
+      "module": "modules/ANCS.md"
+    },
+    "ANCS-005": {
+      "line": 3575,
+      "module": "modules/ANCS.md"
+    },
+    "ANCS-006": {
+      "line": 3576,
+      "module": "modules/ANCS.md"
+    },
+    "ANCS-007": {
+      "line": 3577,
+      "module": "modules/ANCS.md"
+    },
+    "ANCS-008": {
+      "line": 3578,
+      "module": "modules/ANCS.md"
+    },
+    "ANCS-009": {
+      "line": 3579,
+      "module": "modules/ANCS.md"
+    },
+    "ANCS-010": {
+      "line": 3580,
+      "module": "modules/ANCS.md"
+    },
+    "ANCS-011": {
+      "line": 3581,
+      "module": "modules/ANCS.md"
+    },
+    "ANCS-012": {
+      "line": 3582,
+      "module": "modules/ANCS.md"
+    },
+    "ANCS-013": {
+      "line": 3583,
+      "module": "modules/ANCS.md"
+    },
+    "ANCS-014": {
+      "line": 3584,
+      "module": "modules/ANCS.md"
+    },
+    "MUSIC-001": {
+      "line": 3590,
+      "module": "modules/MUSIC.md"
+    },
+    "MUSIC-002": {
+      "line": 3591,
+      "module": "modules/MUSIC.md"
+    },
+    "MUSIC-003": {
+      "line": 3592,
+      "module": "modules/MUSIC.md"
+    },
+    "MUSIC-004": {
+      "line": 3593,
+      "module": "modules/MUSIC.md"
+    },
+    "MUSIC-005": {
+      "line": 3594,
+      "module": "modules/MUSIC.md"
+    },
+    "MUSIC-006": {
+      "line": 3595,
+      "module": "modules/MUSIC.md"
+    },
+    "MUSIC-007": {
+      "line": 3596,
+      "module": "modules/MUSIC.md"
+    },
+    "MUSIC-008": {
+      "line": 3597,
+      "module": "modules/MUSIC.md"
+    },
+    "MUSIC-009": {
+      "line": 3598,
+      "module": "modules/MUSIC.md"
+    },
+    "MUSIC-010": {
+      "line": 3599,
+      "module": "modules/MUSIC.md"
+    },
+    "MUSIC-011": {
+      "line": 3600,
+      "module": "modules/MUSIC.md"
+    },
+    "MUSIC-012": {
+      "line": 3601,
+      "module": "modules/MUSIC.md"
+    },
+    "MUSIC-013": {
+      "line": 3602,
+      "module": "modules/MUSIC.md"
+    },
+    "MUSIC-014": {
+      "line": 3603,
+      "module": "modules/MUSIC.md"
+    },
+    "DRIVE-001": {
+      "line": 3609,
+      "module": "modules/DRIVE.md"
+    },
+    "DRIVE-002": {
+      "line": 3610,
+      "module": "modules/DRIVE.md"
+    },
+    "DRIVE-003": {
+      "line": 3611,
+      "module": "modules/DRIVE.md"
+    },
+    "KNOW-001": {
+      "line": 3617,
+      "module": "modules/KNOW.md"
+    },
+    "KNOW-002": {
+      "line": 3618,
+      "module": "modules/KNOW.md"
+    },
+    "KNOW-003": {
+      "line": 3619,
+      "module": "modules/KNOW.md"
+    },
+    "KNOW-004": {
+      "line": 3620,
+      "module": "modules/KNOW.md"
+    },
+    "KNOW-005": {
+      "line": 3621,
+      "module": "modules/KNOW.md"
+    },
+    "GATE-001": {
+      "line": 3629,
+      "module": "modules/GATE.md"
+    },
+    "GATE-002": {
+      "line": 3630,
+      "module": "modules/GATE.md"
+    },
+    "GATE-003": {
+      "line": 3631,
+      "module": "modules/GATE.md"
+    },
+    "GATE-004": {
+      "line": 3632,
+      "module": "modules/GATE.md"
+    },
+    "GATE-005": {
+      "line": 3633,
+      "module": "modules/GATE.md"
+    },
+    "GATE-006": {
+      "line": 3634,
+      "module": "modules/GATE.md"
+    },
+    "GATE-007": {
+      "line": 3635,
+      "module": "modules/GATE.md"
+    },
+    "GATE-008": {
+      "line": 3636,
+      "module": "modules/GATE.md"
+    },
+    "GATE-009": {
+      "line": 3637,
+      "module": "modules/GATE.md"
+    },
+    "GATE-010": {
+      "line": 3638,
+      "module": "modules/GATE.md"
+    },
+    "GATE-011": {
+      "line": 3639,
+      "module": "modules/GATE.md"
+    },
+    "GATE-012": {
+      "line": 3640,
+      "module": "modules/GATE.md"
+    },
+    "GATE-013": {
+      "line": 3641,
+      "module": "modules/GATE.md"
+    },
+    "GATE-014": {
+      "line": 3642,
+      "module": "modules/GATE.md"
+    },
+    "GATE-015": {
+      "line": 3643,
+      "module": "modules/GATE.md"
+    },
+    "GATE-016": {
+      "line": 3644,
+      "module": "modules/GATE.md"
+    },
+    "GATE-017": {
+      "line": 3645,
+      "module": "modules/GATE.md"
+    },
+    "GATE-018": {
+      "line": 3646,
+      "module": "modules/GATE.md"
+    },
+    "GATE-019": {
+      "line": 3647,
+      "module": "modules/GATE.md"
+    },
+    "GATE-020": {
+      "line": 3648,
+      "module": "modules/GATE.md"
+    },
+    "GATE-021": {
+      "line": 3649,
+      "module": "modules/GATE.md"
+    },
+    "GATE-022": {
+      "line": 3650,
+      "module": "modules/GATE.md"
+    },
+    "GATE-023": {
+      "line": 3651,
+      "module": "modules/GATE.md"
+    },
+    "GATE-024": {
+      "line": 3652,
+      "module": "modules/GATE.md"
+    },
+    "GATE-025": {
+      "line": 3653,
+      "module": "modules/GATE.md"
+    },
+    "GATE-026": {
+      "line": 3654,
+      "module": "modules/GATE.md"
+    },
+    "GATE-027": {
+      "line": 3655,
+      "module": "modules/GATE.md"
+    },
+    "GATE-028": {
+      "line": 3656,
+      "module": "modules/GATE.md"
+    },
+    "GATE-029": {
+      "line": 3657,
+      "module": "modules/GATE.md"
+    },
+    "GATE-030": {
+      "line": 3658,
+      "module": "modules/GATE.md"
+    },
+    "GATE-031": {
+      "line": 3659,
+      "module": "modules/GATE.md"
+    },
+    "GATE-032": {
+      "line": 3660,
+      "module": "modules/GATE.md"
+    },
+    "GATE-033": {
+      "line": 3661,
+      "module": "modules/GATE.md"
+    },
+    "GATE-034": {
+      "line": 3662,
+      "module": "modules/GATE.md"
+    },
+    "GATE-035": {
+      "line": 3663,
+      "module": "modules/GATE.md"
+    },
+    "GATE-036": {
+      "line": 3664,
+      "module": "modules/GATE.md"
+    },
+    "GATE-037": {
+      "line": 3665,
+      "module": "modules/GATE.md"
+    },
+    "GATE-038": {
+      "line": 3666,
+      "module": "modules/GATE.md"
+    },
+    "GATE-039": {
+      "line": 3667,
+      "module": "modules/GATE.md"
+    },
+    "GATE-040": {
+      "line": 3668,
+      "module": "modules/GATE.md"
+    },
+    "GATE-041": {
+      "line": 3669,
+      "module": "modules/GATE.md"
+    },
+    "GATE-042": {
+      "line": 3670,
+      "module": "modules/GATE.md"
+    },
+    "GATE-043": {
+      "line": 3671,
+      "module": "modules/GATE.md"
+    },
+    "GATE-044": {
+      "line": 3672,
+      "module": "modules/GATE.md"
+    },
+    "GATE-045": {
+      "line": 3673,
+      "module": "modules/GATE.md"
+    },
+    "GATE-046": {
+      "line": 3674,
+      "module": "modules/GATE.md"
+    },
+    "GATE-047": {
+      "line": 3675,
+      "module": "modules/GATE.md"
+    },
+    "GATE-048": {
+      "line": 3676,
+      "module": "modules/GATE.md"
+    },
+    "GATE-049": {
+      "line": 3677,
+      "module": "modules/GATE.md"
+    },
+    "GATE-050": {
+      "line": 3678,
+      "module": "modules/GATE.md"
+    },
+    "GATE-051": {
+      "line": 3679,
+      "module": "modules/GATE.md"
+    },
+    "GATE-052": {
+      "line": 3680,
+      "module": "modules/GATE.md"
+    },
+    "GATE-053": {
+      "line": 3681,
+      "module": "modules/GATE.md"
+    },
+    "GATE-054": {
+      "line": 3682,
+      "module": "modules/GATE.md"
+    },
+    "GATE-055": {
+      "line": 3683,
+      "module": "modules/GATE.md"
+    },
+    "GATE-056": {
+      "line": 3684,
+      "module": "modules/GATE.md"
+    },
+    "GATE-057": {
+      "line": 3685,
+      "module": "modules/GATE.md"
+    },
+    "GATE-058": {
+      "line": 3687,
+      "module": "modules/GATE.md"
+    },
+    "GATE-059": {
+      "line": 3688,
+      "module": "modules/GATE.md"
+    },
+    "GATE-060": {
+      "line": 3689,
+      "module": "modules/GATE.md"
+    },
+    "GATE-061": {
+      "line": 3690,
+      "module": "modules/GATE.md"
+    },
+    "GATE-062": {
+      "line": 3691,
+      "module": "modules/GATE.md"
+    },
+    "GATE-063": {
+      "line": 3692,
+      "module": "modules/GATE.md"
+    },
+    "GATE-064": {
+      "line": 3693,
+      "module": "modules/GATE.md"
+    },
+    "GATE-065": {
+      "line": 3694,
+      "module": "modules/GATE.md"
+    },
+    "GATE-066": {
+      "line": 3695,
+      "module": "modules/GATE.md"
+    },
+    "GATE-067": {
+      "line": 3696,
+      "module": "modules/GATE.md"
+    },
+    "GATE-068": {
+      "line": 3697,
+      "module": "modules/GATE.md"
+    },
+    "GATE-069": {
+      "line": 3698,
+      "module": "modules/GATE.md"
+    },
+    "GATE-070": {
+      "line": 3699,
+      "module": "modules/GATE.md"
+    },
+    "GATE-071": {
+      "line": 3700,
+      "module": "modules/GATE.md"
+    },
+    "GATE-072": {
+      "line": 3701,
+      "module": "modules/GATE.md"
+    },
+    "GATE-073": {
+      "line": 3702,
+      "module": "modules/GATE.md"
+    },
+    "GATE-074": {
+      "line": 3703,
+      "module": "modules/GATE.md"
+    },
+    "GATE-075": {
+      "line": 3704,
+      "module": "modules/GATE.md"
+    },
+    "GATE-076": {
+      "line": 3705,
+      "module": "modules/GATE.md"
+    },
+    "GATE-077": {
+      "line": 3706,
+      "module": "modules/GATE.md"
+    },
+    "GATE-078": {
+      "line": 3707,
+      "module": "modules/GATE.md"
+    },
+    "GATE-079": {
+      "line": 3708,
+      "module": "modules/GATE.md"
+    },
+    "GATE-080": {
+      "line": 3709,
+      "module": "modules/GATE.md"
+    },
+    "GATE-081": {
+      "line": 3710,
+      "module": "modules/GATE.md"
+    },
+    "NAV-018": {
+      "line": 3804,
+      "module": "modules/NAV.md"
+    },
+    "NAV-019": {
+      "line": 3805,
+      "module": "modules/NAV.md"
+    },
+    "MAP-060": {
+      "line": 3806,
+      "module": "modules/MAP.md"
+    },
+    "MAP-061": {
+      "line": 3807,
+      "module": "modules/MAP.md"
+    },
+    "MAP-062": {
+      "line": 3808,
+      "module": "modules/MAP.md"
+    },
+    "MAP-063": {
+      "line": 3809,
+      "module": "modules/MAP.md"
+    },
+    "NATRO-026": {
+      "line": 3810,
+      "module": "modules/NATRO.md"
+    },
+    "NATRO-027": {
+      "line": 3811,
+      "module": "modules/NATRO.md"
+    },
+    "GATE-082": {
+      "line": 3815,
+      "module": "modules/GATE.md"
+    },
+    "GATE-083": {
+      "line": 3816,
+      "module": "modules/GATE.md"
+    },
+    "GATE-084": {
+      "line": 3817,
+      "module": "modules/GATE.md"
+    },
+    "GATE-085": {
+      "line": 3818,
+      "module": "modules/GATE.md"
+    },
+    "GATE-086": {
+      "line": 3819,
+      "module": "modules/GATE.md"
+    },
+    "GATE-087": {
+      "line": 3820,
+      "module": "modules/GATE.md"
+    },
+    "MUSIC-015": {
+      "line": 4704,
+      "module": "modules/MUSIC.md"
+    },
+    "NATRO-028": {
+      "line": 4705,
+      "module": "modules/NATRO.md"
+    },
+    "MAP-064": {
+      "line": 4706,
+      "module": "modules/MAP.md"
+    },
+    "GATE-088": {
+      "line": 4707,
+      "module": "modules/GATE.md"
+    },
+    "GATE-089": {
+      "line": 4708,
+      "module": "modules/GATE.md"
+    },
+    "MUSIC-016": {
+      "line": 4954,
+      "module": "modules/MUSIC.md"
+    },
+    "CLUSTER-027": {
+      "line": 4955,
+      "module": "modules/CLUSTER.md"
+    },
+    "CLUSTER-028": {
+      "line": 4956,
+      "module": "modules/CLUSTER.md"
+    },
+    "MAP-065": {
+      "line": 4957,
+      "module": "modules/MAP.md"
+    },
+    "GATE-090": {
+      "line": 4958,
+      "module": "modules/GATE.md"
+    },
+    "GATE-091": {
+      "line": 4959,
+      "module": "modules/GATE.md"
+    },
+    "GATE-092": {
+      "line": 4960,
+      "module": "modules/GATE.md"
+    },
+    "MUSIC-017": {
+      "line": 4980,
+      "module": "modules/MUSIC.md"
+    },
+    "MUSIC-018": {
+      "line": 4981,
+      "module": "modules/MUSIC.md"
+    },
+    "MAP-066": {
+      "line": 4982,
+      "module": "modules/MAP.md"
+    },
+    "GATE-093": {
+      "line": 4983,
+      "module": "modules/GATE.md"
+    },
+    "GATE-094": {
+      "line": 4984,
+      "module": "modules/GATE.md"
+    },
+    "MUSIC-019": {
+      "line": 5005,
+      "module": "modules/MUSIC.md"
+    },
+    "MUSIC-020": {
+      "line": 5006,
+      "module": "modules/MUSIC.md"
+    },
+    "GATE-095": {
+      "line": 5007,
+      "module": "modules/GATE.md"
+    },
+    "MUSIC-021": {
+      "line": 5017,
+      "module": "modules/MUSIC.md"
+    },
+    "FILES-004": {
+      "line": 6239,
+      "module": "modules/FILES.md"
+    }
+  },
+  "sections": [
+    {
+      "key": "S000",
+      "start": 1,
+      "end": 6,
+      "title": "Единый реестр требований Natro"
+    },
+    {
+      "key": "S001",
+      "start": 7,
+      "end": 12,
+      "title": "Полный реестр: исходные формулировки и хронология"
+    },
+    {
+      "key": "S002",
+      "start": 13,
+      "end": 28,
+      "title": "06.11.2026 — FILES-001…003: SOURCE/TEST/APK подтверждены для3.4.0"
+    },
+    {
+      "key": "S003",
+      "start": 29,
+      "end": 39,
+      "title": "06.11.2026 — FILES: полный CI выявил интеграционные контракты"
+    },
+    {
+      "key": "S004",
+      "start": 40,
+      "end": 58,
+      "title": "06.11.2026 — FILES-001…003: встроенный файловый менеджер с Яндекс Диском"
+    },
+    {
+      "key": "S005",
+      "start": 59,
+      "end": 69,
+      "title": "18.10.2026 17:34 МСК — прямая авторизация публикации 3.3.2"
+    },
+    {
+      "key": "S006",
+      "start": 70,
+      "end": 95,
+      "title": "18.10.2026 17:08 МСК — продолжить исправление переключения и крыльев"
+    },
+    {
+      "key": "S007",
+      "start": 96,
+      "end": 108,
+      "title": "18.10.2026 16:38 МСК — FIELD3.3.1: выключение приборки не прошло"
+    },
+    {
+      "key": "S008",
+      "start": 109,
+      "end": 124,
+      "title": "18.10.2026 16:30:30 МСК — 3.3.1 опубликована в stable/latest"
+    },
+    {
+      "key": "S009",
+      "start": 125,
+      "end": 151,
+      "title": "18.10.2026 — проверка готовности и публикация 3.3.1"
+    },
+    {
+      "key": "S010",
+      "start": 152,
+      "end": 162,
+      "title": "18.10.2026 10:39 МСК — подготовить установочную3.3.1"
+    },
+    {
+      "key": "S011",
+      "start": 163,
+      "end": 186,
+      "title": "18.10.2026 10:00 МСК — продолжить исправление переключателя (CLUSTER-023/024/026)"
+    },
+    {
+      "key": "S012",
+      "start": 187,
+      "end": 200,
+      "title": "18.10.2026 09:35 МСК — проверить обратный путь DIM, не только caller"
+    },
+    {
+      "key": "S013",
+      "start": 201,
+      "end": 228,
+      "title": "18.10.2026 09:26 МСК — CLUSTER-023/026: эталон — перенос активного приложения"
+    },
+    {
+      "key": "S014",
+      "start": 229,
+      "end": 239,
+      "title": "18.10.2026 05:21:21UTC — 3.3.0 stable опубликована"
+    },
+    {
+      "key": "S015",
+      "start": 240,
+      "end": 256,
+      "title": "18.10.2026 — 3.3.0 SOURCE / TEST / APK, публикация ожидается"
+    },
+    {
+      "key": "S016",
+      "start": 257,
+      "end": 274,
+      "title": "18.10.2026 — CLUSTER_WINGS: адресный сбор в Natro, кандидат3.3.0"
+    },
+    {
+      "key": "S017",
+      "start": 275,
+      "end": 310,
+      "title": "18.10.2026 — CLUSTER_WINGS / KNOW-005: все архивы проекта и адресный план"
+    },
+    {
+      "key": "S018",
+      "start": 311,
+      "end": 335,
+      "title": "18.10.2026 — CLUSTER_WINGS: продолжать разбор имеющихся байтов"
+    },
+    {
+      "key": "S019",
+      "start": 336,
+      "end": 353,
+      "title": "17.10.2026 21:44 МСК — BASE-DIM / CLUSTER_WINGS: разбирать уже полученный QNX"
+    },
+    {
+      "key": "S020",
+      "start": 354,
+      "end": 365,
+      "title": "17.10.2026 — CLUSTER_WINGS, продолжение после вопроса21:34"
+    },
+    {
+      "key": "S021",
+      "start": 366,
+      "end": 389,
+      "title": "17.10.2026 21:16 МСК — CLUSTER_WINGS / BASE-DIM: видео входа и выхода"
+    },
+    {
+      "key": "S022",
+      "start": 390,
+      "end": 408,
+      "title": "17.10.2026 20:53 МСК — FIELD3.2.9, повторная жалоба на неполный архив"
+    },
+    {
+      "key": "S023",
+      "start": 409,
+      "end": 417,
+      "title": "17.10.2026 19:59:12 МСК — 3.2.9 stable опубликована"
+    },
+    {
+      "key": "S024",
+      "start": 418,
+      "end": 439,
+      "title": "17.10.2026 — 3.2.9 SOURCE / TEST / APK приняты"
+    },
+    {
+      "key": "S025",
+      "start": 440,
+      "end": 487,
+      "title": "17.10.2026 19:11–19:15МСК — MEDIA-TOUCH-329 / MUSIC-INFO-329 / QNX-RESULT-329"
+    },
+    {
+      "key": "S026",
+      "start": 488,
+      "end": 498,
+      "title": "17.10.2026 19:03:53МСК — Natro3.2.8 stable опубликована"
+    },
+    {
+      "key": "S027",
+      "start": 499,
+      "end": 514,
+      "title": "17.10.2026 — QNX-COLLECTOR-328 SOURCE/TEST/APK приняты"
+    },
+    {
+      "key": "S028",
+      "start": 515,
+      "end": 531,
+      "title": "17.10.2026 18:45 МСК — QNX-COLLECTOR-328"
+    },
+    {
+      "key": "S029",
+      "start": 532,
+      "end": 547,
+      "title": "17.10.2026 18:30–18:35 МСК — полнота исследования и FIELD3.2.7"
+    },
+    {
+      "key": "S030",
+      "start": 548,
+      "end": 563,
+      "title": "17.10.2026 18:18:44 МСК — Natro3.2.7 опубликована stable/latest"
+    },
+    {
+      "key": "S031",
+      "start": 564,
+      "end": 578,
+      "title": "17.10.2026 — Natro3.2.7: SOURCE/TEST/APK проверены, stable publication выполняется"
+    },
+    {
+      "key": "S032",
+      "start": 579,
+      "end": 586,
+      "title": "17.10.2026 18:06 МСК — подтверждение публикации3.2.7"
+    },
+    {
+      "key": "S033",
+      "start": 587,
+      "end": 601,
+      "title": "17.10.2026 — QNX-DOWNLOAD-327: локальные проверки, публикация BLOCKED"
+    },
+    {
+      "key": "S034",
+      "start": 602,
+      "end": 625,
+      "title": "17.10.2026 17:35–17:36 МСК — QNX-DOWNLOAD-327 и исключения двух дампов"
+    },
+    {
+      "key": "S035",
+      "start": 626,
+      "end": 654,
+      "title": "17.10.2026 16:15–16:24 — отказ updater и повтор QNX RST"
+    },
+    {
+      "key": "S036",
+      "start": 655,
+      "end": 682,
+      "title": "17.10.2026 16:09 — 3.2.5 опубликована, SOURCE/TEST/APK закрыты; FIELD OPEN"
+    },
+    {
+      "key": "S037",
+      "start": 683,
+      "end": 697,
+      "title": "17.10.2026 15:39–15:40 — вид уведомления MConfig о режиме вождения на HUD"
+    },
+    {
+      "key": "S038",
+      "start": 698,
+      "end": 725,
+      "title": "17.10.2026 15:21–15:25 — полный QNX архив и другие каналы связи"
+    },
+    {
+      "key": "S039",
+      "start": 726,
+      "end": 769,
+      "title": "17.10.2026 — полоса повторилась; сравнение MConfig48 и новые QNX цели"
+    },
+    {
+      "key": "S040",
+      "start": 770,
+      "end": 797,
+      "title": "17.10.2026 — FIELD3.2.4 после перезагрузки, mappings получены; крылья OPEN"
+    },
+    {
+      "key": "S041",
+      "start": 798,
+      "end": 810,
+      "title": "17.10.2026 — FIELD3.2.4, архив792651: снова транспортный отказ"
+    },
+    {
+      "key": "S042",
+      "start": 811,
+      "end": 823,
+      "title": "17.10.2026 14:18 МСК — статус по вопросу «Готово?»"
+    },
+    {
+      "key": "S043",
+      "start": 824,
+      "end": 851,
+      "title": "17.10.2026 — 3.2.4 собрана и подписана прежним ключом"
+    },
+    {
+      "key": "S044",
+      "start": 852,
+      "end": 864,
+      "title": "17.10.2026 — 3.2.4: результат полного CI и совместимость генератора"
+    },
+    {
+      "key": "S045",
+      "start": 865,
+      "end": 880,
+      "title": "17.10.2026 — исправление ошибочного вывода об отсутствии ключа (REL-015)"
+    },
+    {
+      "key": "S046",
+      "start": 881,
+      "end": 897,
+      "title": "17.10.2026 13:45 MSK — продолжение выпуска 3.2.4"
+    },
+    {
+      "key": "S047",
+      "start": 898,
+      "end": 952,
+      "title": "17.10.2026 — постоянный LAN, экспорт с телефона и канал обновления"
+    },
+    {
+      "key": "S048",
+      "start": 953,
+      "end": 972,
+      "title": "17.10.2026 — исправление QNX stat и повтор FIELD полосы/аккумулятора"
+    },
+    {
+      "key": "S049",
+      "start": 973,
+      "end": 984,
+      "title": "17.10.2026 13:07 МСК — QCONN greeting получен"
+    },
+    {
+      "key": "S050",
+      "start": 985,
+      "end": 998,
+      "title": "17.10.2026 — ADB-PARTIAL-OUTPUT: реализация после «Ну так продолжай»"
+    },
+    {
+      "key": "S051",
+      "start": 999,
+      "end": 1015,
+      "title": "17.10.2026 — маршрут подтверждён; таймаут терминала не равен отказу QNX"
+    },
+    {
+      "key": "S052",
+      "start": 1016,
+      "end": 1035,
+      "title": "17.10.2026 — прямой nc-контроль: отказ подтверждён вне сборщика"
+    },
+    {
+      "key": "S053",
+      "start": 1036,
+      "end": 1058,
+      "title": "17.10.2026 — повторный FIELD3.2.3 DD605 и аудит изменений подключения"
+    },
+    {
+      "key": "S054",
+      "start": 1059,
+      "end": 1090,
+      "title": "17.10.2026 — FIELD3.2.3 / ZIP8283: QNX недоступен до первого запроса"
+    },
+    {
+      "key": "S055",
+      "start": 1091,
+      "end": 1134,
+      "title": "17.10.2026 — PROCESS-COMPLIANCE-20261017: выполнять действующие требования проекта"
+    },
+    {
+      "key": "S056",
+      "start": 1135,
+      "end": 1166,
+      "title": "17.10.2026 08:38 МСК — описание, требования и все исследовательские зацепки"
+    },
+    {
+      "key": "S057",
+      "start": 1167,
+      "end": 1192,
+      "title": "17.10.2026 08:32 МСК — проверка публикации 3.2.3 и постоянного правила Git"
+    },
+    {
+      "key": "S058",
+      "start": 1193,
+      "end": 1199,
+      "title": "17.10.2026 08:18 МСК — продолжить сборку3.2.3"
+    },
+    {
+      "key": "S059",
+      "start": 1200,
+      "end": 1239,
+      "title": "16.10.2026 22:39 МСК — полный доступный каталог QNX, снятие ограничений"
+    },
+    {
+      "key": "S060",
+      "start": 1240,
+      "end": 1251,
+      "title": "Выпуск3.2.2 — SOURCE/TEST/APK; FIELD OPEN"
+    },
+    {
+      "key": "S061",
+      "start": 1252,
+      "end": 1259,
+      "title": "16.10.2026 18:46 МСК — собрать3.2.2"
+    },
+    {
+      "key": "S062",
+      "start": 1260,
+      "end": 1281,
+      "title": "16.10.2026 18:35–18:36 МСК — исправить сбор, включая mappings"
+    },
+    {
+      "key": "S063",
+      "start": 1282,
+      "end": 1295,
+      "title": "16.10.2026 — выпуск3.2.1: SOURCE/TEST/APK; FIELD OPEN"
+    },
+    {
+      "key": "S064",
+      "start": 1296,
+      "end": 1305,
+      "title": "16.10.2026 16:51 МСК — собрать APK3.2.1"
+    },
+    {
+      "key": "S065",
+      "start": 1306,
+      "end": 1331,
+      "title": "16.10.2026 — исправить сбор QNX по дампу dad3c5be"
+    },
+    {
+      "key": "S066",
+      "start": 1332,
+      "end": 1344,
+      "title": "Выпуск3.2.0 — SOURCE/TEST/APK; FIELD OPEN"
+    },
+    {
+      "key": "S067",
+      "start": 1345,
+      "end": 1353,
+      "title": "14.10.2026 — исправление номера выпуска по REL-004"
+    },
+    {
+      "key": "S068",
+      "start": 1354,
+      "end": 1363,
+      "title": "14.10.2026 17:17 МСК — продолжить разбор нового дампа3.1.9"
+    },
+    {
+      "key": "S069",
+      "start": 1364,
+      "end": 1385,
+      "title": "14.10.2026 15:21 МСК — расширенный сбор и исправление потери metadata"
+    },
+    {
+      "key": "S070",
+      "start": 1386,
+      "end": 1394,
+      "title": "14.10.2026 — архивный путь QNX DLT"
+    },
+    {
+      "key": "S071",
+      "start": 1395,
+      "end": 1402,
+      "title": "14.10.2026 — продолжение пути прозрачности"
+    },
+    {
+      "key": "S072",
+      "start": 1403,
+      "end": 1410,
+      "title": "14.10.2026 — ограничение диагностического composition query"
+    },
+    {
+      "key": "S073",
+      "start": 1411,
+      "end": 1420,
+      "title": "14.10.2026 — проверка единого прозрачного слоя крыльев"
+    },
+    {
+      "key": "S074",
+      "start": 1421,
+      "end": 1433,
+      "title": "14.10.2026 14:45 МСК — пользовательский дамп3.1.8 проверен"
+    },
+    {
+      "key": "S075",
+      "start": 1434,
+      "end": 1447,
+      "title": "14.10.2026 —3.1.8 собран, подписан и сохранён; FIELD OPEN"
+    },
+    {
+      "key": "S076",
+      "start": 1448,
+      "end": 1463,
+      "title": "14.10.2026 08:55 МСК — расширенный QNX-сбор и APK3.1.8"
+    },
+    {
+      "key": "S077",
+      "start": 1464,
+      "end": 1475,
+      "title": "14.10.2026 — дополнительный поиск firmware по поручению пользователя"
+    },
+    {
+      "key": "S078",
+      "start": 1476,
+      "end": 1492,
+      "title": "Выпуск3.1.7 — SOURCE/TEST/APK; FIELD OPEN"
+    },
+    {
+      "key": "S079",
+      "start": 1493,
+      "end": 1525,
+      "title": "14.10.2026 — повтор полосы, точный заряд и продолжение крыльев"
+    },
+    {
+      "key": "S080",
+      "start": 1526,
+      "end": 1543,
+      "title": "13.10.2026 19:38 МСК — QNX-дамп, нижняя полоса и понятное сохранение"
+    },
+    {
+      "key": "S081",
+      "start": 1544,
+      "end": 1554,
+      "title": "13.10.2026 — продолжение поиска DIM receiver: QNX panel route"
+    },
+    {
+      "key": "S082",
+      "start": 1555,
+      "end": 1567,
+      "title": "13.10.2026 — аудит публикации разборов за12–13октября"
+    },
+    {
+      "key": "S083",
+      "start": 1568,
+      "end": 1576,
+      "title": "13.10.2026 — фактический системный дамп, Git и голубой край карты"
+    },
+    {
+      "key": "S084",
+      "start": 1577,
+      "end": 1593,
+      "title": "Выпуск3.1.4 — SOURCE/TEST/APK; FIELD OPEN"
+    },
+    {
+      "key": "S085",
+      "start": 1594,
+      "end": 1605,
+      "title": "Кандидат3.1.4 /208021347 —13.10.2026"
+    },
+    {
+      "key": "S086",
+      "start": 1606,
+      "end": 1624,
+      "title": "13.10.2026 — просмотр Загрузки/Natro с iPhone"
+    },
+    {
+      "key": "S087",
+      "start": 1625,
+      "end": 1641,
+      "title": "13.10.2026 — системный дамп из журнала и падение 3.1.3"
+    },
+    {
+      "key": "S088",
+      "start": 1642,
+      "end": 1661,
+      "title": "Выпуск 3.1.3 / 10.10.2026 — SOURCE/TEST/APK; FIELD OPEN"
+    },
+    {
+      "key": "S089",
+      "start": 1662,
+      "end": 1699,
+      "title": "10.10.2026 17:08 МСК — повтор белой полосы и диагностика ANCS"
+    },
+    {
+      "key": "S090",
+      "start": 1700,
+      "end": 1739,
+      "title": "10.10.2026 16:27 МСК — исправления запуска и иконок, кандидат 3.1.3"
+    },
+    {
+      "key": "S091",
+      "start": 1740,
+      "end": 1758,
+      "title": "Выпуск 3.1.2 / 10.10.2026 — SOURCE/TEST/APK, FIELD OPEN"
+    },
+    {
+      "key": "S092",
+      "start": 1759,
+      "end": 1800,
+      "title": "10.10.2026 — исправить HUD/LCA и receiver exhaustion, кандидат 3.1.2"
+    },
+    {
+      "key": "S093",
+      "start": 1801,
+      "end": 1823,
+      "title": "Выпуск 3.1.1 / 09.10.2026 — SOURCE/TEST/RELEASE, аппаратные gates OPEN"
+    },
+    {
+      "key": "S094",
+      "start": 1824,
+      "end": 1830,
+      "title": "Уточнение FIX-311-NAV по фактическому успешному запуску"
+    },
+    {
+      "key": "S095",
+      "start": 1831,
+      "end": 1846,
+      "title": "09.10.2026 18:39 МСК — уведомления web app со своей иконкой"
+    },
+    {
+      "key": "S096",
+      "start": 1847,
+      "end": 1875,
+      "title": "09.10.2026 17:53 МСК — исправления перед разрешённой публикацией 3.1.1"
+    },
+    {
+      "key": "S097",
+      "start": 1876,
+      "end": 1905,
+      "title": "09.10.2026 17:29 МСК — диагностировать неясную причину до следующего воспроизведения"
+    },
+    {
+      "key": "S098",
+      "start": 1906,
+      "end": 1947,
+      "title": "08.10.2026 07:47 МСК — повторные отказы, HUD и запрет изменений ANCS"
+    },
+    {
+      "key": "S099",
+      "start": 1948,
+      "end": 1994,
+      "title": "07.10.2026 19:35 МСК — повторные отказы 3.0.8, исправления 3.0.9"
+    },
+    {
+      "key": "S100",
+      "start": 1995,
+      "end": 2030,
+      "title": "07.10.2026 — исправить ошибки журналов и выпустить 3.0.8"
+    },
+    {
+      "key": "S101",
+      "start": 2031,
+      "end": 2047,
+      "title": "Выпуск 3.0.8 — проверенный установочный APK"
+    },
+    {
+      "key": "S102",
+      "start": 2048,
+      "end": 2090,
+      "title": "06.10.2026 — новая сборка по полному разбору логов (3.0.7)"
+    },
+    {
+      "key": "S103",
+      "start": 2091,
+      "end": 2108,
+      "title": "05.10.2026 21:48 МСК — довести 3.0.6 до установочного APK"
+    },
+    {
+      "key": "S104",
+      "start": 2109,
+      "end": 2160,
+      "title": "05.10.2026 — утренние дефекты и автозапуск HOME пассажира"
+    },
+    {
+      "key": "S105",
+      "start": 2161,
+      "end": 2176,
+      "title": "05.10.2026 — разрешённая публикация Helper 71"
+    },
+    {
+      "key": "S106",
+      "start": 2177,
+      "end": 2203,
+      "title": "04.10.2026 16:31–16:42 МСК — системная ревизия диагностики"
+    },
+    {
+      "key": "S107",
+      "start": 2204,
+      "end": 2215,
+      "title": "Выпуск диагностики 3.0.5: SOURCE / TEST / APK"
+    },
+    {
+      "key": "S108",
+      "start": 2216,
+      "end": 2244,
+      "title": "04.10.2026 — продолжение завершено до подписанного кандидата 3.0.4"
+    },
+    {
+      "key": "S109",
+      "start": 2245,
+      "end": 2337,
+      "title": "04.10.2026 13:06 МСК — продолжить незавершённый состав после 3.0.3"
+    },
+    {
+      "key": "S110",
+      "start": 2338,
+      "end": 2359,
+      "title": "04.10.2026 — Natro 3.0.3 собран и подписан"
+    },
+    {
+      "key": "S111",
+      "start": 2360,
+      "end": 2388,
+      "title": "04.10.2026 — команда собрать APK после успешного CI"
+    },
+    {
+      "key": "S112",
+      "start": 2389,
+      "end": 2482,
+      "title": "04.10.2026 — продолжение из нового чата, устранение удержания редакторов"
+    },
+    {
+      "key": "S113",
+      "start": 2483,
+      "end": 2558,
+      "title": "04.10.2026 — пять полевых отказов 3.0.2, продолжить исправления"
+    },
+    {
+      "key": "S114",
+      "start": 2559,
+      "end": 2580,
+      "title": "04.10.2026 — отрицательная приёмка полноты 3.0.2: переделать редакторы полностью"
+    },
+    {
+      "key": "S115",
+      "start": 2581,
+      "end": 2594,
+      "title": "03.10.2026 22:16 МСК — завершить состав выпуска и собрать APK"
+    },
+    {
+      "key": "S116",
+      "start": 2595,
+      "end": 2609,
+      "title": "Реализация кандидата 3.0.2 (проверка продолжается)"
+    },
+    {
+      "key": "S117",
+      "start": 2610,
+      "end": 2628,
+      "title": "03.10.2026 — уточнение состава: структура и оформление настроек"
+    },
+    {
+      "key": "S118",
+      "start": 2629,
+      "end": 2643,
+      "title": "03.10.2026 — лаунчер пассажира и «Домой пассажир»"
+    },
+    {
+      "key": "S119",
+      "start": 2644,
+      "end": 2662,
+      "title": "03.10.2026 — пассажирская боковая панель и сопутствующие окна"
+    },
+    {
+      "key": "S120",
+      "start": 2663,
+      "end": 2675,
+      "title": "03.10.2026 — восстановление кнопок после замены APK и задержки MEDIA"
+    },
+    {
+      "key": "S121",
+      "start": 2676,
+      "end": 2691,
+      "title": "03.10.2026 — ручные иконки телефона и очередь после восстановления"
+    },
+    {
+      "key": "S122",
+      "start": 2692,
+      "end": 2710,
+      "title": "03.10.2026 — полнота копии при любом расширении функционала"
+    },
+    {
+      "key": "S123",
+      "start": 2711,
+      "end": 2741,
+      "title": "03.10.2026 — принудительная ночь HUD/приборки и защита стартового кадра"
+    },
+    {
+      "key": "S124",
+      "start": 2742,
+      "end": 2767,
+      "title": "03.10.2026 — анализ пары mHUD7.1 и модифицированного Navigator30.3.0"
+    },
+    {
+      "key": "S125",
+      "start": 2768,
+      "end": 2794,
+      "title": "03.10.2026 — накопление исправлений, APK пока не собирать"
+    },
+    {
+      "key": "S126",
+      "start": 2795,
+      "end": 2808,
+      "title": "16.09.2026 — выпуск 3.0.1 собран, аппаратная приёмка ожидается"
+    },
+    {
+      "key": "S127",
+      "start": 2809,
+      "end": 2845,
+      "title": "16.09.2026 — поручено исправить весь вечерний разбор, кандидат 3.0.1"
+    },
+    {
+      "key": "S128",
+      "start": 2846,
+      "end": 2892,
+      "title": "16.09.2026, вечер — повторная отрицательная приёмка 3.0.0 и разбор журнала"
+    },
+    {
+      "key": "S129",
+      "start": 2893,
+      "end": 2921,
+      "title": "Выпуск 3.0.0 — итог сборки и подписи 16.09.2026"
+    },
+    {
+      "key": "S130",
+      "start": 2922,
+      "end": 2935,
+      "title": "Окончательное уточнение выпуска 16.09.2026 — 3.0.0"
+    },
+    {
+      "key": "S131",
+      "start": 2936,
+      "end": 2966,
+      "title": "Кандидат 2.10.0 — продолжение полного исправления 16.09.2026"
+    },
+    {
+      "key": "S132",
+      "start": 2967,
+      "end": 2985,
+      "title": "Уточнение музыки 16.09.2026 — значок перед названием"
+    },
+    {
+      "key": "S133",
+      "start": 2986,
+      "end": 3008,
+      "title": "Уточнение 16.09.2026 — 100 м, полный текст альтернативы и Natro в сервисном режиме"
+    },
+    {
+      "key": "S134",
+      "start": 3009,
+      "end": 3029,
+      "title": "Продолжение 16.09.2026 — аппаратные отказы карт и времени музыки"
+    },
+    {
+      "key": "S135",
+      "start": 3030,
+      "end": 3060,
+      "title": "Итог 16.09.2026 — подписанная Natro 2.9.9, аппаратная приёмка открыта"
+    },
+    {
+      "key": "S136",
+      "start": 3061,
+      "end": 3071,
+      "title": "Дополнение 16.09.2026 — сервисный режим по DezzK/stealth"
+    },
+    {
+      "key": "S137",
+      "start": 3072,
+      "end": 3073,
+      "title": "Дополнение 16.09.2026 — раздел ADB по MConfig+ v46.1"
+    },
+    {
+      "key": "S138",
+      "start": 3074,
+      "end": 3105,
+      "title": "Дополнение пользователя — режимы вождения monjaro-selector"
+    },
+    {
+      "key": "S139",
+      "start": 3106,
+      "end": 3140,
+      "title": "Дополнение пользователя — буфер обмена и локальная передача с iPhone"
+    },
+    {
+      "key": "S140",
+      "start": 3141,
+      "end": 3172,
+      "title": "Продолжение выпуска 16.09.2026 — сверка полноты 2.9.8"
+    },
+    {
+      "key": "S141",
+      "start": 3173,
+      "end": 3252,
+      "title": "Дополнение 16.09.2026 — исправления после проверки 2.9.7"
+    },
+    {
+      "key": "S142",
+      "start": 3253,
+      "end": 3277,
+      "title": "Как вести этот файл"
+    },
+    {
+      "key": "S143",
+      "start": 3278,
+      "end": 3299,
+      "title": "1. Неподлежащие изменению правила проекта и выпусков"
+    },
+    {
+      "key": "S144",
+      "start": 3300,
+      "end": 3312,
+      "title": "2. Целевая платформа и базовые компоненты"
+    },
+    {
+      "key": "S145",
+      "start": 3313,
+      "end": 3314,
+      "title": "3. Яндекс Навигатор, отдельные карты, HUD и карта панели приборов"
+    },
+    {
+      "key": "S146",
+      "start": 3315,
+      "end": 3336,
+      "title": "3.1 Независимость и жизненный цикл карт"
+    },
+    {
+      "key": "S147",
+      "start": 3337,
+      "end": 3362,
+      "title": "3.2 Оконный режим Навигатора"
+    },
+    {
+      "key": "S148",
+      "start": 3363,
+      "end": 3426,
+      "title": "3.3 Навигационные слои и визуальные требования"
+    },
+    {
+      "key": "S149",
+      "start": 3427,
+      "end": 3447,
+      "title": "4. Карточка предупреждений HUD и левая таблица знаков"
+    },
+    {
+      "key": "S150",
+      "start": 3448,
+      "end": 3466,
+      "title": "Уточнение механизма оригинальных знаков 05.09.2026"
+    },
+    {
+      "key": "S151",
+      "start": 3467,
+      "end": 3498,
+      "title": "5. Панель приборов Natro"
+    },
+    {
+      "key": "S152",
+      "start": 3499,
+      "end": 3509,
+      "title": "5.1 Панель штатной вкладки DIM"
+    },
+    {
+      "key": "S153",
+      "start": 3510,
+      "end": 3539,
+      "title": "6. Natro: запуск, производительность и базовый интерфейс"
+    },
+    {
+      "key": "S154",
+      "start": 3540,
+      "end": 3552,
+      "title": "6.1 Пользовательская системная шторка"
+    },
+    {
+      "key": "S155",
+      "start": 3553,
+      "end": 3566,
+      "title": "7. Уведомления, камера 360 и парктроники"
+    },
+    {
+      "key": "S156",
+      "start": 3567,
+      "end": 3585,
+      "title": "8. ANCS и iPhone Helper"
+    },
+    {
+      "key": "S157",
+      "start": 3586,
+      "end": 3604,
+      "title": "9. Яндекс Музыка и управление медиа"
+    },
+    {
+      "key": "S158",
+      "start": 3605,
+      "end": 3612,
+      "title": "10. Круиз-контроль и ограничитель скорости KX11"
+    },
+    {
+      "key": "S159",
+      "start": 3613,
+      "end": 3622,
+      "title": "10.1 Цифровой справочник прошивки Geely"
+    },
+    {
+      "key": "S160",
+      "start": 3623,
+      "end": 3768,
+      "title": "11. Текущие обязательные проверки перед следующим APK"
+    },
+    {
+      "key": "S161",
+      "start": 3769,
+      "end": 3821,
+      "title": "11.1 Уточнения после повторных аппаратных отказов 12.09.2026"
+    },
+    {
+      "key": "S162",
+      "start": 3822,
+      "end": 4697,
+      "title": "12. Журнал изменений реестра"
+    },
+    {
+      "key": "S163",
+      "start": 4698,
+      "end": 4716,
+      "title": "2026-09-13 — Natro 2.9.1: разрешённая сборка пары, события и журнал нажатий"
+    },
+    {
+      "key": "S164",
+      "start": 4717,
+      "end": 4721,
+      "title": "2026-09-13 — подтверждение выпуска 2.9.1"
+    },
+    {
+      "key": "S165",
+      "start": 4722,
+      "end": 4733,
+      "title": "13.09.2026 — продолжение: белый старт и настоящая «Поездка 2»"
+    },
+    {
+      "key": "S166",
+      "start": 4734,
+      "end": 4737,
+      "title": "13.09.2026 — проверенная итоговая пара 2.9.2"
+    },
+    {
+      "key": "S167",
+      "start": 4738,
+      "end": 4751,
+      "title": "13.09.2026 — повторный отказ на KX11 после 2.9.2: аудит новых журналов"
+    },
+    {
+      "key": "S168",
+      "start": 4752,
+      "end": 4764,
+      "title": "13.09.2026 — дополнение ANCS: журнал iPhone Helper 70"
+    },
+    {
+      "key": "S169",
+      "start": 4765,
+      "end": 4778,
+      "title": "13.09.2026 — музыка и карта приборки только после открытия настроек"
+    },
+    {
+      "key": "S170",
+      "start": 4779,
+      "end": 4803,
+      "title": "13.09.2026 — повторная сверка MConfig и совместимость медиакнопок"
+    },
+    {
+      "key": "S171",
+      "start": 4804,
+      "end": 4815,
+      "title": "13.09.2026 — уточнение пользователя: не подменять схему мультимедиа MConfig"
+    },
+    {
+      "key": "S172",
+      "start": 4816,
+      "end": 4827,
+      "title": "13.09.2026 — разрешены исправления исходников и наблюдение штатных медиакнопок"
+    },
+    {
+      "key": "S173",
+      "start": 4828,
+      "end": 4846,
+      "title": "13.09.2026 — реализация согласованного пакета; исходники, не новый APK"
+    },
+    {
+      "key": "S174",
+      "start": 4847,
+      "end": 4853,
+      "title": "13.09.2026 — разрешены сборка 2.9.3 и публикация исходников"
+    },
+    {
+      "key": "S175",
+      "start": 4854,
+      "end": 4858,
+      "title": "13.09.2026 — уточнение контракта при полной сборке 2.9.3"
+    },
+    {
+      "key": "S176",
+      "start": 4859,
+      "end": 4867,
+      "title": "13.09.2026 — подписанный выпуск 2.9.3 и публикация доказательств"
+    },
+    {
+      "key": "S177",
+      "start": 4868,
+      "end": 4879,
+      "title": "14.09.2026 — аппаратный результат 2.9.3 и уточнение знака контроля"
+    },
+    {
+      "key": "S178",
+      "start": 4880,
+      "end": 4890,
+      "title": "14.09.2026 — состав кандидата 2.9.4 и уточнение приёмки"
+    },
+    {
+      "key": "S179",
+      "start": 4891,
+      "end": 4898,
+      "title": "14.09.2026 — фактический выпуск 2.9.4"
+    },
+    {
+      "key": "S180",
+      "start": 4899,
+      "end": 4927,
+      "title": "14.09.2026 — повторение хвостиков и музыки после 2.9.4"
+    },
+    {
+      "key": "S181",
+      "start": 4928,
+      "end": 4969,
+      "title": "14.09.2026 — подписанный выпуск 2.9.5 после вечернего отрицательного результата"
+    },
+    {
+      "key": "S182",
+      "start": 4970,
+      "end": 4995,
+      "title": "Дополнение 15.09.2026: единое медиа по mSaver 2.8.1 и табличка у развилки"
+    },
+    {
+      "key": "S183",
+      "start": 4996,
+      "end": 5018,
+      "title": "Уточнение пользователя: все кнопки и полный каталог действий MConfig"
+    },
+    {
+      "key": "S184",
+      "start": 5019,
+      "end": 5041,
+      "title": "Локальный кандидат 15.09.2026 — состояние выполнения MUSIC-017…021 и MAP-066"
+    },
+    {
+      "key": "S185",
+      "start": 5042,
+      "end": 5064,
+      "title": "Продолжение 15.09.2026 — публикация разрешена, проверка Android началась"
+    },
+    {
+      "key": "S186",
+      "start": 5065,
+      "end": 5074,
+      "title": "Выпуск 2.9.7 от 15.09.2026 — проверенные APK"
+    },
+    {
+      "key": "S187",
+      "start": 5075,
+      "end": 5086,
+      "title": "04.10.2026 — Android-проверка кандидата 3.0.2"
+    },
+    {
+      "key": "S188",
+      "start": 5087,
+      "end": 5098,
+      "title": "04.10.2026 — подписанная проверочная пара 3.0.2"
+    },
+    {
+      "key": "S189",
+      "start": 5099,
+      "end": 5118,
+      "title": "11.10.2026 — ROUTEDIAG-001: опыт автоматического получения назначения iPhone"
+    },
+    {
+      "key": "S190",
+      "start": 5119,
+      "end": 5135,
+      "title": "2026-10-13 — FIELD: список приложений и узкий диалог в 3.1.5"
+    },
+    {
+      "key": "S191",
+      "start": 5136,
+      "end": 5149,
+      "title": "2026-10-13 — 3.1.6: отказ QNX должен быть объясним"
+    },
+    {
+      "key": "S192",
+      "start": 5150,
+      "end": 5172,
+      "title": "2026-10-13 — сверка QNX с исходными успешными логами пользователя"
+    },
+    {
+      "key": "S193",
+      "start": 5173,
+      "end": 5185,
+      "title": "2026-10-14 — выпуск 3.1.6 собран и подписан"
+    },
+    {
+      "key": "S194",
+      "start": 5186,
+      "end": 5201,
+      "title": "2026-10-14 — поправка пользователя: DIM и HUD составляют общий экран"
+    },
+    {
+      "key": "S195",
+      "start": 5202,
+      "end": 5217,
+      "title": "2026-10-14 — разбор libslog2parse и повторная проверка владельцев"
+    },
+    {
+      "key": "S196",
+      "start": 5218,
+      "end": 5230,
+      "title": "2026-10-14 — восстановлены libkx11_lib и qnxslogadapter"
+    },
+    {
+      "key": "S197",
+      "start": 5231,
+      "end": 5243,
+      "title": "2026-10-14 — WFD guest boundary и частота общего экрана"
+    },
+    {
+      "key": "S198",
+      "start": 5244,
+      "end": 5255,
+      "title": "2026-10-14 — безымянные Android слои и повторный тест I"
+    },
+    {
+      "key": "S199",
+      "start": 5256,
+      "end": 5281,
+      "title": "2026-10-14 — расширение сборщика для проверки контейнера навигации"
+    },
+    {
+      "key": "S200",
+      "start": 5282,
+      "end": 5290,
+      "title": "2026-10-14 — сборка и публикация 3.1.10"
+    },
+    {
+      "key": "S201",
+      "start": 5291,
+      "end": 5297,
+      "title": "18.10.2026 — FIELD двух сборов крыльев 3.3.1"
+    },
+    {
+      "key": "S202",
+      "start": 5298,
+      "end": 5306,
+      "title": "18.10.2026 — 3.3.2 SOURCE / TEST / APK, публикация"
+    },
+    {
+      "key": "S203",
+      "start": 5307,
+      "end": 5314,
+      "title": "18.10.2026 — выпуск3.3.2 и FIELD18:17; адресный разбор Sys2038"
+    },
+    {
+      "key": "S204",
+      "start": 5315,
+      "end": 5320,
+      "title": "18.10.2026 — продолжение от запуска навигационного приложения"
+    },
+    {
+      "key": "S205",
+      "start": 5321,
+      "end": 5324,
+      "title": "18.10.2026 после20:03МСК — уточнение положительного ответа DIM"
+    },
+    {
+      "key": "S206",
+      "start": 5325,
+      "end": 5328,
+      "title": "18.10.2026 после20:08МСК — FULL/AR: граница поддержки"
+    },
+    {
+      "key": "S207",
+      "start": 5329,
+      "end": 5332,
+      "title": "18.10.2026 после20:11МСК — идентификация внешнего DIM остаётся OPEN"
+    },
+    {
+      "key": "S208",
+      "start": 5333,
+      "end": 5337,
+      "title": "18.10.2026 — поиск внешнего DIM в интернете"
+    },
+    {
+      "key": "S209",
+      "start": 5338,
+      "end": 5363,
+      "title": "18.10.2026 — непрерывная пассивная запись DIM"
+    },
+    {
+      "key": "S210",
+      "start": 5364,
+      "end": 5386,
+      "title": "19.10.2026 — исправление CI записи DIM"
+    },
+    {
+      "key": "S211",
+      "start": 5387,
+      "end": 5396,
+      "title": "19.10.2026 06:52МСК — выпуск Natro3.3.3"
+    },
+    {
+      "key": "S212",
+      "start": 5397,
+      "end": 5408,
+      "title": "19.10.2026 — APK3.3.3 подписан и проверен"
+    },
+    {
+      "key": "S213",
+      "start": 5409,
+      "end": 5418,
+      "title": "2026-10-19 — выпуск Natro 3.3.3 завершён"
+    },
+    {
+      "key": "S214",
+      "start": 5419,
+      "end": 5450,
+      "title": "20.10.2026 — 3.3.4, устранение непрозрачной выгрузки DIM"
+    },
+    {
+      "key": "S215",
+      "start": 5451,
+      "end": 5456,
+      "title": "20.10.2026 — CLUSTER_WINGS: сопоставление записи UART19.10"
+    },
+    {
+      "key": "S216",
+      "start": 5457,
+      "end": 5474,
+      "title": "23.10.2026 — BASE-MEDIAKEY / MEDIA_LATENCY / GATE-079"
+    },
+    {
+      "key": "S217",
+      "start": 5475,
+      "end": 5484,
+      "title": "23.10.2026 — выпуск3.3.5 разрешён"
+    },
+    {
+      "key": "S218",
+      "start": 5485,
+      "end": 5510,
+      "title": "23.10.2026 — 3.3.5: проверенный APK, публикация выполняется"
+    },
+    {
+      "key": "S219",
+      "start": 5511,
+      "end": 5541,
+      "title": "24.10.2026 — MEDIA-GESTURES-336: назначения медиакнопок"
+    },
+    {
+      "key": "S220",
+      "start": 5542,
+      "end": 5551,
+      "title": "24.10.2026 — исправление номера нового выпуска"
+    },
+    {
+      "key": "S221",
+      "start": 5552,
+      "end": 5573,
+      "title": "24.10.2026 — 3.3.6: SOURCE/TEST/APK проверены, FIELD OPEN"
+    },
+    {
+      "key": "S222",
+      "start": 5574,
+      "end": 5587,
+      "title": "24.10.2026 11:11 МСК — 3.3.6 опубликована"
+    },
+    {
+      "key": "S223",
+      "start": 5588,
+      "end": 5599,
+      "title": "24.10.2026 — доступность «Лайк / убрать лайк» для физической кнопки"
+    },
+    {
+      "key": "S224",
+      "start": 5600,
+      "end": 5611,
+      "title": "24.10.2026 — готовые действия лайка и Алисы"
+    },
+    {
+      "key": "S225",
+      "start": 5612,
+      "end": 5621,
+      "title": "24.10.2026 — MEDIA-ACTIONS-337: сборка после Android проверки"
+    },
+    {
+      "key": "S226",
+      "start": 5622,
+      "end": 5640,
+      "title": "24.10.2026 — MEDIA-ACTIONS-337: SOURCE/TEST/APK PASS"
+    },
+    {
+      "key": "S227",
+      "start": 5641,
+      "end": 5648,
+      "title": "24.10.2026 12:24 МСК — публикация3.3.7 завершена"
+    },
+    {
+      "key": "S228",
+      "start": 5649,
+      "end": 5662,
+      "title": "24.10.2026 — ALICE-338: исправление вызова, сохранение окна"
+    },
+    {
+      "key": "S229",
+      "start": 5663,
+      "end": 5679,
+      "title": "24.10.2026 — ALICE-338-R2 / MUSIC-ALICE-338"
+    },
+    {
+      "key": "S230",
+      "start": 5680,
+      "end": 5693,
+      "title": "24.10.2026 — BOOT-338: журнал3.3.7 и восстановление после неудачного запуска"
+    },
+    {
+      "key": "S231",
+      "start": 5694,
+      "end": 5717,
+      "title": "24.10.2026 — BOOT-338 / ALICE-338: полный CI и уточнение причин"
+    },
+    {
+      "key": "S232",
+      "start": 5718,
+      "end": 5732,
+      "title": "24.10.2026 — 3.3.8: SOURCE/TEST/APK PASS, FIELD OPEN"
+    },
+    {
+      "key": "S233",
+      "start": 5733,
+      "end": 5742,
+      "title": "24.10.2026 16:22 МСК — 3.3.8 PUBLISH PASS"
+    },
+    {
+      "key": "S234",
+      "start": 5743,
+      "end": 5760,
+      "title": "25.10.2026 — ALICE-339: FIELD3.3.8 FAILED, исправить IPC"
+    },
+    {
+      "key": "S235",
+      "start": 5761,
+      "end": 5776,
+      "title": "25.10.2026 — ALICE-339: SOURCE/TEST/APK PASS"
+    },
+    {
+      "key": "S236",
+      "start": 5777,
+      "end": 5785,
+      "title": "25.10.2026 10:11 МСК — 3.3.9 PUBLISH PASS"
+    },
+    {
+      "key": "S237",
+      "start": 5786,
+      "end": 5792,
+      "title": "06.11.2026 — публикация3.4.0"
+    },
+    {
+      "key": "S238",
+      "start": 5793,
+      "end": 5804,
+      "title": "06.11.2026 — ALICE-VOICE-END-340: окончание разговора раньше закрытия UI"
+    },
+    {
+      "key": "S239",
+      "start": 5805,
+      "end": 5823,
+      "title": "06.11.2026 — ALICE-VOICE-END-341: единая сессия независимо от источника запуска"
+    },
+    {
+      "key": "S240",
+      "start": 5824,
+      "end": 5845,
+      "title": "07.11.2026 — ALICE-VOICE-END-341 повторные сеансы / BOOT-338"
+    },
+    {
+      "key": "S241",
+      "start": 5846,
+      "end": 5861,
+      "title": "07.11.2026 — MUSIC-BOOT-MOD-342: отдельный bootstrap переданной Музыки"
+    },
+    {
+      "key": "S242",
+      "start": 5862,
+      "end": 5867,
+      "title": "Продолжение 2026-11-07: кандидат 3.4.2"
+    },
+    {
+      "key": "S243",
+      "start": 5868,
+      "end": 5872,
+      "title": "07.11.2026 — 3.4.2 SOURCE/TEST/APK"
+    },
+    {
+      "key": "S244",
+      "start": 5873,
+      "end": 5881,
+      "title": "07.11.2026 — BOOT-338 / ANR-343: восстановление и причина зависания"
+    },
+    {
+      "key": "S245",
+      "start": 5882,
+      "end": 5899,
+      "title": "07.11.2026 — продолжить до выпуска 3.4.3: BOOT-338 / ANR-343 / REL"
+    },
+    {
+      "key": "S246",
+      "start": 5900,
+      "end": 5908,
+      "title": "07.11.2026 11:31:05 МСК — 3.4.3 stable/latest опубликована"
+    },
+    {
+      "key": "S247",
+      "start": 5909,
+      "end": 5922,
+      "title": "07.11.2026 — BOOT-338 / ANR-343 / MUSIC-BOOT-MOD-342: FIELD3.4.3 FAILED"
+    },
+    {
+      "key": "S248",
+      "start": 5923,
+      "end": 5936,
+      "title": "07.11.2026 — исправить все выявленные отказы холодной загрузки (3.4.4 candidate)"
+    },
+    {
+      "key": "S249",
+      "start": 5937,
+      "end": 5948,
+      "title": "07.11.2026 — 3.4.4 SOURCE/TEST/APK PASS"
+    },
+    {
+      "key": "S250",
+      "start": 5949,
+      "end": 5957,
+      "title": "07.11.2026 12:07:46 МСК — 3.4.4 PUBLISH PASS"
+    },
+    {
+      "key": "S251",
+      "start": 5958,
+      "end": 5968,
+      "title": "07.11.2026 — FIELD3.4.4: Navigator два запуска успешны, Music FAILED"
+    },
+    {
+      "key": "S252",
+      "start": 5969,
+      "end": 5975,
+      "title": "07.11.2026 — Music endpoint repair candidate"
+    },
+    {
+      "key": "S253",
+      "start": 5976,
+      "end": 5991,
+      "title": "07.11.2026 — Music Natro 2: завершить упаковку после проверки CI"
+    },
+    {
+      "key": "S254",
+      "start": 5992,
+      "end": 6006,
+      "title": "07.11.2026 — Music Natro 2: локальный APK PASS, публикация BLOCKED"
+    },
+    {
+      "key": "S255",
+      "start": 6007,
+      "end": 6013,
+      "title": "07.11.2026 — Music Natro 2: публикация прямо разрешена"
+    },
+    {
+      "key": "S256",
+      "start": 6014,
+      "end": 6020,
+      "title": "Music Natro 2 — PUBLISH PASS"
+    },
+    {
+      "key": "S257",
+      "start": 6021,
+      "end": 6034,
+      "title": "07.11.2026 — Music Natro 2 FIELD FAILED: prepare/PLAY race"
+    },
+    {
+      "key": "S258",
+      "start": 6035,
+      "end": 6052,
+      "title": "07.11.2026 — завершить Natro 3.4.5 и проверить необходимость новой Музыки"
+    },
+    {
+      "key": "S259",
+      "start": 6053,
+      "end": 6076,
+      "title": "07.11.2026 — FIELD3.4.5 FAILED: native Music binding / Navigator recovery"
+    },
+    {
+      "key": "S260",
+      "start": 6077,
+      "end": 6080,
+      "title": "07.11.2026 — разрешение и сборка 3.4.6"
+    },
+    {
+      "key": "S261",
+      "start": 6081,
+      "end": 6085,
+      "title": "08.11.2026 — MUSIC-WIFI-BOOT: задержка и подключение Wi-Fi"
+    },
+    {
+      "key": "S262",
+      "start": 6086,
+      "end": 6092,
+      "title": "08.11.2026 — сборка 3.4.7"
+    },
+    {
+      "key": "S263",
+      "start": 6093,
+      "end": 6105,
+      "title": "12.11.2026 — MUSIC-BOOT-MOD-342: повторный PLAY и офлайн-волна"
+    },
+    {
+      "key": "S264",
+      "start": 6106,
+      "end": 6112,
+      "title": "12.11.2026 — MUSIC-WAVE-DIAG: native transition reasons"
+    },
+    {
+      "key": "S265",
+      "start": 6113,
+      "end": 6115,
+      "title": "13.11.2026 — завершить MUSIC-WAVE-DIAG"
+    },
+    {
+      "key": "S266",
+      "start": 6116,
+      "end": 6119,
+      "title": "13.11.2026 — MUSIC-WAVE-DIAG: продолжить до установочной пары"
+    },
+    {
+      "key": "S267",
+      "start": 6120,
+      "end": 6144,
+      "title": "14.11.2026 — завершить выпуск Natro 3.4.8 и Music Natro 4"
+    },
+    {
+      "key": "S268",
+      "start": 6145,
+      "end": 6149,
+      "title": "14.11.2026 — Natro 3.4.8 опубликован и передан с Music Natro 4"
+    },
+    {
+      "key": "S269",
+      "start": 6150,
+      "end": 6160,
+      "title": "14.11.2026 — UPDATE-CENTER-349: единый раздел обновлений трёх приложений"
+    },
+    {
+      "key": "S270",
+      "start": 6161,
+      "end": 6165,
+      "title": "UPDATE-CENTER-349 — SOURCE/TEST/APK PASS,14.11.2026"
+    },
+    {
+      "key": "S271",
+      "start": 6166,
+      "end": 6181,
+      "title": "14.11.2026 — публикация 3.4.9 через коннектор GitHub"
+    },
+    {
+      "key": "S272",
+      "start": 6182,
+      "end": 6194,
+      "title": "14.11.2026 — 3.4.9: три канала опубликованы через коннектор"
+    },
+    {
+      "key": "S273",
+      "start": 6195,
+      "end": 6218,
+      "title": "19.11.2026 — Natro 3.5.0, синяя табличка и недавние файлы"
+    },
+    {
+      "key": "S274",
+      "start": 6219,
+      "end": 6226,
+      "title": "19.11.2026 — уточнение FILES-004 по отбору в «Недавних»"
+    },
+    {
+      "key": "S275",
+      "start": 6227,
+      "end": 6234,
+      "title": "19.11.2026 — CARD-017/018/019, привязка полной таблички к повороту"
+    },
+    {
+      "key": "S276",
+      "start": 6235,
+      "end": 6244,
+      "title": "19.11.2026 — проверка кандидата 3.5.1, FILES-004 и CARD-017/018/019"
+    },
+    {
+      "key": "S277",
+      "start": 6245,
+      "end": 6252,
+      "title": "19.11.2026 — исходники обновления интерфейса 3.5.2"
+    },
+    {
+      "key": "S278",
+      "start": 6253,
+      "end": 6256,
+      "title": "19.11.2026 — сохранить автоматическую настройку доступа 3.5.0"
+    },
+    {
+      "key": "S279",
+      "start": 6257,
+      "end": 6262,
+      "title": "19.11.2026 — мигание привязанной таблички и единое оформление полос"
+    },
+    {
+      "key": "S280",
+      "start": 6263,
+      "end": 6268,
+      "title": "19.11.2026 — выпуск 3.5.3 и подтверждение действующего доступа"
+    },
+    {
+      "key": "S281",
+      "start": 6269,
+      "end": 6282,
+      "title": "20.11.2026 — повторная ошибка 3.5.3 и требования к 3.5.4"
+    },
+    {
+      "key": "S282",
+      "start": 6283,
+      "end": 6304,
+      "title": "20.11.2026 — FIELD 3.5.4: редкое моргание остаётся"
+    },
+    {
+      "key": "S283",
+      "start": 6305,
+      "end": 6343,
+      "title": "23.11.2026 — CARD-026: размер стрелок, независимый переход и границы экрана"
+    },
+    {
+      "key": "S284",
+      "start": 6344,
+      "end": 6355,
+      "title": "23.11.2026 — 3.5.6: результат первого полного CI и повторная проверка"
+    },
+    {
+      "key": "S285",
+      "start": 6356,
+      "end": 6396,
+      "title": "23.11.2026 — выпуск 3.5.6: SOURCE/TEST/APK/PUBLISH подтверждены, FIELD открыт"
+    },
+    {
+      "key": "S286",
+      "start": 6397,
+      "end": 6426,
+      "title": "24.11.2026 — CARD-026: FIELD 3.5.6 отрицательный, безусловное primary hide отменяется"
+    },
+    {
+      "key": "S287",
+      "start": 6427,
+      "end": 6442,
+      "title": "24.11.2026 — подтверждение публикации кандидата 3.5.7"
+    },
+    {
+      "key": "S288",
+      "start": 6443,
+      "end": 6459,
+      "title": "24.11.2026 — закрытие выпуска3.5.7, FIELD открыт"
+    },
+    {
+      "key": "S289",
+      "start": 6460,
+      "end": 6470,
+      "title": "24.11.2026 — ревизия документации по запросу пользователя"
+    },
+    {
+      "key": "S290",
+      "start": 6471,
+      "end": 6477,
+      "title": "24.11.2026 — выборочное чтение требований и сохранение прежней редакции"
+    }
+  ]
+}

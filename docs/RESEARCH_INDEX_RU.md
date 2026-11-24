@@ -196,3 +196,5 @@ patch and synthetic fixture checks PASS; release and physical capture OPEN.
 - 24.11.2026: [3.5.7 — передача видимости и опубликованные доказательства](releases/3.5.7/README_RU.md). SOURCE/TEST/APK/PUBLISH PASS; FIELD OPEN.
 
 - 24.11.2026: [ревизия описания и требований](DOCUMENTATION_REVIEW_2026_11_24_RU.md), [действующие уточнения](CURRENT_REQUIREMENTS_RU.md). Полный структурный индекс; аппаратные gates не закрывались.
+
+- 24.11.2026: [реорганизация чтения требований](requirements/REORGANIZATION_2026_11_24_RU.md), [модули и зависимости](requirements/README_RU.md). Архив прежней редакции сохранён; функциональные требования и FIELD не изменены.
