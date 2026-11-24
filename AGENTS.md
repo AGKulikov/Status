@@ -1,16 +1,29 @@
 # Repository instructions
 
-Before changing, reviewing, building, or releasing, read this file,
-`docs/requirements/COMMON_RU.md` and `docs/CURRENT_REQUIREMENTS_RU.md`.
-Then use `docs/requirements/README_RU.md` to select affected modules and dependencies.
+Before changing, reviewing, building, or releasing, read this file and confirm the
+working branch/commit against the remote (preserve local work; never reset it).
+Run `python tools/requirements.py check` BEFORE relying on generated views. If stale,
+inspect source changes and regenerate; do not hide missing source access with cached summaries.
+Then read `docs/requirements/COMMON_RU.md` and `docs/CURRENT_REQUIREMENTS_RU.md`,
+and use `docs/requirements/README_RU.md` to select affected modules and dependencies.
 `PROJECT_REQUIREMENTS_RU.md` remains the full authoritative ledger; do NOT read it
 entirely by default. Read relevant module rows and use `python tools/requirements.py search`
 for IDs, families AND task terms (including Russian synonyms) across the WHOLE ledger.
-Inspect every matching title, then read relevant amendments/context with the `read` command.
+Inspect every result page and snippet; generic titles can contain relevant amendments.
+Use `matches` for all hits inside long sections, then `read` the full relevant passages
+and parent context. Copy versioned Snnn@revision references from search; stale refs fail.
 Search is candidate discovery, not proof that unreturned requirements are irrelevant.
-If scope is uncertain, expand the search and read the containing/adjacent sections.
+If scope is uncertain or no result is found, broaden IDs/synonyms and consult linked
+specifications/research; absence of a hit never proves absence of a requirement.
+Follow explicit cross-references until no relevant dependency remains unread. Repeat
+scope discovery when touched components change. If conflicting instructions cannot be
+resolved from explicit user decisions/evidence, record both and clarify only the blocked
+part; continue independent authorized work. Never resolve conflict by silently omitting a rule.
 Before implementation record affected IDs, dependencies and acceptance gates in the task
-report; before closeout account for each, including OPEN/BLOCKED. Do not read all GATE
+report (use `docs/requirements/TASK_READING_TEMPLATE_RU.md`); before closeout account
+for each, including OPEN/BLOCKED. N/A requires a scope reason, never missing evidence.
+For a new chat or changed branch, read the saved task checkpoint, verify its commit/hash,
+and re-read changed requirements; do not assume another chat's context is available. Do not read all GATE
 rows by default: select gates referenced by affected requirements and matching history.
 The new selective reading procedure supersedes historical instructions to read the
 whole ledger. It does not supersede functional requirements or acceptance gates.
@@ -21,8 +34,10 @@ use bounded excerpts, save full evidence in files, and report paths plus concise
 
 When a new user requirement, correction, rejection, or acceptance result arrives:
 
-1. update `PROJECT_REQUIREMENTS_RU.md` in the same change;
-2. never delete an older requirement—mark it superseded and link the replacement;
+1. append the new decision with a stable ID/date and explicit replaced ID/section to
+   `PROJECT_REQUIREMENTS_RU.md` in the same change; preserve the archived baseline verbatim;
+2. never delete an older requirement—record supersession and the replacement in the new
+   entry/current map; do not rewrite old evidence or silently overwrite generated files;
 3. distinguish source/test completion from verification on the ECARX KX11;
 4. do not describe an item as fixed unless its stated acceptance gate has passed;
 5. preserve the stable signing, versioning, install-over, Git provenance, and proprietary-baseline

@@ -13,12 +13,53 @@ OUT = ROOT / 'docs/requirements'
 ROW = re.compile(r'^\| ([A-Z]+-\d{3}) \|')
 
 
+def revision(text):
+    return hashlib.sha256(text.encode()).hexdigest()[:16]
+
+
 def sections(text):
     lines = text.splitlines(keepends=True)
     starts = [0] + [i for i, line in enumerate(lines) if i and re.match(r'^#{2,6} ', line)]
-    return [dict(key=f'S{n:03}', start=a+1, end=b,
-                 title=lines[a].strip().lstrip('# ').strip(), text=''.join(lines[a:b]))
-            for n, (a, b) in enumerate(zip(starts, starts[1:]+[len(lines)]))]
+    chunks, parents = [], []
+    for n, (a, b) in enumerate(zip(starts, starts[1:]+[len(lines)])):
+        heading = re.match(r'^(#{1,6}) ', lines[a])
+        level = len(heading[1]) if heading else 1
+        while parents and parents[-1]['level'] >= level:
+            parents.pop()
+        chunk = dict(key=f'S{n:03}', start=a+1, end=b, level=level,
+                     title=lines[a].strip().lstrip('# ').strip(),
+                     parents=[p['key'] for p in parents],
+                     text=''.join(lines[a:b]))
+        chunks.append(chunk)
+        parents.append(chunk)
+    return chunks
+
+
+def fold(text):
+    return text.casefold().replace('ё', 'е')
+
+
+def matching_lines(section, terms):
+    needles = [fold(term) for term in terms]
+    return [(offset, line) for offset, line in enumerate(section['text'].splitlines())
+            if any(term in fold(line) for term in needles)]
+
+
+def excerpt(line, terms, width=180):
+    folded = fold(line)
+    positions = [folded.find(fold(t)) for t in terms if fold(t) in folded]
+    start = max(0, min(positions, default=0)-50)
+    return ('…' if start else '') + line[start:start+width] + ('…' if start+width < len(line) else '')
+
+
+def resolve_ref(chunks, reference, text):
+    key, separator, stamp = reference.partition('@')
+    if not separator or stamp != revision(text):
+        raise ValueError('STALE or unversioned section reference; run search again and copy Snnn@revision')
+    chosen = next((s for s in chunks if s['key'] == key), None)
+    if not chosen:
+        raise ValueError('Unknown section; run search again')
+    return chosen
 
 
 def relocate(row):
@@ -70,20 +111,39 @@ def generated(text):
     return output
 
 
-def main():
+def check_generated(text, outputs=None):
+    outputs = generated(text) if outputs is None else outputs
+    for name, value in outputs.items():
+        p = OUT/name
+        if not p.exists() or p.read_text() != value:
+            raise ValueError(f'STALE or missing: {p}; run python tools/requirements.py build')
+    expected = {str(OUT/name) for name in outputs if name.startswith('modules/')}
+    if {str(p) for p in (OUT/'modules').glob('*.md')} != expected:
+        raise ValueError('Unexpected module file; run build')
+    routing = (OUT/'README_RU.md').read_text()
+    for name in outputs:
+        if name.startswith('modules/') and f']({name})' not in routing:
+            raise ValueError(f'No reading route for {name}; update docs/requirements/README_RU.md')
+    if ''.join(s['text'] for s in sections(text)) != text:
+        raise ValueError('Incomplete section coverage')
+
+
+def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='command', required=True)
     sub.add_parser('build')
     sub.add_parser('check')
     search = sub.add_parser('search')
-    search.add_argument('terms', nargs='+', help='Literal case-insensitive OR across entire ledger')
-    search.add_argument('--offset', type=int, default=0)
-    search.add_argument('--limit', type=int, default=30)
+    search.add_argument('terms', nargs='+', help='Case-insensitive literal OR; е/ё equivalent')
     read = sub.add_parser('read')
-    read.add_argument('section', help='Snnn from search; IDs are current ledger positions, not stable IDs')
-    read.add_argument('--offset', type=int, default=0)
-    read.add_argument('--limit', type=int, default=100)
-    args = parser.parse_args()
+    read.add_argument('section', help='Copy Snnn@revision from search, never reuse after edits')
+    matches = sub.add_parser('matches')
+    matches.add_argument('section')
+    matches.add_argument('terms', nargs='+')
+    for command, limit in ((search, 30), (read, 100), (matches, 20)):
+        command.add_argument('--offset', type=int, default=0)
+        command.add_argument('--limit', type=int, default=limit)
+    args = parser.parse_args(argv)
     text = LEDGER.read_text()
     if args.command in ('build', 'check'):
         outputs = generated(text)
@@ -96,36 +156,62 @@ def main():
                 if str(p.relative_to(OUT)) not in outputs:
                     p.unlink()
         else:
-            for name, value in outputs.items():
-                p = OUT/name
-                if not p.exists() or p.read_text() != value:
-                    raise SystemExit(f'STALE or missing: {p.relative_to(ROOT)}; run build')
-            expected = {str(OUT/name) for name in outputs if name.startswith('modules/')}
-            if {str(p) for p in (OUT/'modules').glob('*.md')} != expected:
-                raise SystemExit('Unexpected module file; run build')
-            chunks = sections(text)
-            assert ''.join(s['text'] for s in chunks) == text
+            try:
+                check_generated(text, outputs)
+            except ValueError as error:
+                parser.error(str(error))
         print(f'{args.command}: {len(outputs)-2} modules, {sum(bool(ROW.match(l)) for l in text.splitlines())} canonical rows; full section coverage OK')
         return
     if args.offset < 0 or args.limit < 1:
         parser.error('offset must be >= 0 and limit >= 1')
-    chunks = sections(text)
+    if hasattr(args, 'terms') and any(not term.strip() for term in args.terms):
+        parser.error('Search terms must be nonempty')
+    try:
+        check_generated(text)
+        chunks = sections(text)
+        chosen = resolve_ref(chunks, args.section, text) if hasattr(args, 'section') else None
+    except ValueError as error:
+        parser.error(str(error))
+    stamp = revision(text)
     if args.command == 'search':
-        hits = [s for s in chunks if any(t.casefold() in s['text'].casefold() for t in args.terms)]
+        hits = [(s, matching_lines(s, args.terms)) for s in chunks]
+        hits = [(s, lines) for s, lines in hits if lines]
+        if hits and args.offset >= len(hits):
+            parser.error('Offset outside search results; nothing inspected')
         page = hits[args.offset:args.offset+args.limit]
-        print(f'{len(hits)} matching sections; showing {args.offset+1 if page else 0}..{args.offset+len(page)}. OR search; titles only, read relevant bodies. Use --offset for remaining results.')
-        for s in page:
-            print(f"{s['key']} L{s['start']}-{s['end']} {s['title']}")
+        print(f'{len(hits)} matching sections; showing {args.offset+1 if page else 0}..{args.offset+len(page)}; revision {stamp}. OR search; snippets are not full requirements.')
+        for s, lines in page:
+            print(f"{s['key']}@{stamp} L{s['start']}-{s['end']} {s['title']}")
+            offset, line = lines[0]
+            print(f"  {len(lines)} matching lines; first L{s['start']+offset}, read --offset {offset}: {excerpt(line, args.terms)}")
+        if args.offset+args.limit < len(hits):
+            print(f'REMAINING: use search with same terms and --offset {args.offset+args.limit}')
+        if not hits:
+            print('NO MATCH is not proof of absence: search family IDs, synonyms, and linked specifications; record the gap.')
     else:
-        chosen = next((s for s in chunks if s['key'] == args.section), None)
-        if not chosen:
-            parser.error('Unknown section; run search again after ledger changes')
-        lines = chosen['text'].splitlines()
-        print(f"{chosen['key']}: {len(lines)} lines; showing offset {args.offset}, limit {args.limit}; original links resolve from repository root.")
-        for i, line in enumerate(lines[args.offset:args.offset+args.limit], chosen['start']+args.offset):
-            print(f'{i}: {line}')
-        if args.offset+args.limit < len(lines):
-            print(f'REMAINING: use --offset {args.offset+args.limit}')
+        parent_refs = [f'{key}@{stamp}' for key in chosen['parents']]
+        print(f"{chosen['key']}@{stamp}; parent context: {', '.join(parent_refs) or 'none'}")
+        if args.command == 'matches':
+            hits = matching_lines(chosen, args.terms)
+            if hits and args.offset >= len(hits):
+                parser.error('Offset outside matching lines; nothing inspected')
+            page = hits[args.offset:args.offset+args.limit]
+            print(f'{len(hits)} matching lines; showing {args.offset+1 if page else 0}..{args.offset+len(page)}. Read bodies around these offsets; snippets are not acceptance evidence.')
+            if not hits:
+                print('NO MATCH is not proof of absence: broaden the query and inspect context.')
+            for offset, line in page:
+                print(f"L{chosen['start']+offset}, read --offset {max(0, offset-3)}: {excerpt(line, args.terms)}")
+            if args.offset+args.limit < len(hits):
+                print(f'REMAINING: use matches with same terms and --offset {args.offset+args.limit}')
+        else:
+            lines = chosen['text'].splitlines()
+            print(f"{len(lines)} lines; showing offset {args.offset}, limit {args.limit}; original links resolve from repository root.")
+            for i, line in enumerate(lines[args.offset:args.offset+args.limit], chosen['start']+args.offset):
+                print(f'{i}: {line}')
+            if args.offset+args.limit < len(lines):
+                print(f'REMAINING: use read --offset {args.offset+args.limit}')
+            if args.offset >= len(lines):
+                parser.error('Offset outside section; nothing read')
 
 
 if __name__ == '__main__':
