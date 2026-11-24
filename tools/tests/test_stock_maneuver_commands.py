@@ -79,6 +79,40 @@ SOURCES = {
  static void sourceWrappersAreNotRetainedAndFaultsDoNotEscape()throws Exception{setup();Object presenter=owner.presenter;
  StockManeuverCommands.onManeuver(owner,new Object(),"bad","",null);check(!read().getBoolean("visible"));check(presenter==owner.presenter);
  StockManeuverCommands.onManeuver(new Object(),null,null,null,null);}
+ static JSONObject external(String identity)throws Exception{
+  return new JSONObject(StockManeuverCommands.snapshotForDestinations(activity,3,true,identity));}
+ static void destinationKeepsCurrentCommandsDuringPrimaryHide()throws Exception{
+  setup();check(external("turn-a").getBoolean("primaryVisible"));
+  owner.isViewContentVisible=false;owner.visibility=8;StockManeuverCommands.onChanged(owner);
+  JSONObject card=external("turn-a");check(card.getBoolean("visible"));check(!card.getBoolean("primaryVisible"));
+  check(card.getJSONObject("main").getBoolean("imageVisible"));
+  check(card.getJSONObject("main").getString("distance").equals("600"));
+  StockManeuverCommands.onManeuver(owner,new Description(),"500","м",null);
+  check(external("turn-a").getJSONObject("main").getString("distance").equals("500"));
+  check(!external("turn-b").getBoolean("visible"));
+  check(!external("").getBoolean("visible"));
+  send(owner);check(external("turn-b").getBoolean("visible"));
+  owner.presenter=new Object();StockManeuverCommands.onChanged(owner);
+  check(!external("turn-b").getBoolean("visible"));
+ }
+ static void destinationsHideIndependentlyOnlyAfterReplacement()throws Exception{
+  setup();owner.isViewContentVisible=false;
+  String root=new JSONObject().put("maneuverIdentity","turn-a").put("maneuverCardJson",external("turn-a").toString()).toString();
+  for(boolean h:new boolean[]{false,true})for(boolean c:new boolean[]{false,true}){
+   JSONObject card=new JSONObject(new JSONObject(ManeuverDestinationVisibility.apply(root,h?"turn-a":"",c?"turn-a":"")).getString("maneuverCardJson"));
+   check(card.getBoolean("hudVisible")==!h);check(card.getBoolean("clusterVisible")==!c);
+  }
+  JSONObject unrelated=new JSONObject(new JSONObject(ManeuverDestinationVisibility.apply(root,"nearby-lanes","later-turn")).getString("maneuverCardJson"));
+  check(unrelated.getBoolean("hudVisible") && unrelated.getBoolean("clusterVisible"));
+  String next=new JSONObject(root).put("maneuverIdentity","turn-b").toString();
+  unrelated=new JSONObject(new JSONObject(ManeuverDestinationVisibility.apply(next,"turn-a","turn-a")).getString("maneuverCardJson"));
+  check(!unrelated.getBoolean("visible") && !unrelated.getBoolean("hudVisible") && !unrelated.getBoolean("clusterVisible"));
+  owner.isViewContentVisible=true;
+  root=new JSONObject().put("maneuverIdentity","turn-a").put("maneuverCardJson",external("turn-a").toString()).toString();
+  JSONObject card=new JSONObject(new JSONObject(ManeuverDestinationVisibility.apply(root,"turn-a","turn-a")).getString("maneuverCardJson"));
+  check(card.getBoolean("hudVisible") && card.getBoolean("clusterVisible"));
+  check(ManeuverDestinationVisibility.apply("broken","turn-a","turn-a").equals("broken"));
+ }
  public static void main(String[] args)throws Exception{CommandsReplay.class.getDeclaredMethod(args[0]).invoke(null);}}
 '''
 }
@@ -94,7 +128,7 @@ class StockManeuverCommandsTest(unittest.TestCase):
         for name, source in SOURCES.items():
             path = cls.root / name; path.parent.mkdir(parents=True, exist_ok=True); path.write_text(source); paths.append(str(path))
         compiler = [shutil.which('javac')] if shutil.which('javac') else ['java','com.sun.tools.javac.Main']
-        subprocess.run(compiler + ['-cp',jar,'-d',str(cls.root),*paths,str(ROOT/'navigator-mod/src/main/java/ru/natro/navigation/StockManeuverCommands.java')],check=True,capture_output=True)
+        subprocess.run(compiler + ['-cp',jar,'-d',str(cls.root),*paths,*[str(ROOT/'navigator-mod/src/main/java/ru/natro/navigation'/n) for n in ('StockManeuverCommands.java','ManeuverDestinationVisibility.java')]],check=True,capture_output=True)
         cls.classpath = str(cls.root) + os.pathsep + jar
     @classmethod
     def tearDownClass(cls): cls.temp.cleanup()
@@ -104,6 +138,8 @@ class StockManeuverCommandsTest(unittest.TestCase):
     def test_owner(self): self.replay('oldOwnerCannotCrossActivityOrPresenter')
     def test_orientation(self): self.replay('ineligibleOrientationCannotHideActiveOwner')
     def test_failure(self): self.replay('sourceWrappersAreNotRetainedAndFaultsDoNotEscape')
+    def test_destination_fallback(self): self.replay('destinationKeepsCurrentCommandsDuringPrimaryHide')
+    def test_independent_handoff(self): self.replay('destinationsHideIndependentlyOnlyAfterReplacement')
 
 
 if __name__ == '__main__': unittest.main()

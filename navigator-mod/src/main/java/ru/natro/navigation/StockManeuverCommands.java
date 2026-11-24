@@ -30,6 +30,8 @@ public final class StockManeuverCommands {
         final WeakReference<Object> presenter;
         long revision;
         boolean valid = true, maneuverReceived;
+        boolean unboundManeuver;
+        String maneuverIdentity = "";
         JSONObject maneuver = new JSONObject(), auxiliary = new JSONObject();
         JSONArray lanes = new JSONArray(), signs = new JSONArray(), followingSigns = new JSONArray();
         State(Object presenter) { this.presenter = new WeakReference<>(presenter); }
@@ -97,11 +99,25 @@ public final class StockManeuverCommands {
             value.maneuver = maneuver;
             value.auxiliary = next;
             value.maneuverReceived = true;
+            value.unboundManeuver = true;
         });
     }
 
     /** One route-epoch snapshot; unavailable command data is explicit, never legacy fallback. */
     static String snapshot(Activity activity, long routeEpoch, boolean active) {
+        return snapshot(activity, routeEpoch, active, null);
+    }
+
+    /** Content stays usable when the primary map moves its card onto the route. Each destination
+     * decides visibility after its own texture is ready. A new maneuver needs a new native command;
+     * merely receiving another route snapshot cannot rebind old arrows to the next turn. */
+    static String snapshotForDestinations(Activity activity, long routeEpoch, boolean active,
+                                          String maneuverIdentity) {
+        return snapshot(activity, routeEpoch, active, maneuverIdentity == null ? "" : maneuverIdentity);
+    }
+
+    private static String snapshot(Activity activity, long routeEpoch, boolean active,
+                                   String maneuverIdentity) {
         try {
             if (!active || routeEpoch != epoch || activity == null || activity.isFinishing()
                     || activity.isDestroyed()) return hidden(routeEpoch);
@@ -118,10 +134,19 @@ public final class StockManeuverCommands {
                     owner = view; selected = value;
                 }
             }
-            if (selected == null || !selected.valid || !selected.maneuverReceived
-                    || !Boolean.TRUE.equals(field(owner, "isViewContentVisible"))
-                    || !Boolean.TRUE.equals(call(owner, "getCanBeVisible"))
-                    || owner.getVisibility() != View.VISIBLE || owner.getAlpha() <= .01f) return hidden(routeEpoch);
+            if (selected == null || !selected.valid || !selected.maneuverReceived)
+                return hidden(routeEpoch);
+            boolean primaryVisible = Boolean.TRUE.equals(field(owner, "isViewContentVisible"))
+                    && owner.getVisibility() == View.VISIBLE && owner.getAlpha() > .01f;
+            boolean destination = maneuverIdentity != null;
+            if (destination) {
+                if (maneuverIdentity.isEmpty()) return hidden(routeEpoch);
+                if (selected.unboundManeuver) {
+                    selected.maneuverIdentity = maneuverIdentity;
+                    selected.unboundManeuver = false;
+                }
+                if (!maneuverIdentity.equals(selected.maneuverIdentity)) return hidden(routeEpoch);
+            } else if (!primaryVisible) return hidden(routeEpoch);
             JSONObject result = new JSONObject().put("schema", 1).put("routeEpoch", epoch)
                     .put("generation", selected.generation).put("revision", selected.revision)
                     .put("visible", true).put("package", "ru.yandex.yandexnavi")
@@ -133,28 +158,31 @@ public final class StockManeuverCommands {
                     .put("maxLines", call(owner, "getMaxLines"))
                     .put("nextStreetCanBeLarge", call(owner, "getNextStreetCanBeLarge"))
                     .put("directionSignRedesigned", call(owner, "isDirectionSignRedisigned"));
+            if (destination) result.put("primaryVisible", primaryVisible)
+                    .put("maneuverIdentity", maneuverIdentity);
             JSONObject main = new JSONObject(selected.maneuver.toString());
-            main.put("imageVisible", visible(owner, "image_maneuverballoon_maneuver"))
+            main.put("imageVisible", visible(owner, "image_maneuverballoon_maneuver", destination))
+                    .put("lanes", geometry(owner, "lane_signs_container", selected.lanes, destination));
+            if (!destination || primaryVisible) main
                     .put("via", text(owner, "text_via_point_number"))
                     .put("distance", text(owner, "text_maneuverballoon_distance"))
                     .put("unit", text(owner, "text_maneuverballoon_metrics"))
-                    .put("nextRoad", text(owner, "text_nextstreet"))
-                    .put("lanes", geometry(owner, "lane_signs_container", selected.lanes));
+                    .put("nextRoad", text(owner, "text_nextstreet"));
             result.put("main", main)
-                    .put("signs", visible(owner, "roadsign_container") ? selected.signs : new JSONArray())
-                    .put("followingSigns", visible(owner, "next_upcoming_roadsign_container")
+                    .put("signs", visible(owner, "roadsign_container", destination) ? selected.signs : new JSONArray())
+                    .put("followingSigns", visible(owner, "next_upcoming_roadsign_container", destination)
                             ? selected.followingSigns : new JSONArray());
             JSONObject aux = new JSONObject(selected.auxiliary.toString());
             String kind = aux.optString("kind");
             boolean upcoming = kind.startsWith("NEXT_UPCOMING");
-            if (!visible(owner, upcoming ? "next_upcoming_group" : "under_balloon")) {
+            if (!visible(owner, upcoming ? "next_upcoming_group" : "under_balloon", destination)) {
                 aux = new JSONObject();
             } else if ("NEXT_UPCOMING_LANES".equals(kind)) {
-                aux.put("lanes", geometry(owner, "next_upcoming_lane_signs_container", aux.getJSONArray("lanes")));
+                aux.put("lanes", geometry(owner, "next_upcoming_lane_signs_container", aux.getJSONArray("lanes"), destination));
             } else if ("EXIT_NUMBER".equals(kind) || "TURN_NUMBER".equals(kind)) {
-                aux.put("text", text(owner, "exit_number_text"));
+                aux.put("text", text(owner, "exit_number_text", destination));
             }
-            if (upcoming && aux.length() > 0) aux.put("prefix", text(owner, "next_upcoming_then_text"));
+            if (upcoming && aux.length() > 0) aux.put("prefix", text(owner, "next_upcoming_then_text", destination));
             result.put("auxiliary", aux);
             String json = result.toString();
             return json.length() <= 32768 ? json : hidden(routeEpoch);
@@ -205,9 +233,9 @@ public final class StockManeuverCommands {
         }
         return result;
     }
-    private static JSONArray geometry(View owner, String name, JSONArray raw) throws Exception {
+    private static JSONArray geometry(View owner, String name, JSONArray raw, boolean destination) throws Exception {
         JSONArray result = new JSONArray();
-        if (!visible(owner, name) || raw.length() == 0) return result;
+        if (!visible(owner, name, destination) || raw.length() == 0) return result;
         ViewGroup group = (ViewGroup) child(owner, name);
         if (group.getChildCount() != raw.length()) throw new IllegalStateException("Lane layout mismatch");
         for (int i = 0; i < raw.length(); i++) {
@@ -257,8 +285,12 @@ public final class StockManeuverCommands {
         return id == 0 ? null : owner.findViewById(id);
     }
     private static boolean visible(View owner, String name) {
+        return visible(owner, name, false);
+    }
+    private static boolean visible(View owner, String name, boolean ignoreOwnerVisibility) {
         View value = child(owner, name);
         for (int i = 0; i < 64 && value != null; i++) {
+            if (value == owner && ignoreOwnerVisibility) return true;
             if (value.getVisibility() != View.VISIBLE || value.getAlpha() <= .01f) return false;
             if (value == owner) return true;
             ViewParent parent = value.getParent();
@@ -267,8 +299,11 @@ public final class StockManeuverCommands {
         return false;
     }
     private static String text(View owner, String name) throws Exception {
+        return text(owner, name, false);
+    }
+    private static String text(View owner, String name, boolean ignoreOwnerVisibility) throws Exception {
         View value = child(owner, name);
-        return visible(owner, name) && value instanceof TextView ? bounded(((TextView) value).getText()) : "";
+        return visible(owner, name, ignoreOwnerVisibility) && value instanceof TextView ? bounded(((TextView) value).getText()) : "";
     }
     private static String resource(Object value) throws Exception {
         String name = value == null ? "" : bounded(call(value, "getInternalId"));

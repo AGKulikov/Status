@@ -593,6 +593,7 @@ final class PrimaryTurnObserver {
         long now = SystemClock.elapsedRealtime();
         if (!text.equals(lastReason) && now-lastLog >= 2000) {
             Log.d("NatroTurnMap", text);
+            NavigationBridgeClient.reportDiagnostic("turn-source " + text);
             lastReason = text;
             lastLog = now;
         }

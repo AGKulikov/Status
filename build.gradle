@@ -34,6 +34,7 @@ int getVersionCode() {
         return explicitCode.toInteger()
     }
     def version = getVersionName()
+    if (version == '3.5.7') { return 208021390 }
     if (version == '3.5.6') { return 208021389 }
     if (version == '3.5.5') {
         return 208021388

@@ -73,6 +73,8 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
                   check(map.pin.image.bitmap==s.texture.bitmap && map.pin.style.scale==1.25f);
                   check(map.pin.style.anchor.x==.15f && map.pin.style.anchor.y==.85f);
                   check(c.width==225 && c.height==113 && p.replaces(lane));
+                  check(p.replacesCard(s,c));
+                  c.onScreen=false;check(!p.replacesCard(s,c));c.onScreen=true;
                   lane.routeSegmentIndex=6;lane.routeSegmentPosition=0;check(p.replaces(lane));
                   lane.routeSegmentIndex=8;check(!p.replaces(lane));
                   lane.routeSegmentIndex=5;lane.routeSegmentPosition=1;lane.latitude+=.0001;
@@ -90,6 +92,19 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
                   replacement.loaded.onTaskFinished();
                   check(replacement.visible && !old.visible && map.pins.size()==1);
                   check(c.width==123 && c.height==56);
+                  // Distance revisions arriving faster than GPU completion cannot starve the first
+                  // replacement. Completing its callback still produces a visible bounded image.
+                  PrimaryTurnSample update=new PrimaryTurnSample();update.texture.artwork=new CombinedLaneArtwork();update.texture.combined=false;
+                  update.texture.source=s.texture.source;
+                  p.show(map,update,125,5f,c,style,()->{});Pin inFlight=map.pin;
+                  for(int i=0;i<10;i++){
+                    PrimaryTurnSample newer=new PrimaryTurnSample();newer.texture.artwork=new CombinedLaneArtwork();newer.texture.combined=false;
+                    newer.texture.source=s.texture.source;
+                    p.show(map,newer,125,5f,c,style,()->{});
+                    check(map.pin==inFlight && !inFlight.visible && replacement.visible);
+                  }
+                  inFlight.loaded.onTaskFinished();check(inFlight.visible && !replacement.visible);
+                  replacement=inFlight;s=update;
                   // One destination may still have the turn outside its viewport. It keeps a
                   // complete fixed card; the other destination can attach to the same turn.
                   c.onScreen=false;
@@ -99,6 +114,9 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
                   check(docked.visible && docked.style.anchor.x==0 && docked.style.anchor.y==1);
                   check(docked.point.x==6 && docked.point.y==184 && c.screenReserved);
                   check(docked.image.bitmap.getWidth()==113 && docked.image.bitmap.getHeight()==56);
+                  check(p.replacesCard(s,c));
+                  c.failProjection=true;p.repositionFixed(c);check(!p.replacesCard(s,c));
+                  c.failProjection=false;p.repositionFixed(c);check(p.replacesCard(s,c));
                   check(!p.replaces(lane));
 
                   // Both standalone and combined signs respond to the same appearance.
@@ -125,7 +143,7 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
               }
               class StockTurnTextures {
                 static class Texture {
-                  CombinedLaneArtwork artwork; Bitmap bitmap=new Bitmap(); boolean combined=true;float anchorX=.15f,anchorY=.85f;
+                  Object source=new Object();CombinedLaneArtwork artwork; Bitmap bitmap=new Bitmap(); boolean combined=true;float anchorX=.15f,anchorY=.85f;
                 }
               }
               class LaneGuidanceAppearance {boolean same(LaneGuidanceAppearance x){return x==this;}}
@@ -143,9 +161,10 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
                 static void hideUntilTextured(Object pin){((RecordingMap.Pin)pin).setVisible(false);}
               }
               class MapOverlayPlacementCoordinator {
-                int width,height; boolean onScreen=true,screenReserved=false;
+                int width,height; boolean onScreen=true,screenReserved=false,failProjection=false;
                 int viewportWidth(){return 728;} int viewportHeight(){return 190;}
-                Object pointAtScreen(float x,float y){return new Point(x,y);}
+                boolean isBitmapInsideViewport(double lat,double lon,int w,int h,float ax,float ay){return onScreen;}
+                Object pointAtScreen(float x,float y){return failProjection?null:new Point(x,y);}
                 void reserveScreen(String owner,String key,android.graphics.RectF b){screenReserved=true;}
                 static String[] placementLegNames(){return new String[]{"LEFT_CENTER","RIGHT_CENTER","TOP_CENTER","BOTTOM_CENTER","TOP_LEFT","TOP_RIGHT","BOTTOM_LEFT","BOTTOM_RIGHT"};}
                 static class Placement {String legName;Placement(float x,float y,String s){legName=s;}}

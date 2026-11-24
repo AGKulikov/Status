@@ -1167,8 +1167,8 @@ final class NavigatorStatePublisher {
                 .put("maneuverAuxiliaryDistanceMeters",
                         manoeuvre.auxiliary.distanceMeters)
                 .put("maneuverDisplayDistance", manoeuvre.displayDistance)
-                .put("maneuverCardJson", StockManeuverCommands.snapshot(
-                        activityReference.get(), routeEpoch, routeActive))
+                .put("maneuverCardJson", StockManeuverCommands.snapshotForDestinations(
+                        activityReference.get(), routeEpoch, routeActive, manoeuvre.identity))
                 .put("street", text(invoke(currentGuidance, "getRoadName")))
                 .put("destination", routeActive ? destinationForRoute(route) : "")
                 .put("maneuverDistanceMeters", manoeuvre.distanceMeters)

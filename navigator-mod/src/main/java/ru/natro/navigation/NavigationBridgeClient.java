@@ -241,7 +241,10 @@ final class NavigationBridgeClient {
                 // The publisher builds text-rich state at 10 Hz while this primitive map path
                 // remains at 30 Hz. A null snapshot therefore means there is no Binder work.
                 if (snapshotJson != null) {
-                    sendState(MSG_NAVIGATION_SNAPSHOT, KEY_SNAPSHOT_JSON, snapshotJson);
+                    sendState(MSG_NAVIGATION_SNAPSHOT, KEY_SNAPSHOT_JSON,
+                            ManeuverDestinationVisibility.apply(snapshotJson,
+                                    hudMapRenderer.maneuverReplacementIdentity(),
+                                    clusterMapRenderer.maneuverReplacementIdentity()));
                 }
                 if (routeJson != null) {
                     sendState(MSG_ROUTE_GEOMETRY, KEY_ROUTE_GEOMETRY_JSON, routeJson);

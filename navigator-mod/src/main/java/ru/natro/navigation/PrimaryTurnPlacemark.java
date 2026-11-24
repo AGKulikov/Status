@@ -24,6 +24,30 @@ final class PrimaryTurnPlacemark {
     private TurnBalloonLayout displayedLayout, loadingLayout;
     private Object displayedPoint;
 
+    boolean replacesCard(PrimaryTurnSample current, MapOverlayPlacementCoordinator coordinator) {
+        if (current == null || displayed == null || placemark == null
+                || current.routeEpoch != displayed.routeEpoch
+                || !current.turn.id.equals(displayed.turn.id)
+                || current.turn.latitude != displayed.turn.latitude
+                || current.turn.longitude != displayed.turn.longitude
+                || current.texture.source != displayed.texture.source
+                || !isCurrent(displayed, current.routeEpoch, true,
+                        SystemClock.elapsedRealtime(), PrimaryTurnSample.FRESH_MS)) return false;
+        if (displayedLayout != null && displayedLayout.docked)
+            return displayedPoint != null
+                    && displayedWidth <= coordinator.viewportWidth() - 2 * TurnBalloonLayout.MARGIN
+                    && displayedHeight <= coordinator.viewportHeight() - 2 * TurnBalloonLayout.MARGIN;
+        return coordinator.isBitmapInsideViewport(displayed.turn.latitude, displayed.turn.longitude,
+                displayedWidth, displayedHeight,
+                displayedLayout == null ? displayed.texture.anchorX : displayedLayout.anchorX(),
+                displayedLayout == null ? displayed.texture.anchorY : displayedLayout.anchorY());
+    }
+
+    String presentation() {
+        if (displayed != null) return displayedLayout != null && displayedLayout.docked ? "docked" : "route";
+        return loading != null ? "loading" : "absent";
+    }
+
     static int effectiveScale(PrimaryTurnSample sample, int requested,
                               MapOverlayPlacementCoordinator coordinator, LaneGuidanceAppearance appearance) {
         if (sample == null || sample.texture.artwork == null) return requested;
@@ -104,10 +128,17 @@ final class PrimaryTurnPlacemark {
             return;
         }
         if (loadingSample != null && loadingSample.routeEpoch == sample.routeEpoch
-                && loadingSample.turn.id.equals(turn.id) && loadingSample.texture == texture
+                && loadingSample.turn.id.equals(turn.id) && loadingSample.texture.source == texture.source
+                && loadingSample.turn.latitude == turn.latitude
+                && loadingSample.turn.longitude == turn.longitude
                 && loadingScale == scale && loadingZ == zIndex && appearance.same(loadingStyle)
+                && isCurrent(loadingSample, sample.routeEpoch, true,
+                        SystemClock.elapsedRealtime(), PrimaryTurnSample.FRESH_MS)
                 && (nextLayout == null ? loadingLayout == null : nextLayout.sameImage(loadingLayout))) {
-            loadingSample = sample;
+            // A distance update must not cancel an unfinished GPU upload. Complete this
+            // bounded, still-current image first; the ready callback requests the latest one.
+            // Different pixels do not renew the old image's evidence timestamp.
+            if (loadingSample.texture == texture) loadingSample = sample;
             invoke(loading, "setGeometry", new Class<?>[]{Class.forName("com.yandex.mapkit.geometry.Point")}, nextPoint);
             return;
         }
@@ -224,7 +255,11 @@ final class PrimaryTurnPlacemark {
             invoke(placemark, "setGeometry",
                     new Class<?>[]{Class.forName("com.yandex.mapkit.geometry.Point")}, point);
             displayedPoint = point;
-        } catch (Exception unavailable) { /* The next full layout/expiry handles a lost surface. */ }
+        } catch (Exception unavailable) {
+            // A formerly docked icon is no longer a verified on-screen replacement.
+            // Keep the fixed command card until this destination can project again.
+            displayedPoint = null;
+        }
     }
 
     void clear(Object collection, MapOverlayPlacementCoordinator coordinator) {

@@ -361,6 +361,15 @@ final class MapOverlayPlacementCoordinator {
                 && screen[1] >= 0f && screen[1] <= viewportHeight;
     }
 
+    /** Unlike point visibility, a handoff requires the entire displayed card to fit. */
+    boolean isBitmapInsideViewport(double latitude, double longitude, int width, int height,
+                                    float anchorX, float anchorY) {
+        float[] screen = projectOrNull(latitude, longitude);
+        if (screen == null || width <= 0 || height <= 0) return false;
+        return insideSafeViewport(rect(screen[0], screen[1], width, height,
+                new Candidate(anchorX, anchorY, "FIXED")));
+    }
+
     private float[] projectOrNull(double latitude, double longitude) {
         Object currentWindow = mapWindow;
         if (currentWindow != null) {

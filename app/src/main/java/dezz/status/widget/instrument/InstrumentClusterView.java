@@ -508,7 +508,7 @@ public final class InstrumentClusterView extends View implements Choreographer.F
                 && value.isFreshAt(now, NAVIGATION_FRESH_MS) ? value : null;
         NavigationSnapshotV2 accepted = navigationSnapshot;
         commandCard = accepted == null ? StockManeuverCardState.HIDDEN : StockManeuverCardState.parse(
-                accepted.maneuverCardJson, accepted.routeEpoch, accepted.routeActive);
+                accepted.maneuverCardJson, accepted.routeEpoch, accepted.routeActive, "cluster");
         NavigationRouteGeometryV2 geometry = NavigationBridgeStateStore.routeGeometry();
         navigationGeometry = accepted != null && geometry != null
                 && geometry.routeEpoch == accepted.routeEpoch ? geometry : null;

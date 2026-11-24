@@ -82,6 +82,11 @@ public final class StockManeuverCardState {
     }
 
     public static StockManeuverCardState parse(String raw, long epoch, boolean routeActive) {
+        return parse(raw, epoch, routeActive, null);
+    }
+
+    public static StockManeuverCardState parse(String raw, long epoch, boolean routeActive,
+                                               String destination) {
         if (raw == null || raw.isEmpty()) return LEGACY;
         if (!routeActive || raw.length() > 32768) return HIDDEN;
         try {
@@ -90,6 +95,10 @@ public final class StockManeuverCardState {
                     || !source.optBoolean("visible")
                     || !"ru.yandex.yandexnavi".equals(source.getString("package"))
                     || !supportsNavigator(source.getLong("versionCode"))) return HIDDEN;
+            if (destination != null) {
+                if (!destination.equals("hud") && !destination.equals("cluster")) return HIDDEN;
+                if (!source.optBoolean(destination + "Visible", true)) return HIDDEN;
+            }
             return new StockManeuverCardState(source);
         } catch (Exception invalid) { return HIDDEN; }
     }

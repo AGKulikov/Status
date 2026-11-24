@@ -29,6 +29,16 @@ public final class StockManeuverCardStateTest {
         assertTrue(state.hasMain()); assertEquals("context_ra_turn_right", state.image);
         assertEquals("600 м", state.distance); assertEquals("Еринское ш.", state.nextRoad);
     }
+    @Test public void destinationsConsumeOnlyTheirOwnReplacementAcknowledgement() throws Exception {
+        for (boolean hud : new boolean[]{false, true}) for (boolean cluster : new boolean[]{false, true}) {
+            String raw = frame().put("hudVisible", hud).put("clusterVisible", cluster).toString();
+            assertEquals(hud, StockManeuverCardState.parse(raw, 3, true, "hud").hasMain());
+            assertEquals(cluster, StockManeuverCardState.parse(raw, 3, true, "cluster").hasMain());
+        }
+        assertTrue(StockManeuverCardState.parse(frame().toString(), 3, true, "hud").hasMain());
+        assertFalse(StockManeuverCardState.parse(frame().toString(), 4, true, "hud").hasMain());
+        assertFalse(StockManeuverCardState.parse(frame().toString(), 3, false, "cluster").hasMain());
+    }
     @Test public void hiddenUnknownAndWrongEpochNeverBecomeLegacy() throws Exception {
         for (JSONObject value : new JSONObject[]{frame().put("visible", false), frame().put("routeEpoch", 4),
                 frame().put("schema", 2), frame().put("versionCode", 1), frame().put("package", "other")}) {

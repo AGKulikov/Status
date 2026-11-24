@@ -23,6 +23,8 @@ final class LaneGuidanceMapLayer {
     private final Handler main = new Handler(Looper.getMainLooper());
     private Object map;
     private Object collection;
+    private Object turnCollection;
+    private String lastTurnState = "";
     private final PrimaryTurnPlacemark turnPlacemark = new PrimaryTurnPlacemark();
     private PrimaryTurnSample turnSample;
     private boolean showRouteTurns;
@@ -93,9 +95,10 @@ final class LaneGuidanceMapLayer {
         expiryPosted = false;
         main.removeCallbacks(expireTurn);
         turnSample = null;
-        turnPlacemark.clear(collection, placementCoordinator);
+        turnPlacemark.clear(turnCollection, placementCoordinator);
         clearVisual();
         collection = null;
+        turnCollection = null;
         map = null;
     }
 
@@ -200,6 +203,32 @@ final class LaneGuidanceMapLayer {
 
     void repositionFixed() { turnPlacemark.repositionFixed(placementCoordinator); }
 
+    boolean hasManeuverReplacement() {
+        return map != null && latestRouteActive && turnSample != null
+                && (turnSample.texture.combined ? enabled : showRouteTurns)
+                && PrimaryTurnPlacemark.isCurrent(turnSample, turnSample.routeEpoch, true,
+                        SystemClock.elapsedRealtime(), PrimaryTurnSample.FRESH_MS)
+                && turnPlacemark.replacesCard(turnSample, placementCoordinator);
+    }
+
+    String maneuverReplacementIdentity() {
+        if (!hasManeuverReplacement()) return "";
+        NavigatorStatePublisher.RouteTurnFrame turn = turnSample.turn;
+        // Same route-position identity as the next maneuver snapshot. A nearby lane-only
+        // site, or a later turn already visible on the map, cannot acknowledge this card.
+        return "maneuver:" + turnSample.routeEpoch + ':' + turn.routeSegmentIndex + ':'
+                + Math.round(turn.routeSegmentPosition * 1_000_000d) + ':' + turn.action;
+    }
+
+    private void reportTurn(String reason) {
+        String state = reason + "; presentation=" + turnPlacemark.presentation()
+                + "; replacement_ready=" + hasManeuverReplacement();
+        if (state.equals(lastTurnState)) return;
+        lastTurnState = state;
+        NavigationBridgeClient.reportDiagnostic("turn-target " + placementCoordinator.diagnosticContext()
+                + "; " + state);
+    }
+
     private void scheduleExpiryIfNeeded() {
         if (!enabled || map == null || latestSampleElapsedMs <= 0L || expiryPosted) return;
         long age = SystemClock.elapsedRealtime() - latestSampleElapsedMs;
@@ -235,14 +264,24 @@ final class LaneGuidanceMapLayer {
         if (proof != null && latestRouteActive && (proof.texture.combined ? enabled : showRouteTurns)
                 && SystemClock.elapsedRealtime() - proof.sampledAt < PrimaryTurnSample.FRESH_MS) {
             try {
-                turnPlacemark.show(ensureCollection(), proof, effectiveScalePercent, zIndex,
-                        placementCoordinator, appearance, this::renderLane);
+                turnPlacemark.show(ensureTurnCollection(), proof, effectiveScalePercent, zIndex,
+                        placementCoordinator, appearance, () -> {
+                            renderTurn();
+                            renderLane();
+                            reportTurn("source_current");
+                        });
                 turnVisible = true;
             } catch (Exception failure) {
                 Log.w(TAG, "Cannot draw the verified primary maneuver at its route point", failure);
+                turnPlacemark.clear(turnCollection, placementCoordinator);
+                reportTurn("draw_failed=" + failure.getClass().getSimpleName()
+                        + "; cause=" + (failure.getCause() == null ? "none"
+                                : failure.getCause().getClass().getSimpleName()));
+                return;
             }
         }
-        if (!turnVisible) turnPlacemark.clear(collection, placementCoordinator);
+        if (!turnVisible) turnPlacemark.clear(turnCollection, placementCoordinator);
+        reportTurn(proof == null ? "no_source_confirmation" : turnVisible ? "source_current" : "not_rendered");
     }
 
     private void renderLane() {
@@ -290,6 +329,15 @@ final class LaneGuidanceMapLayer {
         if (collection == null) collection = MapObjectLayerFactory.create(map,
                 MapSublayerOrder.LANE_GUIDANCE, MapObjectLayerFactory.MAJOR, zIndex);
         return collection;
+    }
+
+    private Object ensureTurnCollection() throws Exception {
+        if (turnCollection == null) turnCollection = MapObjectLayerFactory.create(map,
+                MapSublayerOrder.LANE_GUIDANCE + "_primary", MapObjectLayerFactory.IGNORE, zIndex);
+        // Placement is already resolved against the destination's full footprints. Native
+        // label collision must not silently cull the only replacement after the fixed card hides.
+        MapObjectLayerFactory.setZIndex(turnCollection, zIndex);
+        return turnCollection;
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})

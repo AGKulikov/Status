@@ -36,6 +36,15 @@ final class HudMapRenderer {
 
     void setReadinessReporter(ReadinessReporter value) { readinessReporter = value; }
 
+    boolean hasManeuverReplacement() {
+        return mapReadyReported && runtimeSurfaceAttached && profile.enabled
+                && laneGuidanceMapLayer.hasManeuverReplacement();
+    }
+
+    String maneuverReplacementIdentity() {
+        return hasManeuverReplacement() ? laneGuidanceMapLayer.maneuverReplacementIdentity() : "";
+    }
+
     private void reportMapReady(boolean ready) {
         if (readinessReporter != null && generation >= 0L) {
             readinessReporter.onMapReady(generation, ready);

@@ -233,7 +233,7 @@ public final class HudNavigationState {
             @Nullable HudNavigationState previous,
             @Nullable Bitmap sourceManeuverImage) {
         StockManeuverCardState stockCard = StockManeuverCardState.parse(
-                source.maneuverCardJson, source.routeEpoch, source.routeActive);
+                source.maneuverCardJson, source.routeEpoch, source.routeActive, "hud");
         boolean previousDirect = previous != null && previous.direct;
         boolean routeActive = source.routeActive;
         List<Lane> lanes = previousDirect && previous.routeActive && routeActive
