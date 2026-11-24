@@ -1,0 +1,139 @@
+name: Build Natro 3.5.7 update candidate
+
+on:
+  push:
+    branches: ['ci/natro-3.5.7']
+    paths:
+      - docs/releases/3.5.7/build-input.json
+      - .github/workflows/build-natro-3.5.7.yml
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: build-natro-3.5.7
+  cancel-in-progress: true
+
+jobs:
+  candidate:
+    if: github.repository == 'AGKulikov/Status'
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    env:
+      VERSION_NAME: '3.5.7'
+      VERSION_CODE: '208021390'
+      ALLOW_UNSIGNED_RELEASE: 'true'
+      HELPER_CHANGED: 'false'
+    steps:
+      - name: Read the build request
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          path: orchestration
+          persist-credentials: false
+          sparse-checkout: docs/releases/3.5.7/build-input.json
+          sparse-checkout-cone-mode: false
+      - name: Verify the release branch and source tree
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          request=orchestration/docs/releases/3.5.7/build-input.json
+          sha=$(jq -er '.sourceCommit | select(test("^[0-9a-f]{40}$"))' "$request")
+          tree=$(jq -er '.sourceTree | select(test("^[0-9a-f]{40}$"))' "$request")
+          gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/release/natro-3.5.7" |
+            jq -e --arg sha "$sha" '.object.type == "commit" and .object.sha == $sha'
+          gh api "repos/$GITHUB_REPOSITORY/git/commits/$sha" |
+            jq -e --arg tree "$tree" '.tree.sha == $tree'
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "NATRO_SOURCE_SHA=$sha" >> "$GITHUB_ENV"
+          echo "NATRO_SOURCE_TREE=$tree" >> "$GITHUB_ENV"
+      - name: Check out the exact application source
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          path: source
+          ref: ${{ steps.source.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Install the Android build tools
+        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+      - name: Download the signed Android 9 updater test fixture
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          fixture=Natro-3.2.5-signed.apk
+          gh release download natro-v3.2.5 --repo "$GITHUB_REPOSITORY" --pattern "$fixture" --dir "$RUNNER_TEMP"
+          echo "d3fed86ca73c76d1ff10eb3a89a22a731abc50df33ab1782e0986aa164a2daf6  $RUNNER_TEMP/$fixture" | sha256sum -c -
+          echo "NATRO_UPDATER_FIXTURE_APK=$RUNNER_TEMP/$fixture" >> "$GITHUB_ENV"
+      - name: Test the application and build its unsigned release APK
+        working-directory: source
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$NATRO_SOURCE_SHA"
+          test "$(git rev-parse 'HEAD^{tree}')" = "$NATRO_SOURCE_TREE"
+          python3 tools/check_release_version.py "$VERSION_NAME"
+          python3 tools/audit_settings_editors.py --check
+          python3 tools/check_backup_inventory.py
+          node --check app/src/main/assets/lan/client.js
+
+          # Historical Android and Python tests both read these files at their former paths.
+          test "$(git rev-parse HEAD:tests/fixtures/release-workflows)" = 16476dfb949ba0a69b4eb3ff94b9dcf9ceb69219
+          mkdir -p .github
+          ln -s ../tests/fixtures/release-workflows .github/workflows
+          trap 'unlink .github/workflows' EXIT
+          ./gradlew clean --no-daemon --no-configuration-cache
+          ./gradlew testGeelyDebugUnitTest assembleGeelyRelease --no-daemon --no-configuration-cache --max-workers=2
+          JSON_JAR=$(find "$HOME/.gradle/caches" -path '*/org.json/json/20240303/*/*.jar' -print -quit)
+          test -s "$JSON_JAR"
+          export JSON_JAR NATRO_ANDROID_JSON_JAR="$JSON_JAR"
+          python3 -m unittest discover -s tools/tests -q
+      - name: Stage the standalone Natro candidate and test results
+        working-directory: source
+        env:
+          NATRO_STANDALONE: 'true'
+        run: python3 tools/stage_natro_adb_candidate.py
+      - name: Build the Navigator bridge and stage its update
+        working-directory: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          bash tools/build_navigation_patch_dex.sh
+          baseline="$RUNNER_TEMP/Navigator-30.3.0-Natro-3.5.6-signed.apk"
+          gh release download natro-v3.5.6 --repo "$GITHUB_REPOSITORY" --pattern 'Navigator-30.3.0-Natro-3.5.6-signed.apk' --dir "$RUNNER_TEMP"
+          cp build/navigation-mod/classes19.dex "$RUNNER_TEMP/natro-3.5.7-candidate/"
+          python3 tools/navigation_lane_candidate.py stage --baseline "$baseline" \
+            --sdk "$ANDROID_HOME/build-tools/36.0.0" --candidate "$RUNNER_TEMP/natro-3.5.7-candidate" \
+            --source-commit "$NATRO_SOURCE_SHA" --source-tree "$NATRO_SOURCE_TREE" --run "$GITHUB_RUN_ID"
+      - name: Retain unsigned APKs, manifests and Android test XML for offline signing
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Natro-3.5.7-offline-signing-${{ github.run_number }}
+          path: |
+            ${{ runner.temp }}/natro-3.5.7-candidate/*
+            !${{ runner.temp }}/natro-3.5.7-candidate/tools/**
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain the exact SDK tools
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Natro-3.5.7-signing-tools-${{ github.run_number }}
+          path: ${{ runner.temp }}/natro-3.5.7-candidate/tools
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain test reports and build logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: Natro-3.5.7-test-reports-${{ github.run_number }}
+          path: |
+            source/app/build/test-results/**
+            source/app/build/reports/tests/**
+          if-no-files-found: ignore
+          retention-days: 14
