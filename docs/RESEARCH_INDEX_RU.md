@@ -194,3 +194,5 @@ patch and synthetic fixture checks PASS; release and physical capture OPEN.
 - 23.11.2026: [Масштаб и viewport табличек, CARD-026](NAVIGATOR_SIGN_VIEWPORT_2026_11_23_RU.md).
 
 - 24.11.2026: [3.5.7 — передача видимости и опубликованные доказательства](releases/3.5.7/README_RU.md). SOURCE/TEST/APK/PUBLISH PASS; FIELD OPEN.
+
+- 24.11.2026: [ревизия описания и требований](DOCUMENTATION_REVIEW_2026_11_24_RU.md), [действующие уточнения](CURRENT_REQUIREMENTS_RU.md). Полный структурный индекс; аппаратные gates не закрывались.
