@@ -108,21 +108,14 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
                   // One destination may still have the turn outside its viewport. It keeps a
                   // complete fixed card; the other destination can attach to the same turn.
                   c.onScreen=false;
-                  p.show(map,s,125,5f,c,style,()->{});Pin docked=map.pin;
-                  check(replacement.visible && !docked.visible);
-                  docked.loaded.onTaskFinished();
-                  check(docked.visible && docked.style.anchor.x==0 && docked.style.anchor.y==1);
-                  check(docked.point.x==6 && docked.point.y==184 && c.screenReserved);
-                  check(docked.image.bitmap.getWidth()==113 && docked.image.bitmap.getHeight()==56);
-                  check(p.replacesCard(s,c));
-                  c.failProjection=true;p.repositionFixed(c);check(!p.replacesCard(s,c));
-                  c.failProjection=false;p.repositionFixed(c);check(p.replacesCard(s,c));
-                  check(!p.replaces(lane));
-
-                  // Both standalone and combined signs respond to the same appearance.
+                  int before=map.creations;
+                  p.show(map,s,125,5f,c,style,()->{});
+                  check(map.pins.isEmpty() && map.creations==before && !replacement.visible);
+                  check(!p.replacesCard(s,c) && !p.replaces(lane));
+                  c.onScreen=true;
                   LaneGuidanceAppearance other=new LaneGuidanceAppearance();
                   p.show(map,s,125,5f,c,other,()->{});Pin changed=map.pin;
-                  check(changed!=docked && docked.visible && !changed.visible);
+                  check(!changed.visible && !p.replacesCard(s,c));
                   // Superseded callback cannot swap a stale sign after route cleanup.
                   p.clear(map,c);changed.loaded.onTaskFinished();
                   check(map.pins.isEmpty() && !changed.visible && !p.replaces(lane));
@@ -164,11 +157,12 @@ class TestPrimaryTurnPlacemark(unittest.TestCase):
                 int width,height; boolean onScreen=true,screenReserved=false,failProjection=false;
                 int viewportWidth(){return 728;} int viewportHeight(){return 190;}
                 boolean isBitmapInsideViewport(double lat,double lon,int w,int h,float ax,float ay){return onScreen;}
-                Object pointAtScreen(float x,float y){return failProjection?null:new Point(x,y);}
+                String lastOptionalFailure(){return onScreen?"none":"anchor_outside_viewport";}
+                boolean isBodyInsideViewport(double la,double lo,float a,float b,float c,float d,float e,float f){return onScreen;}
                 void reserveScreen(String owner,String key,android.graphics.RectF b){screenReserved=true;}
                 static String[] placementLegNames(){return new String[]{"LEFT_CENTER","RIGHT_CENTER","TOP_CENTER","BOTTOM_CENTER","TOP_LEFT","TOP_RIGHT","BOTTOM_LEFT","BOTTOM_RIGHT"};}
-                static class Placement {String legName;Placement(float x,float y,String s){legName=s;}}
-                static class Footprint {Footprint(String s,int w,int h,float x,float y,android.graphics.RectF r){}}
+                static class Placement {String legName;int variant;Placement(float x,float y,String s){this(x,y,s,0);} Placement(float x,float y,String s,int v){legName=s;variant=v;}}
+                static class Footprint {Footprint(String s,int w,int h,float x,float y,android.graphics.RectF r,int variant){}}
                 Placement reserveIfClear(String o,String k,double lat,double lon,int w,int h,boolean right,int si,double sp,Placement previous,java.util.List<Footprint> f){return onScreen?new Placement(0,.5f,"LEFT_CENTER"):null;}
                 void clearOwner(String name){}
                 void reserveFixed(String owner,String key,double lat,double lon,int w,int h,float x,float y){

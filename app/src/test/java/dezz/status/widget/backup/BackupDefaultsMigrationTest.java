@@ -13,27 +13,27 @@ import static org.junit.Assert.*;
 @RunWith(RobolectricTestRunner.class)
 @Config(sdk=28,application=Application.class)
 public class BackupDefaultsMigrationTest {
-    @Test public void restoresSupportedBackupsIncluding357On357() throws Exception {
+    @Test public void restoresSupportedBackupsIncluding357On358() throws Exception {
         Map<String,Object> defaults = new LinkedHashMap<>();
         defaults.put("old-default", 7);
         defaults.put("user-choice", false);
-        for (int source = 208021335; source <= 208021389; source++) {
+        for (int source = 208021335; source <= 208021390; source++) {
             JSONObject metadata = new JSONObject().put("sourceVersionCode", source)
                     .put("defaultsSchema", source).put("declaredMainDefaults", BackupPreferencesXml.encode(defaults));
-            File snapshot = new File(RuntimeEnvironment.getApplication().getCacheDir(), "357-" + source);
+            File snapshot = new File(RuntimeEnvironment.getApplication().getCacheDir(), "358-" + source);
             File main = BackupFiles.child(snapshot, "de_prefs/example_preferences.xml");
             Map<String,Object> expected = new LinkedHashMap<>();
             expected.put("user-choice", true);
             expected.put("unknown-key", "preserved");
             BackupPreferencesXml.write(main, expected);
-            BackupDefaultsMigration.materialize(snapshot, "example", metadata, 208021390);
+            BackupDefaultsMigration.materialize(snapshot, "example", metadata, 208021391);
             expected.put("old-default", 7);
             assertEquals(expected, BackupPreferencesXml.read(main));
         }
-        for (int invalid : new int[]{208021334, 208021391}) {
+        for (int invalid : new int[]{208021334, 208021392}) {
             JSONObject metadata = new JSONObject().put("sourceVersionCode", invalid)
                     .put("defaultsSchema", invalid).put("declaredMainDefaults", BackupPreferencesXml.encode(defaults));
-            try { BackupDefaultsMigration.validate(metadata, 208021390); fail(); } catch (IOException expected) {}
+            try { BackupDefaultsMigration.validate(metadata, 208021391); fail(); } catch (IOException expected) {}
         }
     }
 
@@ -59,6 +59,17 @@ public class BackupDefaultsMigrationTest {
                     .put("defaultsSchema", invalid).put("declaredMainDefaults", BackupPreferencesXml.encode(defaults));
             try { BackupDefaultsMigration.validate(metadata, 208021389); fail(); } catch (IOException expected) {}
         }
+    }
+
+    @Test public void fresh358SnapshotLeavesUnconfiguredPreferencesAbsent() throws Exception {
+        File snapshot = new File(RuntimeEnvironment.getApplication().getCacheDir(), "358-fresh");
+        File main = BackupFiles.child(snapshot, "de_prefs/example_preferences.xml");
+        assertFalse(main.exists());
+        JSONObject metadata = new JSONObject().put("sourceVersionCode", 208021391)
+                .put("defaultsSchema", 208021391)
+                .put("declaredMainDefaults", BackupPreferencesXml.encode(Collections.singletonMap("example-default", true)));
+        BackupDefaultsMigration.materialize(snapshot, "example", metadata, 208021391);
+        assertFalse(main.exists());
     }
 
     @Test public void fresh357SnapshotLeavesUnconfiguredPreferencesAbsent() throws Exception {

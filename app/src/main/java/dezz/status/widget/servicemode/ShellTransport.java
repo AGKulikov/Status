@@ -5,11 +5,11 @@ import dezz.status.widget.R;
 
 /**
  * Abstraction for executing shell commands on the device.
- * Implementations: {@link AdbTransport}, {@link TelnetTransport}.
+ * Implemented by {@link AdbTransport}.
  */
-public interface ShellTransport {
+public interface ShellTransport extends AutoCloseable {
     /**
-     * Human-readable description for UI, e.g. "telnet android.local:23" or "adb port 5555".
+     * Human-readable description for UI, e.g. "ADB 127.0.0.1:5555".
      */
     String describe();
 

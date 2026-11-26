@@ -169,7 +169,10 @@ public final class AppRuntimeBootstrap {
         if (!any) return;
 
         PrivilegedShell.get(appContext).ensurePrivileges(request.build(), result -> {
-            if (!result.transportAvailable) return;
+            if (!result.transportAvailable) {
+                Toast.makeText(appContext, R.string.service_mode_no_connection_detected, Toast.LENGTH_LONG).show();
+                return;
+            }
             if (result.anyGranted()) {
                 List<PrivilegedShell.PermissionKind> visibleGrants =
                         successKindsForToast(result.grantedKinds);

@@ -18,6 +18,7 @@ public class AdbTransport {
     public static boolean failAfterOutput;
     public static void reset() { root=false;refuse=false;dropRootReply=false;services.clear();commands.clear(); partialOutput=null;afterOutput=null;failAfterOutput=false; }
     public static boolean probe(String host,int port,Consumer<Socket> sink) { sink.accept(new Socket());return true; }
+    public static AdbTransport connectInteractive(Context c,String host,int port,Consumer<Socket> sink) {return connect(c,host,port,sink);}
     public static AdbTransport connect(Context c,String host,int port,Consumer<Socket> sink) { sink.accept(new Socket());return new AdbTransport(); }
     public static long lastTimeout;
     public void execRaw(String wrapped,Consumer<byte[]> output,long timeout) throws IOException {

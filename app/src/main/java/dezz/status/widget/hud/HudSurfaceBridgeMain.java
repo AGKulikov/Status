@@ -26,7 +26,7 @@ import java.security.MessageDigest;
  * <p>This bridge creates a direct layer on the configured HUD stack. The archived
  * {@code ecarx_daemon_OverlayDisplay} names do not establish ownership of HUD car/speed graphics
  * or DIM wings: the full historical dump places the active overlay on another stack.
- * The already configured local ADB/Telnet shell starts this bridge under the shell identity, which is
+ * The already configured local ADB shell starts this bridge under the shell identity, which is
  * allowed to create a SurfaceControl on the HUD layer stack. The application sends complete,
  * clipped 728x190 PNG frames over a nonce-protected loopback socket.</p>
  *

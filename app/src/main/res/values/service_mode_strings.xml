@@ -14,7 +14,7 @@
     <string name="service_mode_apps_restore_error">Apps restore error: %s</string>
     <string name="service_mode_no_apps_selected">No apps selected</string>
     <string name="service_mode_list_loading">Loading apps list…</string>
-    <string name="service_mode_no_connection_detected">No ADB or Telnet connection detected. Cannot hide or restore apps.</string>
+    <string name="service_mode_no_connection_detected">ADB access is unavailable. Open the Natro ADB console and authorize its key on the head unit.</string>
     <string name="service_mode_hide_apps">Hide selected apps</string>
     <string name="service_mode_restore_apps">Restore selected apps</string>
 

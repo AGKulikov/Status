@@ -11,6 +11,11 @@ final class PrimaryTurnSample {
     final long sampledAt;
     final long routeEpoch;
 
+    String maneuverIdentity() {
+        return "maneuver:" + routeEpoch + ':' + turn.routeSegmentIndex + ':'
+                + Math.round(turn.routeSegmentPosition * 1_000_000d) + ':' + turn.action;
+    }
+
     PrimaryTurnSample(NavigatorStatePublisher.RouteTurnFrame turn, StockTurnTextures.Texture texture,
                       long sampledAt, long routeEpoch) {
         this.turn = turn;

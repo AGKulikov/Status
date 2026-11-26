@@ -53,18 +53,8 @@ import java.util.concurrent.atomic.AtomicReference;
  * car head units where the standard Settings UI for Usage Access / Notification Listener
  * doesn't exist (e.g. Geely Monjaro / QUALCOMM KX11 stack).
  *
- * <p>Strategy: probe a small fixed set of well-known network ports on every local interface
- * (loopback + every {@code up} non-loopback IPv4/IPv6) until one responds to ADB or Telnet,
- * then run shell commands through that transport with the elevated capabilities that come
- * from {@code shell}-uid command execution. Same trick as the sibling {@code stealth} app,
- * but stripped of port-scan diagnostics — we only care about getting one working channel.
- *
- * <p>The found endpoint is cached in device-protected SharedPreferences so subsequent app
- * launches verify it directly without enumerating interfaces.
- *
- * <p>Probe order on each host: ADB 5555 → ADB 7777 → Telnet 23. ADB first because the probe
- * is allocation-safe (manual handshake — see {@link AdbTransport#probe}) and Telnet listeners
- * tend to advertise themselves loudly with banners.
+ * <p>System operations use a local ADB connection authenticated with Natro's stored key.
+ * A verified endpoint is cached in device-protected preferences for subsequent starts.
  *
  * <p>All public methods are thread-safe. Discovery and command execution share a single-thread
  * executor so callers never race a half-completed discovery; user-facing callbacks are
@@ -77,11 +67,6 @@ public class PrivilegedShell {
     private static final int PROBE_PARALLELISM = 8;
 
     private static final int[] ADB_PORTS = {5555, 7777};
-    private static final int[] TELNET_PORTS = {23};
-
-    /** Read-timeout used by the Telnet sanity probe (full {@link TelnetTransport#exec}). */
-    private static final int TELNET_PROBE_READ_TIMEOUT_MS = 1500;
-
     /**
      * After a discovery returns null we mute further attempts for this long. Without it,
      * every {@code onCreate} of MainActivity (rotations, navigations) would re-run the full
@@ -299,7 +284,7 @@ public class PrivilegedShell {
                 trace.stage("discovery_started", "");
                 ConnectionStorage.Endpoint endpoint = ensureEndpoint();
                 if (endpoint == null) {
-                    deliverCommand(trace, callback, null, "No privileged transport available", "no_transport"); return;
+                    deliverCommand(trace, callback, null, appContext.getString(dezz.status.widget.R.string.service_mode_no_connection_detected), "no_transport"); return;
                 }
                 trace.stage("connect_started", "transport=" + endpoint.transport);
                 transport = open(endpoint);
@@ -342,7 +327,7 @@ public class PrivilegedShell {
     /**
      * Run a foreground command on a dedicated transport without blocking regular privileged
      * operations. This is intentionally different from shell backgrounding: an {@code app_process}
-     * child launched with {@code &} can receive SIGHUP as soon as the short ADB/Telnet command
+     * child launched with {@code &} can receive SIGHUP as soon as the short ADB command
      * channel closes. Keeping the transport and remote shell alive gives the child a deterministic
      * lifetime and also preserves its stderr for actionable diagnostics.
      */
@@ -351,25 +336,15 @@ public class PrivilegedShell {
             ConnectionStorage.Endpoint endpoint = ensureEndpoint();
             if (endpoint == null) {
                 mainHandler.post(() -> callback.onFinished(
-                        null, "No privileged transport available"));
+                        null, appContext.getString(dezz.status.widget.R.string.service_mode_no_connection_detected)));
                 return;
             }
             longRunningExecutor.execute(() -> {
-                ShellTransport transport = null;
+                AdbTransport transport = null;
                 try {
                     transport = open(endpoint);
                     mainHandler.post(callback::onStarted);
-                    String output;
-                    if (transport instanceof TelnetTransport) {
-                        // Zero is an infinite Socket read timeout. The bridge itself has bounded
-                        // accept/frame timeouts, so this cannot leave an orphaned remote process.
-                        output = ((TelnetTransport) transport).exec(command, 0);
-                    } else if (transport instanceof AdbTransport) {
-                        output = ((AdbTransport) transport).execLongRunning(command);
-                    } else {
-                        output = transport.exec(command);
-                    }
-                    String completedOutput = output;
+                    String completedOutput = transport.execLongRunning(command);
                     mainHandler.post(() -> callback.onFinished(completedOutput, null));
                 } catch (Exception failure) {
                     Log.w(TAG, "Long-running command failed", failure);
@@ -428,17 +403,10 @@ public class PrivilegedShell {
      * Used on fast path so app startup isn't paying for a fresh scan every time.
      */
     private boolean quickProbe(ConnectionStorage.Endpoint endpoint) {
-        try {
-            if (ConnectionStorage.TRANSPORT_ADB.equals(endpoint.transport)) {
-                return AdbTransport.probe(endpoint.host, endpoint.port);
-            }
-            // Telnet has no equivalent allocation-safe probe — just connect and close.
-            ShellTransport t = TelnetTransport.connect(endpoint.host, endpoint.port);
-            t.close();
-            return true;
-        } catch (Throwable t) {
-            return false;
-        }
+        return ConnectionStorage.TRANSPORT_ADB.equals(endpoint.transport)
+                && ("127.0.0.1".equals(endpoint.host) || "::1".equals(endpoint.host)
+                    || candidateHosts().contains(endpoint.host))
+                && AdbTransport.probe(endpoint.host, endpoint.port);
     }
 
     @Nullable
@@ -447,7 +415,7 @@ public class PrivilegedShell {
         List<String> hosts = candidateHosts();
         Log.i(TAG, "Discovery start: " + hosts.size() + " hosts");
 
-        int probeCount = hosts.size() * (ADB_PORTS.length + TELNET_PORTS.length);
+        int probeCount = hosts.size() * ADB_PORTS.length;
         if (probeCount == 0) {
             // Defensive — candidateHosts() always adds the two loopbacks, but keep this
             // guard in case future refactoring removes the hardcoded entries.
@@ -473,10 +441,6 @@ public class PrivilegedShell {
             for (String host : hosts) {
                 for (int port : ADB_PORTS) {
                     cs.submit(() -> probeAdb(host, port, liveSockets));
-                    submitted++;
-                }
-                for (int port : TELNET_PORTS) {
-                    cs.submit(() -> probeTelnet(host, port, liveSockets));
                     submitted++;
                 }
             }
@@ -509,7 +473,7 @@ public class PrivilegedShell {
     }
 
     @Nullable
-    private static ConnectionStorage.Endpoint probeAdb(String host, int port,
+    private ConnectionStorage.Endpoint probeAdb(String host, int port,
                                                        Set<Closeable> liveSockets) {
         Socket[] socketHolder = new Socket[1];
         try {
@@ -517,37 +481,18 @@ public class PrivilegedShell {
                 socketHolder[0] = s;
                 liveSockets.add(s);
             });
-            return ok
-                    ? new ConnectionStorage.Endpoint(host, port, ConnectionStorage.TRANSPORT_ADB)
-                    : null;
-        } finally {
             if (socketHolder[0] != null) liveSockets.remove(socketHolder[0]);
-        }
-    }
-
-    @Nullable
-    private static ConnectionStorage.Endpoint probeTelnet(String host, int port,
-                                                          Set<Closeable> liveSockets) {
-        Socket[] socketHolder = new Socket[1];
-        ShellTransport t = null;
-        try {
-            t = TelnetTransport.connect(host, port, s -> {
-                socketHolder[0] = s;
-                liveSockets.add(s);
-            });
-            // Canonical sanity probe — same one stealth uses. Any Android shell will answer
-            // with the path to framework-res.apk. Use the short read-timeout overload so
-            // an unresponsive shell doesn't burn the full 5-second default.
-            String resp = ((TelnetTransport) t).exec("pm path android",
-                    TELNET_PROBE_READ_TIMEOUT_MS);
-            if (resp != null && resp.contains("package:")) {
-                return new ConnectionStorage.Endpoint(host, port, ConnectionStorage.TRANSPORT_TELNET);
+            if (!ok) return null;
+            // Discovery only caches an endpoint after Android accepts this application's key.
+            try (AdbTransport verified = AdbTransport.connect(appContext, host, port, socket -> {
+                liveSockets.add(socket);
+                socketHolder[0] = socket;
+            })) {
+                return new ConnectionStorage.Endpoint(host, port, ConnectionStorage.TRANSPORT_ADB);
+            } catch (Exception denied) {
+                return null;
             }
-            return null;
-        } catch (Exception e) {
-            return null;
         } finally {
-            if (t != null) t.close();
             if (socketHolder[0] != null) liveSockets.remove(socketHolder[0]);
         }
     }
@@ -581,11 +526,16 @@ public class PrivilegedShell {
         return new ArrayList<>(hosts);
     }
 
-    private ShellTransport open(ConnectionStorage.Endpoint endpoint) throws Exception {
-        if (ConnectionStorage.TRANSPORT_ADB.equals(endpoint.transport)) {
-            return AdbTransport.connect(appContext, endpoint.host, endpoint.port);
+    private AdbTransport open(ConnectionStorage.Endpoint endpoint) throws Exception {
+        if (!ConnectionStorage.TRANSPORT_ADB.equals(endpoint.transport)) {
+            throw new java.io.IOException(appContext.getString(dezz.status.widget.R.string.service_mode_no_connection_detected));
         }
-        return TelnetTransport.connect(endpoint.host, endpoint.port);
+        try {
+            return AdbTransport.connect(appContext, endpoint.host, endpoint.port);
+        } catch (Exception failure) {
+            activeEndpoint.compareAndSet(endpoint, null);
+            throw failure;
+        }
     }
 
     // ── Permission grant logic ───────────────────────────────────────

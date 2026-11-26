@@ -19,10 +19,9 @@ import java.util.Objects;
  * Answers the proof-of-password challenge used by Sprut's current cloud client.
  *
  * <p>The server-provided salt and KDF settings are public authentication parameters. Password
- * bytes and the Argon2 result remain local and are cleared as soon as the signature has been
- * produced.</p>
+ * bytes and derived keys remain local. The temporary key is scoped to one authentication dialogue.</p>
  */
-final class SprutCloudChallenge {
+final class SprutCloudChallenge implements AutoCloseable {
     private static final int DERIVED_KEY_BYTES = 32;
     private static final int MAX_QUESTION_DATA_CHARS = 16_384;
     private static final int MAX_BINARY_FIELD_BYTES = 4_096;
@@ -30,11 +29,22 @@ final class SprutCloudChallenge {
     private static final int MAX_ITERATIONS = 16;
     private static final int MAX_PARALLELISM = 16;
 
-    private SprutCloudChallenge() {}
+    private String password;
+    private byte[] cachedKey;
+    private byte[] cachedSalt;
+    private KdfSettings cachedSettings;
+
+    SprutCloudChallenge(String password) {
+        this.password = Objects.requireNonNull(password, "password");
+    }
 
     static String answer(String password, String questionData) throws IOException {
-        Objects.requireNonNull(password, "password");
-        if (password.isEmpty()) throw invalid("password is empty");
+        try (SprutCloudChallenge dialogue = new SprutCloudChallenge(password)) {
+            return dialogue.sign(questionData);
+        }
+    }
+
+    String sign(String questionData) throws IOException {
         if (questionData == null || questionData.isEmpty()
                 || questionData.length() > MAX_QUESTION_DATA_CHARS) {
             throw invalid("question data is missing or too large");
@@ -57,32 +67,65 @@ final class SprutCloudChallenge {
             throw invalid("challenge length is outside the supported range");
         }
 
-        byte[] passwordBytes = password.getBytes(StandardCharsets.UTF_8);
-        byte[] argonResult = new byte[DERIVED_KEY_BYTES];
+        byte[] argonResult = keyFor(rootSalt, settings);
         byte[] signature = new byte[Ed25519.SIGNATURE_SIZE];
         try {
-            Argon2Parameters parameters = new Argon2Parameters.Builder(
-                    Argon2Parameters.ARGON2_id)
+            Ed25519.sign(argonResult, 0, challenge, 0, challenge.length, signature, 0);
+            return Base64.getEncoder().encodeToString(signature);
+        } catch (RuntimeException failure) {
+            throw invalid("cryptographic proof failed", failure);
+        } finally {
+            Arrays.fill(argonResult, (byte) 0);
+            Arrays.fill(signature, (byte) 0);
+        }
+    }
+
+    private byte[] keyFor(byte[] salt, KdfSettings settings) throws IOException {
+        byte[] passwordBytes;
+        synchronized (this) {
+            if (password == null) throw invalid("authentication dialogue closed");
+            if (password.isEmpty()) throw invalid("password is empty");
+            if (settings.sameAs(cachedSettings) && Arrays.equals(cachedSalt, salt)) {
+                return cachedKey.clone();
+            }
+            passwordBytes = password.getBytes(StandardCharsets.UTF_8);
+        }
+        // Derivation can be slow. Closing a socket on the UI thread must never wait for it.
+        byte[] key = new byte[DERIVED_KEY_BYTES];
+        try {
+            Argon2Parameters parameters = new Argon2Parameters.Builder(Argon2Parameters.ARGON2_id)
                     .withVersion(Argon2Parameters.ARGON2_VERSION_13)
                     .withMemoryAsKB(settings.memoryKib)
                     .withIterations(settings.iterations)
                     .withParallelism(settings.parallelism)
-                    .withSalt(rootSalt)
+                    .withSalt(salt)
                     .build();
             Argon2BytesGenerator argon2 = new Argon2BytesGenerator();
             argon2.init(parameters);
-            argon2.generateBytes(passwordBytes, argonResult);
-
-            // This deliberately mirrors beta.spruthub.ru: the 32-byte Argon2id result is the
-            // Ed25519 seed. There is no HKDF stage in the official web client.
-            Ed25519.sign(argonResult, 0, challenge, 0, challenge.length, signature, 0);
-            return Base64.getEncoder().encodeToString(signature);
-        } catch (RuntimeException cryptoFailure) {
-            throw invalid("cryptographic proof failed", cryptoFailure);
+            argon2.generateBytes(passwordBytes, key);
+            synchronized (this) {
+                if (password == null) throw invalid("authentication dialogue closed");
+                if (cachedKey != null) Arrays.fill(cachedKey, (byte) 0);
+                cachedKey = key.clone();
+                cachedSalt = salt;
+                cachedSettings = settings;
+                return key;
+            }
+        } catch (IOException | RuntimeException failure) {
+            Arrays.fill(key, (byte) 0);
+            if (failure instanceof IOException) throw (IOException) failure;
+            throw invalid("cryptographic proof failed", failure);
         } finally {
             Arrays.fill(passwordBytes, (byte) 0);
-            Arrays.fill(argonResult, (byte) 0);
         }
+    }
+
+    @Override public synchronized void close() {
+        if (cachedKey != null) Arrays.fill(cachedKey, (byte) 0);
+        cachedKey = null;
+        cachedSalt = null;
+        cachedSettings = null;
+        password = null;
     }
 
     private static byte[] decode(JSONObject data, String name) throws IOException {
@@ -121,6 +164,11 @@ final class SprutCloudChallenge {
             this.memoryKib = memoryKib;
             this.iterations = iterations;
             this.parallelism = parallelism;
+        }
+
+        boolean sameAs(KdfSettings other) {
+            return other != null && memoryKib == other.memoryKib
+                    && iterations == other.iterations && parallelism == other.parallelism;
         }
 
         static KdfSettings parse(String raw) throws IOException {

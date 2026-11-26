@@ -38,7 +38,6 @@ public class ConnectionStorage {
     private static final String DELIM = "|";
 
     public static final String TRANSPORT_ADB = "ADB";
-    public static final String TRANSPORT_TELNET = "Telnet";
 
     private final SharedPreferences prefs;
 
@@ -101,10 +100,10 @@ public class ConnectionStorage {
 
     private static Endpoint decode(String s) {
         String[] parts = s.split("\\" + DELIM, -1);
-        if (parts.length != 3) return null;
+        if (parts.length != 3 || !TRANSPORT_ADB.equals(parts[2])) return null;
         try {
             int port = Integer.parseInt(parts[1]);
-            return new Endpoint(parts[0], port, parts[2]);
+            return port > 0 && port <= 65535 ? new Endpoint(parts[0], port, parts[2]) : null;
         } catch (NumberFormatException ex) {
             return null;
         }

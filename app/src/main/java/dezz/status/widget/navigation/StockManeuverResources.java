@@ -28,7 +28,7 @@ public final class StockManeuverResources {
     static boolean compatiblePackage(PackageInfo navigator, PackageManager manager, String host) {
         long installedCode = navigator.getLongVersionCode();
         // 3.5.2 through 3.5.6 retain the reviewed resources and maneuver command format.
-        return (installedCode == 739564638L || installedCode == 739564637L || installedCode == 739564636L || installedCode == 739564635L || installedCode == 739564634L || installedCode == 739564633L || StockManeuverCardState.supportsNavigator(installedCode))
+        return (installedCode == 739564639L || installedCode == 739564638L || installedCode == 739564637L || installedCode == 739564636L || installedCode == 739564635L || installedCode == 739564634L || installedCode == 739564633L || StockManeuverCardState.supportsNavigator(installedCode))
                 && manager.checkSignatures(host, PACKAGE) == PackageManager.SIGNATURE_MATCH;
     }
     private Drawable get(String name) {

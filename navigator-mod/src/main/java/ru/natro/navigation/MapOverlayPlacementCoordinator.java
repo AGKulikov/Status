@@ -82,20 +82,6 @@ final class MapOverlayPlacementCoordinator {
     int viewportWidth() { return viewportWidth; }
     int viewportHeight() { return viewportHeight; }
 
-    /** Used only for the explicitly screen-fixed fallback, which has no geographic pointer. */
-    Object pointAtScreen(float x, float y) throws Exception {
-        if (mapWindow == null) return null;
-        Class<?> type = Class.forName("com.yandex.mapkit.ScreenPoint");
-        Object screen = type.getConstructor(float.class, float.class).newInstance(x, y);
-        return invoke(mapWindow, "screenToWorld", new Class<?>[]{type}, screen);
-    }
-
-    void reserveScreen(String owner, String key, RectF bounds) {
-        RectF occupied = new RectF(bounds);
-        occupied.inset(-ITEM_MARGIN_PX, -ITEM_MARGIN_PX);
-        reservations.add(new Reservation(owner, key, occupied));
-    }
-
     void attach(Object nextMapWindow, int width, int height) {
         mapWindow = nextMapWindow;
         viewportWidth = Math.max(1, width);
@@ -359,6 +345,16 @@ final class MapOverlayPlacementCoordinator {
         if (screen == null) return true;
         return screen[0] >= 0f && screen[0] <= viewportWidth
                 && screen[1] >= 0f && screen[1] <= viewportHeight;
+    }
+
+    boolean isBodyInsideViewport(double latitude, double longitude, float tipX, float tipY,
+                                 float left, float top, float right, float bottom) {
+        float[] screen = projectOrNull(latitude, longitude);
+        if (screen == null || screen[0] < 0 || screen[0] >= viewportWidth
+                || screen[1] < 0 || screen[1] >= viewportHeight) return false;
+        float x = screen[0] - tipX, y = screen[1] - tipY;
+        return insideSafeViewport(new RectF(x + left, y + top,
+                x + right, y + bottom));
     }
 
     /** Unlike point visibility, a handoff requires the entire displayed card to fit. */

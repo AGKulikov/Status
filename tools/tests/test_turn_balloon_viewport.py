@@ -21,21 +21,26 @@ public class ViewportReplay {
  public Screen worldToScreen(Point p){return new Screen(x,y);}}
  static void check(boolean b){if(!b)throw new AssertionError();}
  static boolean run(int vw,int vh,float x,float y,float requested){
+  return run(vw,vh,x,y,requested,false);
+ }
+ static boolean run(int vw,int vh,float x,float y,float requested,boolean obstruction){
   MapOverlayPlacementCoordinator c=new MapOverlayPlacementCoordinator();c.attach(new Window(x,y),vw,vh);
+  if(obstruction)c.reserveCentered("camera","obstacle",55,37,34,34);
   float scale=TurnBalloonLayout.fitScale(100,140,vw,vh,requested);
   int w=Math.round(100*scale),h=Math.round(140*scale),gap=Math.max(3,Math.round(8*scale));
   List<MapOverlayPlacementCoordinator.Footprint> f=new ArrayList<>();
   for(String side:MapOverlayPlacementCoordinator.placementLegNames()){
-   TurnBalloonLayout l=new TurnBalloonLayout(w,h,gap,side);
-   f.add(new MapOverlayPlacementCoordinator.Footprint(side,l.width,l.height,l.anchorX(),l.anchorY(),new RectF(l.left,l.top,l.right,l.bottom)));
+   for(int v=0;v<3;v++){TurnBalloonLayout l=new TurnBalloonLayout(w,h,gap,side,v);
+   f.add(new MapOverlayPlacementCoordinator.Footprint(side,l.width,l.height,l.anchorX(),l.anchorY(),new RectF(l.left,l.top,l.right,l.bottom),v));}
   }
   MapOverlayPlacementCoordinator.Placement p=c.reserveIfClear("turn","same",55,37,w,h,true,10,0,null,f);
-  TurnBalloonLayout l=new TurnBalloonLayout(w,h,gap,p==null?"DOCKED":p.legName);
-  float bx=p==null?6:x-l.tipX+l.left,by=p==null?vh-6-h:y-l.tipY+l.top;
+  if(p==null)return false;
+  if(obstruction)check(p.variant>0);
+  TurnBalloonLayout l=new TurnBalloonLayout(w,h,gap,p.legName,p.variant);
+  float bx=x-l.tipX+l.left,by=y-l.tipY+l.top;
   check(bx>=5.99 && by>=5.99 && bx+w<=vw-5.99 && by+h<=vh-5.99);
-  if(p!=null) {check(Math.abs(l.anchorX()*l.width-l.tipX)<.001);check(Math.abs(l.anchorY()*l.height-l.tipY)<.001);}
-  else {check(l.tipX==0 && l.tipY==l.height && l.width==w && l.height==h);}
-  return p!=null;
+  check(c.isBodyInsideViewport(55,37,l.tipX,l.tipY,l.left,l.top,l.right,l.bottom));
+  return true;
  }
  public static void main(String[] args){
   int count=0;
@@ -46,6 +51,7 @@ public class ViewportReplay {
   check(count==784);
   check(!run(728,190,364,-50,1f));
   check(run(800,360,400,180,1f));
+  check(run(728,190,364,95,1f,true));
  }
 }"""}
   with tempfile.TemporaryDirectory() as d:

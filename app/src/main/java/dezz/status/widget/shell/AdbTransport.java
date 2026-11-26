@@ -87,6 +87,17 @@ public class AdbTransport implements ShellTransport {
     /** Publishes the socket before connect so an owning console can cancel AUTH as well as I/O. */
     public static AdbTransport connect(Context context, String host, int port,
                                        Consumer<Socket> socketSink) throws Exception {
+        return open(context, host, port, socketSink, true);
+    }
+
+    /** Only the user-facing ADB console may request first-time key approval from Android. */
+    public static AdbTransport connectInteractive(Context context, String host, int port,
+                                                   Consumer<Socket> socketSink) throws Exception {
+        return open(context, host, port, socketSink, false);
+    }
+
+    private static AdbTransport open(Context context, String host, int port,
+                                     Consumer<Socket> socketSink, boolean knownKeyOnly) throws Exception {
         AdbCrypto crypto = getOrCreateCrypto(context);
 
         Socket socket = new Socket();
@@ -95,7 +106,7 @@ public class AdbTransport implements ShellTransport {
         try {
             socket.connect(new InetSocketAddress(host, port), CONNECT_TIMEOUT_MS);
             connection = AdbConnection.create(socket, crypto);
-            if (!connection.connect(HANDSHAKE_TIMEOUT_MS, TimeUnit.MILLISECONDS, false)) {
+            if (!connection.connectWithKey(HANDSHAKE_TIMEOUT_MS, TimeUnit.MILLISECONDS, knownKeyOnly)) {
                 throw new IOException("ADB handshake timeout");
             }
             return new AdbTransport(socket, connection, host, port);
@@ -135,7 +146,7 @@ public class AdbTransport implements ShellTransport {
      * This implementation reads exactly {@value #ADB_HEADER_LEN} bytes and checks the
      * ADB header invariant {@code magic == command ^ 0xFFFFFFFF}.
      *
-     * @return true iff the peer responded with a valid ADB CNXN or AUTH header.
+     * @return true iff the peer responded with an ADB RSA challenge header.
      */
     public static boolean probe(String host, int port) {
         return probe(host, port, null);
@@ -190,11 +201,8 @@ public class AdbTransport implements ShellTransport {
             int respMagic = rb.getInt();
 
             if (respMagic != (respCommand ^ 0xFFFFFFFF)) return false;
-            // AUTH is the usual response from an adbd that hasn't authorised our key yet (it
-            // asks us to sign a challenge); CNXN means the key is already on the device's
-            // adb_keys allow-list — both cases prove the peer speaks the ADB protocol, so
-            // both count as a successful probe.
-            return respCommand == ADB_CMD_AUTH || respCommand == ADB_CMD_CNXN;
+            // Discovery requires a real authentication challenge. A bare greeting proves no key ownership.
+            return respCommand == ADB_CMD_AUTH && rb.getInt(4) == 1 && rb.getInt(12) == 20;
         } catch (Exception e) {
             return false;
         } finally {

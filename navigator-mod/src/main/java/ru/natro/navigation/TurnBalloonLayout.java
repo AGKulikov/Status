@@ -7,11 +7,16 @@ final class TurnBalloonLayout {
     final String side;
     final int width, height;
     final float left, top, right, bottom, tipX, tipY;
-    final boolean docked;
+    final int variant;
 
     TurnBalloonLayout(int bodyWidth, int bodyHeight, int gap, String side) {
+        this(bodyWidth, bodyHeight, gap, side, 0);
+    }
+
+    TurnBalloonLayout(int bodyWidth, int bodyHeight, int baseGap, String side, int variant) {
         this.side = side;
-        docked = "DOCKED".equals(side);
+        this.variant = variant;
+        int gap = baseGap * (1 + 2 * variant);
         boolean leftLeg = side.equals("LEFT_CENTER") || side.endsWith("_LEFT");
         boolean rightLeg = side.equals("RIGHT_CENTER") || side.endsWith("_RIGHT");
         boolean topLeg = side.startsWith("TOP_");
@@ -22,8 +27,8 @@ final class TurnBalloonLayout {
         bottom = top + bodyHeight;
         width = bodyWidth + (leftLeg || rightLeg ? gap : 0);
         height = bodyHeight + (topLeg || bottomLeg ? gap : 0);
-        tipX = docked || leftLeg ? 0 : rightLeg ? width : width / 2f;
-        tipY = docked ? height : topLeg ? 0 : bottomLeg ? height : height / 2f;
+        tipX = leftLeg ? 0 : rightLeg ? width : width / 2f;
+        tipY = topLeg ? 0 : bottomLeg ? height : height / 2f;
     }
 
     float anchorX() { return tipX / width; }

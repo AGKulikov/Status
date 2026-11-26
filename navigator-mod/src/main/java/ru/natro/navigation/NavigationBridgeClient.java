@@ -113,6 +113,7 @@ final class NavigationBridgeClient {
     private final BackgroundMapLease backgroundMapLease;
     private final String sessionId = UUID.randomUUID().toString();
     private Messenger remote;
+    private String lastManeuverDecision = "";
     private boolean binding;
     private boolean bound;
     private long retryMs = MIN_RETRY_MS;
@@ -244,7 +245,12 @@ final class NavigationBridgeClient {
                     sendState(MSG_NAVIGATION_SNAPSHOT, KEY_SNAPSHOT_JSON,
                             ManeuverDestinationVisibility.apply(snapshotJson,
                                     hudMapRenderer.maneuverReplacementIdentity(),
-                                    clusterMapRenderer.maneuverReplacementIdentity()));
+                                    clusterMapRenderer.maneuverReplacementIdentity(), decision -> {
+                                        if (!decision.equals(lastManeuverDecision)) {
+                                            lastManeuverDecision = decision;
+                                            sendDiagnostic("turn-card " + decision);
+                                        }
+                                    }));
                 }
                 if (routeJson != null) {
                     sendState(MSG_ROUTE_GEOMETRY, KEY_ROUTE_GEOMETRY_JSON, routeJson);

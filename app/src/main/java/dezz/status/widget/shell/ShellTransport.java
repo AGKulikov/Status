@@ -19,10 +19,10 @@ package dezz.status.widget.shell;
 
 /**
  * Abstraction for executing shell commands on the device via an out-of-band
- * privileged channel (ADB-over-network or Telnet listener).
- * Implementations: {@link AdbTransport}, {@link TelnetTransport}.
+ * privileged channel using authenticated ADB.
+ * Implemented by {@link AdbTransport}.
  */
-public interface ShellTransport {
+public interface ShellTransport extends AutoCloseable {
     /** Human-readable description for logs and toasts, e.g. {@code "ADB 127.0.0.1:5555"}. */
     String describe();
 

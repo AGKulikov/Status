@@ -36,6 +36,12 @@ class StockTurnTexturesTest(unittest.TestCase):
                     Object createLaneBalloonView();
                 }
             """,
+            "ru.natro.navigation.StockManeuverCommands": """
+                final class StockManeuverCommands {static class MapCard {
+                    String text="";void observe(String name,Object[] args,Object view){
+                      if(name.equals("setDistance"))text=args[0]+" "+args[1];}
+                    String freeze(Object view,boolean combined){return text;}
+                }}""",
             "ru.yandex.yandexnavi.ui.guidance.context.ManeuverBalloonViewImpl": """
                 public class ManeuverBalloonViewImpl implements com.yandex.navikit.ui.guidance.context.Turn {
                     public int calls;
@@ -86,7 +92,7 @@ class StockTurnTexturesTest(unittest.TestCase):
                         check(StockTurnTextures.forWindow(primary).isEmpty(),"no pixels on factory/view creation");
                         ImageProvider image=joint.createTexture();
                         StockTurnTextures.Texture first=StockTurnTextures.forWindow(primary).get(0);
-                        check(stock.both.calls==1 && first.combined && first.provider==image &&
+                        check(stock.both.calls==1 && first.combined && first.card.equals("500 м") && first.provider==image &&
                               image==stock.both.image && first.bitmap==image.getImage() &&
                               first.anchorX==.125f && first.anchorY==.95f,"genuine stock pixels and anchor");
                         check(StockTurnTextures.forWindow(other).isEmpty(),"distinct map windows");
@@ -94,7 +100,7 @@ class StockTurnTexturesTest(unittest.TestCase):
                         check(StockTurnTextures.forWindow(primary).get(0)==first,"same pixels keep observation identity");
                         joint.setDistance("400","м");joint.createTexture();
                         StockTurnTextures.Texture changed=StockTurnTextures.forWindow(primary).get(0);
-                        check(changed!=first && changed.source==first.source,"distance revision preserves native source identity");
+                        check(changed!=first && changed.source==first.source && changed.card.equals("400 м") && first.card.equals("500 м"),"distance revision preserves native source identity");
                         stock.both.broken=true;
                         check(joint.createTexture()==stock.both.image &&
                               StockTurnTextures.forWindow(primary).isEmpty(),"failed sample preserves original result");

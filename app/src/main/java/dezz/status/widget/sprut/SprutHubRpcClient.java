@@ -11,11 +11,13 @@ import org.json.JSONObject;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
@@ -82,6 +84,7 @@ public final class SprutHubRpcClient implements Closeable {
             });
     private final AtomicLong nextId = new AtomicLong(1L);
     private final Map<Long, Pending> pending = new ConcurrentHashMap<>();
+    private final Set<CompletableFuture<Void>> catalogWaits = ConcurrentHashMap.newKeySet();
     private final Listener listener;
     private final String url;
     private final String diagnosticEndpoint;
@@ -214,7 +217,7 @@ public final class SprutHubRpcClient implements Closeable {
                 entry.timeout = scheduler.schedule(() -> {
                     Pending timedOut = pending.remove(id);
                     if (timedOut != null) {
-                        IOException timeout = new IOException("Sprut.hub reply timeout for "
+                        IOException timeout = new SocketTimeoutException("Sprut.hub reply timeout for "
                                 + timedOut.command + " (id=" + id + ")");
                         DiagnosticJournal.warn("spruthub.rpc", timeout.getMessage());
                         timedOut.future.completeExceptionally(timeout);
@@ -238,6 +241,41 @@ public final class SprutHubRpcClient implements Closeable {
             }
         }
         return result;
+    }
+
+    /** Only idempotent catalog list queries can enter the retry path. */
+    CompletableFuture<JSONObject> readCatalogList(JSONObject params) {
+        String command = commandName(params);
+        if (!"room.list".equals(command) && !"accessory.list".equals(command)) {
+            return failedFuture(new IllegalArgumentException("Unsupported catalog read"));
+        }
+        return SprutCatalogRead.run(() -> call(params), (delay, reason) -> {
+            DiagnosticJournal.info("spruthub.recovery", "retry " + command
+                    + "; reason=" + reason + "; delay_ms=" + delay);
+            return waitForCatalogRetry(delay);
+        });
+    }
+
+    private CompletableFuture<Void> waitForCatalogRetry(long delayMs) {
+        synchronized (lock) {
+            if (stopped || !open || socket == null) {
+                return failedFuture(new IOException("Sprut.hub session closed before catalog retry"));
+            }
+            CompletableFuture<Void> wait = new CompletableFuture<>();
+            catalogWaits.add(wait);
+            try {
+                ScheduledFuture<?> timer = scheduler.schedule(() -> wait.complete(null),
+                        delayMs, TimeUnit.MILLISECONDS);
+                wait.whenComplete((ignored, failure) -> {
+                    timer.cancel(false);
+                    catalogWaits.remove(wait);
+                });
+            } catch (RejectedExecutionException closed) {
+                catalogWaits.remove(wait);
+                wait.completeExceptionally(closed);
+            }
+            return wait;
+        }
     }
 
     /** Closes only the current socket. A controller may create a fresh client for reconnect. */
@@ -317,6 +355,7 @@ public final class SprutHubRpcClient implements Closeable {
     }
 
     private void failPending(@NonNull IOException error) {
+        for (CompletableFuture<Void> wait : catalogWaits) wait.completeExceptionally(error);
         for (Map.Entry<Long, Pending> item : pending.entrySet()) {
             Pending removed = pending.remove(item.getKey());
             if (removed != null) {

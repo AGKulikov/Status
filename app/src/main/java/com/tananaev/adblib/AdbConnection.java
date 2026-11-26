@@ -81,6 +81,7 @@ public class AdbConnection implements Closeable {
      * Specifies whether this connection has already sent a signed token.
      */
     private boolean sentSignature;
+    private boolean requireSignedChallenge;
 
     /**
      * A hash map of our open streams indexed by local ID.
@@ -211,6 +212,10 @@ public class AdbConnection implements Closeable {
                                 break;
 
                             case AdbProtocol.CMD_CNXN:
+                                if (requireSignedChallenge && !sentSignature) {
+                                    authorisationFailed = true;
+                                    throw new AdbAuthenticationFailedException();
+                                }
                                 synchronized (conn) {
                                     /* We need to store the max data size */
                                     conn.maxData = msg.arg1;
@@ -268,6 +273,13 @@ public class AdbConnection implements Closeable {
      */
     public void connect() throws IOException, InterruptedException {
         connect(Long.MAX_VALUE, TimeUnit.MILLISECONDS, false);
+    }
+
+    /** Require a signed challenge before exposing streams. Interactive callers may request enrollment. */
+    public boolean connectWithKey(long timeout, TimeUnit unit, boolean knownKeyOnly)
+            throws IOException, InterruptedException {
+        requireSignedChallenge = true;
+        return connect(timeout, unit, knownKeyOnly);
     }
 
     /**

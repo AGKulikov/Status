@@ -5,6 +5,7 @@ import android.content.Context;
 import android.net.wifi.WifiManager;
 import android.os.Process;
 import android.os.PowerManager;
+import android.os.SystemClock;
 import android.util.Log;
 
 import androidx.annotation.NonNull;
@@ -114,6 +115,7 @@ public final class SprutHubController {
     private boolean bufferedEventOverflow;
     @NonNull private String cachedCatalogLoadSignature = "";
     private int reconnectAttempt;
+    @Nullable private SprutCloudChallenge authDialogue;
 
     public SprutHubController(@NonNull Context context, @NonNull Preferences prefs,
                               @NonNull AutomationStateStore states,
@@ -394,6 +396,8 @@ public final class SprutHubController {
         // authenticated session. Only syncSnapshot() promotes it again after a full snapshot.
         sessionSynced = false;
         lastSynced = false;
+        final long attemptStarted = SystemClock.elapsedRealtime();
+        DiagnosticJournal.info("spruthub.recovery", "connect attempt=" + (reconnectAttempt + 1));
         updateState(State.CONNECTING, "connecting");
         final SprutHubRpcClient[] owner = new SprutHubRpcClient[1];
         final SprutHubRpcClient next;
@@ -403,7 +407,7 @@ public final class SprutHubController {
                         @Override public void onOpen() {
                             SprutHubRpcClient source = owner[0];
                             if (!isCurrent(source, expectedGeneration)) return;
-                            authenticateAndSync(source, expectedGeneration);
+                            authenticateAndSync(source, expectedGeneration, attemptStarted);
                         }
 
                         @Override public void onEvent(@NonNull JSONObject event) {
@@ -443,7 +447,8 @@ public final class SprutHubController {
                 && candidate == client;
     }
 
-    private void authenticateAndSync(@NonNull SprutHubRpcClient current, long expectedGeneration) {
+    private void authenticateAndSync(@NonNull SprutHubRpcClient current, long expectedGeneration,
+                                     long attemptStarted) {
         updateState(State.AUTHENTICATING, "authorizing");
         current.clearSession();
         authenticate(current)
@@ -451,6 +456,8 @@ public final class SprutHubController {
                     if (!isCurrent(current, expectedGeneration)) {
                         throw new CompletionException(new IOException("Superseded connection"));
                     }
+                    DiagnosticJournal.info("spruthub.recovery", "authenticated; since_connect_ms="
+                            + (SystemClock.elapsedRealtime() - attemptStarted));
                     current.setSession(token, null);
                     return selectHub(current, token)
                             .thenCompose(ignored -> registerClientInfoBestEffort(current))
@@ -460,6 +467,9 @@ public final class SprutHubController {
                 .whenComplete((result, failure) -> {
                     if (failure != null) {
                         failCurrentSession(current, expectedGeneration, failure);
+                    } else if (isCurrent(current, expectedGeneration)) {
+                        DiagnosticJournal.info("spruthub.recovery", "online; since_connect_ms="
+                                + (SystemClock.elapsedRealtime() - attemptStarted));
                     }
                 });
     }
@@ -494,16 +504,25 @@ public final class SprutHubController {
     private CompletableFuture<String> authenticateModern(@NonNull SprutHubRpcClient current,
                                                          @NonNull JSONObject first) {
         requireQuestion(first, "auth", "QUESTION_TYPE_EMAIL");
+        final SprutCloudChallenge dialogue;
+        synchronized (lock) {
+            if (current != client || !current.isOpen()) {
+                return failedFuture(new IOException("Superseded Sprut.hub authentication"));
+            }
+            dialogue = new SprutCloudChallenge(prefs.sprutPassword.get());
+            authDialogue = dialogue;
+        }
         return current.call(SprutProtocolAdapter.buildAuthAnswerParams(
                         prefs.sprutEmail.get().trim()))
-                .thenCompose(email -> answerPasswordQuestion(current, email, 0))
-                .thenApply(this::extractToken);
+                .thenCompose(email -> answerPasswordQuestion(current, email, dialogue, 0))
+                .thenApply(this::extractToken)
+                .whenComplete((value, failure) -> dialogue.close());
     }
 
     @NonNull
     private CompletableFuture<JSONObject> answerPasswordQuestion(
             @NonNull SprutHubRpcClient current, @NonNull JSONObject response,
-            int challengeRestart) {
+            SprutCloudChallenge dialogue, int challengeRestart) {
         String type = questionType(response, "answer");
         if ("QUESTION_TYPE_PASSWORD".equals(type)) {
             // Older hubs explicitly request the plaintext answer.
@@ -521,8 +540,7 @@ public final class SprutHubController {
                 "answering current cloud password-proof challenge");
         return CompletableFuture.supplyAsync(() -> {
                     try {
-                        return SprutCloudChallenge.answer(
-                                prefs.sprutPassword.get(), challengeData);
+                        return dialogue.sign(challengeData);
                     } catch (IOException failure) {
                         throw new CompletionException(failure);
                     }
@@ -538,7 +556,7 @@ public final class SprutHubController {
                      * so restart that dialogue instead of changing or quoting the signature.
                      */
                     if (hasParserUnsafeProofCharacters(answer)) {
-                        return restartCloudChallenge(current, challengeRestart,
+                        return restartCloudChallenge(current, dialogue, challengeRestart,
                                 "generated proof has relay-unsafe Base64 characters");
                     }
                     return current.call(SprutProtocolAdapter.buildAuthAnswerParams(answer))
@@ -550,7 +568,7 @@ public final class SprutHubController {
                             if (!isChallengeResultParserFailure(cause)) {
                                 return failedFuture(cause);
                             }
-                            return restartCloudChallenge(current, challengeRestart,
+                            return restartCloudChallenge(current, dialogue, challengeRestart,
                                     "relay rejected the proof before verification");
                         })
                         .thenCompose(stage -> stage);
@@ -559,11 +577,11 @@ public final class SprutHubController {
 
     @NonNull
     private CompletableFuture<JSONObject> restartCloudChallenge(
-            @NonNull SprutHubRpcClient current, int completedRestarts,
+            @NonNull SprutHubRpcClient current, SprutCloudChallenge dialogue, int completedRestarts,
             @NonNull String reason) {
         if (completedRestarts >= MAX_CLOUD_CHALLENGE_RESTARTS) {
             return failedFuture(new IOException(
-                    "Sprut.hub relay repeatedly rejected password-proof encoding"));
+                    "Sprut.hub password-proof compatibility retry limit reached"));
         }
         int nextRestart = completedRestarts + 1;
         DiagnosticJournal.warn("spruthub.session",
@@ -577,7 +595,7 @@ public final class SprutHubController {
                             prefs.sprutEmail.get().trim()));
                 })
                 .thenCompose(email -> answerPasswordQuestion(
-                        current, email, nextRestart));
+                        current, email, dialogue, nextRestart));
     }
 
     static boolean hasParserUnsafeProofCharacters(@NonNull String answer) {
@@ -712,19 +730,25 @@ public final class SprutHubController {
                 bufferedEventOverflow = false;
             }
 
-            CompletableFuture<JSONObject> rooms = current.call(
-                    SprutProtocolAdapter.buildRoomListParams(), 20_000L);
+            CompletableFuture<JSONObject> rooms = current.readCatalogList(
+                    SprutProtocolAdapter.buildRoomListParams());
             String primaryExpand = current.isOfficialCloud()
                     ? SprutProtocolAdapter.EXPAND_COMMA : SprutProtocolAdapter.EXPAND_PLUS;
             String fallbackExpand = current.isOfficialCloud()
                     ? SprutProtocolAdapter.EXPAND_PLUS : SprutProtocolAdapter.EXPAND_COMMA;
-            CompletableFuture<JSONObject> accessories = current.call(
-                            SprutProtocolAdapter.buildAccessoryListParams(primaryExpand), 20_000L)
-                    .handle((value, failure) -> failure == null
-                            ? CompletableFuture.completedFuture(value)
-                            : current.call(SprutProtocolAdapter.buildAccessoryListParams(
-                                    fallbackExpand), 20_000L))
-                    .thenCompose(stage -> stage);
+            CompletableFuture<JSONObject> accessories = current.readCatalogList(
+                            SprutProtocolAdapter.buildAccessoryListParams(primaryExpand))
+                    .<CompletableFuture<JSONObject>>handle((value, failure) -> {
+                        if (failure == null) return CompletableFuture.completedFuture(value);
+                        // Only a protocol rejection can indicate unsupported expand syntax.
+                        Throwable cause = unwrap(failure);
+                        if (!(cause instanceof SprutHubRpcClient.RpcException)
+                                || SprutCatalogRead.retryReason(cause) != null || !current.isOpen()) {
+                            return failedFuture(cause);
+                        }
+                        return current.readCatalogList(
+                                SprutProtocolAdapter.buildAccessoryListParams(fallbackExpand));
+                    }).thenCompose(stage -> stage);
             CompletableFuture<JSONObject> serviceTypes = current.call(
                             object("service", object("types", new JSONObject())), 20_000L)
                     .exceptionally(ignored -> new JSONObject());
@@ -1023,14 +1047,18 @@ public final class SprutHubController {
         int index = Math.min(reconnectAttempt++, RECONNECT_DELAYS_MS.length - 1);
         long base = RECONNECT_DELAYS_MS[index];
         long jitter = (long) (base * (Math.random() * 0.4d - 0.2d));
+        long delayMs = Math.max(500L, base + jitter);
+        long scheduledAt = SystemClock.elapsedRealtime();
+        DiagnosticJournal.info("spruthub.recovery", "reconnect scheduled; delay_ms=" + delayMs);
         try {
             scheduler.schedule(() -> {
                 synchronized (lock) {
-                    if (stopped || expectedGeneration != generation || !isConfigured()) return;
-                    closeClientLocked();
+                    if (stopped || expectedGeneration != generation || !isConfigured() || client != null) return;
+                    DiagnosticJournal.info("spruthub.recovery", "reconnect timer; actual_ms="
+                            + (SystemClock.elapsedRealtime() - scheduledAt));
                     connectLocked(expectedGeneration);
                 }
-            }, Math.max(500L, base + jitter), TimeUnit.MILLISECONDS);
+            }, delayMs, TimeUnit.MILLISECONDS);
         } catch (RejectedExecutionException ignored) {
             // Normal when a late disconnect callback races with service shutdown.
         }
@@ -1054,6 +1082,10 @@ public final class SprutHubController {
     private void closeClientLocked() {
         SprutHubRpcClient old = client;
         client = null;
+        if (authDialogue != null) {
+            authDialogue.close();
+            authDialogue = null;
+        }
         snapshotEpoch++;
         snapshotInFlight = null;
         synchronized (catalogLock) {

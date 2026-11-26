@@ -492,7 +492,7 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // Step 1: Check ADB/Telnet connection — fail fast, before showing any other dialogs
+        // Step 1: Check ADB connection — fail fast, before showing any other dialogs
         if (selectionNeedsTransport() && !ShellExecutor.getInstance(this).hasWorkingTransport()) {
             Toast.makeText(this, R.string.service_mode_no_connection_detected, Toast.LENGTH_LONG).show();
             return;

@@ -3,6 +3,10 @@ package dezz.status.widget.sprut;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertArrayEquals;
+import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.fail;
 
 import org.json.JSONObject;
@@ -68,5 +72,35 @@ public final class SprutCloudChallengeTest {
         assertEquals(
                 SprutCloudChallenge.answer("secret", base.toString()),
                 SprutCloudChallenge.answer("secret", withUnknownFields.toString()));
+    }
+
+    @Test public void retriesReuseOnlyTheKeyForThisSaltAndCostAndWipeItOnClose() throws Exception {
+        JSONObject data = new JSONObject()
+                .put("rootSalt", "AAECAwQFBgcICQoLDA0ODw==")
+                .put("challenge", "AQIDBAUGBwg=").put("kdfParams", "m=32,t=2,p=1");
+        SprutCloudChallenge dialogue = new SprutCloudChallenge("test-password");
+        java.lang.reflect.Field key = SprutCloudChallenge.class.getDeclaredField("cachedKey");
+        key.setAccessible(true);
+        byte[] lastKey;
+        try (dialogue) {
+            String first = dialogue.sign(data.toString());
+            byte[] initialKey = (byte[]) key.get(dialogue);
+            data.put("challenge", "AgIDBAUGBwg=");
+            String next = dialogue.sign(data.toString());
+            assertSame(initialKey, key.get(dialogue));
+            assertNotEquals(first, next);
+            assertEquals(SprutCloudChallenge.answer("test-password", data.toString()), next);
+
+            data.put("kdfParams", "m=64,t=1,p=1");
+            assertEquals(SprutCloudChallenge.answer("test-password", data.toString()),
+                    dialogue.sign(data.toString()));
+            assertArrayEquals(new byte[32], initialKey);
+            data.put("rootSalt", "AQECAwQFBgcICQoLDA0ODw==");
+            assertEquals(SprutCloudChallenge.answer("test-password", data.toString()),
+                    dialogue.sign(data.toString()));
+            lastKey = (byte[]) key.get(dialogue);
+        }
+        assertArrayEquals(new byte[32], lastKey);
+        assertThrows(IOException.class, () -> dialogue.sign(data.toString()));
     }
 }

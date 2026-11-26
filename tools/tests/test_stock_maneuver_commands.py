@@ -27,6 +27,7 @@ SOURCES = {
  public class View implements ViewParent {public static int VISIBLE=0;public int visibility,id;public ViewParent parent;
  public Resources getResources(){return new Resources();}public Context getContext(){return new Context();}
  public int getVisibility(){return visibility;}public float getAlpha(){return 1;}public ViewParent getParent(){return parent;}
+ public int getWidth(){return 30;}public int getHeight(){return 40;}
  public View findViewById(int id){return this.id==id?this:null;}public ViewGroup.LayoutParams getLayoutParams(){return new ViewGroup.MarginLayoutParams();}}
 ''',
  'android/view/ViewGroup.java': '''package android.view; import java.util.*;public class ViewGroup extends View {
@@ -95,6 +96,44 @@ SOURCES = {
   owner.presenter=new Object();StockManeuverCommands.onChanged(owner);
   check(!external("turn-b").getBoolean("visible"));
  }
+ public static class Lane {
+  public java.util.List<?> getSecondaryLanesImages(){return java.util.Collections.emptyList();}
+  public Resource getHighlightedLaneImage(){return new Resource();}public Resource getLaneKindImage(){return null;}
+  public Resource getLaneKindCropImage(){return null;}public boolean getHasLeftOffset(){return false;}
+  public boolean getHasRightOffset(){return true;}public String getOverlap(){return "";}
+ }
+ public static class Container {
+  public android.view.ViewGroup group=new android.view.ViewGroup();
+  public android.view.ViewGroup getLaneItemsView(){return group;}
+ }
+ static void combinedCardUsesItsOwnLaneLayout()throws Exception{
+  Container view=new Container();view.group.add(new android.view.View());view.group.add(new android.view.View());
+  StockManeuverCommands.MapCard map=new StockManeuverCommands.MapCard();
+  map.observe("setItems",new Object[]{java.util.Arrays.asList(new Lane(),new Lane())},view);
+  map.observe("setDistance",new Object[]{"200","м"},view);
+  JSONObject main=new JSONObject(map.freeze(view,true)).getJSONObject("main");
+  check(!main.getBoolean("imageVisible") && main.getJSONArray("lanes").length()==2);
+  check(main.getJSONArray("lanes").getJSONObject(1).getInt("width")==30);
+  map.observe("setItems",new Object[]{java.util.Collections.singletonList(new Object())},view);
+  check(map.freeze(view,true).isEmpty());
+ }
+ static void mapCardKeepsSingleNativeRevision()throws Exception{
+  setup();StockManeuverCommands.MapCard map=new StockManeuverCommands.MapCard();
+  map.observe("setManeuverImage",new Object[]{new Resource()},owner);
+  map.observe("setNextRoadName",new Object[]{"Нагатинская наб."},owner);
+  map.observe("setDistance",new Object[]{"200","м"},owner);
+  String payload=map.freeze(owner,false);
+  map.observe("setDistance",new Object[]{"150","м"},owner);
+  JSONObject card=new JSONObject(StockManeuverCommands.mapCard(payload,9,3,"turn-a"));
+  JSONObject main=card.getJSONObject("main");
+  check(main.getString("distance").equals("200") && main.getString("unit").equals("м"));
+  check(main.getString("nextRoad").equals("Нагатинская наб.") && main.getString("image").equals("context_ra_turn_right"));
+  check(new JSONObject(map.freeze(owner,false)).getJSONObject("main").getString("distance").equals("150"));
+  check(map.freeze(owner,true).isEmpty());
+  String root=new JSONObject().put("maneuverIdentity","turn-a").put("maneuverCardJson",card.toString()).toString();
+  JSONObject routed=new JSONObject(new JSONObject(ManeuverDestinationVisibility.apply(root,"turn-b","turn-a")).getString("maneuverCardJson"));
+  check(routed.getBoolean("hudVisible") && !routed.getBoolean("clusterVisible"));
+ }
  static void destinationsHideIndependentlyOnlyAfterReplacement()throws Exception{
   setup();owner.isViewContentVisible=false;
   String root=new JSONObject().put("maneuverIdentity","turn-a").put("maneuverCardJson",external("turn-a").toString()).toString();
@@ -110,7 +149,7 @@ SOURCES = {
   owner.isViewContentVisible=true;
   root=new JSONObject().put("maneuverIdentity","turn-a").put("maneuverCardJson",external("turn-a").toString()).toString();
   JSONObject card=new JSONObject(new JSONObject(ManeuverDestinationVisibility.apply(root,"turn-a","turn-a")).getString("maneuverCardJson"));
-  check(card.getBoolean("hudVisible") && card.getBoolean("clusterVisible"));
+  check(!card.getBoolean("hudVisible") && !card.getBoolean("clusterVisible"));
   check(ManeuverDestinationVisibility.apply("broken","turn-a","turn-a").equals("broken"));
  }
  public static void main(String[] args)throws Exception{CommandsReplay.class.getDeclaredMethod(args[0]).invoke(null);}}
@@ -133,6 +172,8 @@ class StockManeuverCommandsTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls): cls.temp.cleanup()
     def replay(self, name): subprocess.run(['java','-cp',self.classpath,'ru.natro.navigation.CommandsReplay',name],check=True)
+    def test_map_card_lanes(self): self.replay('combinedCardUsesItsOwnLaneLayout')
+    def test_map_card_snapshot(self): self.replay('mapCardKeepsSingleNativeRevision')
     def test_epoch(self): self.replay('routeNeedsFreshCommand')
     def test_background_visibility(self): self.replay('backgroundWindowKeepsContentButNativeHideClears')
     def test_owner(self): self.replay('oldOwnerCannotCrossActivityOrPresenter')

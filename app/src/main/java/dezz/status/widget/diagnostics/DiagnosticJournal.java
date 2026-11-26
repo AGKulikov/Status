@@ -457,7 +457,9 @@ public final class DiagnosticJournal {
                 || "launcher-navigation".equals(component) || "navigator-launch".equals(component)
                 || "navigator-window".equals(component)
                 || "ancs-lifecycle".equals(component) || "runtime".equals(component)
-                || "startup".equals(component);
+                || "startup".equals(component) || "spruthub.state".equals(component)
+                || "spruthub.recovery".equals(component) || "spruthub.transport".equals(component)
+                || "spruthub.session".equals(component);
     }
 
     private static void writeLine(File file, Level level, String component, String rawMessage, long timestamp, long uptimeMs) {

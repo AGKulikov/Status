@@ -103,6 +103,76 @@ public final class StockManeuverCommands {
         });
     }
 
+    /** Native map balloon commands are recorded per view and frozen with its rendered texture. */
+    static final class MapCard {
+        private String distance = "", unit = "", road = "", image = "";
+        private JSONArray laneItems = new JSONArray(), signItems = new JSONArray();
+        private boolean screenSaver;
+
+        void observe(String name, Object[] args, Object view) {
+            try {
+                switch (name) {
+                    case "setDistance":
+                        distance = bounded(args[0]);
+                        unit = bounded(args[1]);
+                        break;
+                    case "setNextRoadName":
+                        road = bounded(args[0]);
+                        break;
+                    case "setManeuverImage":
+                        image = "";
+                        image = resource(args[0]);
+                        break;
+                    case "setItems":
+                        laneItems = null;
+                        laneItems = lanes(args[0]);
+                        break;
+                    case "setDirectionSignItems":
+                        signItems = null;
+                        signItems = args[0] == null || ((List<?>) args[0]).isEmpty()
+                                ? new JSONArray() : signs((View) call(container(view), "getView"), args[0]);
+                        break;
+                    case "setScreenSaverModeEnabled":
+                        screenSaver = Boolean.TRUE.equals(args[0]);
+                        break;
+                }
+            } catch (Exception invalid) {
+                // Keep malformed layers unavailable until a subsequent valid command replaces them.
+            }
+        }
+
+        private static Object container(Object view) throws Exception {
+            try { return call(view, "getContainer"); }
+            catch (NoSuchMethodException standalone) { return view; }
+        }
+
+        String freeze(Object view, boolean combined) {
+            try {
+                if (distance.isEmpty() || signItems == null || laneItems == null
+                        || (combined ? laneItems.length() == 0 : image.isEmpty())) return "";
+                JSONArray measured = combined ? geometry(
+                        (ViewGroup) call(container(view), "getLaneItemsView"), laneItems, true) : new JSONArray();
+                JSONObject main = new JSONObject().put("distance", distance).put("unit", unit)
+                        .put("nextRoad", road).put("imageVisible", !combined)
+                        .put("image", image).put("lanes", measured);
+                String json = new JSONObject().put("main", main).put("signs", signItems)
+                        .put("screenSaver", screenSaver).toString();
+                return json.length() < 30000 ? json : "";
+            } catch (Exception invalid) { return ""; }
+        }
+    }
+
+    static String mapCard(String payload, long revision, long epoch, String identity) {
+        try {
+            JSONObject card = new JSONObject(payload);
+            return card.put("schema", 1).put("routeEpoch", epoch).put("generation", revision)
+                    .put("revision", revision).put("visible", true).put("primaryVisible", false)
+                    .put("package", "ru.yandex.yandexnavi").put("versionCode", 739564630)
+                    .put("maneuverIdentity", identity).put("source", "route_balloon")
+                    .put("auxiliary", new JSONObject()).toString();
+        } catch (Exception invalid) { return ""; }
+    }
+
     /** One route-epoch snapshot; unavailable command data is explicit, never legacy fallback. */
     static String snapshot(Activity activity, long routeEpoch, boolean active) {
         return snapshot(activity, routeEpoch, active, null);
@@ -234,15 +304,21 @@ public final class StockManeuverCommands {
         return result;
     }
     private static JSONArray geometry(View owner, String name, JSONArray raw, boolean destination) throws Exception {
+        if (!visible(owner, name, destination) || raw.length() == 0) return new JSONArray();
+        return geometry((ViewGroup) child(owner, name), raw, false);
+    }
+
+    private static JSONArray geometry(ViewGroup group, JSONArray raw, boolean laidOut) throws Exception {
         JSONArray result = new JSONArray();
-        if (!visible(owner, name, destination) || raw.length() == 0) return result;
-        ViewGroup group = (ViewGroup) child(owner, name);
         if (group.getChildCount() != raw.length()) throw new IllegalStateException("Lane layout mismatch");
         for (int i = 0; i < raw.length(); i++) {
-            ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) group.getChildAt(i).getLayoutParams();
-            if (params.width <= 0 || params.height <= 0) throw new IllegalStateException("Unresolved lane size");
-            result.put(new JSONObject(raw.getJSONObject(i).toString()).put("width", params.width)
-                    .put("height", params.height).put("left", params.leftMargin).put("right", params.rightMargin));
+            View child = group.getChildAt(i);
+            ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) child.getLayoutParams();
+            int width = laidOut ? child.getWidth() : params.width;
+            int height = laidOut ? child.getHeight() : params.height;
+            if (width <= 0 || height <= 0) throw new IllegalStateException("Unresolved lane size");
+            result.put(new JSONObject(raw.getJSONObject(i).toString()).put("width", width)
+                    .put("height", height).put("left", params.leftMargin).put("right", params.rightMargin));
         }
         return result;
     }

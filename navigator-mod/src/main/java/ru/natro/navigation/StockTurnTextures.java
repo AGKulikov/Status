@@ -30,11 +30,13 @@ public final class StockTurnTextures {
         // Identity of the native view, independent of its changing distance/texture.
         // A token does not keep the view, its Context or its window alive.
         final Object source;
+        final String card;
         final CombinedLaneArtwork artwork;
 
         Texture(Bitmap bitmap, Object provider, float anchorX, float anchorY,
-                boolean combined, long revision, CombinedLaneArtwork artwork, Object source) {
+                boolean combined, long revision, CombinedLaneArtwork artwork, Object source, String card) {
             this.source = source;
+            this.card = card;
             this.artwork = artwork;
             this.bitmap = bitmap;
             this.provider = provider;
@@ -65,7 +67,7 @@ public final class StockTurnTextures {
             Class<?> type = Class.forName(FACTORY, false, loader);
             if (!type.isInstance(delegate)) return delegate;
             WeakReference<Object> sourceWindow = new WeakReference<>(mapWindow);
-            return forward(type, delegate, (method, result, proxy) -> {
+            return forward(type, delegate, (method, result, proxy, args) -> {
                 boolean combined = method.getName().equals("createLaneAndManeuverBalloonView");
                 if (!combined && !method.getName().equals("createManeuverBalloonView")) return result;
                 String owner = VIEWS + (combined ? "LaneAndManeuverBalloonViewImpl" : "ManeuverBalloonViewImpl");
@@ -84,7 +86,9 @@ public final class StockTurnTextures {
         Method x = point.getMethod("getX"), y = point.getMethod("getY");
         Method image = api.getMethod("createTexture").getReturnType().getMethod("getImage");
         Object source = new Object();
-        return forward(api, view, (method, provider, owner) -> {
+        StockManeuverCommands.MapCard card = new StockManeuverCommands.MapCard();
+        return forward(api, view, (method, provider, owner, args) -> {
+            if (args != null) card.observe(method.getName(), args, view);
             if (method.getName().equals("createTexture") && window.get() != null) {
                 // The pinned createTexture() allocates a new ARGB bitmap, draws it once and returns
                 // ImageProvider.fromBitmap. Read the matching normalized anchor after that layout.
@@ -99,7 +103,7 @@ public final class StockTurnTextures {
                     if (ax >= 0 && ax <= 1 && ay >= 0 && ay <= 1 && bitmap != null
                             && !bitmap.isRecycled() && bitmap.getWidth() > 0 && bitmap.getHeight() > 0
                             && (long) bitmap.getWidth() * bitmap.getHeight() <= MAX_PIXELS) {
-                        record(window, owner, bitmap, provider, ax, ay, combined, view, source);
+                        record(window, owner, bitmap, provider, ax, ay, combined, view, source, card.freeze(view, combined));
                         recorded = true;
                     }
                 } finally {
@@ -111,7 +115,7 @@ public final class StockTurnTextures {
     }
 
     private interface Observation {
-        Object after(Method method, Object original, Object proxy) throws ReflectiveOperationException;
+        Object after(Method method, Object original, Object proxy, Object[] args) throws ReflectiveOperationException;
     }
 
     private static Object forward(Class<?> api, Object original, Observation observation) {
@@ -128,7 +132,7 @@ public final class StockTurnTextures {
                 throw failure.getCause();
             }
             try {
-                return observation.after(method, result, proxy);
+                return observation.after(method, result, proxy, args);
             } catch (Throwable unavailable) {
                 // A failed observation has no effect on Navigator's original render.
                 return result;
@@ -138,17 +142,17 @@ public final class StockTurnTextures {
     }
 
     private static synchronized void record(WeakReference<Object> window, Object owner, Bitmap bitmap,
-                                            Object provider, float ax, float ay, boolean combined, Object view, Object source) {
+                                            Object provider, float ax, float ay, boolean combined, Object view, Object source, String card) {
         for (Capture capture : captures) {
             Texture old = capture.texture;
             if (capture.view.get() == owner && capture.window.get() == window.get()
                     && old.anchorX == ax && old.anchorY == ay && old.combined == combined
-                    && !old.bitmap.isRecycled() && old.bitmap.sameAs(bitmap)) return;
+                    && old.card.equals(card) && !old.bitmap.isRecycled() && old.bitmap.sameAs(bitmap)) return;
         }
         CombinedLaneArtwork artwork = CombinedLaneArtwork.capture(view, bitmap);
         remove(owner);
         if (captures.size() == MAX_TEXTURES) captures.remove(0);
-        captures.add(new Capture(window, owner, new Texture(bitmap, provider, ax, ay, combined, ++sequence, artwork, source)));
+        captures.add(new Capture(window, owner, new Texture(bitmap, provider, ax, ay, combined, ++sequence, artwork, source, card)));
     }
 
     private static synchronized void remove(Object owner) {

@@ -114,7 +114,7 @@ public class CombinedLaneArtworkTest {
         profile.laneGuidanceCardColor = "#8000FF00";
         LaneGuidanceAppearance style = new LaneGuidanceAppearance(profile);
         for (String side : new String[]{"LEFT_CENTER","RIGHT_CENTER","TOP_LEFT","TOP_RIGHT",
-                "BOTTOM_LEFT","BOTTOM_RIGHT","TOP_CENTER","BOTTOM_CENTER","DOCKED"}) {
+                "BOTTOM_LEFT","BOTTOM_RIGHT","TOP_CENTER","BOTTOM_CENTER"}) {
             TurnBalloonLayout layout = new TurnBalloonLayout(120,60,12,side);
             Bitmap rendered = artwork.renderPlaced(style,1.5f,layout);
             assertEquals(layout.width,rendered.getWidth());
@@ -122,7 +122,6 @@ public class CombinedLaneArtworkTest {
             assertEquals(Color.RED,rendered.getPixel((int)layout.left+37,(int)layout.top+22));
             assertEquals(Color.YELLOW,rendered.getPixel((int)layout.left+67,(int)layout.top+22));
             assertEquals(0x8000FF00,rendered.getPixel((int)layout.left+90,(int)layout.top+37));
-            if (layout.docked) { assertEquals(120,rendered.getWidth());assertEquals(60,rendered.getHeight()); }
         }
     }
 

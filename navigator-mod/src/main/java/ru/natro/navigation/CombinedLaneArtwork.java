@@ -152,15 +152,13 @@ final class CombinedLaneArtwork {
                 : style.cornerRadius * factor;
         if (style.cornerRadius < 0) stockBody.transform(transform, outline);
         else outline.addRoundRect(targetBody, radius, radius, Path.Direction.CW);
-        if (!layout.docked) {
-            float[] base = BalloonGeometry.tailBase(targetBody.left, targetBody.top,
-                    targetBody.right, targetBody.bottom, radius, layout.tipX, layout.tipY,
-                    Math.max(2f, 6f * factor));
-            Path pointer = new Path();
-            pointer.moveTo(layout.tipX, layout.tipY);
-            pointer.lineTo(base[0], base[1]); pointer.lineTo(base[2], base[3]); pointer.close();
-            if (!outline.op(pointer, Path.Op.UNION)) throw new IllegalStateException("Pointer union");
-        }
+        float[] base = BalloonGeometry.tailBase(targetBody.left, targetBody.top,
+                targetBody.right, targetBody.bottom, radius, layout.tipX, layout.tipY,
+                Math.max(2f, 6f * factor));
+        Path pointer = new Path();
+        pointer.moveTo(layout.tipX, layout.tipY);
+        pointer.lineTo(base[0], base[1]); pointer.lineTo(base[2], base[3]); pointer.close();
+        if (!outline.op(pointer, Path.Op.UNION)) throw new IllegalStateException("Pointer union");
         Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
         paint.setColor(style.cardColor == null ? stockColor : Color.parseColor(style.cardColor));
         canvas.drawPath(outline, paint);

@@ -161,6 +161,7 @@ dependencies {
     implementation 'androidx.concurrent:concurrent-futures:1.3.0'
     implementation libs.material
     implementation libs.okhttp
+    testImplementation "com.squareup.okhttp3:mockwebserver:${libs.versions.okhttp.get()}"
     // Sprut's current cloud login proves password knowledge with
     // Argon2id -> HKDF-SHA256 -> Ed25519 instead of sending the password.
     implementation libs.bouncycastle

@@ -86,7 +86,7 @@ public final class AdbConsoleSession implements AutoCloseable {
                 if (!AdbTransport.probe("127.0.0.1", port, this::takeSocket))
                     throw new IOException("порт не отвечает по протоколу ADB");
                 checkCancelled();
-                AdbTransport candidate = AdbTransport.connect(context, "127.0.0.1", port, this::takeSocket);
+                AdbTransport candidate = AdbTransport.connectInteractive(context, "127.0.0.1", port, this::takeSocket);
                 if (cancelled.get()) { candidate.close(); checkCancelled(); }
                 transport = candidate; preferredPort = port; endpoint = "Connected · 127.0.0.1:" + port;
                 return;

@@ -22,7 +22,9 @@ final class PrimaryTurnPlacemark {
     private int loadingScale, displayedWidth, displayedHeight;
     private float loadingZ;
     private TurnBalloonLayout displayedLayout, loadingLayout;
-    private Object displayedPoint;
+    private String placementReason = "none";
+
+    String placementReason() { return placementReason; }
 
     boolean replacesCard(PrimaryTurnSample current, MapOverlayPlacementCoordinator coordinator) {
         if (current == null || displayed == null || placemark == null
@@ -33,10 +35,11 @@ final class PrimaryTurnPlacemark {
                 || current.texture.source != displayed.texture.source
                 || !isCurrent(displayed, current.routeEpoch, true,
                         SystemClock.elapsedRealtime(), PrimaryTurnSample.FRESH_MS)) return false;
-        if (displayedLayout != null && displayedLayout.docked)
-            return displayedPoint != null
-                    && displayedWidth <= coordinator.viewportWidth() - 2 * TurnBalloonLayout.MARGIN
-                    && displayedHeight <= coordinator.viewportHeight() - 2 * TurnBalloonLayout.MARGIN;
+        if (displayedLayout != null) {
+            return coordinator.isBodyInsideViewport(displayed.turn.latitude, displayed.turn.longitude,
+                    displayedLayout.tipX, displayedLayout.tipY, displayedLayout.left, displayedLayout.top,
+                    displayedLayout.right, displayedLayout.bottom);
+        }
         return coordinator.isBitmapInsideViewport(displayed.turn.latitude, displayed.turn.longitude,
                 displayedWidth, displayedHeight,
                 displayedLayout == null ? displayed.texture.anchorX : displayedLayout.anchorX(),
@@ -44,7 +47,7 @@ final class PrimaryTurnPlacemark {
     }
 
     String presentation() {
-        if (displayed != null) return displayedLayout != null && displayedLayout.docked ? "docked" : "route";
+        if (displayed != null) return "route";
         return loading != null ? "loading" : "absent";
     }
 
@@ -66,31 +69,25 @@ final class PrimaryTurnPlacemark {
         int gap = Math.max(3, Math.round(8f * scale / 100f));
         ArrayList<MapOverlayPlacementCoordinator.Footprint> footprints = new ArrayList<>();
         for (String side : MapOverlayPlacementCoordinator.placementLegNames()) {
-            TurnBalloonLayout l = new TurnBalloonLayout(w, h, gap, side);
-            footprints.add(new MapOverlayPlacementCoordinator.Footprint(side, l.width, l.height,
-                    l.anchorX(), l.anchorY(), new RectF(l.left, l.top, l.right, l.bottom)));
+            for (int variant = 0; variant < 3; variant++) {
+                TurnBalloonLayout l = new TurnBalloonLayout(w, h, gap, side, variant);
+                footprints.add(new MapOverlayPlacementCoordinator.Footprint(side, l.width, l.height,
+                        l.anchorX(), l.anchorY(), new RectF(l.left, l.top, l.right, l.bottom), variant));
+            }
         }
         coordinator.clearOwner(OWNER);
         NavigatorStatePublisher.RouteTurnFrame t = sample.turn;
         MapOverlayPlacementCoordinator.Placement previous = displayedLayout == null ? null
                 : new MapOverlayPlacementCoordinator.Placement(displayedLayout.anchorX(),
-                        displayedLayout.anchorY(), displayedLayout.side);
+                        displayedLayout.anchorY(), displayedLayout.side, displayedLayout.variant);
         MapOverlayPlacementCoordinator.Placement p = coordinator.reserveIfClear(OWNER, t.id,
                 t.latitude, t.longitude, w, h, true, t.routeSegmentIndex,
                 t.routeSegmentPosition, previous, footprints);
-        return new TurnBalloonLayout(w, h, gap, p == null ? "DOCKED" : p.legName);
+        placementReason = coordinator.lastOptionalFailure();
+        return p == null ? null : new TurnBalloonLayout(w, h, gap, p.legName, p.variant);
     }
 
-    private static Object point(PrimaryTurnSample sample, TurnBalloonLayout layout,
-                                MapOverlayPlacementCoordinator coordinator) throws Exception {
-        if (layout != null && layout.docked) {
-            // The bottom of a pitched map stays on the ground plane; the top may be above
-            // its horizon and screenToWorld would return null precisely when fallback is needed.
-            Object p = coordinator.pointAtScreen(TurnBalloonLayout.MARGIN,
-                    coordinator.viewportHeight() - TurnBalloonLayout.MARGIN);
-            if (p == null) throw new IllegalStateException("No destination viewport projection");
-            return p;
-        }
+    private static Object point(PrimaryTurnSample sample) throws Exception {
         return Class.forName("com.yandex.mapkit.geometry.Point")
                 .getConstructor(double.class, double.class)
                 .newInstance(sample.turn.latitude, sample.turn.longitude);
@@ -111,7 +108,21 @@ final class PrimaryTurnPlacemark {
             throw new IllegalArgumentException("Invalid primary maneuver artwork or anchor");
 
         TurnBalloonLayout nextLayout = layout(sample, scale, coordinator, appearance);
-        Object nextPoint = point(sample, nextLayout, coordinator);
+        if (texture.artwork != null && nextLayout == null) {
+            clear(collection, coordinator);
+            return;
+        }
+        if (texture.artwork == null) {
+            if (!coordinator.isBitmapInsideViewport(turn.latitude, turn.longitude,
+                    Math.round(texture.bitmap.getWidth() * scale / 100f),
+                    Math.round(texture.bitmap.getHeight() * scale / 100f), texture.anchorX, texture.anchorY)) {
+                placementReason = "stock_texture_outside_viewport";
+                clear(collection, coordinator);
+                return;
+            }
+            placementReason = "none";
+        }
+        Object nextPoint = point(sample);
 
         if (displayed != null && displayed.routeEpoch == sample.routeEpoch
                 && displayed.turn.id.equals(turn.id) && displayed.turn.latitude == turn.latitude
@@ -122,7 +133,6 @@ final class PrimaryTurnPlacemark {
             remove(collection, loading);
             loading = null; loadingSample = null; loadingCallback = null;
             displayed = sample;
-            displayedPoint = nextPoint;
             invoke(placemark, "setGeometry", new Class<?>[]{Class.forName("com.yandex.mapkit.geometry.Point")}, nextPoint);
             reserve(coordinator);
             return;
@@ -191,8 +201,7 @@ final class PrimaryTurnPlacemark {
                         displayedScale = loadingScale;
                         displayedZ = loadingZ;
                         displayedLayout = loadingLayout;
-                        displayedPoint = point(displayed, displayedLayout, coordinator);
-                        invoke(candidate, "setGeometry", new Class<?>[]{pointClass}, displayedPoint);
+
                         float rasterScale = texture.artwork == null ? scale / 100f : 1f;
                         displayedWidth = Math.round(bitmap.getWidth() * rasterScale);
                         displayedHeight = Math.round(bitmap.getHeight() * rasterScale);
@@ -233,33 +242,12 @@ final class PrimaryTurnPlacemark {
     void reserve(MapOverlayPlacementCoordinator coordinator) {
         coordinator.clearOwner(OWNER);
         if (displayed == null) return;
-        if (displayedLayout != null && displayedLayout.docked) {
-            int m = TurnBalloonLayout.MARGIN;
-            int bottom = coordinator.viewportHeight() - m;
-            coordinator.reserveScreen(OWNER, displayed.turn.id,
-                    new RectF(m, bottom - displayedHeight, m + displayedWidth, bottom));
-            return;
-        }
         NavigatorStatePublisher.RouteTurnFrame turn = displayed.turn;
         StockTurnTextures.Texture texture = displayed.texture;
         coordinator.reserveFixed(OWNER, turn.id, turn.latitude, turn.longitude,
                 displayedWidth, displayedHeight,
                 displayedLayout == null ? texture.anchorX : displayedLayout.anchorX(),
                 displayedLayout == null ? texture.anchorY : displayedLayout.anchorY());
-    }
-
-    void repositionFixed(MapOverlayPlacementCoordinator coordinator) {
-        if (displayedLayout == null || !displayedLayout.docked || placemark == null) return;
-        try {
-            Object point = point(displayed, displayedLayout, coordinator);
-            invoke(placemark, "setGeometry",
-                    new Class<?>[]{Class.forName("com.yandex.mapkit.geometry.Point")}, point);
-            displayedPoint = point;
-        } catch (Exception unavailable) {
-            // A formerly docked icon is no longer a verified on-screen replacement.
-            // Keep the fixed command card until this destination can project again.
-            displayedPoint = null;
-        }
     }
 
     void clear(Object collection, MapOverlayPlacementCoordinator coordinator) {
@@ -271,7 +259,6 @@ final class PrimaryTurnPlacemark {
         placemark = null;
         displayed = null;
         displayedLayout = loadingLayout = null;
-        displayedPoint = null;
         coordinator.clearOwner(OWNER);
     }
 

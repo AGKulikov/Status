@@ -33,7 +33,6 @@ public class ConnectionStorage {
     private static final String KEY_TRANSPORT = "transport";
 
     public static final String TRANSPORT_ADB = "ADB";
-    public static final String TRANSPORT_TELNET = "Telnet";
 
     private final SharedPreferences prefs;
 
@@ -62,7 +61,7 @@ public class ConnectionStorage {
         String host = prefs.getString(KEY_HOST, null);
         int port = prefs.getInt(KEY_PORT, -1);
         String transport = prefs.getString(KEY_TRANSPORT, null);
-        if (host == null || port <= 0 || transport == null) return null;
+        if (host == null || port <= 0 || port > 65535 || !TRANSPORT_ADB.equals(transport)) return null;
         return new Endpoint(host, port, transport);
     }
 

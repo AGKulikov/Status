@@ -775,7 +775,7 @@ final class NavigatorStatePublisher {
             String snapshot = snapshotDue
                     ? buildSnapshot(currentGuidance, currentNaviKitGuidance,
                             activeRoute, inputs,
-                            activeTrafficLights, activeLaneState).toString() : null;
+                            activeTrafficLights, activeLaneState, turnProof).toString() : null;
             if (snapshotDue) lastSnapshotDispatchElapsedMs = elapsedNow;
             String route = routeChanged || forceRoute ? buildRoutePayload().toString() : null;
             sink.onNavigationState(snapshot, route, activeRoute, routeEpoch,
@@ -1117,7 +1117,7 @@ final class NavigatorStatePublisher {
                                      Object route,
                                      SnapshotInputs inputs,
                                      List<TrafficLightFrame> trafficLights,
-                                     LaneState lanes)
+                                     LaneState lanes, PrimaryTurnSample turnProof)
             throws Exception {
         long now = System.currentTimeMillis();
         Object routePosition = inputs.routePosition;
@@ -1149,6 +1149,16 @@ final class NavigatorStatePublisher {
         builtManeuverArtworkIdentity = manoeuvre.identity;
         builtManeuverArtwork = manoeuvre.artwork;
         builtManeuverArtworkSignature = manoeuvre.artworkSignature;
+        // Observe the pinned command identity even on frames presented by the map turn.
+        String card = StockManeuverCommands.snapshotForDestinations(
+                activityReference.get(), routeEpoch, routeActive, manoeuvre.identity);
+        if (PrimaryTurnPlacemark.isCurrent(turnProof, routeEpoch, routeActive,
+                SystemClock.elapsedRealtime(), PrimaryTurnSample.FRESH_MS)
+                && manoeuvre.identity.equals(turnProof.maneuverIdentity()) && !turnProof.texture.card.isEmpty()) {
+            String captured = StockManeuverCommands.mapCard(turnProof.texture.card, turnProof.texture.revision,
+                    routeEpoch, manoeuvre.identity);
+            if (!captured.isEmpty()) card = captured;
+        }
         JSONObject result = new JSONObject()
                 .put("schema", 1)
                 .put("sequence", snapshotSequence)
@@ -1167,8 +1177,7 @@ final class NavigatorStatePublisher {
                 .put("maneuverAuxiliaryDistanceMeters",
                         manoeuvre.auxiliary.distanceMeters)
                 .put("maneuverDisplayDistance", manoeuvre.displayDistance)
-                .put("maneuverCardJson", StockManeuverCommands.snapshotForDestinations(
-                        activityReference.get(), routeEpoch, routeActive, manoeuvre.identity))
+                .put("maneuverCardJson", card)
                 .put("street", text(invoke(currentGuidance, "getRoadName")))
                 .put("destination", routeActive ? destinationForRoute(route) : "")
                 .put("maneuverDistanceMeters", manoeuvre.distanceMeters)

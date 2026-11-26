@@ -13,7 +13,7 @@
     <string name="service_mode_apps_restore_error">Ошибка восстановления приложения: %s</string>
     <string name="service_mode_no_apps_selected">Приложения не выбраны</string>
     <string name="service_mode_list_loading">Загрузка списка приложений…</string>
-    <string name="service_mode_no_connection_detected">ADB или Telnet недоступны. Скрыть или восстановить приложения нельзя.</string>
+    <string name="service_mode_no_connection_detected">Нет доступа по ADB. Откройте консоль ADB в Natro и разрешите подключение на магнитоле.</string>
     <string name="service_mode_hide_apps">Скрыть выбранные приложения</string>
     <string name="service_mode_restore_apps">Восстановить выбранные приложения</string>
 

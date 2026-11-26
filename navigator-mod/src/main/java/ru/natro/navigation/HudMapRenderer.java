@@ -1268,9 +1268,6 @@ final class HudMapRenderer {
     /** Re-evaluates collisions after camera movement without redrawing unchanged textures. */
     private void relayoutOverlays(boolean force) {
         if (mapWindow == null) return;
-        // A fixed fallback follows screen coordinates at the camera cadence, independently
-        // of the less frequent and more expensive eight-side collision pass.
-        laneGuidanceMapLayer.repositionFixed();
         long now = android.os.SystemClock.elapsedRealtime();
         if (!force && now - lastOverlayLayoutElapsedMs < 200L) return;
         lastOverlayLayoutElapsedMs = now;

@@ -201,8 +201,6 @@ final class LaneGuidanceMapLayer {
         }
     }
 
-    void repositionFixed() { turnPlacemark.repositionFixed(placementCoordinator); }
-
     boolean hasManeuverReplacement() {
         return map != null && latestRouteActive && turnSample != null
                 && (turnSample.texture.combined ? enabled : showRouteTurns)
@@ -213,15 +211,12 @@ final class LaneGuidanceMapLayer {
 
     String maneuverReplacementIdentity() {
         if (!hasManeuverReplacement()) return "";
-        NavigatorStatePublisher.RouteTurnFrame turn = turnSample.turn;
-        // Same route-position identity as the next maneuver snapshot. A nearby lane-only
-        // site, or a later turn already visible on the map, cannot acknowledge this card.
-        return "maneuver:" + turnSample.routeEpoch + ':' + turn.routeSegmentIndex + ':'
-                + Math.round(turn.routeSegmentPosition * 1_000_000d) + ':' + turn.action;
+        return turnSample.maneuverIdentity();
     }
 
     private void reportTurn(String reason) {
         String state = reason + "; presentation=" + turnPlacemark.presentation()
+                + "; placement=" + turnPlacemark.placementReason()
                 + "; replacement_ready=" + hasManeuverReplacement();
         if (state.equals(lastTurnState)) return;
         lastTurnState = state;

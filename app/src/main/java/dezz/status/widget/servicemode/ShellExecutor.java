@@ -51,7 +51,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 /**
- * Discovers a working {@link ShellTransport} (Telnet or ADB) and runs pm commands through it.
+ * Discovers a working {@link ShellTransport} over authenticated ADB and runs pm commands through it.
  * <p>
  * Discovery has two phases:
  * <ol>
@@ -60,7 +60,7 @@ import java.util.concurrent.atomic.AtomicReference;
  *         and {@code restoreSelectedApps} are usable within ~1 second on app restart.</li>
  *     <li><b>Full scan.</b> For each IPv4 address bound to the device (loopback +
  *         every "up" non-loopback interface) scan every TCP port 1..65535, then probe
- *         each open port for ADB / Telnet support. Runs to completion regardless of
+ *         each open port for ADB support. Runs to completion regardless of
  *         whether the cache phase succeeded — so the diagnostic dialog always shows the
  *         full picture and the cache is rewritten with the current set of working ports.</li>
  * </ol>
@@ -68,7 +68,7 @@ import java.util.concurrent.atomic.AtomicReference;
 public class ShellExecutor {
     private static final String TAG = "ShellExecutor";
 
-    /** Concurrency cap when probing ADB/Telnet on detected open ports. */
+    /** Concurrency cap when probing ADB on detected open ports. */
     private static final int PROTOCOL_PROBE_THREADS = 4;
 
     /** How many hosts get scanned in parallel during the full discovery phase. */
@@ -149,7 +149,7 @@ public class ShellExecutor {
 
     /** One protocol probe attempt against an open port. */
     public static class ProbeAttempt {
-        public final String transport;       // "ADB" or "Telnet"
+        public final String transport;       // "ADB"
         public final boolean success;
         /** Brief failure description when {@code success == false}; null otherwise. */
         public final String errorMessage;
@@ -164,7 +164,7 @@ public class ShellExecutor {
     /** One open port on a host with the protocol probes that have been attempted on it. */
     public static class PortResult {
         public final int port;
-        /** Empty until probes start; populated as ADB/Telnet probes finish. */
+        /** Empty until probes start; populated as ADB probes finish. */
         public final List<ProbeAttempt> probes;
         public final boolean isActive;
 
@@ -345,7 +345,7 @@ public class ShellExecutor {
                                     Map<String, HostScanState> states,
                                     StatusCallback callback) {
         if (!states.containsKey(e.host)) return;
-        ProbeAttempt attempt = tryProtocol(e.host, e.port, e.transport);
+        ProbeAttempt attempt = probeAdb(e.host, e.port);
         if (attempt.success) {
             // Cache hit still works — record it. Full scan will discover the same port
             // again (and won't re-probe since the slot is already non-empty).
@@ -409,7 +409,7 @@ public class ShellExecutor {
         }
         publish(callback, states, false);
 
-        // 2) Probe each open port for ADB / Telnet. Daemon factory so the workers don't
+        // 2) Probe each open port for ADB. Daemon factory so the workers don't
         // pin the process if a probe lingers — bounded handshake should already prevent it,
         // but defensive: stuck workers aren't worth keeping the JVM around for.
         if (openPorts.isEmpty()) return;
@@ -438,11 +438,6 @@ public class ShellExecutor {
         }
     }
 
-    /**
-     * Try ADB first (fast handshake), then Telnet on the same port. Records every attempt
-     * (success or failure with diagnostic message) so the dialog can explain why a port
-     * with an open socket didn't end up usable.
-     */
     private void probeProtocols(String host, int port,
                                 Map<String, HostScanState> states,
                                 StatusCallback callback) {
@@ -452,48 +447,17 @@ public class ShellExecutor {
             if (existing != null && existing.hasSupportedTransport()) return;
         }
 
-        List<ProbeAttempt> attempts = new ArrayList<>(2);
-        ProbeAttempt adb = tryProtocol(host, port, ConnectionStorage.TRANSPORT_ADB);
-        attempts.add(adb);
-        if (!adb.success) {
-            attempts.add(tryProtocol(host, port, ConnectionStorage.TRANSPORT_TELNET));
-        }
-        recordPortResult(host, port, attempts, states);
+        recordPortResult(host, port, Collections.singletonList(probeAdb(host, port)), states);
         publish(callback, states, false);
     }
 
-    /**
-     * Connect with the given transport and run the canonical probe command.
-     * Returns a {@link ProbeAttempt} carrying success/failure and a short diagnostic
-     * for the failure case (exception class + message, or unexpected response).
-     */
-    private ProbeAttempt tryProtocol(String host, int port, String transport) {
-        if (ConnectionStorage.TRANSPORT_ADB.equals(transport)) {
-            // Use a manual handshake instead of adblib — see AdbTransport.probe javadoc.
-            // adblib's parseAdbMessage trusts peer-supplied payloadLength and OOMs the
-            // entire process when probing a non-ADB port that returns garbage bytes.
-            try {
-                return AdbTransport.probe(host, port)
-                        ? new ProbeAttempt(transport, true, null)
-                        : new ProbeAttempt(transport, false, "Not ADB");
-            } catch (Throwable t) {
-                return new ProbeAttempt(transport, false, describeException(t));
-            }
-        }
-
-        ShellTransport t = null;
-        try {
-            t = TelnetTransport.connect(host, port);
-            String response = t.exec("pm path android");
-            if (response.contains("package:")) {
-                return new ProbeAttempt(transport, true, null);
-            }
-            return new ProbeAttempt(transport, false,
-                    "pm path android returned: " + truncate(response, 120));
-        } catch (Exception e) {
-            return new ProbeAttempt(transport, false, describeException(e));
-        } finally {
-            if (t != null) try { t.close(); } catch (Exception ignored) {}
+    private ProbeAttempt probeAdb(String host, int port) {
+        String adb = ConnectionStorage.TRANSPORT_ADB;
+        if (!AdbTransport.probe(host, port)) return new ProbeAttempt(adb, false, "ADB unavailable");
+        try (ShellTransport verified = AdbTransport.connect(appContext, host, port)) {
+            return new ProbeAttempt(adb, true, null);
+        } catch (Exception failure) {
+            return new ProbeAttempt(adb, false, describeException(failure));
         }
     }
 
@@ -906,10 +870,7 @@ public class ShellExecutor {
 
         boolean becameActive = false;
         if (successful != null && activeFactory == null) {
-            String transport = successful.transport;
-            TransportFactory factory = ConnectionStorage.TRANSPORT_TELNET.equals(transport)
-                    ? () -> TelnetTransport.connect(host, port)
-                    : () -> AdbTransport.connect(appContext, host, port);
+            TransportFactory factory = () -> AdbTransport.connect(appContext, host, port);
             synchronized (this) {
                 if (activeFactory == null) {
                     activeFactory = factory;

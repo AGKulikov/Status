@@ -1,5 +1,5 @@
 {
-  "ledger_sha256": "e28cf72df2bcde3f1703041610dff57e7d64b9c2fd93b1362b31bb5bef392c59",
+  "ledger_sha256": "73386b5f808a5de37c329a9b17bc41b285330b077b04d2e1b946197a9fda0f55",
   "canonical": {
     "FILES-001": {
       "line": 49,
@@ -1792,6 +1792,10 @@
     "FILES-004": {
       "line": 6239,
       "module": "modules/FILES.md"
+    },
+    "NATRO-031": {
+      "line": 6505,
+      "module": "modules/NATRO.md"
     }
   },
   "sections": [
@@ -4764,9 +4768,39 @@
     {
       "key": "S292",
       "start": 6491,
-      "end": 6495,
+      "end": 6496,
       "level": 2,
       "title": "24.11.2026 — DOC-UPDATE-20261124: порядок обновления требований и описания",
+      "parents": [
+        "S000"
+      ]
+    },
+    {
+      "key": "S293",
+      "start": 6497,
+      "end": 6500,
+      "level": 2,
+      "title": "26.11.2026 — CARD-026, две карточки на HUD в 3.5.7",
+      "parents": [
+        "S000"
+      ]
+    },
+    {
+      "key": "S294",
+      "start": 6501,
+      "end": 6510,
+      "level": 2,
+      "title": "26.11.2026 — восстановление облачного сеанса SprutHub",
+      "parents": [
+        "S000"
+      ]
+    },
+    {
+      "key": "S295",
+      "start": 6511,
+      "end": 6515,
+      "level": 2,
+      "title": "26.11.2026 — подготовка совместимости пары 3.5.8",
       "parents": [
         "S000"
       ]
