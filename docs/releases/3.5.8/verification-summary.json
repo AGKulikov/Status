@@ -1,0 +1,98 @@
+{
+  "sourceCommit": "8c2e078f8d5715cf79830507450e1c79b877e024",
+  "sourceTree": "e7302da7d1c6fb3a97f1a4781a9781a3a08042bc",
+  "orchestratorCommit": "ad6114011f85fe4da579b762d1d884f9e761e7fc",
+  "runId": 45869125778,
+  "runNumber": 1,
+  "artifactHashes": {
+    "Natro-3.5.8-signing-tools-1": "sha256:14e803e0e235329e7c912d0ea6d59c88a0a115bc1f8041137d09f79a9079cbd4",
+    "Natro-3.5.8-offline-signing-1": "sha256:639f3f50bc8d6e042fe0dd574ee7ef1eda374b1decc43ba43d8f2150d61dbd94"
+  },
+  "version": "3.5.8",
+  "androidTests": {
+    "tests": 2380,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "toolTestsLocal": {
+    "tests": 323,
+    "failures": 0,
+    "errors": 0
+  },
+  "installOver357MetadataVerified": true,
+  "fieldAcceptance": "OPEN",
+  "publicChannelReadback": "verified",
+  "signature": {
+    "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+    "singleSigner": true,
+    "v2": true,
+    "v3": true,
+    "exactApi28": true,
+    "zipalign16KiB": true
+  },
+  "pairedDelivery": true,
+  "navigatorChangedPayload": [
+    "AndroidManifest.xml",
+    "classes19.dex"
+  ],
+  "navigatorUnchangedPayloadEntries": 17225,
+  "packages": {
+    "natro": {
+      "schema": 1,
+      "channel": "stable",
+      "package": "ru.natro.statuswidget",
+      "versionCode": 208021391,
+      "versionName": "3.5.8",
+      "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+      "sha256": "1b386faf8df813c1a01a8d4a1833b28165f54a7e52560809326fe0b75a175f59",
+      "size": 30431986,
+      "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.5.8/Natro-3.5.8-signed.apk"
+    },
+    "navigator": {
+      "schema": 1,
+      "channel": "stable",
+      "package": "ru.yandex.yandexnavi",
+      "versionCode": 739564639,
+      "versionName": "30.3.0 Natro 3.5.8",
+      "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+      "sha256": "364e1cd52edf67cf1a735cc589ecfe54db80cccfd8f7a3858485ea489a1ad778",
+      "size": 156509802,
+      "url": "https://github.com/AGKulikov/Status/releases/download/natro-v3.5.8/Navigator-30.3.0-Natro-3.5.8-signed.apk"
+    }
+  },
+  "requirements": [
+    "REL-001",
+    "REL-002",
+    "REL-003",
+    "REL-004",
+    "REL-005",
+    "REL-006",
+    "REL-007",
+    "REL-008",
+    "REL-009",
+    "REL-010",
+    "REL-011",
+    "REL-013",
+    "REL-014",
+    "REL-015",
+    "REL-017",
+    "BASE-001",
+    "BASE-004",
+    "BASE-006",
+    "CARD-017",
+    "CARD-018",
+    "CARD-019",
+    "CARD-020",
+    "CARD-026",
+    "MAP-033",
+    "MAP-054",
+    "NATRO-031",
+    "ADB-002",
+    "QNX-DOWNLOAD-327",
+    "GATE-058",
+    "GATE-060"
+  ],
+  "publishRunId": 45871734121,
+  "publicChannelReceipt": "public-channel-verification.json"
+}
