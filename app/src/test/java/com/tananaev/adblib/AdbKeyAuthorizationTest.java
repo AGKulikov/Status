@@ -11,10 +11,10 @@ import java.util.concurrent.TimeUnit;
 import static org.junit.Assert.*;
 
 public final class AdbKeyAuthorizationTest {
-    private enum Reply { ACCEPT_KEY, REJECT_KEY, NO_AUTH, APPROVE_NEW_KEY }
+    private enum Reply { ACCEPT_KEY, REJECT_KEY, NO_AUTH, INVALID_TOKEN, APPROVE_NEW_KEY }
 
     private static void handshake(Reply reply, boolean interactive) throws Exception {
-        byte[] challenge = new byte[20];
+        byte[] challenge = new byte[reply == Reply.INVALID_TOKEN ? 19 : 20];
         try (ServerSocket server = new ServerSocket(0, 1, InetAddress.getLoopbackAddress());
              Socket client = new Socket(server.getInetAddress(), server.getLocalPort());
              Socket peer = server.accept();
@@ -27,6 +27,7 @@ public final class AdbKeyAuthorizationTest {
                     if (reply != Reply.NO_AUTH) {
                         byte[] token = AdbProtocol.generateAuth(AdbProtocol.AUTH_TYPE_TOKEN, challenge);
                         peer.getOutputStream().write(token);
+                        if (reply == Reply.INVALID_TOKEN) return;
                         AdbProtocol.AdbMessage signed = AdbProtocol.AdbMessage.parseAdbMessage(peer.getInputStream());
                         assertEquals(AdbProtocol.CMD_AUTH, signed.command);
                         assertEquals(AdbProtocol.AUTH_TYPE_SIGNATURE, signed.arg0);
@@ -40,7 +41,7 @@ public final class AdbKeyAuthorizationTest {
                     peer.getOutputStream().write(AdbProtocol.generateConnect());
                 } catch (Exception error) { throw new java.util.concurrent.CompletionException(error); }
             });
-            if (reply == Reply.NO_AUTH || reply == Reply.REJECT_KEY) {
+            if (reply == Reply.NO_AUTH || reply == Reply.INVALID_TOKEN || reply == Reply.REJECT_KEY) {
                 assertThrows(AdbAuthenticationFailedException.class,
                         () -> connection.connectWithKey(5, TimeUnit.SECONDS, !interactive));
             } else {
@@ -50,6 +51,7 @@ public final class AdbKeyAuthorizationTest {
         }
     }
 
+    @Test public void rejectsMalformedChallenge() throws Exception { handshake(Reply.INVALID_TOKEN, false); }
     @Test public void usesPreviouslyApprovedKey() throws Exception { handshake(Reply.ACCEPT_KEY, false); }
     @Test public void backgroundDoesNotEnrollRejectedKey() throws Exception { handshake(Reply.REJECT_KEY, false); }
     @Test public void backgroundRequiresAuthentication() throws Exception { handshake(Reply.NO_AUTH, false); }

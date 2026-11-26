@@ -185,6 +185,11 @@ public class AdbConnection implements Closeable {
                                 byte[] packet;
 
                                 if (msg.arg0 == AdbProtocol.AUTH_TYPE_TOKEN) {
+                                    if (requireSignedChallenge && (msg.arg1 != 0
+                                            || msg.payload == null || msg.payload.length != 20)) {
+                                        authorisationFailed = true;
+                                        throw new AdbAuthenticationFailedException();
+                                    }
                                     /* This is an authentication challenge */
                                     if (conn.sentSignature) {
                                         if (abortOnUnauthorised) {
