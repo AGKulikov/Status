@@ -3191,3 +3191,7 @@ Native wave diagnostics candidate: decision/selection events intercepted at exac
 pinned telemetry/logger entries; journal export independent of boot. APK/FIELD OPEN.
 
 13.11: targeted CI43365616986 PASS. Observer tail-replay rate loss corrected; native reason/online-result hooks checked against pinned Music3. Native body canonical restoration is a packaging gate. Full3.4.8/Music4 APK and ECARX gates remain OPEN until the release report.
+
+### 26.11.2026. SSH для диагностики приборки
+
+В индексе проверенных октябрьских архивов совпали SHA-256 имён /usr/sbin/sshd и /etc/ssh/sshd_config. Индекс подтверждает наличие файлов в образе. Активная служба SSH, ключ сервера, учётная запись и разрешение пересылки на конкретном автомобиле требуют отдельной проверки. В Natro она доступна в разделе «Диагностика → Доступ к QNX». [Подробности](docs/releases/3.5.8/README_RU.md).

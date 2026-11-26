@@ -165,6 +165,8 @@ dependencies {
     // Sprut's current cloud login proves password knowledge with
     // Argon2id -> HKDF-SHA256 -> Ed25519 instead of sending the password.
     implementation libs.bouncycastle
+    implementation "com.github.mwiede:jsch:2.28.8"
+    testImplementation "org.apache.sshd:sshd-core:2.20.1"
     implementation libs.recyclerview
 
     // eCarX AdaptAPI (Geely flavor only) — class-jar converted from the vendor-distributed

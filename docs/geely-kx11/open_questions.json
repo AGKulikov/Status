@@ -1941,7 +1941,7 @@
         "previous_refusal_cause": "unknown"
       },
       "missing_evidence": "Состояние listener/пути в момент отказа; post-reboot успех его не объясняет.",
-      "next_step": "Исправный endpoint повторно не проверять. При повторном отказе сохранить состояние до reboot; не менять firewall и не предлагать произвольное ожидание.",
+      "next_step": "Проверить доверенный отпечаток, вход клиентским ключом и диагностический канал кнопкой «Доступ к QNX» на конкретной приборке.",
       "previous_next_step_20261017": "Выпустить исправление stat parser с новой версией и release gates; затем проверить полный каталог, файлы/mappings/slog2. Выполнена часть SOURCE/TEST/APK3.2.4, FIELD блокируется свежим transport refused.",
       "sources": [
         "research-2026-10-16-qnx/DUMP_324_792651_RU.md",
@@ -1956,7 +1956,7 @@
         "BASE-DIM",
         "PLAT_DISPLAY"
       ],
-      "last_reviewed": "2026-10-17",
+      "last_reviewed": "2026-11-26",
       "history": [
         {
           "date": "2026-10-17",
@@ -2038,6 +2038,12 @@
           "level": "FIELD_ARCHIVE_VERIFIED",
           "finding": "Vehicle2805553.2.9:52payload size/SHA PASS, QNX traversal complete, both Android logs exit0; residual paths/live changes explained. No renderer/hide proof, no historical endpoint-refusal root cause established.",
           "source": "research-2026-10-17-white-bar/FIELD_2053_RU.md"
+        },
+        {
+          "date": "2026-11-26",
+          "status": "SOURCE_TEST_FIELD_OPEN",
+          "finding": "Индекс прежних архивов содержит пути sshd и sshd_config. Наличие работающего SSH и разрешения ключа Natro на KX11 проверяется отдельно.",
+          "source": "../releases/3.5.8/README_RU.md"
         }
       ]
     },

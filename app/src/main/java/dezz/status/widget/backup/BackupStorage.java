@@ -24,6 +24,7 @@ public final class BackupStorage {
         if(this.context.isDeviceProtectedStorage())throw new IllegalStateException("The application default must remain credential-protected");
         addContext("ce",context.getApplicationContext());
         addContext("de",context.createDeviceProtectedStorageContext());
+        excluded.put("ce_no_backup",Collections.singleton("qnx-ssh"));
         excluded.put("de_no_backup",new HashSet<>(Collections.singletonList("natro-backup")));
         File[] external=context.getExternalFilesDirs(null);
         for(int index=0;index<external.length;index++)if(external[index]!=null)roots.put("external_"+index,external[index]);

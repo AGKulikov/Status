@@ -23,6 +23,8 @@ import android.util.Log;
 
 import androidx.annotation.Nullable;
 
+import dezz.status.widget.qnx.QnxSsh;
+import dezz.status.widget.qnx.QnxSshProfile;
 import com.tananaev.adblib.AdbBase64;
 import com.tananaev.adblib.AdbConnection;
 import com.tananaev.adblib.AdbCrypto;
@@ -69,7 +71,10 @@ public class AdbTransport implements ShellTransport {
     private final String host;
     private final int port;
 
-    private AdbTransport(Socket socket, AdbConnection connection, String host, int port) {
+    private final Context appContext;
+
+    private AdbTransport(Context context, Socket socket, AdbConnection connection, String host, int port) {
+        this.appContext = context.getApplicationContext();
         this.socket = socket;
         this.connection = connection;
         this.host = host;
@@ -109,7 +114,7 @@ public class AdbTransport implements ShellTransport {
             if (!connection.connectWithKey(HANDSHAKE_TIMEOUT_MS, TimeUnit.MILLISECONDS, knownKeyOnly)) {
                 throw new IOException("ADB handshake timeout");
             }
-            return new AdbTransport(socket, connection, host, port);
+            return new AdbTransport(context, socket, connection, host, port);
         } catch (Exception e) {
             if (connection != null) {
                 try { connection.close(); } catch (Exception ignored) {}
@@ -256,38 +261,64 @@ public class AdbTransport implements ShellTransport {
         }
     }
 
-    /** Exact existing QNX endpoint, GET-only protocol; shares cancellation with the ADB socket. */
-    public void collectQnx(dezz.status.widget.diagnostics.QnxFileReader.Receiver receiver) throws Exception {
-        // Catalog first: a later unsupported binary or procfs response cannot hide it.
-        qnxStage(reader -> reader.collectInventory(receiver));
-        for (String path : dezz.status.widget.diagnostics.QnxFileReader.TARGETS) {
-            receiver.diagnostic(path, "stage=connect\npath=" + path + "\n");
-            qnxStage(reader -> reader.collectSingle(path, receiver));
+    private QnxSsh openQnx(QnxSshProfile profile) throws Exception {
+        try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 15_000L, "qnx-ssh-auth")) {
+            return QnxSsh.connect(new AdbSshProxy(this::openBounded), profile.user, profile.pin, QnxSshProfile.clientKey());
         }
-        qnxStage(reader -> reader.collectLogs(receiver));
-        qnxStage(reader -> reader.collectProcesses(receiver));
     }
+
+    /** Check the server, the client key and the forwarded service without requesting files. */
+    public void verifyQnx(QnxSshProfile profile) throws Exception {
+        try (QnxSsh ssh = openQnx(profile);
+             AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 15_000L, "qnx-ssh-service");
+             QnxSsh.Forward forward = ssh.openDiagnostics()) {
+            QnxSsh.verifyGreeting(forward.input);
+        }
+    }
+
+    public void collectQnx(dezz.status.widget.diagnostics.QnxFileReader.Receiver receiver) throws Exception {
+        try (QnxSsh ssh = openQnx(QnxSshProfile.load(appContext))) {
+            qnxStage(ssh, reader -> reader.collectInventory(receiver));
+            for (String path : dezz.status.widget.diagnostics.QnxFileReader.TARGETS) {
+                receiver.diagnostic(path, "stage=connect\npath=" + path + "\n");
+                qnxStage(ssh, reader -> reader.collectSingle(path, receiver));
+            }
+            qnxStage(ssh, reader -> reader.collectLogs(receiver));
+            qnxStage(ssh, reader -> reader.collectProcesses(receiver));
+        }
+    }
+
     public void collectQnxFull(dezz.status.widget.diagnostics.QnxFileReader.Receiver receiver) throws Exception {
-        qnxStage(reader -> reader.collectInventory(receiver));
-        qnxStage(reader -> reader.collectTree(receiver));
-        qnxStage(reader -> reader.collectLogs(receiver));
-        qnxStage(reader -> reader.collectProcesses(receiver));
+        try (QnxSsh ssh = openQnx(QnxSshProfile.load(appContext))) {
+            qnxStage(ssh, reader -> reader.collectInventory(receiver));
+            qnxStage(ssh, reader -> reader.collectTree(receiver));
+            qnxStage(ssh, reader -> reader.collectLogs(receiver));
+            qnxStage(ssh, reader -> reader.collectProcesses(receiver));
+        }
     }
+
     private interface QnxStep { void run(dezz.status.widget.diagnostics.QnxFileReader reader) throws Exception; }
-    private void qnxStage(QnxStep step) throws Exception {
+    private void qnxStage(QnxSsh ssh, QnxStep step) throws Exception {
         if (Thread.currentThread().isInterrupted() || socket.isClosed())
             throw new IOException("QNX collection cancelled or ADB disconnected");
-        AdbStream stream = openBounded("shell:toybox nc -w 30 198.18.34.2 8000");
-        try {
+        try (QnxSsh.Forward forward = ssh.openDiagnostics()) {
             step.run(new dezz.status.widget.diagnostics.QnxFileReader(new dezz.status.widget.diagnostics.QnxFileReader.Wire() {
                 public byte[] read() throws Exception {
-                    try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 30_000L, "qnx-read")) { return stream.read(); }
+                    try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 30_000L, "qnx-read")) {
+                        byte[] data = new byte[8192];
+                        int count = forward.input.read(data);
+                        if (count < 0) throw new java.io.EOFException("QNX SSH channel closed");
+                        return java.util.Arrays.copyOf(data, count);
+                    }
                 }
                 public void write(byte[] bytes) throws Exception {
-                    try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 30_000L, "qnx-write")) { stream.write(bytes); }
+                    try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 30_000L, "qnx-write")) {
+                        forward.output.write(bytes);
+                        forward.output.flush();
+                    }
                 }
             }));
-        } finally { try { stream.close(); } catch (Exception ignored) {} }
+        }
     }
 
     public String execLongRunning(String command) throws Exception {

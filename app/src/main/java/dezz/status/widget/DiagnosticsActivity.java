@@ -245,6 +245,9 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
         systemDumpSave.setOnClickListener(view -> confirmDumpToDownloads());
         dumpActions.addView(systemDumpSave, weightedWithMargin(8));
         page.addView(dumpActions, topMargin(8));
+        Button qnxAccess = button("Доступ к QNX");
+        qnxAccess.setOnClickListener(v -> dezz.status.widget.qnx.QnxAccessDialog.show(this));
+        page.addView(qnxAccess, topMargin(8));
         Button vehicleArchive = button("Доскачать QNX и каналы связи");
         vehicleArchive.setOnClickListener(view -> {
             if(systemDumpSession!=null) {
@@ -736,7 +739,7 @@ public final class DiagnosticsActivity extends dezz.status.widget.settings.Setti
                         + "Из существующей папки DLT — перечень и до 2 МиБ последних данных каждого из 4 свежих журналов. "
                         + "Ограничения размера и количества для QNX сняты, общего таймера сбора нет. Нужны свободное место и доступ к встроенному ADB. "
                         + "Сбор можно отменить; зависшее соединение прервётся с сохранением уже полученных данных. Доступный su 0 "
-                        + "проверяется без перезапуска adbd. QNX читается прежним способом через ADB и qconn; "
+                        + "проверяется без перезапуска adbd. для QNX проверяются ключи SSH приборки и Natro; "
                         + "если сервис недоступен, службы и firewall не меняются. Прошивка и настройки не изменяются. "
                         + "Отсутствующие или недоступные файлы будут отмечены. Архив содержит закрытые "
                         + "системные файлы и журналы, которые могут содержать личные данные — передавайте его лично, не публикуйте. Хранятся два последних ZIP "
