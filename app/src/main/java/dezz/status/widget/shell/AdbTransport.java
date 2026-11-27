@@ -151,7 +151,7 @@ public class AdbTransport implements ShellTransport {
      * This implementation reads exactly {@value #ADB_HEADER_LEN} bytes and checks the
      * ADB header invariant {@code magic == command ^ 0xFFFFFFFF}.
      *
-     * @return true iff the peer responded with an ADB RSA challenge header.
+     * @return true iff the peer responded with a valid ADB CNXN or AUTH header.
      */
     public static boolean probe(String host, int port) {
         return probe(host, port, null);
@@ -206,8 +206,12 @@ public class AdbTransport implements ShellTransport {
             int respMagic = rb.getInt();
 
             if (respMagic != (respCommand ^ 0xFFFFFFFF)) return false;
-            // Discovery requires a real authentication challenge. A bare greeting proves no key ownership.
-            return respCommand == ADB_CMD_AUTH && rb.getInt(4) == 1 && rb.getInt(12) == 20;
+            int payloadLength = rb.getInt(12);
+            if (payloadLength < 0 || payloadLength > 4096) return false;
+            if (respCommand == ADB_CMD_AUTH)
+                return rb.getInt(4) == 1 && rb.getInt(8) == 0 && payloadLength == 20;
+            // A daemon configured without AUTH is already ready after CNXN.
+            return respCommand == ADB_CMD_CNXN && rb.getInt(8) > 0;
         } catch (Exception e) {
             return false;
         } finally {
@@ -262,6 +266,7 @@ public class AdbTransport implements ShellTransport {
     }
 
     private QnxSsh openQnx(QnxSshProfile profile) throws Exception {
+        if (profile == null) return null;
         try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 15_000L, "qnx-ssh-auth")) {
             return QnxSsh.connect(new AdbSshProxy(this::openBounded), profile.user, profile.pin, QnxSshProfile.clientKey());
         }
@@ -269,15 +274,13 @@ public class AdbTransport implements ShellTransport {
 
     /** Check the server, the client key and the forwarded service without requesting files. */
     public void verifyQnx(QnxSshProfile profile) throws Exception {
-        try (QnxSsh ssh = openQnx(profile);
-             AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 15_000L, "qnx-ssh-service");
-             QnxSsh.Forward forward = ssh.openDiagnostics()) {
-            QnxSsh.verifyGreeting(forward.input);
+        try (QnxSsh ssh = openQnx(profile)) {
+            qnxStage(ssh, dezz.status.widget.diagnostics.QnxFileReader::verifyGreeting);
         }
     }
 
     public void collectQnx(dezz.status.widget.diagnostics.QnxFileReader.Receiver receiver) throws Exception {
-        try (QnxSsh ssh = openQnx(QnxSshProfile.load(appContext))) {
+        try (QnxSsh ssh = openQnx(QnxSshProfile.loadOptional(appContext))) {
             qnxStage(ssh, reader -> reader.collectInventory(receiver));
             for (String path : dezz.status.widget.diagnostics.QnxFileReader.TARGETS) {
                 receiver.diagnostic(path, "stage=connect\npath=" + path + "\n");
@@ -289,7 +292,7 @@ public class AdbTransport implements ShellTransport {
     }
 
     public void collectQnxFull(dezz.status.widget.diagnostics.QnxFileReader.Receiver receiver) throws Exception {
-        try (QnxSsh ssh = openQnx(QnxSshProfile.load(appContext))) {
+        try (QnxSsh ssh = openQnx(QnxSshProfile.loadOptional(appContext))) {
             qnxStage(ssh, reader -> reader.collectInventory(receiver));
             qnxStage(ssh, reader -> reader.collectTree(receiver));
             qnxStage(ssh, reader -> reader.collectLogs(receiver));
@@ -301,6 +304,25 @@ public class AdbTransport implements ShellTransport {
     private void qnxStage(QnxSsh ssh, QnxStep step) throws Exception {
         if (Thread.currentThread().isInterrupted() || socket.isClosed())
             throw new IOException("QNX collection cancelled or ADB disconnected");
+        if (ssh == null) {
+            // Existing KX11 qconn route. Each stage retains its own cancellable ADB stream.
+            AdbStream stream = openBounded("shell:toybox nc -w 30 198.18.34.2 8000");
+            try {
+                step.run(new dezz.status.widget.diagnostics.QnxFileReader(new dezz.status.widget.diagnostics.QnxFileReader.Wire() {
+                    public byte[] read() throws Exception {
+                        try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 30_000L, "qnx-read")) {
+                            return stream.read();
+                        }
+                    }
+                    public void write(byte[] bytes) throws Exception {
+                        try (AdbOperationDeadline deadline = new AdbOperationDeadline(socket, 30_000L, "qnx-write")) {
+                            stream.write(bytes);
+                        }
+                    }
+                }));
+            } finally { try { stream.close(); } catch (Exception ignored) {} }
+            return;
+        }
         try (QnxSsh.Forward forward = ssh.openDiagnostics()) {
             step.run(new dezz.status.widget.diagnostics.QnxFileReader(new dezz.status.widget.diagnostics.QnxFileReader.Wire() {
                 public byte[] read() throws Exception {

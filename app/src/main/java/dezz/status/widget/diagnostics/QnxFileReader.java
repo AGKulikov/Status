@@ -265,7 +265,8 @@ public final class QnxFileReader {
         long fd=number(f[1],10);if(fd>1000000)throw new IOException("qnx_bad_descriptor");
         return fd;
     }
-    private void handshake() throws Exception {
+    /** Read only the service greeting and negotiation bytes, without requesting files. */
+    public void verifyGreeting() throws Exception {
         String greeting;
         try { greeting=line(); }
         catch(IOException error) {
@@ -283,6 +284,9 @@ public final class QnxFileReader {
         stage="negotiation";
         if(!Arrays.equals(exact(3),new byte[]{(byte)255,(byte)253,34}))
             throw new IOException("qnx_handshake_mismatch");
+    }
+    private void handshake() throws Exception {
+        verifyGreeting();
         stage="service_file";
         send("service file\r\n");if(!reply().equals("OK"))throw new IOException("qnx_service_failed");
     }

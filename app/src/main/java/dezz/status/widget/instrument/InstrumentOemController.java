@@ -217,6 +217,7 @@ public final class InstrumentOemController {
         final boolean[] requested = {false};
         final boolean[] wrote = {false};
         final boolean[] sdkAvailable = {false};
+        final boolean[] modeRead = {false};
         CausalDiagnostics.Span trace = CausalDiagnostics.begin("white-bar", "generation=" + owner
                 + ", attempt=" + whiteAttempt + ", enabled=" + whiteBarEnabled, 7_000);
         trace.run(() -> PrivilegedShell.get(context).runCommand(() -> {
@@ -226,6 +227,7 @@ public final class InstrumentOemController {
             Integer actual = whiteBarEnabled ? InstrumentDisplayLauncher.readDimMode(context) : null;
             sdkAvailable[0] = actual != null && actual >= 1 && actual <= 3;
             modes[1] = actual == null || actual < 1 || actual > 3 ? modes[0] : actual;
+            modeRead[0] = true;
             boolean deny = InstrumentOemPolicy.suppressWhiteBar(whiteBarEnabled, modes[1]);
             trace.stage("mode_resolved", "global_mode=" + modes[0] + ", sdk_mode=" + actual
                     + ", selected_mode=" + modes[1] + ", source=" + (sdkAvailable[0]?"SDK":"Global_fallback")
@@ -243,7 +245,8 @@ public final class InstrumentOemController {
             trace.finish(success ? "readback_matched" : "readback_failed", "generation=" + owner
                     + ", current_generation=" + whiteGeneration + ", global_mode=" + modes[0]
                     + ", selected_mode=" + modes[1] + ", sdk_available=" + sdkAvailable[0]
-                    + ", expected=" + InstrumentOemPolicy.whiteBarAppOp(deny)
+                    + ", mode_read=" + modeRead[0]
+                    + ", expected=" + (modeRead[0] ? InstrumentOemPolicy.whiteBarAppOp(deny) : "unresolved")
                     + ", readback=" + InstrumentOemPolicy.appOpState(output)
                     + ", transport_error=" + (error!=null) + ", wrote=" + wrote[0]
                     + ", window=" + InstrumentPanelActivity.windowState() + ", physical_pixels=unobserved");

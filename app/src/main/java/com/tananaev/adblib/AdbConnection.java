@@ -81,7 +81,7 @@ public class AdbConnection implements Closeable {
      * Specifies whether this connection has already sent a signed token.
      */
     private boolean sentSignature;
-    private boolean requireSignedChallenge;
+    private boolean validateChallenge;
 
     /**
      * A hash map of our open streams indexed by local ID.
@@ -185,7 +185,7 @@ public class AdbConnection implements Closeable {
                                 byte[] packet;
 
                                 if (msg.arg0 == AdbProtocol.AUTH_TYPE_TOKEN) {
-                                    if (requireSignedChallenge && (msg.arg1 != 0
+                                    if (validateChallenge && (msg.arg1 != 0
                                             || msg.payload == null || msg.payload.length != 20)) {
                                         authorisationFailed = true;
                                         throw new AdbAuthenticationFailedException();
@@ -217,10 +217,6 @@ public class AdbConnection implements Closeable {
                                 break;
 
                             case AdbProtocol.CMD_CNXN:
-                                if (requireSignedChallenge && !sentSignature) {
-                                    authorisationFailed = true;
-                                    throw new AdbAuthenticationFailedException();
-                                }
                                 synchronized (conn) {
                                     /* We need to store the max data size */
                                     conn.maxData = msg.arg1;
@@ -280,10 +276,10 @@ public class AdbConnection implements Closeable {
         connect(Long.MAX_VALUE, TimeUnit.MILLISECONDS, false);
     }
 
-    /** Require a signed challenge before exposing streams. Interactive callers may request enrollment. */
+    /** Use the saved key when the server requests AUTH. Interactive callers may request enrollment. */
     public boolean connectWithKey(long timeout, TimeUnit unit, boolean knownKeyOnly)
             throws IOException, InterruptedException {
-        requireSignedChallenge = true;
+        validateChallenge = true;
         return connect(timeout, unit, knownKeyOnly);
     }
 

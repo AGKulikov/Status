@@ -219,11 +219,11 @@ public final class SystemFileDump {
                         manifest.append("graphics:collection\tfailed\t0\t-\n");
                     }
                     final String[] currentPath={"-"};
-                    final StringBuilder qnxDetails=new StringBuilder("endpoint=198.18.34.2:22\ntransport=adb-exec+ssh-publickey\nforward=localhost:8000\n"
+                    final StringBuilder qnxDetails=new StringBuilder("endpoint=198.18.34.2:8000\ntransport=adb\nssh=only_with_saved_profile\n"
                             +"connection_scope=one_file_or_metadata_stage\noverall_deadline_seconds=none\nio_deadline_seconds=30\n");
                     boolean qnxFailed=false;
                     try {
-                        progress.update("Проверка SSH и чтение QNX…");
+                        progress.update("Подключение и чтение QNX…");
                         qnx.collect(new QnxFileReader.Receiver() {
                             private final java.util.Set<String> logs=new java.util.HashSet<>();
                             private final java.util.Set<String> artifacts=new java.util.HashSet<>();

@@ -1,5 +1,5 @@
 {
-  "ledger_sha256": "3fcf9fe77856efb3f7ed868c3f168c590321eea262699ee26335868a96110493",
+  "ledger_sha256": "4fbc9ed4b6bcb0f655f01c1043b86cdc2b882a3217f0dfbbeb0ffc0f7b2bf328",
   "canonical": {
     "FILES-001": {
       "line": 49,
@@ -4808,9 +4808,19 @@
     {
       "key": "S296",
       "start": 6521,
-      "end": 6523,
+      "end": 6524,
       "level": 2,
       "title": "26.11.2026 — публикация пары 3.5.8",
+      "parents": [
+        "S000"
+      ]
+    },
+    {
+      "key": "S297",
+      "start": 6525,
+      "end": 6527,
+      "level": 2,
+      "title": "27.11.2026 — восстановление ADB и QNX после 3.5.8",
       "parents": [
         "S000"
       ]

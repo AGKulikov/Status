@@ -131,8 +131,8 @@ class SystemDumpTest(unittest.TestCase):
         method=transport.split('public void collectQnx(',1)[1].split('public String execLongRunning',1)[0]
         self.assertIn('for (String path : dezz.status.widget.diagnostics.QnxFileReader.TARGETS)',method)
         self.assertIn('reader.collectSingle(path, receiver)',method)
-        self.assertNotIn("toybox nc", method)
-        self.assertEqual(method.count("openQnx(QnxSshProfile.load(appContext))"), 2)
+        self.assertIn("shell:toybox nc -w 30 198.18.34.2 8000", method)
+        self.assertEqual(method.count("openQnx(QnxSshProfile.loadOptional(appContext))"), 2)
         self.assertIn("ssh.openDiagnostics()", method)
         self.assertIn('.collectProcesses(receiver)',method)
         self.assertIn('.collectInventory(receiver)',method)

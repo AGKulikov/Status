@@ -2220,6 +2220,13 @@
       "date": "2026-11-07",
       "scope": "BOOT_MUSIC_NAVIGATOR_338 updated from verified3.4.5 diagnostics; preserve FAILED field evidence.",
       "source": "BOOT_345_FIELD_2026_11_07_RU.md"
+    },
+    {
+      "date": "2026-11-27",
+      "scope": "Natro 3.5.9 ADB/QNX regression",
+      "evidence": "docs/releases/3.5.9/README_RU.md",
+      "status": "SOURCE; KX11 ADB/qconn and white-bar FIELD open",
+      "finding": "3.5.8 rejects direct CNXN and requires an unverified SSH deployment. Correct ADB negotiation and default direct qconn restored in candidate."
     }
   ]
 }

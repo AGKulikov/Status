@@ -18,21 +18,33 @@ public final class QnxAccessDialog {
         form.setOrientation(LinearLayout.VERTICAL);
         int pad = (int)(16 * activity.getResources().getDisplayMetrics().density);
         form.setPadding(pad, pad, pad, pad);
+        CheckBox ssh = new CheckBox(activity);
+        ssh.setText("Использовать настроенный SSH на приборке");
+        form.addView(ssh);
         EditText user = field(activity, form, "Учётная запись SSH на приборке");
         EditText pin = field(activity, form, "Отпечаток ключа приборки (SHA256:…)");
         TextView status = new TextView(activity);
         try {
-            QnxSshProfile previous = QnxSshProfile.load(activity);
-            user.setText(previous.user);
-            pin.setText(previous.pin);
-        } catch (Exception missing) { status.setText(missing.getMessage()); }
+            QnxSshProfile previous = QnxSshProfile.loadOptional(activity);
+            if (previous != null) {
+                ssh.setChecked(true);
+                user.setText(previous.user);
+                pin.setText(previous.pin);
+            }
+        } catch (Exception invalid) { ssh.setChecked(true); status.setText(invalid.getMessage()); }
         Button copy = button(activity, form, "Скопировать открытый ключ Natro");
+        Runnable updateFields = () -> {
+            int visibility = ssh.isChecked() ? android.view.View.VISIBLE : android.view.View.GONE;
+            user.setVisibility(visibility); pin.setVisibility(visibility); copy.setVisibility(visibility);
+        };
+        ssh.setOnCheckedChangeListener((button, checked) -> updateFields.run());
+        updateFields.run();
         Button test = button(activity, form, "Проверить доступ");
         form.addView(status);
         ScrollView scroll = new ScrollView(activity);
         scroll.addView(form);
         AlertDialog dialog = new AlertDialog.Builder(activity).setTitle("Доступ к QNX")
-                .setMessage("Укажите отпечаток из доверенного источника. Учётная запись на приборке должна разрешать открытый ключ этого Natro.")
+                .setMessage("По умолчанию используется диагностическая служба QNX на порту 8000 через ADB. Для настроенного SSH укажите учётную запись и доверенный отпечаток ключа.")
                 .setView(scroll).setPositiveButton("Сохранить", null).setNegativeButton("Закрыть", null).create();
         AdbConsoleSession session = new AdbConsoleSession(activity);
         dialog.setOnDismissListener(ignored -> session.close());
@@ -57,20 +69,24 @@ public final class QnxAccessDialog {
         });
         test.setOnClickListener(v -> {
             try {
-                QnxSshProfile profile = profile(user, pin);
-                test.setEnabled(false); status.setText("Проверка ADB, ключей SSH и диагностической службы…");
+                QnxSshProfile profile = ssh.isChecked() ? profile(user, pin) : null;
+                test.setEnabled(false); status.setText("Проверка выбранного подключения и службы QNX…");
                 session.submit(connection -> {
                     try { connection.connect(); connection.verifyQnx(profile); }
                     finally { connection.disconnect(); }
                 }, error -> activity.runOnUiThread(() -> {
                     if (!dialog.isShowing()) return;
                     test.setEnabled(true);
-                    status.setText(error == null ? "Приборка приняла ключ Natro. Служба диагностики ответила." : error.getMessage());
+                    status.setText(error == null ? "Служба QNX ответила через выбранное подключение." : error.getMessage());
                 }));
             } catch (IllegalArgumentException error) { status.setText(error.getMessage()); }
         });
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-            try { QnxSshProfile.save(activity, profile(user, pin)); dialog.dismiss(); }
+            try {
+                if (ssh.isChecked()) QnxSshProfile.save(activity, profile(user, pin));
+                else QnxSshProfile.useDirect(activity);
+                dialog.dismiss();
+            }
             catch (Exception error) { status.setText(error.getMessage()); }
         });
     }

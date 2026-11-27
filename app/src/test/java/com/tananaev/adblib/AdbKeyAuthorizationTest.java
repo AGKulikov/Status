@@ -41,7 +41,7 @@ public final class AdbKeyAuthorizationTest {
                     peer.getOutputStream().write(AdbProtocol.generateConnect());
                 } catch (Exception error) { throw new java.util.concurrent.CompletionException(error); }
             });
-            if (reply == Reply.NO_AUTH || reply == Reply.INVALID_TOKEN || reply == Reply.REJECT_KEY) {
+            if (reply == Reply.INVALID_TOKEN || reply == Reply.REJECT_KEY) {
                 assertThrows(AdbAuthenticationFailedException.class,
                         () -> connection.connectWithKey(5, TimeUnit.SECONDS, !interactive));
             } else {
@@ -54,7 +54,7 @@ public final class AdbKeyAuthorizationTest {
     @Test public void rejectsMalformedChallenge() throws Exception { handshake(Reply.INVALID_TOKEN, false); }
     @Test public void usesPreviouslyApprovedKey() throws Exception { handshake(Reply.ACCEPT_KEY, false); }
     @Test public void backgroundDoesNotEnrollRejectedKey() throws Exception { handshake(Reply.REJECT_KEY, false); }
-    @Test public void backgroundRequiresAuthentication() throws Exception { handshake(Reply.NO_AUTH, false); }
-    @Test public void consoleAlsoRequiresAuthentication() throws Exception { handshake(Reply.NO_AUTH, true); }
+    @Test public void backgroundAcceptsReadyDaemon() throws Exception { handshake(Reply.NO_AUTH, false); }
+    @Test public void consoleAcceptsReadyDaemon() throws Exception { handshake(Reply.NO_AUTH, true); }
     @Test public void consoleAllowsOwnerToApproveNewKey() throws Exception { handshake(Reply.APPROVE_NEW_KEY, true); }
 }

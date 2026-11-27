@@ -482,14 +482,20 @@ public class PrivilegedShell {
                 liveSockets.add(s);
             });
             if (socketHolder[0] != null) liveSockets.remove(socketHolder[0]);
-            if (!ok) return null;
-            // Discovery only caches an endpoint after Android accepts this application's key.
+            if (!ok) {
+                dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("adb-discovery",
+                        "phase=probe, port=" + port + ", result=unavailable_or_invalid_protocol");
+                return null;
+            }
+            // Discovery caches an endpoint only after a complete ADB handshake.
             try (AdbTransport verified = AdbTransport.connect(appContext, host, port, socket -> {
                 liveSockets.add(socket);
                 socketHolder[0] = socket;
             })) {
                 return new ConnectionStorage.Endpoint(host, port, ConnectionStorage.TRANSPORT_ADB);
             } catch (Exception denied) {
+                dezz.status.widget.diagnostics.DiagnosticJournal.infoAsync("adb-discovery",
+                        "phase=connect, port=" + port + ", error=" + CausalDiagnostics.failure(denied));
                 return null;
             }
         } finally {

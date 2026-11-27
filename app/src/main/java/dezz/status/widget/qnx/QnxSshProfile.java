@@ -18,10 +18,23 @@ public final class QnxSshProfile {
         return new AtomicFile(new File(new File(context.getNoBackupFilesDir(), "qnx-ssh"), "profile"));
     }
     public static synchronized QnxSshProfile load(Context context) throws IOException {
+        QnxSshProfile profile = loadOptional(context);
+        if (profile == null) throw new IOException("Профиль SSH для QNX не настроен.");
+        return profile;
+    }
+    /** Missing profile selects the existing direct qconn route. Invalid profiles remain errors. */
+    public static synchronized QnxSshProfile loadOptional(Context context) throws IOException {
+        AtomicFile profile = file(context);
+        if (!profile.getBaseFile().exists() && !new File(profile.getBaseFile() + ".bak").exists()) return null;
         Properties values = new Properties();
-        try (InputStream input = file(context).openRead()) { values.load(input); }
-        catch (FileNotFoundException empty) { throw new IOException("Откройте «Доступ к QNX» и укажите учётную запись и отпечаток приборки."); }
+        try (InputStream input = profile.openRead()) { values.load(input); }
         return new QnxSshProfile(values.getProperty("user"), values.getProperty("pin"));
+    }
+    public static synchronized void useDirect(Context context) throws IOException {
+        AtomicFile profile = file(context);
+        profile.delete();
+        if (profile.getBaseFile().exists() || new File(profile.getBaseFile() + ".bak").exists())
+            throw new IOException("Не удалось переключить QNX на прямое подключение.");
     }
     public static synchronized void save(Context context, QnxSshProfile profile) throws IOException {
         AtomicFile file = file(context);
