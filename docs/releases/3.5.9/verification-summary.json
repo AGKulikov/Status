@@ -1,0 +1,67 @@
+{
+  "sourceCommit": "269256bcafbb791f8bcb47a044ced39877aa6002",
+  "sourceTree": "b5ac7de53b8560d879e6973dc36e231aae27680b",
+  "buildRunId": 46016682692,
+  "buildRunUrl": "https://github.com/AGKulikov/Status/actions/runs/46016682692",
+  "androidTests": {
+    "tests": 2386,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "pythonTests": {
+    "tests": 323,
+    "failures": 0,
+    "errors": 0
+  },
+  "regressionSuites": [
+    {
+      "name": "dezz.status.widget.qnx.QnxSshTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "dezz.status.widget.qnx.QnxSshProfileTest",
+      "tests": "1",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.tananaev.adblib.AdbKeyAuthorizationTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "dezz.status.widget.shell.AdbOperationDeadlineTest",
+      "tests": "2",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    {
+      "name": "com.tananaev.adblib.AdbDirectConnectionTest",
+      "tests": "6",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  ],
+  "sourceInventoryOwners": 100,
+  "requirementsModules": 24,
+  "canonicalRequirements": 449,
+  "signedSha256": "8d42ec1365c98ea6e0721f08c4db5776a6de97c645c3d3bb9577ee0cf70bb047",
+  "stableSigner": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+  "installOverVersion": "3.5.8",
+  "physicalKx11Verification": "pending",
+  "whiteBarPhysicalVerification": "pending",
+  "navigatorCompatibleVersion": "30.3.0 Natro 3.5.8",
+  "previousFailedRun": {
+    "id": 46016171225,
+    "reason": "Test class was outside package-private ADB parser package; moved before successful build."
+  }
+}

@@ -2227,6 +2227,16 @@
       "evidence": "docs/releases/3.5.9/README_RU.md",
       "status": "SOURCE; KX11 ADB/qconn and white-bar FIELD open",
       "finding": "3.5.8 rejects direct CNXN and requires an unverified SSH deployment. Correct ADB negotiation and default direct qconn restored in candidate."
+    },
+    {
+      "date": "2026-11-27",
+      "scope": "Natro 3.5.9 published recovery",
+      "evidence": "docs/releases/3.5.9/README_RU.md",
+      "status": "SOURCE TEST APK PUBLISH verified; KX11 FIELD open",
+      "sourceCommit": "269256bcafbb791f8bcb47a044ced39877aa6002",
+      "buildRunId": 46016682692,
+      "publishRunId": 46018401632,
+      "finding": "Direct CNXN and default qconn verified in automated tests. Stable-signed update downloaded from public channel. Vehicle connection and white-bar pixels await field verification."
     }
   ]
 }

@@ -1,0 +1,33 @@
+{
+  "checkedAt": "2026-11-27T14:44:29.510979+00:00",
+  "latestUrl": "https://api.github.com/repos/AGKulikov/Status/releases/latest",
+  "latestPageUrl": "https://github.com/AGKulikov/Status/releases/tag/natro-v3.5.9",
+  "updaterUrl": "https://api.github.com/repos/AGKulikov/Status/releases?per_page=100",
+  "releaseUrl": "https://github.com/AGKulikov/Status/releases/tag/natro-v3.5.9",
+  "tag": "natro-v3.5.9",
+  "sourceCommit": "269256bcafbb791f8bcb47a044ced39877aa6002",
+  "publishedAt": "2026-11-27T14:43:42Z",
+  "releaseId": 460720215,
+  "draft": false,
+  "prerelease": false,
+  "targets": {
+    "natro": {
+      "eligibleManifests": 33,
+      "manifestUrl": "https://github.com/AGKulikov/Status/releases/download/natro-v3.5.9/natro-update.json",
+      "manifestSha256": "39776e45dd04404d300939f25d356b7f024209ace4dc452cb6a12c74a7c825cc",
+      "releaseReportUrl": "https://github.com/AGKulikov/Status/releases/download/natro-v3.5.9/release-report.json",
+      "reportSha256": "73db053540bb61496c8e6524eef1165cb5226f659ca806a5360dbe24cc5f4371",
+      "apkUrl": "https://github.com/AGKulikov/Status/releases/download/natro-v3.5.9/Natro-3.5.9-signed.apk",
+      "bytes": 30436082,
+      "sha256": "8d42ec1365c98ea6e0721f08c4db5776a6de97c645c3d3bb9577ee0cf70bb047",
+      "package": "ru.natro.statuswidget",
+      "versionCode": 208021392,
+      "versionName": "3.5.9",
+      "minSdk": 28,
+      "certificateSha256": "6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75",
+      "exactApi28": true,
+      "signatureV2": true,
+      "signatureV3": true
+    }
+  }
+}

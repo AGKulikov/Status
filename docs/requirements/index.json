@@ -1,5 +1,5 @@
 {
-  "ledger_sha256": "4fbc9ed4b6bcb0f655f01c1043b86cdc2b882a3217f0dfbbeb0ffc0f7b2bf328",
+  "ledger_sha256": "07ec54fbe5614951c8ad532aed3de1f89d5af7983a0459216d3e3ad035ce0031",
   "canonical": {
     "FILES-001": {
       "line": 49,
@@ -4818,9 +4818,19 @@
     {
       "key": "S297",
       "start": 6525,
-      "end": 6527,
+      "end": 6529,
       "level": 2,
       "title": "27.11.2026 — восстановление ADB и QNX после 3.5.8",
+      "parents": [
+        "S000"
+      ]
+    },
+    {
+      "key": "S298",
+      "start": 6530,
+      "end": 6536,
+      "level": 2,
+      "title": "27.11.2026 — выпуск Natro 3.5.9 после исправления ADB и QNX",
       "parents": [
         "S000"
       ]
