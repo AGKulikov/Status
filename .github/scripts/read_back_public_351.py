@@ -18,16 +18,19 @@ WEB = 'https://github.com/' + REPO + '/releases'
 REPO_API = 'https://api.github.com/repos/' + REPO
 API = REPO_API + '/releases'
 CERT = '6e9855aedc008bbdd8a7fbf3f490be07f964b7ac658a837a1592647a08365c75'
-VERSION_CODES = {'3.5.1': (208021384, 739564632), '3.5.2': (208021385, 739564633), '3.5.3': (208021386, 739564634), '3.5.4': (208021387, 739564635), '3.5.5': (208021388, 739564636), '3.5.6': (208021389, 739564637), '3.5.7': (208021390, 739564638), '3.5.8': (208021391, 739564639)}
+VERSION_CODES = {'3.5.1': (208021384, 739564632), '3.5.2': (208021385, 739564633), '3.5.3': (208021386, 739564634), '3.5.4': (208021387, 739564635), '3.5.5': (208021388, 739564636), '3.5.6': (208021389, 739564637), '3.5.7': (208021390, 739564638), '3.5.8': (208021391, 739564639), '3.5.9': (208021392, None)}
 
 
 def targets_for(version):
     app_code, navigator_code = VERSION_CODES[version]
-    return {
+    targets = {
         'natro': ('ru.natro.statuswidget', app_code, version, f'Natro-{version}-signed.apk', 'release-report.json', 128),
         'navigator': ('ru.yandex.yandexnavi', navigator_code, '30.3.0 Natro ' + version,
                       f'Navigator-30.3.0-Natro-{version}-signed.apk', 'navigator-release-report.json', 256),
     }
+    if navigator_code is None:
+        del targets['navigator']
+    return targets
 
 
 def require(condition, message):
