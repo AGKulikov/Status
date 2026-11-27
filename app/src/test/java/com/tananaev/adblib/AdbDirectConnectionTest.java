@@ -1,7 +1,7 @@
-package dezz.status.widget.shell;
+package com.tananaev.adblib;
 
 import android.app.Application;
-import com.tananaev.adblib.AdbProtocol;
+import dezz.status.widget.shell.AdbTransport;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
